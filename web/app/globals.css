@@ -1,0 +1,192 @@
+@import "tailwindcss";
+
+/*
+ * Design tokens — v3 ("design.md" redesign).
+ * Raw values live on :root / [data-theme]; Tailwind utilities read them through @theme inline,
+ * so `bg-surface`, `text-ink`, `border-line` etc. switch automatically with the theme.
+ */
+:root,
+[data-theme="light"] {
+  --page: #f9f8f6;
+  --bg: #ffffff;
+  --bgs: #f4f1ec;
+  --sunk: #eeeae3;
+  --text: #0c1754;
+  --muted: #476788;
+  --border: #ede5db;
+  --bstrong: #6e87a3;
+  --primary: #2545ff;
+  --phover: #1a33d1;
+  --psoft: #eaebf8;
+  --onp: #ffffff;
+  --ptext: #2545ff;
+  --info: #1d4ed8;
+  --crit: #b42318;
+  --crit-soft: #fef3f2;
+  --ser: #b54708;
+  --ser-soft: #fff6ed;
+  --mod: #8a6100;
+  --mod-soft: #fef9e7;
+  --min: #476788;
+  --min-soft: #f4f1ec;
+  --ok: #067647;
+  --ok-soft: #ecfdf3;
+  /* Agency white-label colour (client portal only). */
+  --brand: #0f6e5c;
+  --brand-soft: #e7f3f0;
+  --canvas: #efebe4;
+  --scrim: rgba(12, 23, 84, 0.45);
+  --shc: rgba(12, 23, 84, 0.04) 0 4px 5px, rgba(12, 23, 84, 0.03) 0 4px 10px, rgba(12, 23, 84, 0.05) 0 10px 20px;
+  --sh2: rgba(12, 23, 84, 0.04) 0 4px 5px, rgba(12, 23, 84, 0.03) 0 8px 15px, rgba(12, 23, 84, 0.12) 0 15px 30px;
+  --sh3: rgba(12, 23, 84, 0.06) 0 8px 10px, rgba(12, 23, 84, 0.08) 0 20px 40px, rgba(12, 23, 84, 0.18) 0 40px 80px;
+  color-scheme: light;
+}
+
+[data-theme="dark"] {
+  --page: #0b1120;
+  --bg: #111a2b;
+  --bgs: #16223a;
+  --sunk: #0e1626;
+  --text: #e6eaf0;
+  --muted: #a3aec0;
+  --border: #26354f;
+  --bstrong: #6b7a90;
+  --primary: #6ea8ff;
+  --phover: #9cc3ff;
+  --psoft: #1a2347;
+  --onp: #0b1120;
+  --ptext: #8fbbff;
+  --info: #7da2ff;
+  --crit: #ff8a80;
+  --crit-soft: #2a1416;
+  --ser: #fdb022;
+  --ser-soft: #2a1e0d;
+  --mod: #f5d565;
+  --mod-soft: #262110;
+  --min: #a3aec0;
+  --min-soft: #1a2232;
+  --ok: #4ade80;
+  --ok-soft: #0f2419;
+  --brand: #5fd3b8;
+  --brand-soft: #0f2420;
+  --canvas: #05080f;
+  --scrim: rgba(0, 0, 0, 0.6);
+  /* Dark theme: lighter surface + border instead of heavy shadows. */
+  --shc: none;
+  --sh2: 0 0 0 1px #273246;
+  --sh3: 0 0 0 1px #273246;
+  color-scheme: dark;
+}
+
+@theme inline {
+  --color-page: var(--page);
+  --color-surface: var(--bg);
+  --color-subtle: var(--bgs);
+  --color-sunk: var(--sunk);
+  --color-ink: var(--text);
+  --color-muted: var(--muted);
+  --color-line: var(--border);
+  --color-line-strong: var(--bstrong);
+  --color-primary: var(--primary);
+  --color-primary-hover: var(--phover);
+  --color-primary-soft: var(--psoft);
+  --color-on-primary: var(--onp);
+  --color-ptext: var(--ptext);
+  --color-info: var(--info);
+  --color-crit: var(--crit);
+  --color-crit-soft: var(--crit-soft);
+  --color-ser: var(--ser);
+  --color-ser-soft: var(--ser-soft);
+  --color-mod: var(--mod);
+  --color-mod-soft: var(--mod-soft);
+  --color-min: var(--min);
+  --color-min-soft: var(--min-soft);
+  --color-ok: var(--ok);
+  --color-ok-soft: var(--ok-soft);
+  --color-brand: var(--brand);
+  --color-brand-soft: var(--brand-soft);
+  --color-canvas: var(--canvas);
+  --color-scrim: var(--scrim);
+
+  --shadow-card: var(--shc);
+  --shadow-pop: var(--sh2);
+  --shadow-dialog: var(--sh3);
+
+  --font-sans: var(--font-manrope), system-ui, sans-serif;
+  --font-serif: var(--font-instrument-serif), Georgia, serif;
+  --font-mono: var(--font-jetbrains-mono), ui-monospace, monospace;
+}
+
+@layer base {
+  html,
+  body {
+    margin: 0;
+  }
+  body {
+    background: var(--page);
+    color: var(--text);
+    font-family: var(--font-sans);
+    font-size: 16px;
+    line-height: 24px;
+    -webkit-font-smoothing: antialiased;
+  }
+  *:focus-visible {
+    outline: 2px solid var(--primary);
+    outline-offset: 2px;
+  }
+  a {
+    color: var(--ptext);
+    text-underline-offset: 2px;
+  }
+  a:hover {
+    color: var(--phover);
+  }
+  button {
+    font-family: inherit;
+    cursor: pointer;
+  }
+  button:disabled {
+    cursor: default;
+  }
+  /* Serif display headings use italics for emphasis. */
+  .font-serif em {
+    font-style: italic;
+  }
+}
+
+/* Client portal: the agency's white-label colour replaces the product primary (spec 4.2). */
+.portal {
+  --ptext: var(--brand);
+}
+.portal *:focus-visible {
+  outline-color: var(--brand);
+}
+.portal a:hover {
+  color: var(--text);
+}
+
+@utility tnum {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Interactive transitions — 150ms ease-out (spec 4.6). */
+@utility ease-ui {
+  transition-property: color, background-color, border-color, box-shadow, transform;
+  transition-duration: 150ms;
+  transition-timing-function: ease-out;
+}
+
+/* Elements revealed by GSAP start hidden only when JS + motion are available. */
+html.js [data-reveal],
+html.js [data-hero] {
+  visibility: hidden;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition: none !important;
+    animation: none !important;
+  }
+}
