@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="design_doc_mode" content="canvas">
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root,[data-theme="light"]{--ptext:#2545FF;--page:#F9F8F6;--shc:rgba(12,23,84,.04) 0 4px 5px, rgba(12,23,84,.03) 0 4px 10px, rgba(12,23,84,.05) 0 10px 20px;--bg:#FFFFFF;--bgs:#F4F1EC;--sunk:#EEEAE3;--text:#0C1754;--muted:#476788;--border:#EDE5DB;--bstrong:#6E87A3;--primary:#2545FF;--onp:#FFFFFF;--brand:#0F6E5C;--brandS:#E7F3F0;--crit:#B42318;--critS:#FEF3F2;--ser:#B54708;--serS:#FFF6ED;--mod:#8A6100;--modS:#FEF9E7;--ok:#067647;--okS:#ECFDF3;--min:#476788;--minS:#F4F1EC;--canvas:#EFEBE4}
+[data-theme="dark"]{--ptext:#8FBBFF;--page:#0B1120;--shc:none;--bg:#111A2B;--bgs:#16223A;--sunk:#0E1626;--text:#E6EAF0;--muted:#A3AEC0;--border:#26354F;--bstrong:#6B7A90;--primary:#6EA8FF;--onp:#0B1120;--brand:#5FD3B8;--brandS:#0F2420;--crit:#FF8A80;--critS:#2A1416;--ser:#FDB022;--serS:#2A1E0D;--mod:#F5D565;--modS:#262110;--ok:#4ADE80;--okS:#0F2419;--min:#A3AEC0;--minS:#1A2232;--canvas:#05080F}
+html,body{margin:0}body{font-family:'Manrope',system-ui,sans-serif;-webkit-font-smoothing:antialiased}*{box-sizing:border-box}
+*:focus-visible{outline:2px solid var(--brand);outline-offset:2px}a{color:var(--brand)}a:hover{color:var(--text)}button{font-family:inherit}
+</style>
+</helmet>
+<section data-theme="{{ theme }}" style="background:var(--canvas);padding:48px;display:flex;flex-direction:column;gap:24px;font-family:'Manrope',sans-serif;color:var(--text);min-width:max-content">
+  <div style="display:flex;align-items:center;gap:16px"><h2 style="margin:0;font-size:24px;font-weight:600">Client portal · 375 px · branded for Brightline Studio</h2><button onClick="{{ toggleTheme }}" style="height:32px;padding:0 12px;border-radius:100px;border:1px solid var(--bstrong);background:var(--bg);color:var(--text);font-size:14px;font-weight:600;cursor:pointer">{{ themeLabel }}</button></div>
+  <p style="margin:0;max-width:760px;color:var(--muted);font-size:14px">Agency colour (#0F6E5C, 6.2:1 on white) replaces the product primary in the portal only. No rule IDs, selectors or upsells.</p>
+  <div style="display:flex;gap:48px;align-items:flex-start">
+
+    <div style="display:flex;flex-direction:column;gap:12px">
+      <span style="font-weight:600">S-60 Portal home</span>
+      <div data-screen-label="S-60 Portal home" style="width:375px;min-height:812px;background:var(--bg);border-radius:24px;overflow:hidden;display:flex;flex-direction:column;font-size:16px;line-height:24px">
+        <header style="display:flex;align-items:center;gap:10px;padding:16px 20px;border-bottom:1px solid var(--border)"><span style="width:32px;height:32px;border-radius:6px;background:var(--brand);color:var(--bg);display:grid;place-items:center;font-weight:700;font-size:13px">BS</span><span style="flex:1;font-weight:600">Brightline Studio</span><button aria-label="Account menu" style="width:44px;height:44px;border-radius:50%;border:1px solid var(--border);background:var(--bgs);color:var(--text);font-weight:600;font-size:13px">MO</button></header>
+        <main style="padding:24px 20px;display:flex;flex-direction:column;gap:16px;flex:1">
+          <h1 style="margin:0;font-family:'Instrument Serif',Georgia,serif;font-weight:400;font-size:36px;line-height:40px">Hello, <em>Mark</em></h1>
+          <p style="margin:0;color:var(--muted)">Here's how your websites are doing. Brightline checked them on 14 Oct.</p>
+          <h2 style="margin:8px 0 0;font-size:18px;font-weight:600">Your websites</h2>
+          <sc-for list="{{ sites }}" as="s" hint-placeholder-count="2">
+            <a href="#" style="display:flex;flex-direction:column;gap:12px;padding:18px;border:1px solid var(--border);border-radius:16px;background:var(--bg);box-shadow:var(--shc);text-decoration:none;color:var(--text)">
+              <span style="display:flex;justify-content:space-between;gap:12px"><span><strong style="display:block;font-size:17px">{{ s.name }}</strong><span style="font-size:14px;color:var(--muted)">{{ s.url }}</span></span><span style="font-size:28px;line-height:32px;font-weight:700;font-variant-numeric:tabular-nums">{{ s.score }}</span></span>
+              <span style="display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:14px"><span style="padding:2px 10px;border-radius:999px;background:{{ s.ss }};color:{{ s.sc }};font-weight:600">{{ s.status }}</span><span style="color:var(--muted)">{{ s.band }} · checked {{ s.date }}</span></span>
+            </a>
+          </sc-for>
+        </main>
+        <footer style="padding:16px 20px;border-top:1px solid var(--border);font-size:13px;color:var(--muted);display:flex;justify-content:space-between"><a href="#">Contact your agency</a><span>Powered by Plainsight</span></footer>
+      </div>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:12px">
+      <span style="font-weight:600">S-61 Portal site view</span>
+      <div data-screen-label="S-61 Portal site" style="width:375px;background:var(--bg);border-radius:24px;overflow:hidden;display:flex;flex-direction:column;font-size:16px;line-height:24px">
+        <header style="display:flex;align-items:center;gap:8px;padding:12px 12px 12px 8px;border-bottom:1px solid var(--border)"><a href="#" style="height:44px;padding:0 12px;display:flex;align-items:center;gap:4px;font-weight:600;text-decoration:none">‹ Your websites</a></header>
+        <main style="padding:24px 20px;display:flex;flex-direction:column;gap:24px">
+          <div><h1 style="margin:0;font-family:'Instrument Serif',Georgia,serif;font-weight:400;font-size:36px;line-height:40px">Oakhaus Furniture</h1><span style="font-size:14px;color:var(--muted)">oakhaus.com · checked 14 Oct</span></div>
+          <section style="padding:20px;border-radius:12px;background:var(--brandS);display:flex;flex-direction:column;gap:8px">
+            <span style="display:flex;justify-content:space-between;align-items:center"><span style="font-size:14px;font-weight:600">Automated check score</span><button onClick="{{ toggleWhat }}" aria-expanded="{{ whatOpen }}" style="height:44px;padding:0 4px;border:0;background:transparent;color:var(--brand);font-size:14px;font-weight:600;cursor:pointer;text-decoration:underline">What this means</button></span>
+            <span style="display:flex;align-items:baseline;gap:10px"><span style="font-size:40px;line-height:44px;font-weight:700;font-variant-numeric:tabular-nums">78</span><span style="padding:2px 8px;border-radius:4px;background:var(--modS);color:var(--mod);font-size:14px;font-weight:600">Needs work</span></span>
+            <span style="font-size:15px;font-weight:500;color:var(--ok)">Improving — up 17 since August</span>
+            <sc-if value="{{ whatOpen }}" hint-placeholder-val="{{ false }}"><p role="status" style="margin:4px 0 0;font-size:14px;line-height:20px">The score counts problems automated tests can find. It is not a legal rating. Brightline also tests things a computer can't, like keyboard use.</p></sc-if>
+          </section>
+          <section style="display:flex;flex-direction:column;gap:12px">
+            <h2 style="margin:0;font-size:18px;font-weight:600">Last 6 months</h2>
+            <p style="margin:0;font-size:14px;line-height:20px;color:var(--muted)">Steady progress: 61 in May to 78 in October.</p>
+            <div style="display:flex;align-items:flex-end;gap:10px;height:140px;padding:0 4px;border-bottom:1px solid var(--border)">
+              <sc-for list="{{ months }}" as="m" hint-placeholder-count="6">
+                <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;height:100%;justify-content:flex-end"><span style="font-size:13px;font-weight:600;font-variant-numeric:tabular-nums">{{ m.v }}</span><span style="width:100%;height:{{ m.h }};background:var(--brand);border-radius:4px 4px 0 0;display:block"></span></div>
+              </sc-for>
+            </div>
+            <div style="display:flex;gap:10px;padding:0 4px"><sc-for list="{{ months }}" as="m" hint-placeholder-count="6"><span style="flex:1;text-align:center;font-size:12px;color:var(--muted)">{{ m.l }}</span></sc-for></div>
+            <button onClick="{{ toggleTable }}" style="align-self:flex-start;height:44px;padding:0 16px;border-radius:100px;border:1px solid var(--bstrong);background:var(--bg);color:var(--text);font-size:14px;font-weight:600;cursor:pointer">{{ tableLabel }}</button>
+            <sc-if value="{{ tableOpen }}" hint-placeholder-val="{{ false }}"><table style="border-collapse:collapse;font-size:14px;width:100%"><thead><tr style="background:var(--bgs);text-align:left"><th scope="col" style="padding:8px">Month</th><th scope="col" style="padding:8px">Score</th></tr></thead><tbody><sc-for list="{{ months }}" as="m" hint-placeholder-count="6"><tr style="border-bottom:1px solid var(--border)"><td style="padding:8px">{{ m.l }}</td><td style="padding:8px">{{ m.v }}</td></tr></sc-for></tbody></table></sc-if>
+          </section>
+          <section style="display:flex;flex-direction:column;gap:8px">
+            <h2 style="margin:0;font-size:18px;font-weight:600">Still open</h2>
+            <sc-for list="{{ open }}" as="o" hint-placeholder-count="4"><div style="display:flex;gap:10px;align-items:flex-start;padding:10px 0;border-bottom:1px solid var(--border);font-size:15px;line-height:22px"><span style="flex:0 0 auto;padding:0 8px;border-radius:4px;background:{{ o.s }};color:{{ o.c }};font-size:13px;font-weight:600;line-height:22px">{{ o.n }} {{ o.label }}</span><span>{{ o.t }}</span></div></sc-for>
+          </section>
+          <section style="display:flex;flex-direction:column;gap:8px">
+            <h2 style="margin:0;font-size:18px;font-weight:600">Recently fixed by your team</h2>
+            <ul style="margin:0;padding-left:20px;font-size:15px;line-height:22px;display:flex;flex-direction:column;gap:6px"><li>Pages now have clear titles · 12 Oct</li><li>Checkout errors are announced · 12 Oct</li><li>Cart text is easier to read · 7 Oct</li></ul>
+          </section>
+          <section style="padding:16px;border-radius:12px;border:1px solid var(--border);display:flex;flex-direction:column;gap:6px">
+            <h2 style="margin:0;font-size:16px;font-weight:600">Note from Daniel at Brightline</h2>
+            <p style="margin:0;font-size:15px;line-height:22px">A theme update on 13 Oct removed some product photo descriptions. We're restoring them this week.</p>
+            <span style="font-size:13px;color:var(--muted)">14 Oct</span>
+          </section>
+          <div style="display:flex;flex-direction:column;gap:12px">
+            <a href="#" style="height:48px;border-radius:100px;border:1px solid var(--bstrong);color:var(--text);font-weight:600;text-decoration:none;display:grid;place-items:center">Download October report (PDF)</a>
+            <a href="#" style="height:48px;border-radius:100px;border:1px solid var(--bstrong);color:var(--text);font-weight:600;text-decoration:none;display:grid;place-items:center">Download evidence pack</a>
+            <a href="#" style="height:48px;border-radius:100px;background:var(--brand);color:var(--bg);font-weight:600;text-decoration:none;display:grid;place-items:center">Contact Brightline Studio</a>
+          </div>
+        </main>
+      </div>
+    </div>
+  </div>
+</section>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;theme&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;light&quot;,&quot;dark&quot;],&quot;default&quot;:&quot;light&quot;,&quot;tsType&quot;:&quot;'light'|'dark'&quot;}}">
+class Component extends DCLogic {
+  state={theme:null,whatOpen:false,tableOpen:false};
+  renderVals(){
+    const s=this.state,th=s.theme||this.props.theme||'light';
+    const M=[['May',61],['Jun',63],['Jul',66],['Aug',68],['Sep',72],['Oct',78]];
+    return {
+      theme:th,themeLabel:th==='dark'?'Light theme':'Dark theme',toggleTheme:()=>this.setState({theme:th==='dark'?'light':'dark'}),
+      sites:[{name:'Oakhaus Furniture',url:'oakhaus.com',score:78,band:'Needs work',date:'14 Oct',status:'Improving',ss:'var(--okS)',sc:'var(--ok)'},{name:'Oakhaus Trade',url:'trade.oakhaus.com',score:66,band:'Poor',date:'14 Oct',status:'Needs attention',ss:'var(--serS)',sc:'var(--ser)'}],
+      whatOpen:s.whatOpen,toggleWhat:()=>this.setState({whatOpen:!s.whatOpen}),
+      tableOpen:s.tableOpen,tableLabel:s.tableOpen?'Hide table':'View as table',toggleTable:()=>this.setState({tableOpen:!s.tableOpen}),
+      months:M.map(m=>({l:m[0],v:m[1],h:(m[1]-40)*1.6+'px'})),
+      open:[['Critical','crit',3,'Some people can’t use product photos, the cart button or the newsletter form.'],['Serious','ser',4,'Some text is hard to read and zoom is blocked on phones.'],['Moderate','mod',2,'Page structure is confusing in places.'],['Minor','min',2,'Small fixes on the blog and contact page.']].map(o=>({label:o[0],c:`var(--${o[1]})`,s:`var(--${o[1]}S)`,n:o[2],t:o[3]}))
+    };
+  }
+}
+</script>
+</body>
+</html>

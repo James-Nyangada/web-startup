@@ -1,0 +1,711 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Manrope:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root,[data-theme="light"]{--ptext:#2545FF;--page:#F9F8F6;--shc:rgba(12,23,84,.04) 0 4px 5px, rgba(12,23,84,.03) 0 4px 10px, rgba(12,23,84,.05) 0 10px 20px;--bg:#FFFFFF;--bgs:#F4F1EC;--sunk:#EEEAE3;--text:#0C1754;--muted:#476788;--border:#EDE5DB;--bstrong:#6E87A3;--primary:#2545FF;--phover:#1A33D1;--psoft:#EAEBF8;--onp:#FFFFFF;--info:#1D4ED8;--crit:#B42318;--critS:#FEF3F2;--ser:#B54708;--serS:#FFF6ED;--mod:#8A6100;--modS:#FEF9E7;--min:#476788;--minS:#F4F1EC;--ok:#067647;--okS:#ECFDF3;--sh2:rgba(12,23,84,.04) 0 4px 5px, rgba(12,23,84,.03) 0 8px 15px, rgba(12,23,84,.12) 0 15px 30px;--sh3:rgba(12,23,84,.06) 0 8px 10px, rgba(12,23,84,.08) 0 20px 40px, rgba(12,23,84,.18) 0 40px 80px;--scrim:rgba(12,23,84,.45)}
+[data-theme="dark"]{--ptext:#8FBBFF;--page:#0B1120;--shc:none;--bg:#111A2B;--bgs:#16223A;--sunk:#0E1626;--text:#E6EAF0;--muted:#A3AEC0;--border:#26354F;--bstrong:#6B7A90;--primary:#6EA8FF;--phover:#9CC3FF;--psoft:#1A2347;--onp:#0B1120;--info:#7DA2FF;--crit:#FF8A80;--critS:#2A1416;--ser:#FDB022;--serS:#2A1E0D;--mod:#F5D565;--modS:#262110;--min:#A3AEC0;--minS:#1A2232;--ok:#4ADE80;--okS:#0F2419;--sh2:0 0 0 1px #273246;--sh3:0 0 0 1px #273246;--scrim:rgba(0,0,0,.6)}
+html,body{margin:0;padding:0}
+body{font-family:'Manrope',system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+*{box-sizing:border-box}
+*:focus-visible{outline:2px solid var(--primary);outline-offset:2px}
+a{color:var(--ptext);text-underline-offset:2px}
+a:hover{color:var(--phover)}
+button{font-family:inherit}
+@media (prefers-reduced-motion:reduce){*{transition:none !important}}
+</style>
+</helmet>
+<div data-theme="{{ theme }}" style="min-height:100vh;display:flex;flex-wrap:wrap;background:var(--page);color:var(--text);font-family:'Manrope',system-ui,sans-serif;font-size:16px;line-height:24px">
+
+  <nav aria-label="Main" style="flex:0 0 248px;background:var(--bgs);border-right:1px solid var(--border);display:flex;flex-direction:column;padding:16px 12px;gap:4px;min-height:100vh">
+    <button style="display:flex;align-items:center;gap:12px;padding:8px;border-radius:100px;border:1px solid var(--border);background:var(--bg);color:var(--text);text-align:left;cursor:pointer;margin-bottom:16px" aria-label="Switch organisation. Current: Brightline Studio">
+      <span style="width:32px;height:32px;border-radius:6px;background:var(--primary);color:var(--onp);display:grid;place-items:center;font-weight:700;font-size:13px">BS</span>
+      <span style="display:flex;flex-direction:column;flex:1;min-width:0">
+        <span style="font-size:14px;line-height:20px;font-weight:600">Brightline Studio</span>
+        <span style="font-size:12px;line-height:16px;color:var(--muted)">Agency · 18 sites</span>
+      </span>
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 15l5 5l5-5M7 9l5-5l5 5"></path></svg>
+    </button>
+    <a href="#" style="padding:8px 14px;border-radius:100px;color:var(--text);text-decoration:none;font-size:14px;line-height:20px;font-weight:500">Overview</a>
+    <a href="#" aria-current="page" style="padding:8px 14px;border-radius:100px;color:var(--ptext);background:var(--psoft);text-decoration:none;font-size:14px;line-height:20px;font-weight:600">Sites</a>
+    <a href="#" style="padding:8px 14px;border-radius:100px;color:var(--text);text-decoration:none;font-size:14px;line-height:20px;font-weight:500;display:flex;justify-content:space-between">My tasks<span style="font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums">4</span></a>
+    <a href="#" style="padding:8px 14px;border-radius:100px;color:var(--text);text-decoration:none;font-size:14px;line-height:20px;font-weight:500">Reports</a>
+    <div style="height:1px;background:var(--border);margin:12px 4px"></div>
+    <a href="#" style="padding:8px 14px;border-radius:100px;color:var(--text);text-decoration:none;font-size:14px;line-height:20px;font-weight:500">Settings</a>
+    <a href="#" style="padding:8px 14px;border-radius:100px;color:var(--text);text-decoration:none;font-size:14px;line-height:20px;font-weight:500">Help &amp; docs</a>
+    <div style="flex:1"></div>
+    <button style="display:flex;align-items:center;gap:12px;padding:8px;border-radius:100px;border:0;background:transparent;color:var(--text);text-align:left;cursor:pointer" aria-label="Account menu: Daniel Mwangi">
+      <span style="width:32px;height:32px;border-radius:50%;background:var(--sunk);color:var(--text);display:grid;place-items:center;font-weight:600;font-size:12px;border:1px solid var(--border)">DM</span>
+      <span style="display:flex;flex-direction:column">
+        <span style="font-size:14px;line-height:20px;font-weight:500">Daniel Mwangi</span>
+        <span style="font-size:12px;line-height:16px;color:var(--muted)">Owner</span>
+      </span>
+    </button>
+  </nav>
+
+  <div style="flex:1 1 640px;min-width:0;display:flex;flex-direction:column">
+    <header style="height:64px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:16px;padding:0 32px">
+      <nav aria-label="Breadcrumb" style="flex:1;min-width:0">
+        <ol style="list-style:none;margin:0;padding:0;display:flex;gap:8px;font-size:14px;line-height:20px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">
+          <li><a href="#" style="color:var(--muted)">Sites</a></li>
+          <li aria-hidden="true">/</li>
+          <li><a href="#" style="color:var(--muted)">Oakhaus Furniture</a></li>
+          <li aria-hidden="true">/</li>
+          <li aria-current="page" style="color:var(--text);font-weight:500">{{ tabLabel }}</li>
+        </ol>
+      </nav>
+      <button style="display:flex;align-items:center;gap:12px;height:36px;padding:0 8px 0 12px;border:1px solid var(--bstrong);border-radius:8px;background:var(--bg);color:var(--muted);font-size:14px;cursor:pointer;min-width:260px">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><path d="M11 4a7 7 0 1 0 0 14a7 7 0 1 0 0-14z M20 20l-3.5-3.5"></path></svg>
+        <span style="flex:1;text-align:left">Search or jump to…</span>
+        <kbd style="font-family:'JetBrains Mono',monospace;font-size:12px;padding:0 6px;border:1px solid var(--border);border-radius:4px;background:var(--bgs);color:var(--muted)">Ctrl K</kbd>
+      </button>
+      <button onClick="{{ toggleTheme }}" aria-label="{{ themeLabel }}" title="{{ themeLabel }}" style="width:36px;height:36px;border-radius:100px;border:1px solid var(--border);background:var(--bg);color:var(--text);display:grid;place-items:center;cursor:pointer">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="{{ themeIcon }}"></path></svg>
+      </button>
+      <button aria-label="Notifications, 3 unread" style="position:relative;width:36px;height:36px;border-radius:100px;border:1px solid var(--border);background:var(--bg);color:var(--text);display:grid;place-items:center;cursor:pointer">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9 M10.3 21a1.94 1.94 0 0 0 3.4 0"></path></svg>
+        <span aria-hidden="true" style="position:absolute;top:-6px;right:-6px;min-width:18px;height:18px;padding:0 5px;border-radius:9px;background:var(--crit);color:var(--bg);font-size:11px;line-height:18px;font-weight:700">3</span>
+      </button>
+    </header>
+
+    <main style="flex:1;padding:32px 32px 64px;width:100%;max-width:1344px;margin:0 auto">
+      <div style="display:flex;flex-wrap:wrap;align-items:flex-start;gap:16px 24px;justify-content:space-between">
+        <div style="display:flex;flex-direction:column;gap:8px;min-width:0">
+          <h1 style="margin:0;font-family:'Instrument Serif',Georgia,serif;font-weight:400;font-size:42px;line-height:46px">Oakhaus Furniture</h1>
+          <div style="display:flex;flex-wrap:wrap;align-items:center;gap:8px 16px;font-size:14px;line-height:20px;color:var(--muted)">
+            <a href="#" style="display:inline-flex;align-items:center;gap:4px">oakhaus.com<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 3h6v6 M10 14L21 3 M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path></svg><span style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)">(opens in new tab)</span></a>
+            <span>Shopify</span>
+            <span>Client: Mark Otieno</span>
+            <span style="display:inline-flex;align-items:center;gap:4px;color:var(--ok);font-weight:500"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12a10 10 0 1 0 20 0a10 10 0 1 0-20 0 M9 12l2 2l4-4"></path></svg>Verified</span>
+            <span>Last scan 14 Oct, 09:12</span>
+          </div>
+        </div>
+        <div style="display:flex;gap:12px;align-items:center">
+          <button style="height:40px;padding:0 16px;border-radius:100px;border:1px solid var(--bstrong);background:var(--bg);color:var(--text);font-size:14px;font-weight:600;cursor:pointer">Download report</button>
+          <button style="height:40px;padding:0 16px;border-radius:100px;border:0;background:var(--primary);color:var(--onp);font-size:14px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:8px" style-hover="background:var(--phover)">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-3-6.7L21 8 M21 3v5h-5"></path></svg>Scan now</button>
+        </div>
+      </div>
+
+      <div role="tablist" aria-label="Site sections" style="display:flex;gap:4px;border-bottom:1px solid var(--border);margin:24px 0 32px;overflow-x:auto">
+        <sc-for list="{{ tabs }}" as="t" hint-placeholder-count="9">
+          <button role="tab" aria-selected="{{ t.active }}" onClick="{{ t.onClick }}" style="flex:0 0 auto;padding:10px 12px;border:0;background:transparent;color:{{ t.color }};font-size:14px;line-height:20px;font-weight:{{ t.weight }};cursor:pointer;box-shadow:{{ t.bar }}">{{ t.label }}</button>
+        </sc-for>
+      </div>
+
+      <sc-if value="{{ isOverview }}" hint-placeholder-val="{{ true }}">
+        <div style="display:flex;flex-direction:column;gap:24px">
+          <section aria-labelledby="h-score" style="border:1px solid var(--border);border-radius:16px;background:var(--bg);box-shadow:var(--shc);padding:24px;display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:24px 40px;align-items:start">
+            <div style="display:flex;flex-direction:column;gap:8px;position:relative">
+              <div style="display:flex;align-items:center;gap:6px">
+                <h2 id="h-score" style="margin:0;font-size:14px;line-height:20px;font-weight:600;color:var(--muted)">Automated check score</h2>
+                <button onClick="{{ toggleInfo }}" aria-expanded="{{ infoOpen }}" aria-label="About the automated check score" style="width:24px;height:24px;border-radius:50%;border:0;background:transparent;color:var(--muted);display:grid;place-items:center;cursor:pointer">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><path d="M2 12a10 10 0 1 0 20 0a10 10 0 1 0-20 0 M12 16v-4 M12 8h.01"></path></svg>
+                </button>
+              </div>
+              <sc-if value="{{ infoOpen }}" hint-placeholder-val="{{ false }}">
+                <div role="status" style="position:absolute;top:32px;left:0;z-index:5;width:320px;padding:16px;border-radius:8px;background:var(--bg);border:1px solid var(--border);box-shadow:var(--sh2);font-size:14px;line-height:20px">
+                  This score reflects only what automated tests can detect on the 142 pages we checked — usually around a third of accessibility problems. It is not a compliance rating. <a href="#">What automated tests can't check</a>
+                </div>
+              </sc-if>
+              <div style="display:flex;align-items:baseline;gap:12px">
+                <span style="font-size:40px;line-height:44px;font-weight:700;font-variant-numeric:tabular-nums;letter-spacing:-0.02em">78</span>
+                <span style="font-size:16px;color:var(--muted)">/ 100</span>
+                <span style="padding:2px 8px;border-radius:4px;background:var(--modS);color:var(--mod);font-size:14px;line-height:20px;font-weight:600">Needs work</span>
+              </div>
+              <span style="display:inline-flex;align-items:center;gap:4px;font-size:14px;line-height:20px;color:var(--ok);font-weight:500"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17L17 7 M8 7h9v9"></path></svg>Up 6 since last scan</span>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:12px">
+              <h2 style="margin:0;font-size:14px;line-height:20px;font-weight:600;color:var(--muted)">Open problems by severity</h2>
+              <ul style="list-style:none;margin:0;padding:0;display:grid;grid-template-columns:1fr 1fr;gap:8px">
+                <sc-for list="{{ sevCounts }}" as="s" hint-placeholder-count="4">
+                  <li title="{{ s.tip }}" style="display:flex;align-items:center;gap:8px;padding:8px 14px;border-radius:100px;background:{{ s.bg }};color:{{ s.c }}">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="{{ s.d }}"></path></svg>
+                    <span style="font-size:14px;font-weight:600;flex:1">{{ s.label }}</span>
+                    <span style="font-size:18px;font-weight:700;font-variant-numeric:tabular-nums">{{ s.count }}</span>
+                  </li>
+                </sc-for>
+              </ul>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:12px">
+              <h2 style="margin:0;font-size:14px;line-height:20px;font-weight:600;color:var(--muted)">Since 12 Oct</h2>
+              <div style="display:flex;flex-direction:column;gap:8px;font-size:16px">
+                <a href="#" onClick="{{ goIssues }}" style="display:flex;justify-content:space-between;text-decoration:none;color:var(--text);padding:6px 0;border-bottom:1px solid var(--border)"><span>New problems</span><strong style="font-variant-numeric:tabular-nums">+3</strong></a>
+                <a href="#" onClick="{{ goIssues }}" style="display:flex;justify-content:space-between;text-decoration:none;color:var(--text);padding:6px 0;border-bottom:1px solid var(--border)"><span>Fixed</span><strong style="font-variant-numeric:tabular-nums;color:var(--ok)">{{ fixedCount }}</strong></a>
+                <a href="#" onClick="{{ goIssues }}" style="display:flex;justify-content:space-between;text-decoration:none;color:var(--text);padding:6px 0"><span style="display:inline-flex;align-items:center;gap:6px"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 9-9a9.75 9.75 0 0 0-6.74 2.74L3 8 M3 3v5h5"></path></svg>Came back (regressed)</span><strong style="font-variant-numeric:tabular-nums">{{ regressedCount }}</strong></a>
+              </div>
+            </div>
+          </section>
+
+          <section aria-labelledby="h-trend" style="border:1px solid var(--border);border-radius:16px;background:var(--bg);box-shadow:var(--shc);padding:24px;display:flex;flex-direction:column;gap:16px">
+            <div style="display:flex;flex-wrap:wrap;justify-content:space-between;gap:12px;align-items:flex-start">
+              <div style="display:flex;flex-direction:column;gap:4px">
+                <h2 id="h-trend" style="margin:0;font-size:20px;line-height:28px;font-weight:600">Score over the last 12 scans</h2>
+                <p style="margin:0;font-size:14px;line-height:20px;color:var(--muted);text-wrap:pretty">Up from 61 to 78 since 5 Aug. Open problems fell from 24 to 11. The 2 Sep scan was partial.</p>
+              </div>
+              <button onClick="{{ toggleChartTable }}" aria-pressed="{{ chartTable }}" style="height:32px;padding:0 12px;border-radius:100px;border:1px solid var(--bstrong);background:var(--bg);color:var(--text);font-size:14px;font-weight:500;cursor:pointer">{{ chartToggleLabel }}</button>
+            </div>
+            <sc-if value="{{ chartVisible }}" hint-placeholder-val="{{ true }}">
+              <div style="width:100%;min-height:200px">{{ chart }}</div>
+              <div style="display:flex;gap:20px;font-size:12px;line-height:16px;color:var(--muted)">
+                <span style="display:inline-flex;align-items:center;gap:6px"><span style="width:10px;height:10px;border-radius:50%;background:var(--primary)"></span>Full scan</span>
+                <span style="display:inline-flex;align-items:center;gap:6px"><span style="width:10px;height:10px;border-radius:50%;border:2px solid var(--primary)"></span>Partial scan (some pages failed)</span>
+                <span>Use Tab to move between points</span>
+              </div>
+            </sc-if>
+            <sc-if value="{{ chartTable }}" hint-placeholder-val="{{ false }}">
+              <table style="width:100%;border-collapse:collapse;font-size:14px;line-height:20px;font-variant-numeric:tabular-nums">
+                <thead><tr style="background:var(--bgs);text-align:left"><th scope="col" style="padding:8px 12px;font-weight:600">Scan date</th><th scope="col" style="padding:8px 12px;font-weight:600">Score</th><th scope="col" style="padding:8px 12px;font-weight:600">Open problems</th><th scope="col" style="padding:8px 12px;font-weight:600">Note</th></tr></thead>
+                <tbody>
+                  <sc-for list="{{ trend }}" as="r" hint-placeholder-count="12">
+                    <tr style="border-bottom:1px solid var(--border)"><td style="padding:8px 12px">{{ r.d }}</td><td style="padding:8px 12px">{{ r.v }}</td><td style="padding:8px 12px">{{ r.o }}</td><td style="padding:8px 12px;color:var(--muted)">{{ r.note }}</td></tr>
+                  </sc-for>
+                </tbody>
+              </table>
+            </sc-if>
+          </section>
+
+          <section aria-labelledby="h-first" style="border:1px solid var(--border);border-radius:16px;background:var(--bg);box-shadow:var(--shc);overflow:hidden">
+            <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;padding:20px 24px">
+              <div style="display:flex;flex-direction:column;gap:4px">
+                <h2 id="h-first" style="margin:0;font-size:20px;line-height:28px;font-weight:600">Fix these first</h2>
+                <p style="margin:0;font-size:14px;line-height:20px;color:var(--muted)">Ranked by how badly they block people, times how often they happen.</p>
+              </div>
+              <a href="#" onClick="{{ goIssues }}" style="font-size:14px;font-weight:600;white-space:nowrap">See all issues</a>
+            </div>
+            <ul style="list-style:none;margin:0;padding:0">
+              <sc-for list="{{ topIssues }}" as="item" hint-placeholder-count="5">
+                <li style="border-top:1px solid var(--border)">
+                  <button onClick="{{ item.open }}" aria-label="{{ item.openLabel }}" style="width:100%;display:grid;grid-template-columns:120px minmax(0,1fr) auto auto;gap:16px;align-items:center;padding:14px 24px;border:0;background:transparent;color:var(--text);text-align:left;cursor:pointer" style-hover="background:var(--bgs)">
+                    <span style="display:inline-flex;align-items:center;gap:4px;justify-self:start;padding:2px 8px;border-radius:4px;background:{{ item.ss }};color:{{ item.sc }};font-size:13px;font-weight:600;line-height:20px"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="{{ item.sd }}"></path></svg>{{ item.sl }}</span>
+                    <span style="display:flex;flex-direction:column;min-width:0">
+                      <span style="font-size:16px;line-height:24px;font-weight:500">{{ item.title }}</span>
+                      <span style="font-size:14px;line-height:20px;color:var(--muted)">{{ item.template }} · <span style="font-family:'JetBrains Mono',monospace;font-size:13px">{{ item.rule }}</span></span>
+                    </span>
+                    <span style="display:flex;gap:8px;align-items:center">
+                      <sc-if value="{{ item.isRegressed }}" hint-placeholder-val="{{ false }}"><span style="display:inline-flex;align-items:center;gap:4px;padding:1px 8px;border-radius:4px;border:1px solid var(--bstrong);font-size:13px;font-weight:500;line-height:20px"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 9-9a9.75 9.75 0 0 0-6.74 2.74L3 8 M3 3v5h5"></path></svg>Regressed</span></sc-if>
+                    </span>
+                    <span style="font-size:14px;color:var(--muted);font-variant-numeric:tabular-nums;white-space:nowrap;min-width:110px;text-align:right">{{ item.occLabel }}</span>
+                  </button>
+                </li>
+              </sc-for>
+            </ul>
+          </section>
+
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:24px">
+            <section aria-labelledby="h-fixed" style="border:1px solid var(--border);border-radius:16px;background:var(--bg);box-shadow:var(--shc);padding:24px;display:flex;flex-direction:column;gap:12px">
+              <h2 id="h-fixed" style="margin:0;font-size:20px;line-height:28px;font-weight:600">Recently fixed</h2>
+              <ul style="list-style:none;margin:0;padding:0;display:flex;flex-direction:column">
+                <sc-for list="{{ recentlyFixed }}" as="f" hint-placeholder-count="5">
+                  <li style="display:flex;gap:10px;align-items:flex-start;padding:10px 0;border-bottom:1px solid var(--border);font-size:14px;line-height:20px">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--ok)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex:0 0 auto;margin-top:1px"><path d="M2 12a10 10 0 1 0 20 0a10 10 0 1 0-20 0 M9 12l2 2l4-4"></path></svg>
+                    <span style="flex:1">{{ f.title }}</span>
+                    <span style="color:var(--muted);white-space:nowrap">{{ f.date }}</span>
+                  </li>
+                </sc-for>
+              </ul>
+            </section>
+            <section aria-labelledby="h-cov" style="border:1px solid var(--border);border-radius:16px;background:var(--bg);box-shadow:var(--shc);padding:24px;display:flex;flex-direction:column;gap:12px">
+              <h2 id="h-cov" style="margin:0;font-size:20px;line-height:28px;font-weight:600">Coverage</h2>
+              <dl style="margin:0;display:grid;grid-template-columns:1fr auto;gap:0;font-size:14px;line-height:20px">
+                <dt style="padding:10px 0;border-bottom:1px solid var(--border);color:var(--muted)">Pages checked</dt><dd style="margin:0;padding:10px 0;border-bottom:1px solid var(--border);font-weight:600;font-variant-numeric:tabular-nums;text-align:right">142 of 150</dd>
+                <dt style="padding:10px 0;border-bottom:1px solid var(--border);color:var(--muted)">Templates found</dt><dd style="margin:0;padding:10px 0;border-bottom:1px solid var(--border);font-weight:600;text-align:right">7</dd>
+                <dt style="padding:10px 0;border-bottom:1px solid var(--border);color:var(--muted)">Standard</dt><dd style="margin:0;padding:10px 0;border-bottom:1px solid var(--border);font-weight:600;text-align:right">WCAG 2.2 AA</dd>
+                <dt style="padding:10px 0;border-bottom:1px solid var(--border);color:var(--muted)">Next scan</dt><dd style="margin:0;padding:10px 0;border-bottom:1px solid var(--border);font-weight:600;text-align:right">Mon 19 Oct, 03:00 EAT</dd>
+              </dl>
+              <p style="margin:4px 0 0;font-size:14px;line-height:20px;color:var(--muted);text-wrap:pretty">Automated tests can't judge keyboard flow, screen reader experience or whether alt text makes sense. <a href="#">Log a manual check</a></p>
+            </section>
+          </div>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ isIssues }}" hint-placeholder-val="{{ false }}">
+        <div style="display:flex;flex-direction:column;gap:16px">
+          <div style="display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:12px">
+            <h2 style="margin:0;font-size:24px;line-height:32px;font-weight:600">Issues <span style="font-size:16px;font-weight:400;color:var(--muted);font-variant-numeric:tabular-nums">{{ openSummary }}</span></h2>
+            <div style="display:flex;gap:12px">
+              <button style="height:40px;padding:0 16px;border-radius:100px;border:1px solid var(--bstrong);background:var(--bg);color:var(--text);font-size:14px;font-weight:600;cursor:pointer">Export CSV</button>
+            </div>
+          </div>
+          <div role="search" style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:12px;border-radius:8px;background:var(--bgs);border:1px solid var(--border)">
+            <label style="display:flex;align-items:center;gap:8px;height:36px;padding:0 12px;border:1px solid var(--bstrong);border-radius:4px;background:var(--bg);flex:1 1 240px;max-width:340px">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><path d="M11 4a7 7 0 1 0 0 14a7 7 0 1 0 0-14z M20 20l-3.5-3.5"></path></svg>
+              <span style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)">Search issues</span>
+              <input value="{{ search }}" onChange="{{ onSearch }}" placeholder="Search by problem or rule" style="border:0;outline:0;background:transparent;color:var(--text);font-size:14px;flex:1;min-width:0;font-family:inherit">
+            </label>
+            <span style="font-size:14px;color:var(--muted);margin:0 4px 0 8px">Severity</span>
+            <sc-for list="{{ sevChips }}" as="c" hint-placeholder-count="4">
+              <button onClick="{{ c.onClick }}" aria-pressed="{{ c.pressed }}" style="display:inline-flex;align-items:center;gap:6px;height:32px;padding:0 12px;border-radius:999px;border:1px solid {{ c.border }};background:{{ c.bg }};color:{{ c.color }};font-size:14px;font-weight:500;cursor:pointer">
+                <sc-if value="{{ c.pressed }}" hint-placeholder-val="{{ false }}"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6L9 17l-5-5"></path></svg></sc-if>{{ c.label }}</button>
+            </sc-for>
+            <button style="display:inline-flex;align-items:center;gap:6px;height:32px;padding:0 12px;border-radius:999px;border:1px solid var(--bstrong);background:var(--bg);color:var(--text);font-size:14px;font-weight:500;cursor:pointer">Status: Open</button>
+            <button style="display:inline-flex;align-items:center;gap:6px;height:32px;padding:0 12px;border-radius:999px;border:1px solid var(--bstrong);background:var(--bg);color:var(--text);font-size:14px;font-weight:500;cursor:pointer">Template</button>
+            <button style="display:inline-flex;align-items:center;gap:6px;height:32px;padding:0 12px;border-radius:999px;border:1px solid var(--bstrong);background:var(--bg);color:var(--text);font-size:14px;font-weight:500;cursor:pointer">More</button>
+            <button onClick="{{ clearAll }}" style="height:32px;padding:0 8px;border:0;background:transparent;color:var(--ptext);font-size:14px;font-weight:600;cursor:pointer;text-decoration:underline;text-underline-offset:2px">Clear all</button>
+            <span role="status" aria-live="polite" style="margin-left:auto;font-size:14px;color:var(--muted);font-variant-numeric:tabular-nums">{{ resultCount }}</span>
+          </div>
+
+          <sc-if value="{{ hasSelection }}" hint-placeholder-val="{{ false }}">
+            <div style="display:flex;flex-wrap:wrap;gap:12px;align-items:center;padding:8px 12px 8px 16px;border-radius:8px;background:var(--psoft);border:1px solid var(--primary)">
+              <span role="status" aria-live="polite" style="font-size:14px;font-weight:600;color:var(--ptext);flex:1">{{ selectedLabel }}</span>
+              <button style="height:32px;padding:0 12px;border-radius:100px;border:1px solid var(--bstrong);background:var(--bg);color:var(--text);font-size:14px;font-weight:600;cursor:pointer">Assign</button>
+              <button style="height:32px;padding:0 12px;border-radius:100px;border:1px solid var(--bstrong);background:var(--bg);color:var(--text);font-size:14px;font-weight:600;cursor:pointer">Set due date</button>
+              <button onClick="{{ recheckSelected }}" style="height:32px;padding:0 12px;border-radius:100px;border:1px solid var(--bstrong);background:var(--bg);color:var(--text);font-size:14px;font-weight:600;cursor:pointer">Recheck selected</button>
+              <button onClick="{{ clearSel }}" style="height:32px;padding:0 8px;border:0;background:transparent;color:var(--ptext);font-size:14px;font-weight:600;cursor:pointer">Clear selection</button>
+            </div>
+          </sc-if>
+
+          <sc-if value="{{ noResults }}" hint-placeholder-val="{{ false }}">
+            <div style="border:1px dashed var(--bstrong);border-radius:8px;padding:48px 24px;display:flex;flex-direction:column;align-items:center;gap:8px;text-align:center">
+              <h3 style="margin:0;font-size:20px;line-height:28px;font-weight:600">No issues match these filters</h3>
+              <p style="margin:0;font-size:14px;color:var(--muted)">Try another search or remove a filter.</p>
+              <button onClick="{{ clearAll }}" style="margin-top:8px;height:40px;padding:0 16px;border-radius:100px;border:1px solid var(--bstrong);background:var(--bg);color:var(--text);font-size:14px;font-weight:600;cursor:pointer">Clear filters</button>
+            </div>
+          </sc-if>
+
+          <div style="display:flex;flex-direction:column;gap:16px">
+            <sc-for list="{{ groups }}" as="g" hint-placeholder-count="4">
+              <section style="border:1px solid var(--border);border-radius:16px;background:var(--bg);box-shadow:var(--shc);overflow:hidden">
+                <h3 style="margin:0">
+                  <button onClick="{{ g.toggle }}" aria-expanded="{{ g.expanded }}" style="width:100%;display:flex;align-items:center;gap:12px;padding:12px 16px;border:0;background:var(--bgs);color:var(--text);text-align:left;cursor:pointer;font-size:16px;line-height:24px;font-weight:600">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="transform:{{ g.chev }}"><path d="M9 18l6-6-6-6"></path></svg>
+                    <span style="display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:4px;background:{{ g.ss }};color:{{ g.sc }};font-size:13px;font-weight:600;line-height:20px"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="{{ g.sd }}"></path></svg>{{ g.sl }}</span>
+                    <span style="flex:1">{{ g.title }}</span>
+                    <span style="font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:400;color:var(--muted)">{{ g.rule }}</span>
+                    <span style="font-size:14px;font-weight:400;color:var(--muted);font-variant-numeric:tabular-nums;min-width:170px;text-align:right">{{ g.meta }}</span>
+                  </button>
+                </h3>
+                <sc-if value="{{ g.expanded }}" hint-placeholder-val="{{ true }}">
+                  <ul style="list-style:none;margin:0;padding:0">
+                    <sc-for list="{{ g.items }}" as="item" hint-placeholder-count="1">
+                      <li style="display:grid;grid-template-columns:24px minmax(0,1fr) auto auto auto;gap:16px;align-items:center;padding:12px 16px;border-top:1px solid var(--border);background:{{ item.rowBg }}">
+                        <input type="checkbox" checked="{{ item.selected }}" onChange="{{ item.toggleSel }}" aria-label="{{ item.checkLabel }}" style="width:18px;height:18px;accent-color:var(--ptext);margin:0">
+                        <button onClick="{{ item.open }}" style="display:flex;flex-direction:column;align-items:flex-start;gap:2px;border:0;background:transparent;color:var(--text);text-align:left;cursor:pointer;padding:4px 0;min-width:0">
+                          <span style="font-size:16px;line-height:24px;font-weight:500;text-decoration:underline;text-decoration-color:var(--border);text-underline-offset:4px">{{ item.template }}</span>
+                          <span style="font-size:14px;line-height:20px;color:var(--muted)">{{ item.pagesLabel }}</span>
+                        </button>
+                        <span style="display:flex;gap:8px">
+                          <sc-if value="{{ item.isRegressed }}" hint-placeholder-val="{{ false }}"><span style="display:inline-flex;align-items:center;gap:4px;padding:1px 8px;border-radius:4px;border:1px solid var(--bstrong);font-size:13px;font-weight:500;line-height:20px"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 9-9a9.75 9.75 0 0 0-6.74 2.74L3 8 M3 3v5h5"></path></svg>Regressed</span></sc-if>
+                          <sc-if value="{{ item.isReview }}" hint-placeholder-val="{{ false }}"><span style="display:inline-flex;align-items:center;gap:4px;padding:1px 8px;border-radius:4px;border:1px solid var(--bstrong);font-size:13px;font-weight:500;line-height:20px"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12a10 10 0 1 0 20 0a10 10 0 1 0-20 0 M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3 M12 17h.01"></path></svg>Needs review</span></sc-if>
+                        </span>
+                        <span style="font-size:14px;color:var(--muted);font-variant-numeric:tabular-nums;white-space:nowrap">{{ item.occLabel }}</span>
+                        <span style="display:flex;align-items:center;gap:8px;min-width:96px;justify-content:flex-end;font-size:14px;color:var(--muted)">
+                          <sc-if value="{{ item.hasAssignee }}" hint-placeholder-val="{{ false }}"><span>{{ item.due }}</span><span title="{{ item.assigneeName }}" style="width:28px;height:28px;border-radius:50%;background:var(--sunk);border:1px solid var(--border);color:var(--text);display:grid;place-items:center;font-size:11px;font-weight:600">{{ item.assignee }}</span></sc-if>
+                          <sc-if value="{{ item.noAssignee }}" hint-placeholder-val="{{ true }}"><span>Unassigned</span></sc-if>
+                        </span>
+                      </li>
+                    </sc-for>
+                  </ul>
+                </sc-if>
+              </section>
+            </sc-for>
+          </div>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ isOther }}" hint-placeholder-val="{{ false }}">
+        <div style="border:1px dashed var(--bstrong);border-radius:8px;padding:48px 24px;text-align:center;color:var(--muted);font-size:14px">{{ tabLabel }} is not part of this design pass. Overview and Issues are interactive.</div>
+      </sc-if>
+    </main>
+  </div>
+
+  <sc-if value="{{ drawerOpen }}" hint-placeholder-val="{{ false }}">
+    <div onClick="{{ closeDrawer }}" style="position:fixed;inset:0;background:var(--scrim);z-index:20"></div>
+    <aside role="dialog" aria-modal="true" aria-labelledby="drawer-title" style="position:fixed;top:0;right:0;bottom:0;width:min(560px,100vw);background:var(--bg);border-left:1px solid var(--border);box-shadow:var(--sh3);z-index:21;display:flex;flex-direction:column;border-radius:12px 0 0 12px">
+      <div style="padding:20px 24px 0;display:flex;flex-direction:column;gap:12px">
+        <div style="display:flex;align-items:center;gap:8px">
+          <span style="display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:4px;background:{{ d.ss }};color:{{ d.sc }};font-size:13px;font-weight:600;line-height:20px"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="{{ d.sd }}"></path></svg>{{ d.sl }}</span>
+          <span style="display:inline-flex;align-items:center;gap:4px;padding:1px 8px;border-radius:4px;border:1px solid var(--bstrong);font-size:13px;font-weight:500;line-height:20px">{{ d.statusLabel }}</span>
+          <span style="flex:1"></span>
+          <button aria-label="Copy link to this issue" title="Copy link" style="width:32px;height:32px;border-radius:100px;border:0;background:transparent;color:var(--muted);display:grid;place-items:center;cursor:pointer"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71 M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg></button>
+          <button aria-label="Open in full page" title="Open in full page" style="width:32px;height:32px;border-radius:100px;border:0;background:transparent;color:var(--muted);display:grid;place-items:center;cursor:pointer"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 3h6v6 M9 21H3v-6 M21 3l-7 7 M3 21l7-7"></path></svg></button>
+          <button onClick="{{ closeDrawer }}" aria-label="Close issue details" title="Close (Esc)" style="width:32px;height:32px;border-radius:100px;border:0;background:transparent;color:var(--text);display:grid;place-items:center;cursor:pointer"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><path d="M18 6L6 18 M6 6l12 12"></path></svg></button>
+        </div>
+        <h2 id="drawer-title" tabindex="-1" ref="{{ titleRef }}" style="margin:0;font-size:24px;line-height:32px;font-weight:600;text-wrap:pretty">{{ d.title }}</h2>
+        <div style="font-size:14px;line-height:20px;color:var(--muted)">{{ d.template }} · <span style="font-family:'JetBrains Mono',monospace;font-size:13px">{{ d.rule }}</span> · WCAG {{ d.wcagShort }}</div>
+        <sc-if value="{{ d.isFixed }}" hint-placeholder-val="{{ false }}">
+          <div role="status" style="display:flex;gap:10px;align-items:flex-start;padding:12px 16px;border-radius:8px;background:var(--okS);color:var(--ok);font-size:14px;line-height:20px;font-weight:500"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex:0 0 auto"><path d="M2 12a10 10 0 1 0 20 0a10 10 0 1 0-20 0 M9 12l2 2l4-4"></path></svg>Fixed today in a recheck of {{ d.recheckPages }} pages. Logged in your evidence.</div>
+        </sc-if>
+        <sc-if value="{{ d.isIgnored }}" hint-placeholder-val="{{ false }}">
+          <div style="display:flex;gap:10px;align-items:center;padding:12px 16px;border-radius:8px;background:var(--minS);color:var(--text);font-size:14px;line-height:20px"><span style="flex:1">Ignored — {{ d.ignoreReason }}. It stays in your evidence log.</span><button onClick="{{ reopen }}" style="height:32px;padding:0 12px;border-radius:100px;border:1px solid var(--bstrong);background:var(--bg);color:var(--text);font-size:14px;font-weight:600;cursor:pointer">Reopen</button></div>
+        </sc-if>
+        <sc-if value="{{ d.isActive }}" hint-placeholder-val="{{ true }}">
+          <div style="display:flex;flex-wrap:wrap;gap:8px">
+            <button onClick="{{ recheck }}" disabled="{{ rechecking }}" style="height:32px;padding:0 12px;border-radius:100px;border:0;background:var(--primary);color:var(--onp);font-size:14px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:6px">{{ recheckLabel }}</button>
+            <button style="height:32px;padding:0 12px;border-radius:100px;border:1px solid var(--bstrong);background:var(--bg);color:var(--text);font-size:14px;font-weight:600;cursor:pointer">{{ d.assignLabel }}</button>
+            <button style="height:32px;padding:0 12px;border-radius:100px;border:1px solid var(--bstrong);background:var(--bg);color:var(--text);font-size:14px;font-weight:600;cursor:pointer">{{ d.dueLabel }}</button>
+            <button onClick="{{ openIgnore }}" style="height:32px;padding:0 12px;border-radius:100px;border:1px solid var(--bstrong);background:var(--bg);color:var(--text);font-size:14px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:6px"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9.88 9.88a3 3 0 1 0 4.24 4.24 M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68 M6.61 6.61A13.53 13.53 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61 M2 2l20 20"></path></svg>Ignore</button>
+          </div>
+        </sc-if>
+        <div role="tablist" aria-label="Issue details" style="display:flex;gap:4px;border-bottom:1px solid var(--border);margin-top:4px">
+          <sc-for list="{{ dTabs }}" as="t" hint-placeholder-count="4">
+            <button role="tab" aria-selected="{{ t.active }}" onClick="{{ t.onClick }}" style="padding:10px 10px;border:0;background:transparent;color:{{ t.color }};font-size:14px;font-weight:{{ t.weight }};cursor:pointer;box-shadow:{{ t.bar }}">{{ t.label }}</button>
+          </sc-for>
+        </div>
+      </div>
+
+      <div role="tabpanel" style="flex:1;overflow-y:auto;padding:24px;display:flex;flex-direction:column;gap:24px;font-size:16px;line-height:24px">
+        <sc-if value="{{ dtOverview }}" hint-placeholder-val="{{ true }}">
+          <section style="display:flex;flex-direction:column;gap:4px"><h3 style="margin:0;font-size:16px;line-height:24px;font-weight:600">Who this affects</h3><p style="margin:0;text-wrap:pretty">{{ d.who }}</p></section>
+          <section style="display:flex;flex-direction:column;gap:4px"><h3 style="margin:0;font-size:16px;line-height:24px;font-weight:600">Why it matters</h3><p style="margin:0;text-wrap:pretty">{{ d.why }}</p></section>
+          <dl style="margin:0;display:grid;grid-template-columns:140px 1fr;gap:10px 16px;font-size:14px;line-height:20px;padding:16px;border-radius:8px;background:var(--bgs)">
+            <dt style="color:var(--muted)">WCAG criterion</dt><dd style="margin:0"><a href="#">{{ d.wcag }}</a></dd>
+            <dt style="color:var(--muted)">Where</dt><dd style="margin:0">{{ d.template }} — {{ d.pagesLabel }}</dd>
+            <dt style="color:var(--muted)">First seen</dt><dd style="margin:0">{{ d.first }}</dd>
+            <dt style="color:var(--muted)">Last seen</dt><dd style="margin:0">{{ d.last }}</dd>
+          </dl>
+        </sc-if>
+
+        <sc-if value="{{ dtWhere }}" hint-placeholder-val="{{ false }}">
+          <p style="margin:0;font-size:14px;line-height:20px;color:var(--muted)">{{ d.axe }}</p>
+          <ul style="list-style:none;margin:0;padding:0;border:1px solid var(--border);border-radius:16px;background:var(--bg);box-shadow:var(--shc)">
+            <sc-for list="{{ d.occs }}" as="o" hint-placeholder-count="4">
+              <li style="display:flex;gap:12px;align-items:center;padding:12px 16px;border-bottom:1px solid var(--border)">
+                <span style="flex:1;min-width:0;display:flex;flex-direction:column;gap:2px">
+                  <span style="font-size:14px;line-height:20px;overflow-wrap:anywhere">{{ o.url }}</span>
+                  <code style="font-family:'JetBrains Mono',monospace;font-size:13px;line-height:18px;color:var(--muted);overflow-wrap:anywhere">{{ o.sel }}</code>
+                </span>
+                <a href="#" style="font-size:14px;font-weight:600;white-space:nowrap">Open page<span style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)"> (opens in new tab)</span></a>
+              </li>
+            </sc-for>
+          </ul>
+          <div style="display:flex;flex-direction:column;gap:8px">
+            <h3 style="margin:0;font-size:16px;line-height:24px;font-weight:600">HTML on the first page</h3>
+            <pre style="margin:0;padding:16px;border-radius:8px;background:var(--sunk);font-family:'JetBrains Mono',monospace;font-size:13px;line-height:20px;white-space:pre-wrap;overflow-wrap:anywhere;color:var(--text)">{{ d.snippet }}</pre>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{ dtFix }}" hint-placeholder-val="{{ false }}">
+          <div role="tablist" aria-label="Platform" style="display:inline-flex;gap:0;border:1px solid var(--bstrong);border-radius:100px;overflow:hidden;align-self:flex-start">
+            <sc-for list="{{ pfTabs }}" as="p" hint-placeholder-count="3">
+              <button role="tab" aria-selected="{{ p.active }}" onClick="{{ p.onClick }}" style="height:32px;padding:0 14px;border:0;background:{{ p.bg }};color:{{ p.color }};font-size:14px;font-weight:600;cursor:pointer">{{ p.label }}</button>
+            </sc-for>
+          </div>
+          <sc-if value="{{ hasSteps }}" hint-placeholder-val="{{ true }}">
+            <ol style="margin:0;padding-left:24px;display:flex;flex-direction:column;gap:8px;text-wrap:pretty">
+              <sc-for list="{{ fixSteps }}" as="s" hint-placeholder-count="4"><li>{{ s.text }}</li></sc-for>
+            </ol>
+          </sc-if>
+          <sc-if value="{{ noSteps }}" hint-placeholder-val="{{ false }}">
+            <p style="margin:0;color:var(--muted);text-wrap:pretty">We don't have a written WordPress guide for this problem yet. The generic fix applies to any theme, or ask for an AI suggestion below.</p>
+          </sc-if>
+          <div style="display:flex;flex-direction:column;border-radius:100px;overflow:hidden;border:1px solid var(--border)">
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 8px 6px 16px;background:var(--bgs);border-bottom:1px solid var(--border)">
+              <span style="font-size:12px;line-height:16px;font-weight:500;color:var(--muted)">{{ codeLang }}</span>
+              <button onClick="{{ copyCode }}" style="height:28px;padding:0 10px;border-radius:4px;border:1px solid var(--bstrong);background:var(--bg);color:var(--text);font-size:13px;font-weight:600;cursor:pointer">{{ copyLabel }}</button>
+            </div>
+            <pre style="margin:0;padding:16px;background:var(--sunk);font-family:'JetBrains Mono',monospace;font-size:13px;line-height:20px;white-space:pre-wrap;overflow-wrap:anywhere;color:var(--text)">{{ fixCode }}</pre>
+          </div>
+          <section style="display:flex;flex-direction:column;gap:4px"><h3 style="margin:0;font-size:16px;line-height:24px;font-weight:600">How to check your fix</h3><p style="margin:0;text-wrap:pretty">{{ d.check }}</p></section>
+          <section style="border:1px solid var(--border);border-radius:16px;background:var(--bg);box-shadow:var(--shc);padding:16px;display:flex;flex-direction:column;gap:10px">
+            <div style="display:flex;align-items:center;gap:8px"><span style="padding:2px 8px;border-radius:4px;background:var(--psoft);color:var(--ptext);font-size:13px;font-weight:600;line-height:20px">AI suggestion</span><span style="font-size:14px;color:var(--muted)">Check before applying</span></div>
+            <sc-if value="{{ aiNone }}" hint-placeholder-val="{{ true }}">
+              <p style="margin:0;font-size:14px;line-height:20px;color:var(--muted)">Get a suggestion written for this exact element. 37 of 50 suggestions left this month.</p>
+              <button onClick="{{ genAi }}" style="align-self:flex-start;height:32px;padding:0 12px;border-radius:100px;border:1px solid var(--bstrong);background:var(--bg);color:var(--text);font-size:14px;font-weight:600;cursor:pointer">Generate suggestion</button>
+            </sc-if>
+            <sc-if value="{{ aiGen }}" hint-placeholder-val="{{ false }}"><p role="status" style="margin:0;font-size:14px;color:var(--muted)">Writing a suggestion…</p></sc-if>
+            <sc-if value="{{ aiReady }}" hint-placeholder-val="{{ false }}">
+              <p role="status" style="margin:0;font-size:14px;line-height:20px;text-wrap:pretty">{{ d.ai }}</p>
+              <div style="display:flex;gap:16px;font-size:14px"><button style="border:0;background:transparent;color:var(--ptext);font-weight:600;padding:0;cursor:pointer">Copy</button><button style="border:0;background:transparent;color:var(--muted);padding:0;cursor:pointer;text-decoration:underline;text-underline-offset:2px">Report a bad suggestion</button></div>
+            </sc-if>
+          </section>
+        </sc-if>
+
+        <sc-if value="{{ dtHistory }}" hint-placeholder-val="{{ false }}">
+          <ol style="list-style:none;margin:0;padding:0;display:flex;flex-direction:column">
+            <sc-for list="{{ d.history }}" as="h" hint-placeholder-count="3">
+              <li style="display:grid;grid-template-columns:32px 1fr;gap:12px;padding-bottom:20px">
+                <span style="width:32px;height:32px;border-radius:50%;background:var(--bgs);border:1px solid var(--border);display:grid;place-items:center;color:{{ h.c }}"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="{{ h.d }}"></path></svg></span>
+                <span style="display:flex;flex-direction:column;padding-top:4px"><span style="font-weight:500">{{ h.t }}</span><span style="font-size:14px;line-height:20px;color:var(--muted)">{{ h.m }}</span></span>
+              </li>
+            </sc-for>
+          </ol>
+          <div style="display:flex;flex-direction:column;gap:8px">
+            <label for="note" style="font-weight:600">Add a note</label>
+            <textarea id="note" rows="3" style="padding:10px 12px;border:1px solid var(--bstrong);border-radius:4px;background:var(--bg);color:var(--text);font:inherit;font-size:14px;resize:vertical"></textarea>
+            <div style="display:flex;justify-content:space-between;align-items:center"><label style="display:flex;gap:8px;align-items:center;font-size:14px"><input type="checkbox" style="width:18px;height:18px;accent-color:var(--ptext);margin:0">Visible to client</label><button style="height:32px;padding:0 12px;border-radius:100px;border:1px solid var(--bstrong);background:var(--bg);color:var(--text);font-size:14px;font-weight:600;cursor:pointer">Add note</button></div>
+          </div>
+        </sc-if>
+      </div>
+    </aside>
+  </sc-if>
+
+  <sc-if value="{{ ignoreOpen }}" hint-placeholder-val="{{ false }}">
+    <div style="position:fixed;inset:0;background:var(--scrim);z-index:30;display:grid;place-items:center;padding:16px">
+      <div role="dialog" aria-modal="true" aria-labelledby="ig-title" style="width:min(480px,100%);background:var(--bg);border:1px solid var(--border);border-radius:16px;background:var(--bg);box-shadow:var(--shc);box-shadow:var(--sh3);padding:24px;display:flex;flex-direction:column;gap:16px">
+        <h2 id="ig-title" style="margin:0;font-size:20px;line-height:28px;font-weight:600">Ignore this issue?</h2>
+        <p style="margin:0;font-size:14px;line-height:20px;color:var(--muted)">Ignored issues stay in your evidence log with your reason, so the history stays honest.</p>
+        <fieldset style="border:0;margin:0;padding:0;display:flex;flex-direction:column;gap:8px">
+          <legend style="font-weight:600;margin-bottom:8px">Reason</legend>
+          <sc-for list="{{ reasons }}" as="r" hint-placeholder-count="4">
+            <label style="display:flex;gap:10px;align-items:center;font-size:14px;cursor:pointer"><input type="radio" name="reason" checked="{{ r.checked }}" onChange="{{ r.onChange }}" style="width:18px;height:18px;accent-color:var(--ptext);margin:0">{{ r.label }}</label>
+          </sc-for>
+        </fieldset>
+        <div style="display:flex;flex-direction:column;gap:6px">
+          <label for="ig-note" style="font-weight:600;font-size:14px">Note {{ noteReq }}</label>
+          <textarea id="ig-note" rows="3" value="{{ ignoreNote }}" onChange="{{ onIgnoreNote }}" aria-invalid="{{ noteError }}" style="padding:10px 12px;border:1px solid {{ noteBorder }};border-radius:4px;background:var(--bg);color:var(--text);font:inherit;font-size:14px"></textarea>
+          <sc-if value="{{ noteError }}" hint-placeholder-val="{{ false }}"><span style="font-size:14px;color:var(--crit);display:flex;gap:6px;align-items:center"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7.86 2h8.28L22 7.86v8.28L16.14 22H7.86L2 16.14V7.86z M12 8v4 M12 16h.01"></path></svg>Add a note explaining this decision.</span></sc-if>
+        </div>
+        <div style="display:flex;justify-content:flex-end;gap:12px">
+          <button onClick="{{ closeIgnore }}" style="height:40px;padding:0 16px;border-radius:100px;border:1px solid var(--bstrong);background:var(--bg);color:var(--text);font-size:14px;font-weight:600;cursor:pointer">Cancel</button>
+          <button onClick="{{ confirmIgnore }}" style="height:40px;padding:0 16px;border-radius:100px;border:0;background:var(--primary);color:var(--onp);font-size:14px;font-weight:600;cursor:pointer">Ignore issue</button>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+
+  <div role="status" aria-live="polite" style="position:fixed;right:24px;bottom:24px;z-index:40">
+    <sc-if value="{{ true }}" hint-placeholder-val="{{ false }}">
+      <div style="display:{{ toastDisplay }};gap:12px;align-items:flex-start;width:min(400px,calc(100vw - 48px));padding:14px 12px 14px 16px;border-radius:8px;background:var(--bg);border:1px solid var(--border);box-shadow:var(--sh2);font-size:14px;line-height:20px">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--ok)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex:0 0 auto"><path d="M2 12a10 10 0 1 0 20 0a10 10 0 1 0-20 0 M9 12l2 2l4-4"></path></svg>
+        <span style="flex:1">{{ toastText }}</span>
+        <button onClick="{{ closeToast }}" aria-label="Dismiss message" style="width:24px;height:24px;border:0;background:transparent;color:var(--muted);display:grid;place-items:center;cursor:pointer"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><path d="M18 6L6 18 M6 6l12 12"></path></svg></button>
+      </div>
+    </sc-if>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;theme&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;light&quot;,&quot;dark&quot;],&quot;default&quot;:&quot;light&quot;,&quot;tsType&quot;:&quot;'light'|'dark'&quot;},&quot;startTab&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;overview&quot;,&quot;issues&quot;],&quot;default&quot;:&quot;overview&quot;,&quot;tsType&quot;:&quot;'overview'|'issues'&quot;}}">
+const C = 'M2 12a10 10 0 1 0 20 0a10 10 0 1 0-20 0';
+const P = {
+  critical: 'M7.86 2h8.28L22 7.86v8.28L16.14 22H7.86L2 16.14V7.86z M12 8v4 M12 16h.01',
+  serious: 'M21.73 18l-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3z M12 9v4 M12 17h.01',
+  moderate: C + ' M12 8v4 M12 16h.01',
+  minor: C + ' M12 16v-4 M12 8h.01',
+  ok: C + ' M9 12l2 2l4-4',
+  reg: 'M3 12a9 9 0 1 0 9-9a9.75 9.75 0 0 0-6.74 2.74L3 8 M3 3v5h5',
+  found: 'M11 4a7 7 0 1 0 0 14a7 7 0 1 0 0-14z M20 20l-3.5-3.5',
+  user: 'M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2 M12 3a4 4 0 1 0 0 8a4 4 0 1 0 0-8z',
+  eye: 'M9.88 9.88a3 3 0 1 0 4.24 4.24 M2 2l20 20 M6.61 6.61A13.53 13.53 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61'
+};
+const SEV = {
+  critical: { label: 'Critical', c: 'var(--crit)', s: 'var(--critS)', w: 4, tip: 'Blocks some people from completing a task.' },
+  serious: { label: 'Serious', c: 'var(--ser)', s: 'var(--serS)', w: 3, tip: 'Makes a task very difficult for some people.' },
+  moderate: { label: 'Moderate', c: 'var(--mod)', s: 'var(--modS)', w: 2, tip: 'Causes frustration or confusion.' },
+  minor: { label: 'Minor', c: 'var(--min)', s: 'var(--minS)', w: 1, tip: 'Small annoyance; fix when convenient.' }
+};
+const TREND = [['5 Aug',61,24],['12 Aug',63,22],['19 Aug',62,23],['26 Aug',66,20],['2 Sep',64,21,1],['9 Sep',68,18],['16 Sep',70,17],['23 Sep',69,17],['30 Sep',72,15],['7 Oct',74,13],['12 Oct',72,14],['14 Oct',78,11]];
+const ISSUES = [
+  { id:'i1', rule:'image-alt', sev:'critical', title:'Images are missing descriptions', template:'Product pages', occ:214, pages:107, status:'regressed', assignee:'DM', due:'Due 18 Oct', wcag:'1.1.1 Non-text Content (Level A)', first:'12 Aug, scan #9', last:'14 Oct, scan #23',
+    who:'People who use screen readers hear “image” or a file name instead of what the product looks like, so they can’t compare products.',
+    why:'Product photos carry details shoppers need — colour, material, size. Without a description that information is simply missing.',
+    occs:[['/products/linden-oak-dining-table','.product__media-item:nth-child(2) img'],['/products/arlo-lounge-chair','.product__media-item:nth-child(1) img'],['/products/fenn-side-table','.product__media-item:nth-child(3) img'],['/products/hale-bookcase','.product__thumb img']],
+    snippet:'<img src="//oakhaus.com/cdn/shop/files/linden-oak-02.jpg" width="1200" height="900" loading="lazy">',
+    axe:'The image has no alt attribute, so it has no text alternative. Found on every product page that has more than one image.',
+    steps:['In Shopify admin, open Products and choose a product.','Select an image, then choose “Add alt text”.','Describe what matters to a shopper, e.g. “Linden dining table in white oak, seats six”.','If alt text is set but still missing on the page, your theme isn’t outputting it. Update the image tag in sections/main-product.liquid with the code below.'],
+    code:'{{ media.preview_image | image_url: width: 1200 | image_tag: alt: media.alt }}',
+    gen:'<img src="linden-oak-02.jpg" alt="Linden dining table in white oak, seats six">',
+    check:'Run “Recheck” here. Then turn on VoiceOver or NVDA, move to a product image, and listen for your description.',
+    ai:'Suggested alt text for linden-oak-02.jpg: “Linden dining table in white oak, shown from the side with six matching chairs.”',
+    history:[['found','First found','Scan #9 · 12 Aug'],['ok','Marked fixed','Daniel Mwangi · 2 Oct'],['reg','Came back','Scan #23 · 14 Oct — likely after the theme update on 13 Oct'],['user','Assigned to Daniel Mwangi, due 18 Oct','Daniel Mwangi · 14 Oct']] },
+  { id:'i2', rule:'button-name', sev:'critical', title:'Buttons have no name screen readers can announce', template:'Site header (all pages)', occ:284, pages:142, status:'open', assignee:'AK', due:'Due 21 Oct', wcag:'4.1.2 Name, Role, Value (Level A)', first:'5 Aug, scan #8', last:'14 Oct, scan #23',
+    who:'People who use screen readers hear only “button” on the cart and menu icons, so they can’t find the cart or open navigation.',
+    why:'The cart button is on the path to every purchase. If it can’t be identified, some people can’t buy.',
+    occs:[['/','header .header__icon--cart'],['/','header .header__icon--menu'],['/collections/dining','header .header__icon--cart']],
+    snippet:'<button class="header__icon header__icon--cart"><svg class="icon icon-cart">…</svg><span class="cart-count">2</span></button>',
+    axe:'The button contains only an icon and a number, with no text or label that describes it.',
+    steps:['Go to Online Store → Themes → Edit code.','Open sections/header.liquid and find the cart and menu buttons.','Add a visually hidden label inside each button (code below).','Save, then preview the theme.'],
+    code:'<span class="visually-hidden">Cart, {{ cart.item_count }} items</span>',
+    gen:'<button aria-label="Cart, 2 items">…</button>',
+    check:'Tab to the cart icon with a screen reader running. You should hear “Cart, 2 items, button”.',
+    ai:'Use “Open menu” for the menu button and “Cart, {{ cart.item_count }} items” for the cart button, so the count is announced too.' },
+  { id:'i3', rule:'label', sev:'critical', title:'Form fields have no labels', template:'Newsletter signup (footer)', occ:142, pages:142, status:'open', wcag:'1.3.1 Info and Relationships (Level A)', first:'5 Aug, scan #8', last:'14 Oct, scan #23',
+    who:'People who use screen readers or voice control can’t tell what the email field is for, because it only has placeholder text.',
+    why:'Placeholder text disappears once you start typing and isn’t reliably announced.',
+    occs:[['/','footer #NewsletterForm--footer'],['/pages/about','footer #NewsletterForm--footer']],
+    snippet:'<input id="NewsletterForm--footer" type="email" name="contact[email]" placeholder="Email">',
+    axe:'The input has no label element, aria-label or aria-labelledby.',
+    steps:['Go to Online Store → Themes → Edit code.','Open sections/footer.liquid and find the newsletter form.','Add a label connected to the input’s id (code below).','Keep it visible if your design allows; otherwise use the visually-hidden class.'],
+    code:'<label for="NewsletterForm--footer">Email address</label>',
+    gen:'<label for="email">Email address</label>\n<input id="email" type="email">',
+    check:'Click the label text — the field should receive focus. A screen reader should announce “Email address, edit text”.',
+    ai:'Use a visible label “Email address” above the field, and keep “Email” as the placeholder only if it adds something.' },
+  { id:'i4', rule:'color-contrast', sev:'serious', title:'Text doesn’t have enough contrast', template:'Collection pages', occ:96, pages:24, status:'open', assignee:'AK', due:'Due 25 Oct', wcag:'1.4.3 Contrast (Minimum) (Level AA)', first:'5 Aug, scan #8', last:'14 Oct, scan #23',
+    who:'People with low vision, and anyone on a phone in sunlight, struggle to read sale prices and product subtitles.',
+    why:'Grey #9A9A9A on white is 2.8:1. Body text needs at least 4.5:1.',
+    occs:[['/collections/dining','.price-item--sale'],['/collections/living','.card__subtitle'],['/collections/sale','.price-item--regular s']],
+    snippet:'<span class="price-item price-item--sale" style="color:#9A9A9A">$1,240.00</span>',
+    axe:'Foreground #9A9A9A on background #FFFFFF has a contrast ratio of 2.8:1. Expected 4.5:1.',
+    steps:['Go to Online Store → Themes → Customize → Theme settings → Colors.','Find the secondary text colour used for prices and subtitles.','Change it to #6B6B6B or darker (5.3:1 on white).','Save, then check collection pages.'],
+    code:'.price-item--sale, .card__subtitle { color: #6B6B6B; }',
+    gen:'color: #6B6B6B; /* 5.3:1 on #FFFFFF */',
+    check:'Recheck here, or use a contrast checker on the sale price colour.' },
+  { id:'i5', rule:'color-contrast', sev:'serious', title:'Text doesn’t have enough contrast', template:'Product pages', occ:64, pages:107, status:'open', wcag:'1.4.3 Contrast (Minimum) (Level AA)', first:'19 Aug, scan #10', last:'14 Oct, scan #23',
+    who:'People with low vision struggle to read the delivery estimate under the Add to cart button.', why:'Light grey on cream is 3.1:1, below the 4.5:1 minimum.',
+    occs:[['/products/linden-oak-dining-table','.product__delivery-note']], snippet:'<p class="product__delivery-note">Ships in 3–5 weeks</p>', axe:'Contrast ratio 3.1:1. Expected 4.5:1.',
+    steps:['Go to Online Store → Themes → Customize.','Open a product page and select the delivery note text block.','Pick a darker text colour.'], code:'.product__delivery-note { color: #5C5650; }', gen:'color: #5C5650;', check:'Recheck here after saving.' },
+  { id:'i6', rule:'meta-viewport', sev:'serious', title:'Zooming is turned off on phones', template:'All pages (theme.liquid)', occ:142, pages:142, status:'open', wcag:'1.4.4 Resize Text (Level AA)', first:'5 Aug, scan #8', last:'14 Oct, scan #23',
+    who:'People with low vision can’t pinch to zoom on phones.', why:'Many shoppers rely on zoom to read product details and prices.',
+    occs:[['/','head meta[name="viewport"]']], snippet:'<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">', axe:'maximum-scale=1 prevents zooming.',
+    steps:['Go to Online Store → Themes → Edit code.','Open layout/theme.liquid.','Replace the viewport meta tag with the one below.'], code:'<meta name="viewport" content="width=device-width, initial-scale=1">', gen:'<meta name="viewport" content="width=device-width, initial-scale=1">', check:'On a phone, pinch to zoom on any page.' },
+  { id:'i7', rule:'link-name', sev:'serious', title:'Links have no text', template:'Site footer (social icons)', occ:568, pages:142, status:'open', wcag:'2.4.4 Link Purpose (Level A)', first:'5 Aug, scan #8', last:'14 Oct, scan #23',
+    who:'Screen reader users hear “link” four times with no idea where each goes.', why:'Links need a name that says where they go.',
+    occs:[['/','footer .list-social__link']], snippet:'<a href="https://instagram.com/oakhaus" class="list-social__link"><svg>…</svg></a>', axe:'The link contains only an SVG with no accessible name.',
+    steps:['In the theme editor, open snippets/social-icons.liquid.','Add a hidden label inside each link with the platform name.'], code:'<span class="visually-hidden">Oakhaus on Instagram</span>', gen:'<a href="…" aria-label="Oakhaus on Instagram">', check:'Tab through the footer with a screen reader.' },
+  { id:'i8', rule:'heading-order', sev:'moderate', title:'Heading levels skip', template:'Product pages', occ:107, pages:107, status:'open', wcag:'1.3.1 Info and Relationships (Level A)', first:'5 Aug, scan #8', last:'14 Oct, scan #23',
+    who:'Screen reader users who jump by heading may think content is missing.', why:'The page goes from h1 to h4 for “Details” and “Delivery”.',
+    occs:[['/products/linden-oak-dining-table','.product__accordion h4']], snippet:'<h4 class="accordion__title">Details</h4>', axe:'Heading levels should only increase by one.',
+    steps:['In sections/main-product.liquid, change accordion titles from h4 to h2.','Adjust the styling class so they look the same.'], code:'<h2 class="accordion__title h4">Details</h2>', gen:'<h2 class="h4">Details</h2>', check:'Use a headings list in your screen reader or a browser extension.' },
+  { id:'i9', rule:'region', sev:'moderate', title:'Some content is outside page landmarks', template:'Announcement bar', occ:142, pages:142, status:'needsReview', wcag:'1.3.1 Info and Relationships (Level A)', first:'5 Aug, scan #8', last:'14 Oct, scan #23',
+    who:'Screen reader users navigating by landmark can miss the free-delivery announcement.', why:'Automated tests couldn’t decide whether this is a problem — a person should check.',
+    occs:[['/','.announcement-bar']], snippet:'<div class="announcement-bar">Free delivery in Nairobi over KSh 50,000</div>', axe:'Content is not contained by a landmark region.',
+    steps:['Decide if the announcement matters for every visitor.','If it does, move it inside the header element in sections/header.liquid.'], code:'<header>…<div class="announcement-bar">…</div></header>', gen:'Wrap in <header> or <aside aria-label="Announcement">', check:'Use landmark navigation in your screen reader.' },
+  { id:'i10', rule:'list', sev:'minor', title:'Lists aren’t marked up correctly', template:'Blog posts', occ:12, pages:6, status:'open', wcag:'1.3.1 Info and Relationships (Level A)', first:'26 Aug, scan #11', last:'14 Oct, scan #23',
+    who:'Screen reader users don’t hear how many items a list has.', why:'Care instructions use line breaks and dashes instead of a real list.',
+    occs:[['/blogs/journal/caring-for-oak','.article__content p']], snippet:'<p>- Wipe with a damp cloth<br>- Avoid direct sun</p>', axe:'Content looks like a list but isn’t marked up as one.',
+    steps:['Open the blog post in Shopify admin.','Select the lines and use the bulleted list button in the editor.'], code:'<ul><li>Wipe with a damp cloth</li><li>Avoid direct sun</li></ul>', gen:'<ul><li>…</li></ul>', check:'View the post; bullets should appear as a real list.' },
+  { id:'i11', rule:'frame-title', sev:'minor', title:'Embedded map has no title', template:'Contact page', occ:1, pages:1, status:'open', wcag:'4.1.2 Name, Role, Value (Level A)', first:'5 Aug, scan #8', last:'14 Oct, scan #23',
+    who:'Screen reader users hear “frame” with no description.', why:'A title tells people what the embedded content is before they enter it.',
+    occs:[['/pages/contact','iframe[src*="google.com/maps"]']], snippet:'<iframe src="https://www.google.com/maps/embed?pb=…"></iframe>', axe:'The iframe has no title attribute.',
+    steps:['Edit the Contact page in Shopify admin and switch to HTML view.','Add a title attribute to the iframe.'], code:'<iframe title="Map of the Oakhaus showroom, Westlands" src="…"></iframe>', gen:'<iframe title="…">', check:'Recheck here.' }
+];
+const NAMES = { DM: 'Daniel Mwangi', AK: 'Aisha Kamau' };
+const TABS = ['Overview','Issues','Scans','Pages','Reports','Evidence','Manual checks','Statement','Settings'];
+const DTABS = ['Overview','Where it occurs','How to fix','History'];
+const REASONS = ['False positive','Not applicable','Won’t fix','Accepted risk'];
+
+class Component extends DCLogic {
+  state = {
+    theme: null, tab: null, issues: ISSUES.map(i => ({ ...i })), sevF: [], search: '', sel: [], collapsed: [],
+    open: null, dTab: 0, pf: 'Shopify', rechecking: false, toast: null, copied: false, ai: {},
+    ignoreOpen: false, reason: 0, ignoreNote: '', noteError: false, infoOpen: false, chartTable: false, hover: null,
+    fixed: [['Page has no title','12 Oct'],['Form errors aren’t announced','12 Oct'],['Text doesn’t have enough contrast — Cart','7 Oct'],['Links look the same as text','7 Oct'],['Focus outline removed on buttons','30 Sep']]
+  };
+  titleRef = React.createRef();
+
+  componentDidMount() {
+    this.onKey = e => { if (e.key === 'Escape') { if (this.state.ignoreOpen) this.setState({ ignoreOpen: false }); else if (this.state.open) this.closeDrawer(); } };
+    document.addEventListener('keydown', this.onKey);
+  }
+  componentWillUnmount() { document.removeEventListener('keydown', this.onKey); clearTimeout(this.tt); }
+  focusTitle(n = 0) { const el = document.getElementById('drawer-title'); if (el) el.focus(); else if (n < 10) requestAnimationFrame(() => this.focusTitle(n + 1)); }
+
+  showToast(t) { clearTimeout(this.tt); this.setState({ toastMsg: t }); this.tt = setTimeout(() => this.setState({ toastMsg: null }), 6000); }
+  openIssue(id) { this.returnTo = document.activeElement; this.setState({ open: id, dTab: 0, pf: 'Shopify', copied: false }, () => setTimeout(() => this.focusTitle(), 30)); }
+  closeDrawer() { const r = this.returnTo; this.setState({ open: null }, () => setTimeout(() => { if (r && r.isConnected && r.focus) r.focus(); }, 30)); }
+  setIssue(id, patch) { this.setState(s => ({ issues: s.issues.map(i => i.id === id ? { ...i, ...patch } : i) })); }
+  active(i) { return i.status === 'open' || i.status === 'regressed' || i.status === 'needsReview'; }
+
+  view(i) {
+    const s = SEV[i.sev];
+    return { ...i, sl: s.label, sc: s.c, ss: s.s, sd: P[i.sev], isRegressed: i.status === 'regressed', isReview: i.status === 'needsReview',
+      occLabel: i.occ + (i.occ === 1 ? ' occurrence' : ' occurrences'), pagesLabel: i.pages + (i.pages === 1 ? ' page' : ' pages'),
+      hasAssignee: !!i.assignee, noAssignee: !i.assignee, assigneeName: NAMES[i.assignee] || '',
+      open: () => this.openIssue(i.id), openLabel: `${s.label}: ${i.title}, ${i.template}. Open details` };
+  }
+
+  chart() {
+    const h = React.createElement, W = 820, H = 240, L = 40, R = 120, T = 14, B = 34, pw = W - L - R, ph = H - T - B, n = TREND.length;
+    const x = i => L + i * pw / (n - 1), y = v => T + (100 - v) * ph / 100, k = [];
+    [0, 25, 50, 75, 100].forEach(v => { k.push(h('line', { key: 'g' + v, x1: L, x2: W - R + 10, y1: y(v), y2: y(v), stroke: 'var(--border)' })); k.push(h('text', { key: 'l' + v, x: L - 10, y: y(v) + 4, textAnchor: 'end', fontSize: 12, fill: 'var(--muted)' }, v)); });
+    TREND.forEach((t, i) => { if (i % 2 === 0 || i === n - 1) k.push(h('text', { key: 'x' + i, x: x(i), y: H - 10, textAnchor: 'middle', fontSize: 12, fill: 'var(--muted)' }, t[0])); });
+    k.push(h('polyline', { key: 'ln', points: TREND.map((t, i) => x(i) + ',' + y(t[1])).join(' '), fill: 'none', stroke: 'var(--primary)', strokeWidth: 2.5, strokeLinejoin: 'round' }));
+    TREND.forEach((t, i) => k.push(h('circle', { key: 'p' + i, cx: x(i), cy: y(t[1]), r: i === n - 1 ? 6 : 4.5, fill: t[3] ? 'var(--bg)' : 'var(--primary)', stroke: 'var(--primary)', strokeWidth: 2, tabIndex: 0, role: 'img',
+      'aria-label': `${t[0]}: score ${t[1]}, ${t[2]} open problems${t[3] ? ', partial scan' : ''}`, style: { cursor: 'pointer' },
+      onMouseEnter: () => this.setState({ hover: i }), onMouseLeave: () => this.setState({ hover: null }), onFocus: () => this.setState({ hover: i }), onBlur: () => this.setState({ hover: null }) })));
+    k.push(h('text', { key: 'ann', x: x(n - 1) + 12, y: y(78) + 5, fontSize: 14, fontWeight: 600, fill: 'var(--text)' }, '78 · Needs work'));
+    const hv = this.state.hover;
+    if (hv != null && hv !== n - 1) { const t = TREND[hv], bx = Math.min(x(hv) - 70, W - 150), by = y(t[1]) - 66;
+      k.push(h('g', { key: 'tip', pointerEvents: 'none' }, h('rect', { x: bx, y: by, width: 140, height: 52, rx: 6, fill: 'var(--bg)', stroke: 'var(--bstrong)' }),
+        h('text', { x: bx + 12, y: by + 21, fontSize: 13, fontWeight: 600, fill: 'var(--text)' }, `${t[0]} · ${t[1]}${t[3] ? ' (partial)' : ''}`),
+        h('text', { x: bx + 12, y: by + 40, fontSize: 12, fill: 'var(--muted)' }, `${t[2]} open problems`))); }
+    return h('svg', { viewBox: `0 0 ${W} ${H}`, width: '100%', role: 'group', 'aria-label': 'Score by scan date. Each point is focusable.', style: { display: 'block', overflow: 'visible' } }, k);
+  }
+
+  renderVals() {
+    const st = this.state, theme = st.theme || this.props.theme || 'light';
+    const tab = st.tab != null ? st.tab : (this.props.startTab === 'issues' ? 1 : 0);
+    const act = st.issues.filter(i => this.active(i));
+    const tabStyle = (on) => ({ color: on ? 'var(--ptext)' : 'var(--muted)', weight: on ? 600 : 500, bar: on ? 'inset 0 -2px 0 var(--primary)' : 'none' });
+
+    const sevCounts = Object.keys(SEV).map(k => { const n = act.filter(i => i.sev === k).length; return { label: SEV[k].label, count: n, tip: SEV[k].tip, d: P[k], c: n ? SEV[k].c : 'var(--muted)', bg: n ? SEV[k].s : 'var(--bgs)' }; });
+    const ranked = act.slice().sort((a, b) => SEV[b.sev].w * 1000 + b.occ - (SEV[a.sev].w * 1000 + a.occ));
+
+    const q = st.search.trim().toLowerCase();
+    const filt = act.filter(i => (!st.sevF.length || st.sevF.includes(i.sev)) && (!q || (i.title + ' ' + i.rule + ' ' + i.template).toLowerCase().includes(q)));
+    const byRule = {};
+    filt.forEach(i => { (byRule[i.rule] = byRule[i.rule] || []).push(i); });
+    const groups = Object.keys(byRule).map(r => {
+      const it = byRule[r], s = SEV[it[0].sev], exp = !st.collapsed.includes(r), occ = it.reduce((a, b) => a + b.occ, 0);
+      return { rule: r, title: it[0].title, sl: s.label, sc: s.c, ss: s.s, sd: P[it[0].sev], w: s.w, expanded: exp, chev: exp ? 'rotate(90deg)' : 'none',
+        meta: `${it.length} ${it.length === 1 ? 'issue' : 'issues'} · ${occ} occurrences`,
+        toggle: () => this.setState(x => ({ collapsed: exp ? [...x.collapsed, r] : x.collapsed.filter(c => c !== r) })),
+        items: it.map(i => { const sel = st.sel.includes(i.id); return { ...this.view(i), selected: sel, rowBg: sel ? 'var(--psoft)' : 'transparent', checkLabel: `Select issue: ${i.title}, ${i.template}`,
+          toggleSel: () => this.setState(x => ({ sel: sel ? x.sel.filter(y => y !== i.id) : [...x.sel, i.id] })) }; }) };
+    }).sort((a, b) => b.w - a.w);
+
+    const cur = st.issues.find(i => i.id === st.open);
+    let d = {}, steps = [], code = '', lang = '';
+    if (cur) {
+      d = { ...this.view(cur), wcagShort: cur.wcag.split(' ')[0], recheckPages: Math.min(cur.pages, 3),
+        statusLabel: { open: 'Open', regressed: 'Regressed', needsReview: 'Needs review', fixed: 'Fixed', ignored: 'Ignored' }[cur.status],
+        isFixed: cur.status === 'fixed', isIgnored: cur.status === 'ignored', isActive: this.active(cur),
+        assignLabel: cur.assignee ? 'Assigned: ' + NAMES[cur.assignee] : 'Assign', dueLabel: cur.due || 'Set due date',
+        ai: cur.ai || 'Apply the generic fix to this element; the exact text depends on what the element does on your page.',
+        occs: (cur.occs || []).map(o => ({ url: 'oakhaus.com' + o[0], sel: o[1] })),
+        history: (cur.history || [['found', 'First found', cur.first]].concat(cur.assignee ? [['user', 'Assigned to ' + NAMES[cur.assignee] + ', ' + cur.due.toLowerCase(), 'Daniel Mwangi']] : []))
+          .concat(cur.status === 'fixed' ? [['ok', 'Fixed by recheck', 'Daniel Mwangi · Today']] : []).concat(cur.status === 'ignored' ? [['eye', 'Ignored: ' + cur.ignoreReason, 'Daniel Mwangi · Today']] : [])
+          .map(h => ({ t: h[1], m: h[2], d: P[h[0]], c: h[0] === 'ok' ? 'var(--ok)' : 'var(--muted)' })) };
+      if (st.pf === 'Shopify') { steps = cur.steps; code = cur.code; lang = 'Liquid'; }
+      else if (st.pf === 'WordPress') { steps = []; code = cur.gen; lang = 'HTML'; }
+      else { steps = ['Find the element using the selector in “Where it occurs”.', 'Apply the change shown below.', 'Rescan to confirm.']; code = cur.gen; lang = 'HTML'; }
+    }
+    const aiS = cur ? (st.ai[cur.id] || 'none') : 'none';
+    const reqNote = st.reason >= 2;
+
+    return {
+      theme, themeLabel: theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme',
+      themeIcon: theme === 'dark' ? 'M12 8a4 4 0 1 0 0 8a4 4 0 1 0 0-8z M12 2v2 M12 20v2 M4.93 4.93l1.41 1.41 M17.66 17.66l1.41 1.41 M2 12h2 M20 12h2 M6.34 17.66l-1.41 1.41 M19.07 4.93l-1.41 1.41' : 'M12 3a6 6 0 0 0 9 9a9 9 0 1 1-9-9z',
+      toggleTheme: () => this.setState({ theme: theme === 'dark' ? 'light' : 'dark' }),
+      tabLabel: TABS[tab], isOverview: tab === 0, isIssues: tab === 1, isOther: tab > 1,
+      tabs: TABS.map((l, i) => ({ label: l, active: i === tab, ...tabStyle(i === tab), onClick: () => this.setState({ tab: i }) })),
+      goIssues: e => { e.preventDefault(); this.setState({ tab: 1 }); },
+      infoOpen: st.infoOpen, toggleInfo: () => this.setState(s => ({ infoOpen: !s.infoOpen })),
+      sevCounts, fixedCount: 8 + (st.fixed.length - 5), regressedCount: act.filter(i => i.status === 'regressed').length,
+      chart: this.chart(), chartTable: st.chartTable, chartVisible: !st.chartTable,
+      chartToggleLabel: st.chartTable ? 'View as chart' : 'View as table', toggleChartTable: () => this.setState(s => ({ chartTable: !s.chartTable })),
+      trend: TREND.map(t => ({ d: t[0], v: t[1], o: t[2], note: t[3] ? 'Partial — 9 pages timed out' : '' })),
+      topIssues: ranked.slice(0, 5).map(i => this.view(i)),
+      recentlyFixed: st.fixed.slice(0, 5).map(f => ({ title: f[0], date: f[1] })),
+      openSummary: `${act.length} open · ${act.reduce((a, b) => a + b.occ, 0)} occurrences`,
+      search: st.search, onSearch: e => this.setState({ search: e.target.value }),
+      sevChips: Object.keys(SEV).map(k => { const on = st.sevF.includes(k); return { label: SEV[k].label, pressed: on, border: on ? 'var(--primary)' : 'var(--bstrong)', bg: on ? 'var(--psoft)' : 'var(--bg)', color: on ? 'var(--ptext)' : 'var(--text)',
+        onClick: () => this.setState(s => ({ sevF: on ? s.sevF.filter(x => x !== k) : [...s.sevF, k] })) }; }),
+      clearAll: () => this.setState({ sevF: [], search: '' }),
+      resultCount: `Showing ${filt.length} of ${act.length} issues`, groups, noResults: filt.length === 0,
+      hasSelection: st.sel.length > 0, selectedLabel: `${st.sel.length} ${st.sel.length === 1 ? 'issue' : 'issues'} selected`, clearSel: () => this.setState({ sel: [] }),
+      recheckSelected: () => { const n = st.sel.length; this.showToast(`Rechecking ${n} ${n === 1 ? 'issue' : 'issues'}. We’ll update the list when it’s done.`); this.setState({ sel: [] }); },
+      drawerOpen: !!cur, d, titleRef: this.titleRef, closeDrawer: () => this.closeDrawer(),
+      dTabs: DTABS.map((l, i) => ({ label: l, active: i === st.dTab, ...tabStyle(i === st.dTab), onClick: () => this.setState({ dTab: i }) })),
+      dtOverview: st.dTab === 0, dtWhere: st.dTab === 1, dtFix: st.dTab === 2, dtHistory: st.dTab === 3,
+      pfTabs: ['Shopify', 'WordPress', 'Generic'].map(p => ({ label: p, active: st.pf === p, bg: st.pf === p ? 'var(--primary)' : 'var(--bg)', color: st.pf === p ? 'var(--onp)' : 'var(--text)', onClick: () => this.setState({ pf: p, copied: false }) })),
+      fixSteps: steps.map(t => ({ text: t })), hasSteps: steps.length > 0, noSteps: !!cur && steps.length === 0, fixCode: code, codeLang: lang,
+      copyLabel: st.copied ? 'Copied' : 'Copy code', copyCode: () => { try { navigator.clipboard.writeText(code); } catch (e) {} this.setState({ copied: true }); },
+      aiNone: aiS === 'none', aiGen: aiS === 'gen', aiReady: aiS === 'ready',
+      genAi: () => { const id = cur.id; this.setState(s => ({ ai: { ...s.ai, [id]: 'gen' } })); setTimeout(() => this.setState(s => ({ ai: { ...s.ai, [id]: 'ready' } })), 1400); },
+      rechecking: st.rechecking, recheckLabel: st.rechecking ? 'Rechecking 3 pages…' : 'Recheck',
+      recheck: () => { const id = cur.id, n = Math.min(cur.pages, 3), title = cur.title, tpl = cur.template; this.setState({ rechecking: true });
+        setTimeout(() => { this.setIssue(id, { status: 'fixed' }); this.setState(s => ({ rechecking: false, fixed: [[title + ' — ' + tpl, 'Today'], ...s.fixed], sel: s.sel.filter(x => x !== id) }));
+          this.showToast(`Fixed — the problem no longer appears on ${n} checked ${n === 1 ? 'page' : 'pages'}.`); }, 1600); },
+      reopen: () => this.setIssue(cur.id, { status: 'open' }),
+      ignoreOpen: st.ignoreOpen, openIgnore: () => this.setState({ ignoreOpen: true, reason: 0, ignoreNote: '', noteError: false }), closeIgnore: () => this.setState({ ignoreOpen: false }),
+      reasons: REASONS.map((r, i) => ({ label: r, checked: st.reason === i, onChange: () => this.setState({ reason: i, noteError: false }) })),
+      noteReq: reqNote ? '(required)' : '(optional)', ignoreNote: st.ignoreNote, onIgnoreNote: e => this.setState({ ignoreNote: e.target.value, noteError: false }),
+      noteError: st.noteError, noteBorder: st.noteError ? 'var(--crit)' : 'var(--bstrong)',
+      confirmIgnore: () => { if (reqNote && !st.ignoreNote.trim()) return this.setState({ noteError: true });
+        this.setIssue(cur.id, { status: 'ignored', ignoreReason: REASONS[st.reason].toLowerCase() }); this.setState({ ignoreOpen: false }); this.showToast('Issue ignored. It stays in your evidence log with your reason.'); },
+      toastDisplay: st.toastMsg ? 'flex' : 'none', toastText: st.toastMsg || '', closeToast: () => this.setState({ toastMsg: null })
+    };
+  }
+}
+</script>
+</body>
+</html>

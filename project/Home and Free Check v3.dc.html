@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Manrope:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root,[data-theme="light"]{--ptext:#2545FF;--page:#F9F8F6;--shc:rgba(12,23,84,.04) 0 4px 5px, rgba(12,23,84,.03) 0 4px 10px, rgba(12,23,84,.05) 0 10px 20px;--bg:#FFFFFF;--bgs:#F4F1EC;--sunk:#EEEAE3;--text:#0C1754;--muted:#476788;--border:#EDE5DB;--bstrong:#6E87A3;--primary:#2545FF;--phover:#1A33D1;--psoft:#EAEBF8;--onp:#FFFFFF;--crit:#B42318;--critS:#FEF3F2;--ser:#B54708;--serS:#FFF6ED;--mod:#8A6100;--modS:#FEF9E7;--min:#476788;--minS:#F4F1EC;--ok:#067647;--okS:#ECFDF3}
+[data-theme="dark"]{--ptext:#8FBBFF;--page:#0B1120;--shc:none;--bg:#111A2B;--bgs:#16223A;--sunk:#0E1626;--text:#E6EAF0;--muted:#A3AEC0;--border:#26354F;--bstrong:#6B7A90;--primary:#6EA8FF;--phover:#9CC3FF;--psoft:#1A2347;--onp:#0B1120;--crit:#FF8A80;--critS:#2A1416;--ser:#FDB022;--serS:#2A1E0D;--mod:#F5D565;--modS:#262110;--min:#A3AEC0;--minS:#1A2232;--ok:#4ADE80;--okS:#0F2419}
+html,body{margin:0}body{font-family:'Manrope',system-ui,sans-serif;-webkit-font-smoothing:antialiased}*{box-sizing:border-box}
+*:focus-visible{outline:2px solid var(--primary);outline-offset:2px}a{color:var(--ptext);text-underline-offset:2px}a:hover{color:var(--phover)}button{font-family:inherit}
+</style>
+</helmet>
+<div data-theme="{{ theme }}" style="min-height:100vh;background:var(--page);color:var(--text);font-family:'Manrope',system-ui,sans-serif;font-size:16px;line-height:24px">
+  <header style="border-bottom:1px solid var(--border)">
+    <div style="max-width:1280px;margin:0 auto;padding:16px 32px;display:flex;flex-wrap:wrap;gap:16px 32px;align-items:center">
+      <a href="#" aria-label="Plainsight home" style="display:flex;align-items:center;gap:10px;text-decoration:none;color:var(--text)"><span style="width:28px;height:28px;border-radius:6px;background:var(--primary);display:grid;place-items:center"><span style="width:11px;height:11px;border-radius:50%;background:var(--onp)"></span></span><span style="font-size:20px;font-weight:700;letter-spacing:-0.03em">plainsight</span></a>
+      <nav aria-label="Main" style="display:flex;gap:24px;font-size:14px;font-weight:500;flex:1 1 auto;min-width:0;overflow-x:auto;white-space:nowrap;padding:4px 2px"><a href="#how" style="color:var(--text);text-decoration:none">Product</a><a href="#agencies" style="color:var(--text);text-decoration:none">For agencies</a><a href="#pricing" style="color:var(--text);text-decoration:none">Pricing</a><a href="#" style="color:var(--text);text-decoration:none">Fix guides</a><a href="#check" style="color:var(--ptext);font-weight:600">Free check</a></nav>
+      <div style="display:flex;gap:12px;align-items:center"><button onClick="{{ toggleTheme }}" aria-label="{{ themeLabel }}" style="height:36px;padding:0 10px;border-radius:100px;border:1px solid var(--border);background:var(--bg);color:var(--muted);font-size:13px;cursor:pointer">{{ themeShort }}</button><a href="#" style="font-size:14px;font-weight:600;color:var(--text);text-decoration:none">Sign in</a><a href="#" style="height:40px;padding:0 16px;border-radius:100px;background:var(--primary);color:var(--onp);font-size:14px;font-weight:600;text-decoration:none;display:flex;align-items:center">Start free trial</a></div>
+    </div>
+  </header>
+
+  <main>
+    <section id="check" aria-labelledby="hero-h" style="max-width:1280px;margin:0 auto;padding:96px 32px 80px;display:flex;flex-direction:column;gap:24px">
+      <sc-if value="{{ isInput }}" hint-placeholder-val="{{ true }}">
+        <span style="font-size:12px;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:var(--muted)">Accessibility monitoring for online stores</span><h1 id="hero-h" style="margin:0;max-width:880px;font-family:'Instrument Serif',Georgia,serif;font-weight:400;font-size:76px;line-height:78px;letter-spacing:-0.01em;text-wrap:balance">Find the accessibility problems that <em>stop people buying</em> — and fix them in order.</h1>
+        <p style="margin:0;max-width:680px;font-size:18px;line-height:28px;color:var(--muted);text-wrap:pretty">Weekly checks for Shopify and WordPress sites, plain-language fix guides, and a record of your progress. Built for the ADA in the US and the European Accessibility Act, in force since June 2025.</p>
+        <form onSubmit="{{ submit }}" novalidate="{{ true }}" style="display:flex;flex-direction:column;gap:8px;max-width:640px">
+          <label for="url" style="font-size:14px;font-weight:600">Check one page free</label>
+          <div style="display:flex;flex-wrap:wrap;gap:12px">
+            <div style="flex:1 1 320px;display:flex;height:48px;border:{{ urlBorder }};border-radius:100px;overflow:hidden;background:var(--bg)"><span style="padding:0 12px;display:grid;place-items:center;background:var(--bgs);border-right:1px solid var(--border);color:var(--muted);font-size:16px">https://</span><input id="url" value="{{ url }}" onChange="{{ onUrl }}" aria-invalid="{{ urlError }}" aria-describedby="url-help" autocomplete="url" placeholder="yourstore.com" style="flex:1;border:0;outline:0;padding:0 12px;background:transparent;color:var(--text);font:inherit;font-size:16px;min-width:0"></div>
+            <button type="submit" style="height:48px;padding:0 24px;border-radius:100px;border:0;background:var(--primary);color:var(--onp);font-size:16px;font-weight:600;cursor:pointer" style-hover="background:var(--phover)">Check your site free</button>
+          </div>
+          <sc-if value="{{ urlError }}" hint-placeholder-val="{{ false }}"><span role="alert" style="display:flex;gap:6px;align-items:center;font-size:14px;color:var(--crit)"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7.86 2h8.28L22 7.86v8.28L16.14 22H7.86L2 16.14V7.86z M12 8v4 M12 16h.01"></path></svg>Enter a full web address, like yourstore.com</span></sc-if>
+          <span id="url-help" style="font-size:14px;color:var(--muted)">We check one page. We don't store personal data. No overlay, no script on your site.</span>
+        </form>
+      </sc-if>
+
+      <sc-if value="{{ isProgress }}" hint-placeholder-val="{{ false }}">
+        <div style="max-width:640px;display:flex;flex-direction:column;gap:20px">
+          <h1 style="margin:0;font-family:'Instrument Serif',Georgia,serif;font-weight:400;font-size:44px;line-height:48px">Checking {{ url }}</h1>
+          <p style="margin:0;color:var(--muted)">This usually takes 30–60 seconds.</p>
+          <ol role="status" aria-live="polite" style="list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:12px">
+            <sc-for list="{{ steps }}" as="s" hint-placeholder-count="3">
+              <li style="display:flex;gap:12px;align-items:center;padding:14px 16px;border-radius:100px;border:1px solid var(--border);background:{{ s.bg }}">
+                <span style="width:24px;height:24px;border-radius:50%;display:grid;place-items:center;border:2px solid {{ s.ring }};color:var(--ok);font-size:13px;font-weight:700">{{ s.mark }}</span>
+                <span style="flex:1;font-weight:{{ s.fw }}">{{ s.label }}</span>
+                <span style="font-size:14px;color:var(--muted)">{{ s.state }}</span>
+              </li>
+            </sc-for>
+          </ol>
+          <button onClick="{{ reset }}" style="align-self:flex-start;border:0;background:transparent;color:var(--ptext);font-size:14px;font-weight:600;padding:0;text-decoration:underline;cursor:pointer">Cancel check</button>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ isResult }}" hint-placeholder-val="{{ false }}">
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,420px),1fr));gap:32px;align-items:start">
+          <div style="display:flex;flex-direction:column;gap:20px;min-width:0">
+            <div><h1 tabindex="-1" ref="{{ resRef }}" style="margin:0;font-family:'Instrument Serif',Georgia,serif;font-weight:400;font-size:44px;line-height:48px">Results for {{ url }}</h1><p style="margin:4px 0 0;color:var(--muted);font-size:14px">Home page · checked 15 Oct 2026, 10:41 · 92 automated checks</p></div>
+            <div style="display:flex;flex-wrap:wrap;gap:24px 40px;padding:24px;border:1px solid var(--border);border-radius:16px;background:var(--bg);box-shadow:var(--shc)">
+              <div style="display:flex;flex-direction:column;gap:4px"><span style="font-size:14px;font-weight:600;color:var(--muted)">Automated check score</span><span style="display:flex;align-items:baseline;gap:10px"><span style="font-size:40px;line-height:44px;font-weight:700;font-variant-numeric:tabular-nums">64</span><span style="padding:2px 8px;border-radius:4px;background:var(--critS);color:var(--crit);font-size:14px;font-weight:600">Poor</span></span></div>
+              <ul style="list-style:none;margin:0;padding:0;display:flex;flex-wrap:wrap;gap:8px;align-items:center">
+                <sc-for list="{{ counts }}" as="c" hint-placeholder-count="4"><li style="display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border-radius:8px;background:{{ c.s }};color:{{ c.c }};font-size:14px;font-weight:600"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="{{ c.d }}"></path></svg>{{ c.n }} {{ c.label }}</li></sc-for>
+              </ul>
+            </div>
+            <h2 style="margin:8px 0 0;font-size:24px;line-height:32px;font-weight:600">Top problems on this page</h2>
+            <ul style="list-style:none;margin:0;padding:0;border:1px solid var(--border);border-radius:16px;background:var(--bg);box-shadow:var(--shc)">
+              <sc-for list="{{ top }}" as="t" hint-placeholder-count="6">
+                <li style="border-bottom:1px solid var(--border)">
+                  <h3 style="margin:0"><button onClick="{{ t.toggle }}" aria-expanded="{{ t.open }}" style="width:100%;display:grid;grid-template-columns:110px minmax(0,1fr) auto;gap:12px;align-items:center;padding:14px 16px;border:0;background:transparent;color:var(--text);text-align:left;font-size:16px;font-weight:500;cursor:pointer">
+                    <span style="display:inline-flex;align-items:center;gap:4px;justify-self:start;padding:2px 8px;border-radius:4px;background:{{ t.s }};color:{{ t.c }};font-size:13px;font-weight:600"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="{{ t.d }}"></path></svg>{{ t.label }}</span>
+                    <span>{{ t.title }}</span><span style="font-size:14px;color:var(--muted);font-variant-numeric:tabular-nums">{{ t.n }}×</span></button></h3>
+                  <sc-if value="{{ t.open }}" hint-placeholder-val="{{ false }}"><div style="padding:0 16px 16px 138px;font-size:14px;line-height:20px;display:flex;flex-direction:column;gap:6px"><span><strong>Who it affects:</strong> {{ t.who }}</span><a href="#">Read the fix guide</a></div></sc-if>
+                </li>
+              </sc-for>
+            </ul>
+          </div>
+          <aside style="display:flex;flex-direction:column;gap:20px">
+            <section style="padding:20px;border-radius:8px;background:var(--bgs);display:flex;flex-direction:column;gap:8px">
+              <h2 style="margin:0;font-size:16px;font-weight:600">What this check can't tell you</h2>
+              <ul style="margin:0;padding-left:20px;font-size:14px;line-height:20px;display:flex;flex-direction:column;gap:4px"><li>Whether your site works with a keyboard alone</li><li>Whether alt text and labels actually make sense</li><li>Problems on your other pages, cart and checkout</li><li>Whether your site meets any law — no automated tool can say that</li></ul>
+            </section>
+            <sc-if value="{{ notSent }}" hint-placeholder-val="{{ true }}">
+              <form onSubmit="{{ sendReport }}" style="padding:20px;border-radius:100px;border:1px solid var(--border);display:flex;flex-direction:column;gap:12px">
+                <h2 style="margin:0;font-size:16px;font-weight:600">Email me the full report</h2>
+                <div style="display:flex;flex-direction:column;gap:6px"><label for="em" style="font-size:14px;font-weight:600">Email (required)</label><input id="em" type="email" value="grace@soraskin.co" style="height:40px;padding:0 12px;border:1px solid var(--bstrong);border-radius:4px;background:var(--bg);color:var(--text);font:inherit;font-size:14px"></div>
+                <label style="display:flex;gap:10px;align-items:flex-start;font-size:14px;line-height:20px"><input type="checkbox" style="width:18px;height:18px;accent-color:var(--ptext);margin:1px 0 0;flex:0 0 auto">Also send me occasional tips on fixing accessibility problems. Unsubscribe anytime.</label>
+                <button type="submit" style="height:40px;border-radius:100px;border:1px solid var(--bstrong);background:var(--bg);color:var(--text);font-size:14px;font-weight:600;cursor:pointer">Send full report</button>
+              </form>
+            </sc-if>
+            <sc-if value="{{ sent }}" hint-placeholder-val="{{ false }}"><p role="status" style="margin:0;padding:16px 20px;border-radius:8px;background:var(--okS);color:var(--ok);font-size:14px;font-weight:500">Report sent to grace@soraskin.co. It may take a minute to arrive.</p></sc-if>
+            <section style="padding:24px;border-radius:16px;background:var(--text);color:var(--bg);display:flex;flex-direction:column;gap:12px">
+              <h2 style="margin:0;font-size:20px;line-height:28px;font-weight:600">Monitor your whole site — 14 days free</h2>
+              <p style="margin:0;font-size:14px;line-height:20px">We'll check up to 150 pages every week, group the problems by template, and alert you when something breaks.</p>
+              <a href="#" style="height:44px;border-radius:8px;background:var(--onp);color:var(--ptext);font-size:15px;font-weight:600;text-decoration:none;display:grid;place-items:center">Start free trial</a>
+            </section>
+            <button onClick="{{ reset }}" style="align-self:flex-start;border:0;background:transparent;color:var(--ptext);font-size:14px;font-weight:600;padding:0;text-decoration:underline;cursor:pointer">Check another page</button>
+          </aside>
+        </div>
+      </sc-if>
+    </section>
+
+    <section aria-labelledby="facts-h" style="background:var(--bgs);border-top:1px solid var(--border);border-bottom:1px solid var(--border)">
+      <div style="max-width:1280px;margin:0 auto;padding:64px 32px;display:flex;flex-direction:column;gap:32px">
+        <h2 id="facts-h" style="margin:0;font-family:'Instrument Serif',Georgia,serif;font-weight:400;font-size:52px;line-height:56px;max-width:720px">Accessibility is now a <em>business</em> question, not just a technical one</h2>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:32px">
+          <div style="display:flex;flex-direction:column;gap:8px"><strong style="font-size:20px;line-height:28px">Online stores are the most common target of US accessibility lawsuits.</strong><span style="font-size:14px;color:var(--muted)">Source: [to confirm before launch]</span></div>
+          <div style="display:flex;flex-direction:column;gap:8px"><strong style="font-size:20px;line-height:28px">The European Accessibility Act has applied to e-commerce since 28 June 2025.</strong><span style="font-size:14px;color:var(--muted)">Source: Directive (EU) 2019/882</span></div>
+          <div style="display:flex;flex-direction:column;gap:8px"><strong style="font-size:20px;line-height:28px">Overlays don't fix the underlying code — and can make things worse.</strong><span style="font-size:14px;color:var(--muted)">Source: [to confirm before launch]</span></div>
+        </div>
+      </div>
+    </section>
+
+    <section id="how" aria-labelledby="how-h" style="max-width:1280px;margin:0 auto;padding:80px 32px;display:flex;flex-direction:column;gap:32px">
+      <h2 id="how-h" style="margin:0;font-family:'Instrument Serif',Georgia,serif;font-weight:400;font-size:52px;line-height:56px">How it <em>works</em></h2>
+      <ol style="list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:24px">
+        <sc-for list="{{ how }}" as="h" hint-placeholder-count="4">
+          <li style="display:flex;flex-direction:column;gap:12px">
+            <div style="aspect-ratio:4/3;border-radius:16px;box-shadow:var(--shc);border:1px solid var(--border);background:repeating-linear-gradient(135deg,var(--bgs) 0 10px,var(--sunk) 10px 20px);display:grid;place-items:center"><span style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--muted);background:var(--bg);padding:2px 8px;border-radius:4px">{{ h.shot }}</span></div>
+            <span style="font-size:14px;font-weight:600;color:var(--ptext)">{{ h.n }}</span>
+            <h3 style="margin:0;font-size:20px;line-height:28px;font-weight:600">{{ h.t }}</h3>
+            <p style="margin:0;color:var(--muted);text-wrap:pretty">{{ h.d }}</p>
+          </li>
+        </sc-for>
+      </ol>
+    </section>
+
+    <section id="agencies" aria-labelledby="ag-h" style="border-top:1px solid var(--border)">
+      <div style="max-width:1280px;margin:0 auto;padding:80px 32px;display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,420px),1fr));gap:48px;align-items:center">
+        <div style="display:flex;flex-direction:column;gap:16px">
+          <h2 id="ag-h" style="margin:0;font-family:'Instrument Serif',Georgia,serif;font-weight:400;font-size:52px;line-height:56px">Built for <em>agencies</em> and freelancers</h2>
+          <p style="margin:0;font-size:18px;line-height:28px;color:var(--muted)">Turn accessibility into a monthly care plan your clients understand.</p>
+          <ul style="margin:0;padding-left:20px;display:flex;flex-direction:column;gap:8px"><li>Every client site on one screen, worst first</li><li>Monthly reports with your logo and colours</li><li>A calm client portal — no rule IDs, no jargon</li></ul>
+          <a href="#" style="font-weight:600">See agency plans</a>
+        </div>
+        <div style="aspect-ratio:16/10;border-radius:12px;border:1px solid var(--border);background:repeating-linear-gradient(135deg,var(--bgs) 0 10px,var(--sunk) 10px 20px);display:grid;place-items:center"><span style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--muted);background:var(--bg);padding:2px 8px;border-radius:4px">screenshot: agency overview + branded report</span></div>
+      </div>
+    </section>
+
+    <section aria-labelledby="ov-h" style="background:var(--bgs);border-top:1px solid var(--border);border-bottom:1px solid var(--border)">
+      <div style="max-width:960px;margin:0 auto;padding:64px 32px;display:flex;flex-direction:column;gap:24px">
+        <h2 id="ov-h" style="margin:0;font-family:'Instrument Serif',Georgia,serif;font-weight:400;font-size:52px;line-height:56px">Why not an <em>overlay?</em></h2>
+        <table style="width:100%;border-collapse:collapse;background:var(--bg);border:1px solid var(--border);border-radius:16px;background:var(--bg);box-shadow:var(--shc);font-size:15px">
+          <thead><tr style="text-align:left"><th scope="col" style="padding:12px 16px;border-bottom:1px solid var(--border)"><span style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)">Question</span></th><th scope="col" style="padding:12px 16px;border-bottom:1px solid var(--border)">Overlay widget</th><th scope="col" style="padding:12px 16px;border-bottom:1px solid var(--border);color:var(--ptext)">Plainsight</th></tr></thead>
+          <tbody>
+            <sc-for list="{{ compare }}" as="c" hint-placeholder-count="4"><tr><th scope="row" style="padding:12px 16px;border-bottom:1px solid var(--border);text-align:left;font-weight:500">{{ c.q }}</th><td style="padding:12px 16px;border-bottom:1px solid var(--border);color:var(--muted)">{{ c.a }}</td><td style="padding:12px 16px;border-bottom:1px solid var(--border)">{{ c.b }}</td></tr></sc-for>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="pricing" aria-labelledby="pr-h" style="max-width:1280px;margin:0 auto;padding:80px 32px;display:flex;flex-direction:column;gap:24px">
+      <h2 id="pr-h" style="margin:0;font-family:'Instrument Serif',Georgia,serif;font-weight:400;font-size:52px;line-height:56px"><em>Simple</em> pricing</h2>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px">
+        <sc-for list="{{ plans }}" as="p" hint-placeholder-count="4">
+          <div style="border:{{ p.border }};border-radius:16px;background:var(--bg);box-shadow:var(--shc);padding:24px;display:flex;flex-direction:column;gap:8px">
+            <span style="font-size:13px;font-weight:600;color:var(--ptext);min-height:20px">{{ p.tag }}</span>
+            <h3 style="margin:0;font-size:20px;font-weight:600">{{ p.name }}</h3>
+            <span><strong style="font-size:30px;line-height:38px;font-variant-numeric:tabular-nums">{{ p.price }}</strong><span style="color:var(--muted)"> / month</span></span>
+            <span style="font-size:14px;color:var(--muted)">{{ p.who }}</span>
+          </div>
+        </sc-for>
+      </div>
+      <a href="#" style="font-weight:600">Compare all features</a>
+    </section>
+
+    <section aria-labelledby="faq-h" style="border-top:1px solid var(--border)">
+      <div style="max-width:800px;margin:0 auto;padding:64px 32px;display:flex;flex-direction:column;gap:16px">
+        <h2 id="faq-h" style="margin:0;font-family:'Instrument Serif',Georgia,serif;font-weight:400;font-size:52px;line-height:56px"><em>Questions</em></h2>
+        <sc-for list="{{ faq }}" as="f" hint-placeholder-count="3">
+          <div style="border-bottom:1px solid var(--border)">
+            <h3 style="margin:0"><button onClick="{{ f.toggle }}" aria-expanded="{{ f.open }}" style="width:100%;display:flex;justify-content:space-between;gap:16px;padding:16px 0;border:0;background:transparent;color:var(--text);text-align:left;font-size:18px;font-weight:600;cursor:pointer"><span>{{ f.q }}</span><span aria-hidden="true">{{ f.sign }}</span></button></h3>
+            <sc-if value="{{ f.open }}" hint-placeholder-val="{{ false }}"><p style="margin:0 0 16px;color:var(--muted);text-wrap:pretty">{{ f.a }}</p></sc-if>
+          </div>
+        </sc-for>
+      </div>
+    </section>
+  </main>
+  <footer style="border-top:1px solid var(--border);background:var(--bgs)"><div style="max-width:1280px;margin:0 auto;padding:32px;display:flex;flex-wrap:wrap;gap:16px 32px;font-size:14px;color:var(--muted)"><span style="flex:1">© 2026 Plainsight (working name)</span><a href="#">Terms</a><a href="#">Privacy</a><a href="#">Our bot</a><a href="#">Accessibility statement</a></div></footer>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;theme&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;light&quot;,&quot;dark&quot;],&quot;default&quot;:&quot;light&quot;,&quot;tsType&quot;:&quot;'light'|'dark'&quot;}}">
+const C='M2 12a10 10 0 1 0 20 0a10 10 0 1 0-20 0';
+const SV={critical:['Critical','var(--crit)','var(--critS)','M7.86 2h8.28L22 7.86v8.28L16.14 22H7.86L2 16.14V7.86z M12 8v4 M12 16h.01'],serious:['Serious','var(--ser)','var(--serS)','M21.73 18l-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3z M12 9v4 M12 17h.01'],moderate:['Moderate','var(--mod)','var(--modS)',C+' M12 8v4 M12 16h.01'],minor:['Minor','var(--min)','var(--minS)',C+' M12 16v-4 M12 8h.01']};
+const TOP=[['critical','Images are missing descriptions',14,'People who use screen readers can’t tell what products look like.'],['critical','Buttons have no name screen readers can announce',3,'Screen reader users can’t find the cart or menu.'],['serious','Text doesn’t have enough contrast',22,'People with low vision struggle to read prices.'],['serious','Zooming is turned off on phones',1,'People who need to zoom can’t enlarge the page.'],['moderate','Heading levels skip',4,'Screen reader users may think content is missing.'],['minor','Embedded video has no title',1,'Screen reader users hear only “frame”.']];
+const STEPS=['Loading page','Running 92 automated checks','Preparing results'];
+class Component extends DCLogic {
+  state={theme:null,phase:'input',url:'soraskin.co',err:false,step:0,openTop:-1,faq:0,sent:false};
+  resRef=React.createRef();
+  componentWillUnmount(){(this.t||[]).forEach(clearTimeout);}
+  componentDidUpdate(_,p){if(this.state.phase==='result'&&p.phase!=='result'&&this.resRef.current)this.resRef.current.focus();}
+  renderVals(){
+    const s=this.state,th=s.theme||this.props.theme||'light';
+    const faq=[['Will this make my site compliant?','No tool can make a site compliant on its own. Automated checks find part of the problems; the rest needs people to test. We help you find, fix and record your work — which is what reduces risk.'],['Do I need to install anything?','No. We check your site from the outside, like a visitor. Nothing is added to your pages.'],['Which platforms do you support?','Any public website. Fix guides are written for Shopify and WordPress first, with generic code for everything else.']];
+    return {
+      theme:th,themeLabel:th==='dark'?'Switch to light theme':'Switch to dark theme',themeShort:th==='dark'?'Light':'Dark',toggleTheme:()=>this.setState({theme:th==='dark'?'light':'dark'}),
+      isInput:s.phase==='input',isProgress:s.phase==='progress',isResult:s.phase==='result',
+      url:s.url,onUrl:e=>this.setState({url:e.target.value,err:false}),urlError:s.err,urlBorder:s.err?'2px solid var(--crit)':'1px solid var(--bstrong)',
+      submit:e=>{e.preventDefault();const u=s.url.trim().replace(/^https?:\/\//,'');if(!/^[\w-]+(\.[\w-]+)+/.test(u))return this.setState({err:true});
+        this.setState({phase:'progress',step:0,url:u});this.t=[setTimeout(()=>this.setState({step:1}),1200),setTimeout(()=>this.setState({step:2}),3000),setTimeout(()=>this.setState({phase:'result'}),4200)];},
+      reset:()=>{(this.t||[]).forEach(clearTimeout);this.setState({phase:'input',sent:false});},
+      steps:STEPS.map((l,i)=>({label:l,state:i<s.step?'Done':i===s.step?'In progress…':'Waiting',mark:i<s.step?'✓':'',ring:i<s.step?'var(--ok)':i===s.step?'var(--primary)':'var(--border)',bg:i===s.step?'var(--psoft)':'var(--bg)',fw:i===s.step?600:400})),
+      resRef:this.resRef,
+      counts:[['critical',2],['serious',2],['moderate',1],['minor',1]].map(c=>({label:SV[c[0]][0],c:SV[c[0]][1],s:SV[c[0]][2],d:SV[c[0]][3],n:c[1]})),
+      top:TOP.map((t,i)=>({label:SV[t[0]][0],c:SV[t[0]][1],s:SV[t[0]][2],d:SV[t[0]][3],title:t[1],n:t[2],who:t[3],open:s.openTop===i,toggle:()=>this.setState({openTop:s.openTop===i?-1:i})})),
+      notSent:!s.sent,sent:s.sent,sendReport:e=>{e.preventDefault();this.setState({sent:true});},
+      how:[['1','Scan','We check up to 150 pages every week and group them by template.','screenshot: scan progress'],['2','Understand','Problems in plain words, ranked by who they block.','screenshot: fix these first'],['3','Fix','Step-by-step guides for Shopify and WordPress, with code.','screenshot: fix guide'],['4','Prove','A dated record of scans, fixes and manual checks.','screenshot: evidence timeline']].map(h=>({n:'Step '+h[0],t:h[1],d:h[2],shot:h[3]})),
+      compare:[['Changes your code','No — adds a script on top','Shows you exactly what to change'],['Works with screen readers','Often conflicts with them','Fixes are in your real HTML'],['Proof of effort','None','Evidence pack with dates'],['Claims compliance','Often','Never — we’re honest about limits']].map(c=>({q:c[0],a:c[1],b:c[2]})),
+      plans:[['Store','$29','One store owner, 1 site',''],['Growth','$59','Growing brands, 3 sites',''],['Agency','$149','Up to 25 client sites','Most popular for agencies'],['Agency Pro','$299','Up to 75 sites, custom domain','']].map(p=>({name:p[0],price:p[1],who:p[2],tag:p[3],border:p[3]?'2px solid var(--primary)':'1px solid var(--border)'})),
+      faq:faq.map((f,i)=>({q:f[0],a:f[1],open:s.faq===i,sign:s.faq===i?'−':'+',toggle:()=>this.setState({faq:s.faq===i?-1:i})}))
+    };
+  }
+}
+</script>
+</body>
+</html>

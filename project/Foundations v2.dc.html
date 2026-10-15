@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root,[data-theme="light"]{--ptext:#004EBA;--page:#F8F9FB;--shc:rgba(71,103,136,.04) 0 4px 5px, rgba(71,103,136,.03) 0 4px 10px, rgba(71,103,136,.05) 0 10px 20px;--bg:#FFFFFF;--bgs:#F0F3F8;--sunk:#E9EEF5;--text:#0B3558;--muted:#476788;--border:#D4E0ED;--bstrong:#6E87A3;--primary:#006BFF;--phover:#0055CC;--psoft:#E6F0FF;--onp:#FFFFFF;--info:#1D4ED8;--crit:#B42318;--critS:#FEF3F2;--ser:#B54708;--serS:#FFF6ED;--mod:#8A6100;--modS:#FEF9E7;--min:#476788;--minS:#F0F3F8;--ok:#067647;--okS:#ECFDF3;--sh2:rgba(71,103,136,.04) 0 4px 5px, rgba(71,103,136,.03) 0 8px 15px, rgba(71,103,136,.12) 0 15px 30px}
+[data-theme="dark"]{--ptext:#8FBBFF;--page:#0B1120;--shc:none;--bg:#111A2B;--bgs:#16223A;--sunk:#0E1626;--text:#E6EAF0;--muted:#A3AEC0;--border:#26354F;--bstrong:#6B7A90;--primary:#6EA8FF;--phover:#9CC3FF;--psoft:#1A2347;--onp:#0B1120;--info:#7DA2FF;--crit:#FF8A80;--critS:#2A1416;--ser:#FDB022;--serS:#2A1E0D;--mod:#F5D565;--modS:#262110;--min:#A3AEC0;--minS:#1A2232;--ok:#4ADE80;--okS:#0F2419;--sh2:0 0 0 1px #273246}
+html,body{margin:0}body{font-family:'Manrope',system-ui,sans-serif;-webkit-font-smoothing:antialiased}*{box-sizing:border-box}
+*:focus-visible{outline:2px solid var(--primary);outline-offset:2px}a{color:var(--ptext)}a:hover{color:var(--phover)}button{font-family:inherit}
+</style>
+</helmet>
+<div data-theme="{{ theme }}" style="min-height:100vh;background:var(--page);color:var(--text);font-family:'Manrope',system-ui,sans-serif;font-size:16px;line-height:24px">
+  <header style="position:sticky;top:0;z-index:5;display:flex;flex-wrap:wrap;gap:16px;align-items:center;padding:16px 40px;background:var(--bg);border-bottom:1px solid var(--border)">
+    <div style="flex:1;min-width:240px"><div style="font-size:12px;line-height:16px;font-weight:500;color:var(--muted)">D1 · Foundations</div><h1 style="margin:0;font-size:24px;line-height:32px;font-weight:700">Tokens, type and components · v2</h1></div>
+    <nav aria-label="Sections" style="display:flex;flex-wrap:wrap;gap:16px;font-size:14px"><a href="#brand">Name &amp; mark</a><a href="#color">Colour</a><a href="#type">Type</a><a href="#space">Space &amp; shape</a><a href="#comp">Components</a></nav>
+    <div role="radiogroup" aria-label="Theme" style="display:inline-flex;border:1px solid var(--bstrong);border-radius:8px;overflow:hidden">
+      <sc-for list="{{ themeOpts }}" as="o" hint-placeholder-count="2"><button role="radio" aria-checked="{{ o.on }}" onClick="{{ o.pick }}" style="height:32px;padding:0 14px;border:0;background:{{ o.bg }};color:{{ o.fg }};font-size:14px;font-weight:600;cursor:pointer">{{ o.label }}</button></sc-for>
+    </div>
+  </header>
+
+  <main style="max-width:1280px;margin:0 auto;padding:40px;display:flex;flex-direction:column;gap:64px">
+
+    <section id="brand" style="display:flex;flex-direction:column;gap:20px">
+      <div><h2 style="margin:0;font-size:24px;line-height:32px;font-weight:600">Name and mark — three directions</h2><p style="margin:4px 0 0;color:var(--muted);max-width:720px;text-wrap:pretty">Working names for discussion; each needs a trademark and domain check. Marks are built from simple geometry so they hold at 16 px and in one colour.</p></div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:24px">
+        <article id="logo-a" style="border:1px solid var(--border);border-radius:16px;background:var(--bg);box-shadow:var(--shc);overflow:hidden;display:flex;flex-direction:column">
+          <div style="padding:48px 24px;display:flex;align-items:center;justify-content:center;gap:12px;background:var(--bgs)">
+            <span style="width:36px;height:36px;border-radius:8px;background:var(--primary);display:grid;place-items:center"><span style="width:14px;height:14px;border-radius:50%;background:var(--onp)"></span></span>
+            <span style="font-size:30px;font-weight:700;letter-spacing:-0.03em">plainsight</span>
+          </div>
+          <div style="padding:16px 20px;display:flex;flex-direction:column;gap:4px"><div style="display:flex;gap:8px;align-items:center"><span style="padding:0 8px;border-radius:4px;background:var(--psoft);color:var(--ptext);font-size:13px;font-weight:600">A</span><h3 style="margin:0;font-size:16px;font-weight:600">Plainsight</h3></div><p style="margin:0;font-size:14px;line-height:20px;color:var(--muted)">“Problems in plain sight, in plain language.” Lowercase, calm, closest to the voice rules.</p></div>
+        </article>
+        <article id="logo-b" style="border:1px solid var(--border);border-radius:16px;background:var(--bg);box-shadow:var(--shc);overflow:hidden;display:flex;flex-direction:column">
+          <div style="padding:48px 24px;display:flex;align-items:center;justify-content:center;gap:12px;background:var(--bgs)">
+            <span style="display:flex;align-items:flex-end;gap:3px;height:32px"><span style="width:10px;height:12px;background:var(--primary);border-radius:2px"></span><span style="width:10px;height:22px;background:var(--primary);border-radius:2px"></span><span style="width:10px;height:32px;background:var(--primary);border-radius:2px"></span></span>
+            <span style="font-size:30px;font-weight:700;letter-spacing:-0.02em">Kerbside</span>
+          </div>
+          <div style="padding:16px 20px;display:flex;flex-direction:column;gap:4px"><div style="display:flex;gap:8px;align-items:center"><span style="padding:0 8px;border-radius:4px;background:var(--psoft);color:var(--ptext);font-size:13px;font-weight:600">B</span><h3 style="margin:0;font-size:16px;font-weight:600">Kerbside</h3></div><p style="margin:0;font-size:14px;line-height:20px;color:var(--muted)">Named after the kerb cut — access built in for everyone. Rising steps read as progress.</p></div>
+        </article>
+        <article id="logo-c" style="border:1px solid var(--border);border-radius:16px;background:var(--bg);box-shadow:var(--shc);overflow:hidden;display:flex;flex-direction:column">
+          <div style="padding:48px 24px;display:flex;align-items:center;justify-content:center;gap:12px;background:var(--bgs)">
+            <span style="width:34px;height:34px;border-radius:50%;border:4px solid var(--primary);display:grid;place-items:center"><span style="width:26px;height:4px;background:var(--primary)"></span></span>
+            <span style="font-size:30px;font-weight:600;letter-spacing:-0.01em">Sightline</span>
+          </div>
+          <div style="padding:16px 20px;display:flex;flex-direction:column;gap:4px"><div style="display:flex;gap:8px;align-items:center"><span style="padding:0 8px;border-radius:4px;background:var(--psoft);color:var(--ptext);font-size:13px;font-weight:600">C</span><h3 style="margin:0;font-size:16px;font-weight:600">Sightline</h3></div><p style="margin:0;font-size:14px;line-height:20px;color:var(--muted)">A clear line of sight across every client site. Most “product-like”; works well in agency contexts.</p></div>
+        </article>
+      </div>
+    </section>
+
+    <section id="color" style="display:flex;flex-direction:column;gap:20px">
+      <div><h2 style="margin:0;font-size:24px;line-height:32px;font-weight:600">Colour tokens · {{ themeName }}</h2><p style="margin:4px 0 0;color:var(--muted)">Ratios are from the spec. Use the toggle above to see the other theme.</p></div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:16px">
+        <sc-for list="{{ colors }}" as="c" hint-placeholder-count="12">
+          <div style="border:1px solid var(--border);border-radius:16px;background:var(--bg);box-shadow:var(--shc);overflow:hidden">
+            <div style="height:64px;background:{{ c.v }};border-bottom:1px solid var(--border)"></div>
+            <div style="padding:10px 12px;display:flex;flex-direction:column"><code style="font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:500">{{ c.name }}</code><span style="font-size:13px;color:var(--muted);font-variant-numeric:tabular-nums">{{ c.hex }} · {{ c.note }}</span></div>
+          </div>
+        </sc-for>
+      </div>
+      <h3 style="margin:8px 0 0;font-size:16px;font-weight:600">Severity — always icon + word</h3>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:16px">
+        <sc-for list="{{ sevs }}" as="s" hint-placeholder-count="4">
+          <div style="padding:16px;border-radius:8px;background:{{ s.soft }};color:{{ s.c }};display:flex;flex-direction:column;gap:6px">
+            <span style="display:flex;align-items:center;gap:6px;font-weight:600"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="{{ s.d }}"></path></svg>{{ s.label }}</span>
+            <span style="font-size:14px;line-height:20px">{{ s.tip }}</span>
+            <code style="font-family:'JetBrains Mono',monospace;font-size:12px">{{ s.icon }}</code>
+          </div>
+        </sc-for>
+      </div>
+    </section>
+
+    <section id="type" style="display:flex;flex-direction:column;gap:20px">
+      <h2 style="margin:0;font-size:24px;line-height:32px;font-weight:600">Type scale — Inter and JetBrains Mono</h2>
+      <div style="border:1px solid var(--border);border-radius:16px;background:var(--bg);box-shadow:var(--shc)">
+        <sc-for list="{{ types }}" as="t" hint-placeholder-count="11">
+          <div style="display:grid;grid-template-columns:180px minmax(0,1fr);gap:24px;align-items:baseline;padding:16px 20px;border-bottom:1px solid var(--border)">
+            <span style="display:flex;flex-direction:column"><code style="font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:500">{{ t.name }}</code><span style="font-size:12px;line-height:16px;color:var(--muted)">{{ t.spec }}</span></span>
+            <span style="font-family:{{ t.ff }};font-size:{{ t.fs }};line-height:{{ t.lh }};font-weight:{{ t.fw }};font-variant-numeric:tabular-nums;overflow-wrap:anywhere">{{ t.sample }}</span>
+          </div>
+        </sc-for>
+      </div>
+    </section>
+
+    <section id="space" style="display:flex;flex-direction:column;gap:20px">
+      <h2 style="margin:0;font-size:24px;line-height:32px;font-weight:600">Space, radius, focus</h2>
+      <div style="display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end">
+        <sc-for list="{{ spaces }}" as="s" hint-placeholder-count="14">
+          <div style="display:flex;flex-direction:column;align-items:center;gap:6px"><span style="width:{{ s.px }};height:{{ s.px }};min-width:2px;min-height:2px;background:var(--primary);border-radius:2px"></span><span style="font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums">{{ s.n }}</span></div>
+        </sc-for>
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:24px">
+        <div style="display:flex;flex-direction:column;align-items:center;gap:6px"><span style="width:72px;height:72px;border:2px solid var(--bstrong);border-radius:4px"></span><code style="font-family:'JetBrains Mono',monospace;font-size:12px">radius.sm 4</code></div>
+        <div style="display:flex;flex-direction:column;align-items:center;gap:6px"><span style="width:72px;height:72px;border:2px solid var(--bstrong);border-radius:8px"></span><code style="font-family:'JetBrains Mono',monospace;font-size:12px">radius.md 8</code></div>
+        <div style="display:flex;flex-direction:column;align-items:center;gap:6px"><span style="width:72px;height:72px;border:2px solid var(--bstrong);border-radius:12px"></span><code style="font-family:'JetBrains Mono',monospace;font-size:12px">radius.lg 12</code></div>
+        <div style="display:flex;flex-direction:column;align-items:center;gap:6px"><span style="width:72px;height:72px;border:2px solid var(--bstrong);border-radius:999px"></span><code style="font-family:'JetBrains Mono',monospace;font-size:12px">radius.full</code></div>
+        <div style="display:flex;flex-direction:column;align-items:center;gap:6px"><span style="width:120px;height:40px;border-radius:8px;background:var(--primary);color:var(--onp);display:grid;place-items:center;font-size:14px;font-weight:600;outline:2px solid var(--primary);outline-offset:2px">Focused</span><code style="font-family:'JetBrains Mono',monospace;font-size:12px;margin-top:6px">focus 2px + 2px offset</code></div>
+      </div>
+    </section>
+
+    <section id="comp" style="display:flex;flex-direction:column;gap:32px">
+      <h2 style="margin:0;font-size:24px;line-height:32px;font-weight:600">Components</h2>
+
+      <div style="display:flex;flex-direction:column;gap:12px">
+        <h3 style="margin:0;font-size:16px;font-weight:600">Button — variants × states (md 40)</h3>
+        <div style="display:grid;grid-template-columns:120px repeat(5,minmax(0,1fr));gap:12px;align-items:center;font-size:12px;color:var(--muted);overflow-x:auto">
+          <span></span><span>Default</span><span>Hover</span><span>Focus</span><span>Disabled</span><span>Loading</span>
+          <span>Primary</span>
+          <button style="height:40px;border-radius:8px;border:0;background:var(--primary);color:var(--onp);font-size:14px;font-weight:600">Scan now</button>
+          <button style="height:40px;border-radius:8px;border:0;background:var(--phover);color:var(--onp);font-size:14px;font-weight:600">Scan now</button>
+          <button style="height:40px;border-radius:8px;border:0;background:var(--primary);color:var(--onp);font-size:14px;font-weight:600;outline:2px solid var(--primary);outline-offset:2px">Scan now</button>
+          <button disabled="{{ true }}" style="height:40px;border-radius:8px;border:0;background:var(--sunk);color:var(--muted);font-size:14px;font-weight:600">Scan now</button>
+          <button style="height:40px;border-radius:8px;border:0;background:var(--primary);color:var(--onp);font-size:14px;font-weight:600;display:flex;align-items:center;justify-content:center;gap:8px"><span style="width:14px;height:14px;border-radius:50%;border:2px solid var(--onp);border-right-color:transparent"></span>Saving…</button>
+          <span>Secondary</span>
+          <button style="height:40px;border-radius:8px;border:1px solid var(--bstrong);background:var(--bg);color:var(--text);font-size:14px;font-weight:600">Download report</button>
+          <button style="height:40px;border-radius:8px;border:1px solid var(--bstrong);background:var(--bgs);color:var(--text);font-size:14px;font-weight:600">Download report</button>
+          <button style="height:40px;border-radius:8px;border:1px solid var(--bstrong);background:var(--bg);color:var(--text);font-size:14px;font-weight:600;outline:2px solid var(--primary);outline-offset:2px">Download report</button>
+          <button disabled="{{ true }}" style="height:40px;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--muted);font-size:14px;font-weight:600">Download report</button>
+          <span></span>
+          <span>Tertiary</span>
+          <button style="height:40px;border-radius:8px;border:0;background:transparent;color:var(--ptext);font-size:14px;font-weight:600">See all issues</button>
+          <button style="height:40px;border-radius:8px;border:0;background:var(--psoft);color:var(--ptext);font-size:14px;font-weight:600">See all issues</button>
+          <span></span><span></span><span></span>
+          <span>Destructive</span>
+          <button style="height:40px;border-radius:8px;border:0;background:var(--crit);color:var(--bg);font-size:14px;font-weight:600">Remove site</button>
+          <span></span><span></span><span></span><span></span>
+        </div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:32px">
+        <div style="display:flex;flex-direction:column;gap:6px">
+          <label for="f1" style="font-size:14px;font-weight:600">Website URL (required)</label>
+          <div style="display:flex;height:40px;border:1px solid var(--bstrong);border-radius:4px;overflow:hidden"><span style="padding:0 10px;display:grid;place-items:center;background:var(--bgs);border-right:1px solid var(--border);color:var(--muted);font-size:14px">https://</span><input id="f1" value="oakhaus.com" style="flex:1;border:0;padding:0 10px;background:var(--bg);color:var(--text);font:inherit;font-size:14px;min-width:0"></div>
+          <span style="font-size:14px;line-height:20px;color:var(--muted)">The home page of the site you want to monitor.</span>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:6px">
+          <label for="f2" style="font-size:14px;font-weight:600">Website URL (required)</label>
+          <div style="display:flex;height:40px;border:2px solid var(--crit);border-radius:4px;overflow:hidden"><span style="padding:0 10px;display:grid;place-items:center;background:var(--bgs);color:var(--muted);font-size:14px">https://</span><input id="f2" value="oakhaus" aria-invalid="true" style="flex:1;border:0;padding:0 10px;background:var(--bg);color:var(--text);font:inherit;font-size:14px;min-width:0"></div>
+          <span style="display:flex;gap:6px;align-items:center;font-size:14px;line-height:20px;color:var(--crit)"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7.86 2h8.28L22 7.86v8.28L16.14 22H7.86L2 16.14V7.86z M12 8v4 M12 16h.01"></path></svg>Enter a full web address, like oakhaus.com</span>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:12px">
+          <label style="display:flex;gap:10px;align-items:center;font-size:14px"><input type="checkbox" checked="{{ true }}" style="width:18px;height:18px;accent-color:var(--ptext);margin:0">Visible to client</label>
+          <label style="display:flex;gap:10px;align-items:center;font-size:14px"><input type="radio" name="r" checked="{{ true }}" style="width:18px;height:18px;accent-color:var(--ptext);margin:0">Weekly</label>
+          <button role="switch" aria-checked="{{ sw }}" onClick="{{ toggleSw }}" style="display:flex;gap:10px;align-items:center;border:0;background:transparent;color:var(--text);font-size:14px;padding:0;cursor:pointer">
+            <span style="width:40px;height:24px;border-radius:12px;background:{{ swBg }};border:1px solid var(--bstrong);position:relative;display:block"><span style="position:absolute;top:3px;left:{{ swX }};width:16px;height:16px;border-radius:50%;background:{{ swKnob }}"></span></span>Regression alerts · {{ swLabel }}
+          </button>
+        </div>
+      </div>
+
+      <div style="display:flex;flex-direction:column;gap:12px">
+        <h3 style="margin:0;font-size:16px;font-weight:600">Badges</h3>
+        <div style="display:flex;flex-wrap:wrap;gap:8px">
+          <sc-for list="{{ sevs }}" as="s" hint-placeholder-count="4"><span style="display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:4px;background:{{ s.soft }};color:{{ s.c }};font-size:13px;font-weight:600;line-height:20px"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="{{ s.d }}"></path></svg>{{ s.label }}</span></sc-for>
+          <sc-for list="{{ statuses }}" as="s" hint-placeholder-count="5"><span style="display:inline-flex;align-items:center;gap:4px;padding:1px 8px;border-radius:4px;border:1px solid var(--bstrong);color:{{ s.c }};font-size:13px;font-weight:500;line-height:20px"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="{{ s.d }}"></path></svg>{{ s.label }}</span></sc-for>
+        </div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:16px">
+        <div role="note" style="display:flex;gap:12px;padding:14px 16px;border-radius:8px;background:var(--serS);color:var(--text);border:1px solid var(--ser)"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--ser)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex:0 0 auto"><path d="M21.73 18l-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3z M12 9v4 M12 17h.01"></path></svg><span style="font-size:14px;line-height:20px;flex:1"><strong>Your trial has ended.</strong> Your data is safe for 30 days. Choose a plan to resume monitoring. <a href="#">Choose a plan</a></span></div>
+        <div style="display:flex;gap:12px;padding:14px 16px;border-radius:8px;background:var(--bg);border:1px solid var(--border);box-shadow:var(--sh2)"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--ok)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex:0 0 auto"><path d="M2 12a10 10 0 1 0 20 0a10 10 0 1 0-20 0 M9 12l2 2l4-4"></path></svg><span style="font-size:14px;line-height:20px;flex:1">Fixed — the problem no longer appears on 3 checked pages.</span><span aria-hidden="true" style="color:var(--muted)">✕</span></div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px">
+        <div style="border:1px solid var(--border);border-radius:16px;background:var(--bg);box-shadow:var(--shc);padding:20px;display:flex;flex-direction:column;gap:6px">
+          <span style="font-size:12px;font-weight:500;color:var(--muted)">ScoreDisplay · large</span>
+          <span style="font-size:14px;font-weight:600;color:var(--muted)">Automated check score ⓘ</span>
+          <span style="display:flex;align-items:baseline;gap:10px"><span style="font-size:40px;line-height:44px;font-weight:700;font-variant-numeric:tabular-nums">92</span><span style="padding:2px 8px;border-radius:4px;background:var(--okS);color:var(--ok);font-size:14px;font-weight:600">Good</span></span>
+          <span style="font-size:14px;color:var(--muted)">No change since last scan</span>
+        </div>
+        <div style="border:1px solid var(--border);border-radius:16px;background:var(--bg);box-shadow:var(--shc);padding:20px;display:flex;flex-direction:column;gap:6px">
+          <span style="font-size:12px;font-weight:500;color:var(--muted)">ScoreDisplay · medium, Poor</span>
+          <span style="display:flex;align-items:baseline;gap:10px"><span style="font-size:30px;line-height:38px;font-weight:700;font-variant-numeric:tabular-nums">54</span><span style="padding:2px 8px;border-radius:4px;background:var(--critS);color:var(--crit);font-size:14px;font-weight:600">Poor</span></span>
+          <span style="font-size:14px;color:var(--crit)">Down 9 since last scan</span>
+        </div>
+        <div style="border:1px solid var(--border);border-radius:16px;background:var(--bg);box-shadow:var(--shc);padding:20px;display:flex;flex-direction:column;gap:8px">
+          <span style="font-size:12px;font-weight:500;color:var(--muted)">UsageMeter</span>
+          <span style="display:flex;justify-content:space-between;font-size:14px"><span style="font-weight:600">Sites</span><span style="font-variant-numeric:tabular-nums">18 of 25 sites</span></span>
+          <span style="height:8px;border-radius:4px;background:var(--sunk);border:1px solid var(--bstrong);overflow:hidden;display:block"><span style="display:block;width:72%;height:100%;background:var(--primary)"></span></span>
+        </div>
+        <div style="border:1px dashed var(--bstrong);border-radius:8px;padding:24px;display:flex;flex-direction:column;gap:8px;align-items:flex-start">
+          <span style="font-size:12px;font-weight:500;color:var(--muted)">EmptyState</span>
+          <h4 style="margin:0;font-size:16px;font-weight:600">Add your first website</h4>
+          <p style="margin:0;font-size:14px;line-height:20px;color:var(--muted)">We'll run a quick 10-page check and show results in about a minute.</p>
+          <button style="height:40px;padding:0 16px;border-radius:8px;border:0;background:var(--primary);color:var(--onp);font-size:14px;font-weight:600">Add site</button>
+        </div>
+      </div>
+    </section>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;theme&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;light&quot;,&quot;dark&quot;],&quot;default&quot;:&quot;light&quot;,&quot;tsType&quot;:&quot;'light'|'dark'&quot;}}">
+const C='M2 12a10 10 0 1 0 20 0a10 10 0 1 0-20 0';
+const LIGHT={bg:'#FFFFFF',bgs:'#F0F3F8',sunk:'#E9EEF5',text:'#0B3558',muted:'#476788',border:'#D4E0ED',bstrong:'#6E87A3',primary:'#006BFF',phover:'#0055CC',psoft:'#E6F0FF',ptext:'#004EBA',info:'#1D4ED8',success:'#067647'};
+const DARK={bg:'#0B1120',bgs:'#111827',sunk:'#0E1626',text:'#E6EAF0',muted:'#A3AEC0',border:'#273246',bstrong:'#6B7A90',primary:'#6EA8FF',phover:'#9CC3FF',psoft:'#1A2347',ptext:'#8FBBFF',info:'#7DA2FF',success:'#4ADE80'};
+const ROWS=[['color.bg','bg','Page background','Page background'],['color.bg-subtle','bgs','Sidebar, table head','Sidebar, table head'],['color.surface-sunken','sunk','Code, disabled','Code, disabled'],['color.text','text','12.6 on bg','15.59 on bg'],['color.text-muted','muted','5.9 on bg','8.40 on bg'],['color.border','border','Decorative','Decorative'],['color.border-strong','bstrong','3.7 on bg','4.31 on bg'],['color.primary-text','ptext','Links, selected text','Links, selected text'],['color.primary','primary','White text 4.6 · fills only','7.92 on bg'],['color.primary-hover','phover','White text 6.6','bg text 9.95'],['color.primary-soft','psoft','Cobalt text 6.5','Primary 6.42'],['color.info','info','6.70 on bg','7.61 on bg'],['color.success','success','5.69 on bg','10.81 on bg']];
+class Component extends DCLogic {
+  state={theme:null,sw:true};
+  renderVals(){
+    const th=this.state.theme||this.props.theme||'light', dark=th==='dark', T=dark?DARK:LIGHT, sw=this.state.sw;
+    return {
+      theme:th, themeName:dark?'Dark theme':'Light theme',
+      themeOpts:['light','dark'].map(t=>({label:t==='light'?'Light':'Dark',on:t===th,bg:t===th?'var(--primary)':'var(--bg)',fg:t===th?'var(--onp)':'var(--text)',pick:()=>this.setState({theme:t})})),
+      colors:ROWS.map(r=>({name:r[0],hex:T[r[1]],v:T[r[1]],note:dark?r[3]:r[2]})),
+      sevs:[['Critical','crit','octagon-alert','M7.86 2h8.28L22 7.86v8.28L16.14 22H7.86L2 16.14V7.86z M12 8v4 M12 16h.01','Blocks some people from completing a task.'],['Serious','ser','triangle-alert','M21.73 18l-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3z M12 9v4 M12 17h.01','Makes a task very difficult for some people.'],['Moderate','mod','circle-alert',C+' M12 8v4 M12 16h.01','Causes frustration or confusion.'],['Minor','min','info',C+' M12 16v-4 M12 8h.01','Small annoyance; fix when convenient.']].map(s=>({label:s[0],c:`var(--${s[1]})`,soft:`var(--${s[1]}S)`,icon:s[2],d:s[3],tip:s[4]})),
+      statuses:[['Open','var(--text)',C],['Fixed','var(--ok)',C+' M9 12l2 2l4-4'],['Regressed','var(--text)','M3 12a9 9 0 1 0 9-9a9.75 9.75 0 0 0-6.74 2.74L3 8 M3 3v5h5'],['Ignored','var(--muted)','M9.88 9.88a3 3 0 1 0 4.24 4.24 M2 2l20 20 M6.61 6.61A13.53 13.53 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61'],['Needs review','var(--text)',C+' M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3 M12 17h.01']].map(s=>({label:s[0],c:s[1],d:s[2]})),
+      types:[['type.display','48/56 · 700','48px','56px',700,'Find and fix what blocks your customers'],['type.h1','30/38 · 700','30px','38px',700,'Oakhaus Furniture'],['type.h2','24/32 · 600','24px','32px',600,'Fix these first'],['type.h3','20/28 · 600','20px','28px',600,'Recently fixed'],['type.h4','16/24 · 600','16px','24px',600,'Who this affects'],['type.body-lg','18/28 · 400','18px','28px',400,'People who use screen readers can’t tell what this button does.'],['type.body','16/24 · 400','16px','24px',400,'We found 12 problems that automated tests can detect.'],['type.body-sm','14/20 · 400','14px','20px',400,'Product pages · 214 occurrences'],['type.caption','12/16 · 500','12px','16px',500,'Last scan 14 Oct, 09:12'],['type.mono','14/20 · 400','14px','20px',400,'.product__media-item img',1],['type.score','40/44 · 700 tnum','40px','44px',700,'78']].map(t=>({name:t[0],spec:t[1],fs:t[2],lh:t[3],fw:t[4],sample:t[5],ff:t[6]?"'JetBrains Mono',monospace":"'Manrope',sans-serif"})),
+      spaces:[2,4,8,12,16,20,24,32,40,48,64,80,96].map(n=>({n,px:n+'px'})),
+      sw, toggleSw:()=>this.setState({sw:!sw}), swBg:sw?'var(--primary)':'var(--sunk)', swX:sw?'19px':'3px', swKnob:sw?'var(--onp)':'var(--bstrong)', swLabel:sw?'On':'Off'
+    };
+  }
+}
+</script>
+</body>
+</html>
