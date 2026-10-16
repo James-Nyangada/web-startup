@@ -1,0 +1,25 @@
+{
+  "$comment": "P1-05 reference sites. Real sites change platform over time; when one fails, check the site by hand before changing the detector. Run with: SCANNER_NETWORK_TESTS=1 npx vitest run tests/unit/scanner/platform.test.ts",
+  "sites": [
+    { "url": "https://www.allbirds.com", "platform": "shopify" },
+    { "url": "https://www.gymshark.com", "platform": "shopify" },
+    { "url": "https://colourpop.com", "platform": "shopify" },
+    { "url": "https://www.brooklinen.com", "platform": "shopify" },
+    { "url": "https://www.kyliecosmetics.com", "platform": "shopify" },
+    { "url": "https://wordpress.org", "platform": "wordpress" },
+    { "url": "https://techcrunch.com", "platform": "wordpress" },
+    { "url": "https://blog.mozilla.org", "platform": "wordpress" },
+    { "url": "https://variety.com", "platform": "wordpress" },
+    { "url": "https://ma.tt", "platform": "wordpress" },
+    { "url": "https://woocommerce.com", "platform": "woocommerce" },
+    { "url": "https://www.wpbeginner.com", "platform": "wordpress" },
+    { "url": "https://webflow.com", "platform": "webflow" },
+    { "url": "https://www.wix.com", "platform": "wix" },
+    { "url": "https://www.squarespace.com", "platform": "squarespace" },
+    { "url": "https://example.com", "platform": "custom" },
+    { "url": "https://www.gov.uk", "platform": "custom" },
+    { "url": "https://developer.mozilla.org", "platform": "custom" },
+    { "url": "https://github.com", "platform": "custom" },
+    { "url": "https://www.w3.org", "platform": "custom" }
+  ]
+}

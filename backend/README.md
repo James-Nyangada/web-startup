@@ -48,6 +48,30 @@ CI runs them against a Postgres service container (`.github/workflows/backend-ci
 
 Errors always use this shape: `{ "error": { "code", "message", "details" } }` (codes are in `src/shared/errors.ts`).
 
+## Scanner (Phase 1)
+
+`src/scanner/` is the scan engine. It is pure: it never imports the database or the API, and
+it makes HTTP requests only through `net/guarded-fetch.ts`, which blocks private and internal
+addresses (SSRF protection). ESLint enforces both rules.
+
+Part 1a (finding pages) is built. Try it on any site:
+
+```bash
+npm run scan:discover -- allbirds.com --limit 20
+npm run scan:discover -- https://example.com --limit 10 --exclude "/blog/**" --pin https://example.com/contact --out plan.json
+```
+
+It reads robots.txt and sitemaps (crawling the site if they list fewer than 20 URLs), detects the
+platform, groups URLs into templates and prints the pages a scan would test. Requests are polite:
+at most 1 per second per host (slower if robots.txt asks), so large sites take a minute or two.
+At most 50 sitemap files are read per discovery.
+
+Network tests against 20 real reference sites (`tests/fixtures/platforms.json`) are opt-in:
+
+```bash
+SCANNER_NETWORK_TESTS=1 npx vitest run tests/unit/scanner/platform.test.ts
+```
+
 ## Layout
 
 ```
@@ -61,6 +85,7 @@ src/
   middleware/       Request logging and IDs, error handling
   routes/           HTTP routes
   shared/errors.ts  Error codes shared with the front end
+  scanner/          Scan engine: url/, net/ (SSRF guard), discovery/, platform/, templates/, sampling/, cli/
 drizzle/            SQL migrations (generated + hand-written triggers/RLS)
 tests/              unit/ and integration/
 ```

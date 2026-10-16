@@ -16,7 +16,8 @@
     "db:migrate": "tsx --env-file-if-exists=.env src/db/scripts/migrate.ts",
     "db:seed": "tsx --env-file-if-exists=.env src/db/scripts/seed.ts",
     "db:reset": "tsx --env-file-if-exists=.env src/db/scripts/reset.ts",
-    "db:studio": "drizzle-kit studio"
+    "db:studio": "drizzle-kit studio",
+    "scan:discover": "tsx --env-file-if-exists=.env src/scanner/cli/discover.ts"
   },
   "type": "module",
   "dependencies": {
@@ -25,9 +26,15 @@
     "drizzle-orm": "^0.45.4",
     "express": "^5.3.0",
     "helmet": "^8.3.0",
+    "htmlparser2": "^12.0.0",
+    "ipaddr.js": "^2.5.0",
     "pg": "^8.23.1",
+    "picomatch": "^4.0.7",
     "pino": "^10.4.0",
     "pino-http": "^11.0.0",
+    "robots-parser": "^3.0.1",
+    "saxes": "^6.0.0",
+    "undici": "^8.12.2",
     "uuid": "^14.0.3",
     "zod": "^4.6.7"
   },
@@ -37,6 +44,7 @@
     "@types/express": "^5.0.6",
     "@types/node": "^26.6.5",
     "@types/pg": "^8.23.1",
+    "@types/picomatch": "^4.0.3",
     "@types/supertest": "^7.2.1",
     "drizzle-kit": "^0.31.11",
     "eslint": "^10.12.0",
