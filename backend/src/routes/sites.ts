@@ -10,6 +10,7 @@ import { rootUrlOf } from '../scanner/url/normalize.js';
 import { PLATFORMS, STANDARDS, type Platform } from '../scanner/types.js';
 import { SCAN_FREQUENCIES, type SiteStatus } from '../db/schema/index.js';
 import type { UpdateSiteInput } from '../db/repositories/sites.js';
+import { verifyOwnership } from '../scanner/verification/verify.js';
 import { ErrorCode } from '../shared/errors.js';
 
 const guardedFetch = createGuardedFetch({
@@ -39,6 +40,10 @@ const updateSiteSchema = z.object({
 
 const detectPlatformSchema = z.object({
   url: z.string().trim().min(1, 'URL is required'),
+});
+
+const verifySiteSchema = z.object({
+  method: z.enum(['meta', 'dns', 'file'] as const),
 });
 
 // Default stub limit for sites per org (real limits in Phase 4)
@@ -493,6 +498,166 @@ export function orgSitesRouter(repos: Repositories): Router {
       });
 
       res.status(200).json({ data: { ok: true } });
+    },
+  );
+
+  // GET /v1/orgs/:orgId/sites/:siteId/verification - Token + instructions for each method (O A M)
+  router.get(
+    '/:siteId/verification',
+    requireOrgRole('member'),
+    async (req: Request, res: Response): Promise<void> => {
+      const siteIdParam = req.params.siteId;
+      const siteId = Array.isArray(siteIdParam) ? siteIdParam[0] : siteIdParam;
+
+      if (!siteId) {
+        res.status(400).json({
+          error: {
+            code: ErrorCode.VALIDATION_ERROR,
+            message: 'Site ID is required.',
+            details: {},
+          },
+        });
+        return;
+      }
+
+      const site = await repos.sites.findById(req.orgId!, siteId);
+      if (!site) {
+        res.status(404).json({
+          error: {
+            code: ErrorCode.NOT_FOUND,
+            message: 'Site not found.',
+            details: {},
+          },
+        });
+        return;
+      }
+
+      const metaTag = `<meta name="plainsight-verify" content="${site.verifyToken}">`;
+      const txtRecord = `plainsight-verify=${site.verifyToken}`;
+      const filePath = '/.well-known/plainsight-verify.txt';
+      const fileUrl = `${site.rootUrl}${filePath}`;
+
+      res.status(200).json({
+        data: {
+          siteId: site.id,
+          name: site.name,
+          rootUrl: site.rootUrl,
+          verifyToken: site.verifyToken,
+          status: site.status,
+          verifiedAt: site.verifiedAt,
+          verifyMethod: site.verifyMethod,
+          methods: {
+            meta: {
+              name: 'HTML Meta Tag',
+              tag: metaTag,
+              metaName: 'plainsight-verify',
+              token: site.verifyToken,
+              instructions: 'Add this meta tag inside the <head> section of your homepage HTML.',
+            },
+            dns: {
+              name: 'DNS TXT Record',
+              type: 'TXT',
+              host: '@ (or _plainsight)',
+              value: txtRecord,
+              token: site.verifyToken,
+              instructions: 'Add a TXT record on your apex domain or _plainsight subdomain with this value.',
+            },
+            file: {
+              name: 'File Upload',
+              path: filePath,
+              url: fileUrl,
+              content: site.verifyToken,
+              instructions: 'Create a plain text file at /.well-known/plainsight-verify.txt containing only your token.',
+            },
+          },
+        },
+      });
+    },
+  );
+
+  // POST /v1/orgs/:orgId/sites/:siteId/verify - Run ownership verification check now (O A M)
+  router.post(
+    '/:siteId/verify',
+    requireOrgRole('member'),
+    async (req: Request, res: Response): Promise<void> => {
+      const siteIdParam = req.params.siteId;
+      const siteId = Array.isArray(siteIdParam) ? siteIdParam[0] : siteIdParam;
+
+      if (!siteId) {
+        res.status(400).json({
+          error: {
+            code: ErrorCode.VALIDATION_ERROR,
+            message: 'Site ID is required.',
+            details: {},
+          },
+        });
+        return;
+      }
+
+      const parse = verifySiteSchema.safeParse(req.body);
+      if (!parse.success) {
+        res.status(400).json({
+          error: {
+            code: ErrorCode.VALIDATION_ERROR,
+            message: 'Invalid verification method. Allowed methods: meta, dns, file.',
+            details: parse.error.flatten(),
+          },
+        });
+        return;
+      }
+
+      const site = await repos.sites.findById(req.orgId!, siteId);
+      if (!site) {
+        res.status(404).json({
+          error: {
+            code: ErrorCode.NOT_FOUND,
+            message: 'Site not found.',
+            details: {},
+          },
+        });
+        return;
+      }
+
+      const { method } = parse.data;
+
+      // Run verification check
+      const result = await verifyOwnership(site.rootUrl, site.verifyToken, method, {
+        fetcher: guardedFetch,
+      });
+
+      if (!result.ok) {
+        res.status(400).json({
+          error: {
+            code: ErrorCode.VERIFICATION_FAILED,
+            message: result.reason ?? 'Verification check failed.',
+            details: result.details ?? {},
+          },
+        });
+        return;
+      }
+
+      const updated = await repos.sites.setVerified(req.orgId!, siteId, method);
+
+      // Audit log
+      await repos.auditLog.write(req.orgId!, {
+        actorId: req.auth!.user.id,
+        actorType: 'user',
+        action: 'site.verified',
+        targetId: siteId,
+        targetType: 'site',
+        data: { method, verifiedAt: new Date().toISOString() },
+        ip: req.ip ?? null,
+        userAgent: req.get('user-agent') ?? null,
+      });
+
+      res.status(200).json({
+        data: {
+          ok: true,
+          verified: true,
+          site: updated,
+          method,
+        },
+      });
     },
   );
 

@@ -6,6 +6,7 @@ import {
   sites,
   type ScanFrequency,
   type SiteStatus,
+  type VerifyMethod,
 } from '../schema/index.js';
 import type { OrgId } from './org-scope.js';
 
@@ -189,6 +190,20 @@ export function sitesRepository(db: Database) {
         .update(sites)
         .set({
           deletedAt: new Date(),
+          updatedAt: new Date(),
+        })
+        .where(and(eq(sites.orgId, orgId), eq(sites.id, siteId), isNull(sites.deletedAt)))
+        .returning();
+      return row ?? null;
+    },
+
+    async setVerified(orgId: OrgId, siteId: string, method: VerifyMethod) {
+      const [row] = await db
+        .update(sites)
+        .set({
+          status: 'active',
+          verifyMethod: method,
+          verifiedAt: new Date(),
           updatedAt: new Date(),
         })
         .where(and(eq(sites.orgId, orgId), eq(sites.id, siteId), isNull(sites.deletedAt)))

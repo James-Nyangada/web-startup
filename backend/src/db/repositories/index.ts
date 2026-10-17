@@ -3,6 +3,7 @@ import { auditLogRepository } from './audit-log.js';
 import { membershipsRepository } from './memberships.js';
 import { organizationsRepository } from './organizations.js';
 import { sitesRepository } from './sites.js';
+import { scansRepository } from './scans.js';
 import { usersRepository } from './users.js';
 import { waitlistRepository } from './waitlist.js';
 
@@ -12,6 +13,7 @@ export function createRepositories(db: Database) {
     memberships: membershipsRepository(db),
     organizations: organizationsRepository(db),
     sites: sitesRepository(db),
+    scans: scansRepository(db),
     users: usersRepository(db),
     waitlist: waitlistRepository(db),
   };

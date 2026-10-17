@@ -7,6 +7,7 @@ import { slugify } from '../lib/slugs.js';
 import { requireAuth } from '../middleware/auth.js';
 import { requireOrgRole, resolveOrgContext } from '../middleware/org.js';
 import { orgSitesRouter } from './sites.js';
+import { orgScansRouter } from './scans.js';
 import { ErrorCode } from '../shared/errors.js';
 
 const createOrgSchema = z.object({
@@ -452,6 +453,9 @@ export function orgsRouter(auth: Auth, repos: Repositories): Router {
 
   // Mount Section 7.3 Sites router under orgScoped
   orgScoped.use('/sites', orgSitesRouter(repos));
+
+  // Mount Section 7.4 Scans router under orgScoped
+  orgScoped.use(orgScansRouter(repos));
 
   router.use('/:orgId', orgScoped);
 

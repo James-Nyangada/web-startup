@@ -68,6 +68,16 @@ export function fakeRepos() {
       pause: vi.fn().mockResolvedValue(null),
       resume: vi.fn().mockResolvedValue(null),
       softDelete: vi.fn().mockResolvedValue(null),
+      setVerified: vi.fn().mockResolvedValue(null),
+    },
+    scans: {
+      create: vi.fn().mockResolvedValue(null),
+      findById: vi.fn().mockResolvedValue(null),
+      update: vi.fn().mockResolvedValue(null),
+      listBySite: vi.fn().mockResolvedValue([]),
+      countBySite: vi.fn().mockResolvedValue(0),
+      findRunningScanForSite: vi.fn().mockResolvedValue(null),
+      countOnboardingScansForSite: vi.fn().mockResolvedValue(0),
     },
   } as unknown as Repositories;
   return { repos, join };

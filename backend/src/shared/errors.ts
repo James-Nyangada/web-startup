@@ -23,6 +23,7 @@ export const ErrorCode = {
   PLAN_LIMIT: 'PLAN_LIMIT',
   DUPLICATE_SITE: 'DUPLICATE_SITE',
   SCAN_IN_PROGRESS: 'SCAN_IN_PROGRESS',
+  VERIFICATION_FAILED: 'VERIFICATION_FAILED',
 } as const;
 
 export type ErrorCode = (typeof ErrorCode)[keyof typeof ErrorCode];

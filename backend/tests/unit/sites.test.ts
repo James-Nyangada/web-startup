@@ -4,9 +4,14 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Auth } from '../../src/lib/auth.js';
 import type { Repositories } from '../../src/db/repositories/index.js';
 import type { CreateSiteInput } from '../../src/db/repositories/sites.js';
+import { verifyOwnership } from '../../src/scanner/verification/verify.js';
 import { ErrorCode } from '../../src/shared/errors.js';
 import { assertCrossOrg404 } from '../helpers/cross-org.js';
 import { buildTestApp } from '../helpers/fakes.js';
+
+vi.mock('../../src/scanner/verification/verify.js', () => ({
+  verifyOwnership: vi.fn(),
+}));
 
 function createMockAuth(userId: string, isStaff = false) {
   const mockUser = {
@@ -391,6 +396,104 @@ describe('Sites API (Chunk P2-06 & Section 7.3)', () => {
         method: 'delete',
         path: `/v1/orgs/${otherOrgId}/sites/${siteId}`,
         sessionCookie: adminCookie,
+      });
+    });
+  });
+
+  describe('GET /v1/orgs/:orgId/sites/:siteId/verification', () => {
+    it('returns token and instructions for meta, dns, and file methods', async () => {
+      vi.mocked(repos.sites.findById).mockResolvedValue(mockSite);
+
+      const res = await request(app)
+        .get(`/v1/orgs/${orgId}/sites/${siteId}/verification`)
+        .set('Cookie', adminCookie)
+        .expect(200);
+
+      expect(res.body.data.verifyToken).toBe('ps_test_token');
+      expect(res.body.data.methods.meta.tag).toBe('<meta name="plainsight-verify" content="ps_test_token">');
+      expect(res.body.data.methods.dns.value).toBe('plainsight-verify=ps_test_token');
+      expect(res.body.data.methods.file.path).toBe('/.well-known/plainsight-verify.txt');
+    });
+
+    it('returns 404 for cross-org verification info request', async () => {
+      await assertCrossOrg404(app, {
+        method: 'get',
+        path: `/v1/orgs/${otherOrgId}/sites/${siteId}/verification`,
+        sessionCookie: adminCookie,
+      });
+    });
+  });
+
+  describe('POST /v1/orgs/:orgId/sites/:siteId/verify', () => {
+    it('successfully verifies ownership via meta tag and updates site status', async () => {
+      vi.mocked(repos.sites.findById).mockResolvedValue({
+        ...mockSite,
+        status: 'pending_verification',
+      });
+      vi.mocked(verifyOwnership).mockResolvedValue({
+        ok: true,
+        method: 'meta',
+      });
+      vi.mocked(repos.sites.setVerified).mockResolvedValue({
+        ...mockSite,
+        status: 'active',
+        verifyMethod: 'meta',
+        verifiedAt: new Date(),
+      });
+
+      const res = await request(app)
+        .post(`/v1/orgs/${orgId}/sites/${siteId}/verify`)
+        .set('Cookie', adminCookie)
+        .send({ method: 'meta' })
+        .expect(200);
+
+      expect(res.body.data.ok).toBe(true);
+      expect(res.body.data.verified).toBe(true);
+      expect(res.body.data.method).toBe('meta');
+      expect(repos.sites.setVerified).toHaveBeenCalledWith(orgId, siteId, 'meta');
+      expect(repos.auditLog.write).toHaveBeenCalledWith(
+        orgId,
+        expect.objectContaining({ action: 'site.verified' }),
+      );
+    });
+
+    it('returns 400 VERIFICATION_FAILED with details when verification check fails', async () => {
+      vi.mocked(repos.sites.findById).mockResolvedValue({
+        ...mockSite,
+        status: 'pending_verification',
+      });
+      vi.mocked(verifyOwnership).mockResolvedValue({
+        ok: false,
+        method: 'meta',
+        reason: "No meta tag with name='plainsight-verify' was found on your home page.",
+      });
+
+      const res = await request(app)
+        .post(`/v1/orgs/${orgId}/sites/${siteId}/verify`)
+        .set('Cookie', adminCookie)
+        .send({ method: 'meta' })
+        .expect(400);
+
+      expect(res.body.error.code).toBe(ErrorCode.VERIFICATION_FAILED);
+      expect(res.body.error.message).toContain("No meta tag with name='plainsight-verify' was found");
+    });
+
+    it('rejects invalid verification method with 400 VALIDATION_ERROR', async () => {
+      const res = await request(app)
+        .post(`/v1/orgs/${orgId}/sites/${siteId}/verify`)
+        .set('Cookie', adminCookie)
+        .send({ method: 'invalid_method' })
+        .expect(400);
+
+      expect(res.body.error.code).toBe(ErrorCode.VALIDATION_ERROR);
+    });
+
+    it('returns 404 for cross-org verify request', async () => {
+      await assertCrossOrg404(app, {
+        method: 'post',
+        path: `/v1/orgs/${otherOrgId}/sites/${siteId}/verify`,
+        sessionCookie: adminCookie,
+        body: { method: 'meta' },
       });
     });
   });
