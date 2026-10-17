@@ -16,6 +16,7 @@ import { meRouter } from './routes/me.js';
 import { orgsRouter } from './routes/orgs.js';
 import { detectPlatformRouter } from './routes/sites.js';
 import { waitlistRouter } from './routes/public/waitlist.js';
+import type { ScansRouterOptions } from './routes/scans.js';
 
 export interface AppDeps {
   config: Pick<
@@ -32,6 +33,7 @@ export interface AppDeps {
   repos: Repositories;
   verifyTurnstile: TurnstileVerifier;
   auth?: Auth;
+  scansOptions?: ScansRouterOptions;
 }
 
 export function createApp({
@@ -40,6 +42,7 @@ export function createApp({
   repos,
   verifyTurnstile,
   auth: injectedAuth,
+  scansOptions,
 }: AppDeps): express.Express {
   const app = express();
 
@@ -76,7 +79,7 @@ export function createApp({
   const v1 = Router();
   v1.use('/auth', authRouter(auth, verifyTurnstile, config));
   v1.use('/me', meRouter(auth, repos));
-  v1.use('/orgs', orgsRouter(auth, repos));
+  v1.use('/orgs', orgsRouter(auth, repos, scansOptions));
   v1.use('/sites', detectPlatformRouter(auth));
   v1.use('/public', waitlistRouter(repos, verifyTurnstile));
   app.use('/v1', v1);

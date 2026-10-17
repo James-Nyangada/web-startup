@@ -7,7 +7,7 @@ import { slugify } from '../lib/slugs.js';
 import { requireAuth } from '../middleware/auth.js';
 import { requireOrgRole, resolveOrgContext } from '../middleware/org.js';
 import { orgSitesRouter } from './sites.js';
-import { orgScansRouter } from './scans.js';
+import { orgScansRouter, type ScansRouterOptions } from './scans.js';
 import { ErrorCode } from '../shared/errors.js';
 
 const createOrgSchema = z.object({
@@ -30,7 +30,11 @@ const changeMemberRoleSchema = z.object({
   role: z.enum(['admin', 'member']),
 });
 
-export function orgsRouter(auth: Auth, repos: Repositories): Router {
+export function orgsRouter(
+  auth: Auth,
+  repos: Repositories,
+  scansOptions?: ScansRouterOptions,
+): Router {
   const router = Router();
   router.use(requireAuth(auth));
 
@@ -455,7 +459,7 @@ export function orgsRouter(auth: Auth, repos: Repositories): Router {
   orgScoped.use('/sites', orgSitesRouter(repos));
 
   // Mount Section 7.4 Scans router under orgScoped
-  orgScoped.use(orgScansRouter(repos));
+  orgScoped.use(orgScansRouter(repos, scansOptions));
 
   router.use('/:orgId', orgScoped);
 

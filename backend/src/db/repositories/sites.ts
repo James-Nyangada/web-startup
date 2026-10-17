@@ -210,6 +210,14 @@ export function sitesRepository(db: Database) {
         .returning();
       return row ?? null;
     },
+
+    async findRawById(siteId: string) {
+      const [row] = await db
+        .select()
+        .from(sites)
+        .where(and(eq(sites.id, siteId), isNull(sites.deletedAt)));
+      return row ?? null;
+    },
   };
 }
 

@@ -1,9 +1,11 @@
 import { Router, type Request, type Response } from 'express';
+import type { PgBoss } from 'pg-boss';
 import { z } from 'zod';
 import type { Repositories } from '../db/repositories/index.js';
 import { requireOrgRole } from '../middleware/org.js';
 import { ErrorCode } from '../shared/errors.js';
 import { STANDARDS, type Standard } from '../scanner/types.js';
+import { enqueueScanRun } from '../worker/boss.js';
 
 const createScanSchema = z.object({
   trigger: z.enum(['manual', 'onboarding']).default('manual'),
@@ -49,10 +51,15 @@ export function broadcastScanProgress(
   }
 }
 
+export interface ScansRouterOptions {
+  boss?: PgBoss;
+  enqueueScan?: (scanId: string) => Promise<void>;
+}
+
 /**
  * Mounts org-scoped scan routes under /v1/orgs/:orgId
  */
-export function orgScansRouter(repos: Repositories): Router {
+export function orgScansRouter(repos: Repositories, options?: ScansRouterOptions): Router {
   const router = Router();
 
   // POST /v1/orgs/:orgId/sites/:siteId/scans - Trigger a scan (O A M)
@@ -173,6 +180,21 @@ export function orgScansRouter(repos: Repositories): Router {
         ip: req.ip ?? null,
         userAgent: req.get('user-agent') ?? null,
       });
+
+      // Enqueue scan execution in the background worker
+      if (options?.enqueueScan) {
+        try {
+          await options.enqueueScan(scan.id);
+        } catch {
+          // Worker enqueue error handled by scheduler/retries
+        }
+      } else if (options?.boss) {
+        try {
+          await enqueueScanRun(options.boss, scan.id);
+        } catch {
+          // Worker enqueue error
+        }
+      }
 
       res.status(201).json({ data: { scan } });
     },

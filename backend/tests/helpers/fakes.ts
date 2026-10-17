@@ -78,6 +78,26 @@ export function fakeRepos() {
       countBySite: vi.fn().mockResolvedValue(0),
       findRunningScanForSite: vi.fn().mockResolvedValue(null),
       countOnboardingScansForSite: vi.fn().mockResolvedValue(0),
+      findRawById: vi.fn().mockResolvedValue(null),
+      updateRaw: vi.fn().mockResolvedValue(null),
+      findInterruptedScans: vi.fn().mockResolvedValue([]),
+      requeueInterrupted: vi.fn().mockResolvedValue(null),
+      markFailed: vi.fn().mockResolvedValue(null),
+    },
+    pages: {
+      upsertPages: vi.fn().mockResolvedValue(new Map()),
+      listBySite: vi.fn().mockResolvedValue([]),
+      countBySite: vi.fn().mockResolvedValue(0),
+      findById: vi.fn().mockResolvedValue(null),
+      insertPageResults: vi.fn().mockResolvedValue(undefined),
+      listResultsByScan: vi.fn().mockResolvedValue([]),
+    },
+    issues: {
+      listForDiff: vi.fn().mockResolvedValue([]),
+      applyScanDiff: vi.fn().mockResolvedValue({ createdCount: 0, fixedCount: 0, regressedCount: 0 }),
+      listBySite: vi.fn().mockResolvedValue([]),
+      countBySite: vi.fn().mockResolvedValue(0),
+      findById: vi.fn().mockResolvedValue(null),
     },
   } as unknown as Repositories;
   return { repos, join };

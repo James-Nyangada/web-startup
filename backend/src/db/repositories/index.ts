@@ -4,6 +4,8 @@ import { membershipsRepository } from './memberships.js';
 import { organizationsRepository } from './organizations.js';
 import { sitesRepository } from './sites.js';
 import { scansRepository } from './scans.js';
+import { pagesRepository } from './pages.js';
+import { issuesRepository } from './issues.js';
 import { usersRepository } from './users.js';
 import { waitlistRepository } from './waitlist.js';
 
@@ -14,6 +16,8 @@ export function createRepositories(db: Database) {
     organizations: organizationsRepository(db),
     sites: sitesRepository(db),
     scans: scansRepository(db),
+    pages: pagesRepository(db),
+    issues: issuesRepository(db),
     users: usersRepository(db),
     waitlist: waitlistRepository(db),
   };

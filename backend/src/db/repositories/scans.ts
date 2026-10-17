@@ -131,6 +131,69 @@ export function scansRepository(db: Database) {
         );
       return row?.count ?? 0;
     },
+
+    async findRawById(scanId: string) {
+      const [row] = await db.select().from(scans).where(eq(scans.id, scanId));
+      return row ?? null;
+    },
+
+    async updateRaw(scanId: string, input: UpdateScanInput) {
+      const [row] = await db
+        .update(scans)
+        .set({
+          ...input,
+          updatedAt: new Date(),
+        })
+        .where(eq(scans.id, scanId))
+        .returning();
+
+      if (input.status === 'completed' && row && row.score !== null) {
+        await db
+          .update(sites)
+          .set({
+            score: row.score,
+            lastScanId: row.id,
+            updatedAt: new Date(),
+          })
+          .where(and(eq(sites.id, row.siteId), isNull(sites.deletedAt)));
+      }
+
+      return row ?? null;
+    },
+
+    async findInterruptedScans() {
+      return db
+        .select()
+        .from(scans)
+        .where(sql`${scans.status} in ('discovering', 'scanning', 'processing')`);
+    },
+
+    async requeueInterrupted(scanId: string) {
+      const [row] = await db
+        .update(scans)
+        .set({
+          status: 'queued',
+          updatedAt: new Date(),
+        })
+        .where(eq(scans.id, scanId))
+        .returning();
+      return row ?? null;
+    },
+
+    async markFailed(scanId: string, errorCode: string, errorMessage: string) {
+      const [row] = await db
+        .update(scans)
+        .set({
+          status: 'failed',
+          errorCode,
+          errorMessage,
+          finishedAt: new Date(),
+          updatedAt: new Date(),
+        })
+        .where(eq(scans.id, scanId))
+        .returning();
+      return row ?? null;
+    },
   };
 }
 
