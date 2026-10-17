@@ -36,6 +36,28 @@ export function fakeRepos() {
       isSoleOwnerOfActiveOrg: vi.fn().mockResolvedValue(false),
       softDelete: vi.fn().mockResolvedValue(null),
     },
+    organizations: {
+      create: vi.fn().mockResolvedValue(null),
+      findById: vi.fn().mockResolvedValue(null),
+      findBySlug: vi.fn().mockResolvedValue(null),
+      findByIdOrSlug: vi.fn().mockResolvedValue(null),
+      update: vi.fn().mockResolvedValue(null),
+      softDelete: vi.fn().mockResolvedValue(null),
+      isSlugAvailable: vi.fn().mockResolvedValue(true),
+      createWithInitialOwner: vi.fn().mockResolvedValue(null),
+    },
+    memberships: {
+      list: vi.fn().mockResolvedValue([]),
+      findRole: vi.fn().mockResolvedValue(null),
+      add: vi.fn().mockResolvedValue(null),
+      find: vi.fn().mockResolvedValue(null),
+      updateRole: vi.fn().mockResolvedValue(null),
+      remove: vi.fn().mockResolvedValue(null),
+    },
+    auditLog: {
+      write: vi.fn().mockResolvedValue(undefined),
+      list: vi.fn().mockResolvedValue([]),
+    },
   } as unknown as Repositories;
   return { repos, join };
 }

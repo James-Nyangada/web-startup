@@ -33,5 +33,31 @@ export function membershipsRepository(db: Database) {
       const [row] = await db.insert(memberships).values({ orgId, userId, role }).returning();
       return row;
     },
+
+    async find(orgId: OrgId, userId: string) {
+      const [row] = await db
+        .select()
+        .from(memberships)
+        .where(and(eq(memberships.orgId, orgId), eq(memberships.userId, userId)))
+        .limit(1);
+      return row ?? null;
+    },
+
+    async updateRole(orgId: OrgId, userId: string, role: OrgRole) {
+      const [row] = await db
+        .update(memberships)
+        .set({ role })
+        .where(and(eq(memberships.orgId, orgId), eq(memberships.userId, userId)))
+        .returning();
+      return row ?? null;
+    },
+
+    async remove(orgId: OrgId, userId: string) {
+      const [row] = await db
+        .delete(memberships)
+        .where(and(eq(memberships.orgId, orgId), eq(memberships.userId, userId)))
+        .returning();
+      return row ?? null;
+    },
   };
 }

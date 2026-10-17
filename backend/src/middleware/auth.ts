@@ -7,7 +7,7 @@ declare global {
   namespace Express {
     interface Request {
       auth?: {
-        user: AuthUser;
+        user: AuthUser & { isStaff?: boolean };
         session: AuthSession;
       };
     }
