@@ -7,8 +7,13 @@ import { createDb, createPool, type Database } from '../../src/db/client.js';
 import { asOrgId, createRepositories } from '../../src/db/repositories/index.js';
 import {
   auditLog,
+  issues,
   memberships,
   organizations,
+  pages,
+  rules,
+  scans,
+  sites,
   users,
   waitlist,
 } from '../../src/db/schema/index.js';
@@ -22,6 +27,34 @@ import { testConfig } from '../helpers/fakes.js';
  * Never point this at your Supabase project: it drops and recreates every table.
  */
 const url = process.env.TEST_DATABASE_URL;
+
+const ALL_APP_TABLES = [
+  'users',
+  'organizations',
+  'memberships',
+  'audit_log',
+  'feature_flags',
+  'waitlist',
+  'accounts',
+  'sessions',
+  'verifications',
+  'invitations',
+  'client_access',
+  'branding',
+  'sites',
+  'scans',
+  'pages',
+  'page_results',
+  'rules',
+  'fix_guides',
+  'issues',
+  'issue_occurrences',
+  'issue_events',
+  'issue_notes',
+  'reports',
+  'notification_preferences',
+  'in_app_notifications',
+];
 
 describe.skipIf(!url)('database (integration)', () => {
   let pool: pg.Pool;
@@ -50,13 +83,16 @@ describe.skipIf(!url)('database (integration)', () => {
     const orgs = await db.select().from(organizations).where(eq(organizations.slug, 'demo-agency'));
     expect(orgs).toHaveLength(1);
     expect(orgs[0]?.plan).toBe('trial');
+
+    const allRules = await db.select().from(rules);
+    expect(allRules.length).toBeGreaterThanOrEqual(70);
   });
 
   it('emails are case-insensitive and unique', async () => {
     await expect(db.insert(users).values({ email: 'OWNER@example.com' })).rejects.toThrow();
   });
 
-  it('updated_at is set by trigger', async () => {
+  it('updated_at is set by trigger on organizations and sites', async () => {
     const [before] = await db
       .select()
       .from(organizations)
@@ -65,6 +101,20 @@ describe.skipIf(!url)('database (integration)', () => {
     await db.update(organizations).set({ name: 'Renamed' }).where(eq(organizations.id, before!.id));
     const [after] = await db.select().from(organizations).where(eq(organizations.id, before!.id));
     expect(after!.updatedAt.getTime()).toBeGreaterThan(before!.updatedAt.getTime());
+
+    const [site] = await db
+      .insert(sites)
+      .values({
+        orgId: before!.id,
+        name: 'Test Store',
+        rootUrl: 'https://teststore.example.com',
+        verifyToken: 'token123',
+      })
+      .returning();
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    await db.update(sites).set({ name: 'Updated Store' }).where(eq(sites.id, site!.id));
+    const [updatedSite] = await db.select().from(sites).where(eq(sites.id, site!.id));
+    expect(updatedSite!.updatedAt.getTime()).toBeGreaterThan(site!.updatedAt.getTime());
   });
 
   it('allows at most one owner per organisation', async () => {
@@ -85,6 +135,75 @@ describe.skipIf(!url)('database (integration)', () => {
     await expect(
       db.insert(organizations).values({ name: 'Bad', plan: 'platinum' as 'trial' }),
     ).rejects.toThrow();
+  });
+
+  it('enforces site constraints and scan/page/issue relationships', async () => {
+    const [org] = await db
+      .select()
+      .from(organizations)
+      .where(eq(organizations.slug, 'demo-agency'));
+
+    const [site] = await db
+      .insert(sites)
+      .values({
+        orgId: org!.id,
+        name: 'Acme Shoes',
+        rootUrl: 'https://acme.example.com',
+        platform: 'shopify',
+        verifyToken: 'acme-token',
+      })
+      .returning();
+
+    // Duplicate root_url in same org fails
+    await expect(
+      db.insert(sites).values({
+        orgId: org!.id,
+        name: 'Acme Shoes Duplicate',
+        rootUrl: 'https://acme.example.com',
+        verifyToken: 'dup-token',
+      }),
+    ).rejects.toThrow();
+
+    const [scan] = await db
+      .insert(scans)
+      .values({
+        orgId: org!.id,
+        siteId: site!.id,
+        trigger: 'manual',
+        standard: 'wcag22aa',
+      })
+      .returning();
+
+    const [page] = await db
+      .insert(pages)
+      .values({
+        orgId: org!.id,
+        siteId: site!.id,
+        url: 'https://acme.example.com/products/shoe-1',
+        urlHash: 'hash123',
+        templateKey: 'product',
+      })
+      .returning();
+
+    const [issue] = await db
+      .insert(issues)
+      .values({
+        orgId: org!.id,
+        siteId: site!.id,
+        fingerprint: 'fp-img-alt-1',
+        ruleId: 'image-alt',
+        impact: 'critical',
+        wcagCriteria: ['1.1.1'],
+        wcagLevel: 'A',
+        templateKey: 'product',
+        selector: 'img.product',
+      })
+      .returning();
+
+    expect(site?.id).toBeDefined();
+    expect(scan?.id).toBeDefined();
+    expect(page?.id).toBeDefined();
+    expect(issue?.id).toBeDefined();
   });
 
   it('audit_log is append-only', async () => {
@@ -110,9 +229,10 @@ describe.skipIf(!url)('database (integration)', () => {
   it('enables row-level security on every app table', async () => {
     const { rows } = await pool.query<{ relname: string; relrowsecurity: boolean }>(
       `select relname, relrowsecurity from pg_class
-       where relname in ('users','organizations','memberships','audit_log','feature_flags','waitlist')`,
+       where relname = any($1::text[])`,
+      [ALL_APP_TABLES],
     );
-    expect(rows).toHaveLength(6);
+    expect(rows).toHaveLength(ALL_APP_TABLES.length);
     expect(rows.every((row) => row.relrowsecurity)).toBe(true);
   });
 

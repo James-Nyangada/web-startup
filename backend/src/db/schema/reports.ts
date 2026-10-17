@@ -1,0 +1,52 @@
+import { sql } from 'drizzle-orm';
+import {
+  boolean,
+  check,
+  index,
+  integer,
+  pgTable,
+  text,
+  timestamp,
+  uuid,
+} from 'drizzle-orm/pg-core';
+import { id, inList, timestamps } from './columns.js';
+import { organizations, users } from './identity.js';
+import { scans, sites } from './scanning.js';
+
+export const REPORT_TYPES = [
+  'scan_summary',
+  'full',
+  'evidence_pack',
+  'client_monthly',
+  'agency_overview',
+] as const;
+export type ReportType = (typeof REPORT_TYPES)[number];
+
+export const REPORT_STATUSES = ['queued', 'rendering', 'ready', 'failed'] as const;
+export type ReportStatus = (typeof REPORT_STATUSES)[number];
+
+export const reports = pgTable(
+  'reports',
+  {
+    id: id(),
+    orgId: uuid('org_id')
+      .notNull()
+      .references(() => organizations.id, { onDelete: 'cascade' }),
+    siteId: uuid('site_id').references(() => sites.id, { onDelete: 'cascade' }),
+    scanId: uuid('scan_id').references(() => scans.id, { onDelete: 'set null' }),
+    type: text('type').$type<ReportType>().notNull(),
+    status: text('status').$type<ReportStatus>().notNull().default('queued'),
+    fileKey: text('file_key'),
+    fileSize: integer('file_size'),
+    branded: boolean('branded').notNull().default(false),
+    requestedBy: uuid('requested_by').references(() => users.id, { onDelete: 'set null' }),
+    expiresAt: timestamp('expires_at', { withTimezone: true }),
+    ...timestamps(),
+  },
+  (t) => [
+    index('reports_org_created_idx').on(t.orgId, t.createdAt.desc()),
+    index('reports_site_id_idx').on(t.siteId),
+    check('reports_type_check', sql`${t.type} in (${inList(REPORT_TYPES)})`),
+    check('reports_status_check', sql`${t.status} in (${inList(REPORT_STATUSES)})`),
+  ],
+);

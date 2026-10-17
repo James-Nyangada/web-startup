@@ -1,6 +1,7 @@
 import { sql } from 'drizzle-orm';
 import { closeDb, getDb, type Database } from '../index.js';
-import { featureFlags, memberships, organizations, users } from '../schema/index.js';
+import { featureFlags, memberships, organizations, rules, users } from '../schema/index.js';
+import { RULE_CATALOG } from '../../scanner/rules/catalog.js';
 
 /** Idempotent development seed: safe to run more than once. */
 export async function seed(db: Database): Promise<void> {
@@ -35,6 +36,37 @@ export async function seed(db: Database): Promise<void> {
         { key: 'google_sign_in', enabled: false },
       ])
       .onConflictDoNothing();
+
+    for (const rule of RULE_CATALOG.values()) {
+      await tx
+        .insert(rules)
+        .values({
+          ruleId: rule.ruleId,
+          title: rule.title,
+          description: rule.description,
+          whoIsAffected: rule.whoIsAffected.join(', '),
+          wcagCriteria: rule.wcagCriteria,
+          wcagLevel: rule.wcagLevel,
+          defaultImpact: rule.defaultImpact,
+          weight: rule.weight,
+          helpUrl: rule.helpUrl,
+          axeVersion: rule.axeVersion,
+        })
+        .onConflictDoUpdate({
+          target: rules.ruleId,
+          set: {
+            title: sql`excluded.title`,
+            description: sql`excluded.description`,
+            whoIsAffected: sql`excluded.who_is_affected`,
+            wcagCriteria: sql`excluded.wcag_criteria`,
+            wcagLevel: sql`excluded.wcag_level`,
+            defaultImpact: sql`excluded.default_impact`,
+            weight: sql`excluded.weight`,
+            helpUrl: sql`excluded.help_url`,
+            axeVersion: sql`excluded.axe_version`,
+          },
+        });
+    }
   });
 }
 

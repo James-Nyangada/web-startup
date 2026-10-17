@@ -22,6 +22,20 @@
       "when": 1792140689563,
       "tag": "0002_triggers_and_rls",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1792240631332,
+      "tag": "0003_core_app_tables",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1792240632000,
+      "tag": "0004_core_app_triggers_and_rls",
+      "breakpoints": true
     }
   ]
 }
