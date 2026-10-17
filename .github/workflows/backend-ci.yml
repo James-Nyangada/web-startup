@@ -10,7 +10,7 @@ on:
 jobs:
   check:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     defaults:
       run:
         working-directory: backend
@@ -31,6 +31,8 @@ jobs:
           cache: npm
           cache-dependency-path: backend/package-lock.json
       - run: npm ci
+      # Scanner and report tests drive a real Chromium.
+      - run: npx playwright install --with-deps chromium
       - run: npm run format:check
       - run: npm run lint
       - run: npm run typecheck

@@ -1,0 +1,270 @@
+{
+  "status": "completed",
+  "platform": "shopify",
+  "axeVersion": "4.14.0",
+  "pagesPlanned": 13,
+  "pagesScanned": 13,
+  "templatesFound": 7,
+  "score": 87,
+  "counts": {
+    "critical": 9,
+    "serious": 10,
+    "moderate": 0,
+    "minor": 0,
+    "total": 19,
+    "needsReview": 0
+  },
+  "pages": [
+    {
+      "path": "/",
+      "template": "home",
+      "status": "ok",
+      "score": 90
+    },
+    {
+      "path": "/blogs/news",
+      "template": "blog-index",
+      "status": "ok",
+      "score": 90
+    },
+    {
+      "path": "/blogs/news/hello",
+      "template": "article",
+      "status": "ok",
+      "score": 83
+    },
+    {
+      "path": "/blogs/news/second",
+      "template": "article",
+      "status": "ok",
+      "score": 83
+    },
+    {
+      "path": "/cart",
+      "template": "cart",
+      "status": "ok",
+      "score": 90
+    },
+    {
+      "path": "/collections/all",
+      "template": "collection",
+      "status": "ok",
+      "score": 87
+    },
+    {
+      "path": "/pages/contact",
+      "template": "page:contact",
+      "status": "ok",
+      "score": 87
+    },
+    {
+      "path": "/products/alpha",
+      "template": "product",
+      "status": "ok",
+      "score": 86
+    },
+    {
+      "path": "/products/beta",
+      "template": "product",
+      "status": "ok",
+      "score": 86
+    },
+    {
+      "path": "/products/delta",
+      "template": "product",
+      "status": "ok",
+      "score": 86
+    },
+    {
+      "path": "/products/epsilon",
+      "template": "product",
+      "status": "ok",
+      "score": 86
+    },
+    {
+      "path": "/products/gamma",
+      "template": "product",
+      "status": "ok",
+      "score": 86
+    },
+    {
+      "path": "/products/zeta",
+      "template": "product",
+      "status": "ok",
+      "score": 86
+    }
+  ],
+  "issues": [
+    {
+      "fingerprint": "106eb4062e1a38ec268edc03948bc98f0c5882a2831f6e85da1383388778d9e6",
+      "ruleId": "image-alt",
+      "impact": "critical",
+      "templateKey": "home",
+      "selector": "img",
+      "occurrences": 1,
+      "needsReview": false
+    },
+    {
+      "fingerprint": "1324e53482557ac63295274fb2fa7af3d649bc708b07817f917faf49f0085ab8",
+      "ruleId": "image-alt",
+      "impact": "critical",
+      "templateKey": "cart",
+      "selector": "img",
+      "occurrences": 1,
+      "needsReview": false
+    },
+    {
+      "fingerprint": "2cfe410eb4bdf4919fa71218a695326f45fa02be02681fab37273c1f7249a16f",
+      "ruleId": "link-name",
+      "impact": "serious",
+      "templateKey": "page:contact",
+      "selector": "#*",
+      "occurrences": 1,
+      "needsReview": false
+    },
+    {
+      "fingerprint": "36fcba2d288671578d05063f6126f506f8a73b463ec8e57618430198d7b031cb",
+      "ruleId": "link-name",
+      "impact": "serious",
+      "templateKey": "collection",
+      "selector": "#*",
+      "occurrences": 1,
+      "needsReview": false
+    },
+    {
+      "fingerprint": "383feb9e2f3ff27d38043f0cae881298fa8c283f24cc09c4187263933eb990f0",
+      "ruleId": "image-alt",
+      "impact": "critical",
+      "templateKey": "page:contact",
+      "selector": "img",
+      "occurrences": 1,
+      "needsReview": false
+    },
+    {
+      "fingerprint": "3b55b24b7445a60433cbf180c1bd0abda2208dfa005a3a9be48e2eb2b520de07",
+      "ruleId": "html-has-lang",
+      "impact": "serious",
+      "templateKey": "article",
+      "selector": "html",
+      "occurrences": 2,
+      "needsReview": false
+    },
+    {
+      "fingerprint": "3d59dd76f0d54c2d63e70798ae0b83fbb9d3a39f68e99b16873f3f9fbdf37380",
+      "ruleId": "image-alt",
+      "impact": "critical",
+      "templateKey": "product",
+      "selector": ".*",
+      "occurrences": 6,
+      "needsReview": false
+    },
+    {
+      "fingerprint": "4f47e85c8fda1874d22e57ced82d331e98192221e04f669882347ad113733339",
+      "ruleId": "link-name",
+      "impact": "serious",
+      "templateKey": "article",
+      "selector": "#main > a[href$=\"news\"]",
+      "occurrences": 2,
+      "needsReview": false
+    },
+    {
+      "fingerprint": "5342aa432039a8e847c5f95d98eec7469b0371cbcc4b0735baeec90f237ee3bc",
+      "ruleId": "label",
+      "impact": "critical",
+      "templateKey": "page:contact",
+      "selector": "input[type=\"email\"]",
+      "occurrences": 1,
+      "needsReview": false
+    },
+    {
+      "fingerprint": "85ad9712721a913ab907771b12094bb3adeff93ad5eff786b2797e6ca60a0000",
+      "ruleId": "link-name",
+      "impact": "serious",
+      "templateKey": "blog-index",
+      "selector": "#*",
+      "occurrences": 1,
+      "needsReview": false
+    },
+    {
+      "fingerprint": "a3c23c4ec98540001c4f83cd351d2d5cafee597584189775c4a4455d4f4fb6c9",
+      "ruleId": "button-name",
+      "impact": "critical",
+      "templateKey": "product",
+      "selector": "#*",
+      "occurrences": 6,
+      "needsReview": false
+    },
+    {
+      "fingerprint": "b18afba6499686d235b39e27fed134e5927df2155b4ae826cdaa435bc7a27d16",
+      "ruleId": "link-name",
+      "impact": "serious",
+      "templateKey": "home",
+      "selector": "#*",
+      "occurrences": 1,
+      "needsReview": false
+    },
+    {
+      "fingerprint": "b29e367127436df54195ca5de7e0c0444e8d33495df6ee1bc36c0d4d46803068",
+      "ruleId": "color-contrast",
+      "impact": "serious",
+      "templateKey": "collection",
+      "selector": ".faint",
+      "occurrences": 1,
+      "needsReview": false
+    },
+    {
+      "fingerprint": "b5ab2d1e8ffd7036c4b02803f309ad7e9ccb5e8cf7ff73cb0438473f8aaf6ed5",
+      "ruleId": "link-name",
+      "impact": "serious",
+      "templateKey": "cart",
+      "selector": "#*",
+      "occurrences": 1,
+      "needsReview": false
+    },
+    {
+      "fingerprint": "d74459d9ed3cc8b3b9d89087f93e7d2b51cb8608122c76ecfa36fa57dd12e257",
+      "ruleId": "image-alt",
+      "impact": "critical",
+      "templateKey": "article",
+      "selector": "img",
+      "occurrences": 2,
+      "needsReview": false
+    },
+    {
+      "fingerprint": "e6a7f58d7e5d77a408f00a56c8aef914a5ac00c03cd3af778f113e5c2b81c399",
+      "ruleId": "image-alt",
+      "impact": "critical",
+      "templateKey": "collection",
+      "selector": "img",
+      "occurrences": 1,
+      "needsReview": false
+    },
+    {
+      "fingerprint": "e78a92ebefb90406692b2205983ea59d18431adbd7b8e5f2a422d211fb435c46",
+      "ruleId": "link-name",
+      "impact": "serious",
+      "templateKey": "product",
+      "selector": "#*",
+      "occurrences": 6,
+      "needsReview": false
+    },
+    {
+      "fingerprint": "e8e7aad4555abfeabfc4bc718e6715da5c97cfe5f2a4510c0e43b6139bf2a5ba",
+      "ruleId": "image-alt",
+      "impact": "critical",
+      "templateKey": "blog-index",
+      "selector": "img",
+      "occurrences": 1,
+      "needsReview": false
+    },
+    {
+      "fingerprint": "e96b6a612b8c5efdbf0f4ca52bfbc709ee0e048ff9adca8e44dd91f0c2821467",
+      "ruleId": "link-name",
+      "impact": "serious",
+      "templateKey": "article",
+      "selector": "#*",
+      "occurrences": 2,
+      "needsReview": false
+    }
+  ]
+}

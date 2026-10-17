@@ -18,3 +18,6 @@ export interface ScanLogger {
 }
 
 export const silentLogger: ScanLogger = { debug: () => {}, warn: () => {} };
+
+export const STANDARDS = ['wcag21aa', 'wcag22aa'] as const;
+export type Standard = (typeof STANDARDS)[number];

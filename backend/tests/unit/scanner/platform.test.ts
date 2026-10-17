@@ -1,7 +1,10 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { createGuardedFetch } from '../../../src/scanner/net/guarded-fetch.js';
-import { detectPlatform } from '../../../src/scanner/platform/detect.js';
+import {
+  detectPlatform,
+  detectPlatformFromSitemaps,
+} from '../../../src/scanner/platform/detect.js';
 import type { Platform } from '../../../src/scanner/types.js';
 
 describe('detectPlatform', () => {
@@ -62,6 +65,28 @@ describe('detectPlatform', () => {
     expect(detectPlatform({ html: '', headers: new Headers({ 'X-ShopId': '1' }) }).platform).toBe(
       'shopify',
     );
+  });
+});
+
+describe('detectPlatformFromSitemaps', () => {
+  it.each([
+    [['https://s.com/sitemap.xml', 'https://s.com/sitemap_products_1.xml?from=1&to=9'], 'shopify'],
+    [['https://w.com/wp-sitemap.xml', 'https://w.com/wp-sitemap-posts-post-1.xml'], 'wordpress'],
+    [
+      [
+        'https://w.com/sitemap_index.xml',
+        'https://w.com/post-sitemap.xml',
+        'https://w.com/page-sitemap.xml',
+      ],
+      'wordpress',
+    ],
+    [['https://w.com/post-sitemap.xml', 'https://w.com/product-sitemap.xml'], 'woocommerce'],
+  ])('%j → %s', (urls, expected) => {
+    expect(detectPlatformFromSitemaps(urls)?.platform).toBe(expected);
+  });
+
+  it('returns null when nothing is distinctive', () => {
+    expect(detectPlatformFromSitemaps(['https://x.com/sitemap.xml'])).toBeNull();
   });
 });
 

@@ -54,17 +54,45 @@ Errors always use this shape: `{ "error": { "code", "message", "details" } }` (c
 it makes HTTP requests only through `net/guarded-fetch.ts`, which blocks private and internal
 addresses (SSRF protection). ESLint enforces both rules.
 
-Part 1a (finding pages) is built. Try it on any site:
+First-time setup downloads the browser the scanner uses: `npx playwright install chromium`.
+
+### Scan a site
+
+```bash
+npm run scan -- example.com --limit 25
+npm run scan -- example.com --limit 50 --out result.json --pdf report.pdf
+npm run scan -- example.com --pdf summary.pdf --report summary --paper letter
+```
+
+Finds pages (robots.txt, sitemaps, then a crawl if needed), picks a sample per page template,
+tests each page in Chromium with axe-core 4.14.0, groups problems into issues with stable
+fingerprints, and prints a score and summary. `--pdf` writes R-01 (summary) or R-02 (full) as a
+tagged PDF with bookmarks. Requests are polite (at most 1 per second per host).
+
+To see only which pages would be tested, without a browser:
 
 ```bash
 npm run scan:discover -- allbirds.com --limit 20
-npm run scan:discover -- https://example.com --limit 10 --exclude "/blog/**" --pin https://example.com/contact --out plan.json
 ```
 
-It reads robots.txt and sitemaps (crawling the site if they list fewer than 20 URLs), detects the
-platform, groups URLs into templates and prints the pages a scan would test. Requests are polite:
-at most 1 per second per host (slower if robots.txt asks), so large sites take a minute or two.
-At most 50 sitemap files are read per discovery.
+### Fixture store
+
+A local Shopify-like store with known problems, used by the golden-file tests:
+
+```bash
+npm run fixtures:serve                                       # http://127.0.0.1:4100
+npm run scan -- http://127.0.0.1:4100 --allow-private --pdf fixture.pdf
+```
+
+`--allow-private` turns SSRF protection off for that run and is refused when `NODE_ENV=production`.
+After an intended change to scan results, regenerate the golden file:
+`UPDATE_GOLDEN=1 npx vitest run tests/unit/scanner/golden.test.ts`.
+
+### Opt-in slow tests
+
+```bash
+SCANNER_LOAD_TESTS=1 npx vitest run tests/unit/scanner/load.test.ts   # 250 pages, < 2 GB (~5 min)
+```
 
 Network tests against 20 real reference sites (`tests/fixtures/platforms.json`) are opt-in:
 
@@ -85,7 +113,9 @@ src/
   middleware/       Request logging and IDs, error handling
   routes/           HTTP routes
   shared/errors.ts  Error codes shared with the front end
-  scanner/          Scan engine: url/, net/ (SSRF guard), discovery/, platform/, templates/, sampling/, cli/
+  scanner/          Scan engine: url/, net/ (SSRF guard), discovery/, platform/, templates/,
+                    sampling/, runner/ (Playwright + axe), results/, rules/, cli/
+  reports/          R-01 / R-02 report templates (React) and PDF rendering
 drizzle/            SQL migrations (generated + hand-written triggers/RLS)
 tests/              unit/ and integration/
 ```

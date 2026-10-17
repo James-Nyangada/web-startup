@@ -16,7 +16,8 @@
     "verbatimModuleSyntax": true,
     "types": ["node"],
     "outDir": "dist",
-    "rootDir": "."
+    "rootDir": ".",
+    "jsx": "react-jsx"
   },
   "include": ["src", "tests", "drizzle.config.ts", "vitest.config.ts"]
 }

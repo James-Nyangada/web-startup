@@ -306,6 +306,26 @@ describe('discover (fixture sites)', () => {
     expect(result.platform.platform).toBe('wordpress');
   });
 
+  it('retries a rate-limited home page once, then falls back to sitemap naming for the platform', async () => {
+    let homeHits = 0;
+    const result = await run((base) => ({
+      '/': (_req, res) => {
+        homeHits++;
+        res.writeHead(429, { 'retry-after': '1' }).end('slow down');
+      },
+      '/sitemap.xml': {
+        headers: { 'content-type': 'application/xml' },
+        body: `<sitemapindex><sitemap><loc>${base}/sitemap_products_1.xml</loc></sitemap></sitemapindex>`,
+      },
+      '/sitemap_products_1.xml': {
+        headers: { 'content-type': 'application/xml' },
+        body: `<urlset>${Array.from({ length: 25 }, (_, i) => `<url><loc>${base}/products/p${i}</loc></url>`).join('')}</urlset>`,
+      },
+    }));
+    expect(homeHits).toBe(2);
+    expect(result.platform.platform).toBe('shopify');
+  }, 20_000);
+
   it('only scans the home page when robots.txt errors', async () => {
     const result = await run((base) => ({
       '/robots.txt': { status: 503, body: 'down' },

@@ -1,6 +1,10 @@
 import type { GuardedFetch } from '../net/guarded-fetch.js';
 import { HostRateLimiter } from '../net/rate-limiter.js';
-import { detectPlatform, type PlatformResult } from '../platform/detect.js';
+import {
+  detectPlatform,
+  detectPlatformFromSitemaps,
+  type PlatformResult,
+} from '../platform/detect.js';
 import type { Platform, ScanLogger } from '../types.js';
 import { isSameSite, normalizeUrl } from '../url/normalize.js';
 import { createExcludedPathMatcher, shouldSkipUrl } from '../url/skip-patterns.js';
@@ -72,7 +76,16 @@ export async function discover(input: DiscoverInput): Promise<DiscoveryResult> {
   let navLinks: string[] = [];
   let homeLinks: string[] = [];
   try {
-    const home = await politeFetch(homeUrl);
+    let home = await politeFetch(homeUrl);
+    if (home.status === 429 || home.status === 503) {
+      // Rate-limited: wait as asked (capped at 10 s) and try once more.
+      const retryAfter = Number(home.headers.get('retry-after'));
+      const waitMs =
+        Number.isFinite(retryAfter) && retryAfter > 0 ? Math.min(retryAfter, 10) * 1_000 : 5_000;
+      input.log.warn(`Home page returned ${home.status}; retrying in ${waitMs / 1000}s`);
+      await new Promise((resolve) => setTimeout(resolve, waitMs));
+      home = await politeFetch(homeUrl);
+    }
     if (home.status === 200) {
       homeUrl = normalizeUrl(home.url) ?? homeUrl;
       const page = extractLinks(home.text(), home.url);
@@ -123,6 +136,13 @@ export async function discover(input: DiscoverInput): Promise<DiscoveryResult> {
   });
   for (const entry of sitemaps.entries) addUrl(entry.url, 'sitemap', entry.lastmod);
   const sitemapUrls = found.size;
+  if (!input.platform && (platform.platform === 'unknown' || platform.platform === 'custom')) {
+    const fromSitemaps = detectPlatformFromSitemaps(sitemaps.sitemapsRead);
+    if (fromSitemaps) {
+      platform = fromSitemaps;
+      progress(`Platform (from sitemaps): ${platform.platform}`);
+    }
+  }
   progress(
     `Sitemaps: read ${sitemaps.sitemapsRead.length}, ${sitemaps.entries.length} URL(s) listed`,
   );

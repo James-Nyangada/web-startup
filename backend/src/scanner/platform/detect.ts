@@ -89,3 +89,30 @@ export function detectPlatform({ html, headers }: PlatformSignals): PlatformResu
 
   return { platform: html.trim() ? 'custom' : 'unknown', evidence };
 }
+
+/**
+ * Fallback when the home page could not be read (e.g. rate-limited): platforms
+ * name their sitemap files distinctively.
+ */
+export function detectPlatformFromSitemaps(sitemapUrls: readonly string[]): PlatformResult | null {
+  const paths = sitemapUrls.map((url) => {
+    try {
+      return new URL(url).pathname.toLowerCase();
+    } catch {
+      return '';
+    }
+  });
+  if (paths.some((p) => /\/sitemap_(products|collections|pages|blogs)_\d+\.xml$/.test(p))) {
+    return { platform: 'shopify', evidence: ['Shopify sitemap naming'] };
+  }
+  if (
+    paths.some((p) => /\/product-sitemap\d*\.xml$/.test(p)) &&
+    paths.some((p) => /(post|page)-sitemap/.test(p))
+  ) {
+    return { platform: 'woocommerce', evidence: ['WooCommerce sitemap naming'] };
+  }
+  if (paths.some((p) => /\/wp-sitemap|\/(post|page)-sitemap\d*\.xml$/.test(p))) {
+    return { platform: 'wordpress', evidence: ['WordPress sitemap naming'] };
+  }
+  return null;
+}
