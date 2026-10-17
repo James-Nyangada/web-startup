@@ -1,6 +1,7 @@
 import type pg from 'pg';
 import { vi } from 'vitest';
 import { createApp } from '../../src/app.js';
+import type { Auth } from '../../src/lib/auth.js';
 import type { Repositories } from '../../src/db/repositories/index.js';
 import type { TurnstileVerifier } from '../../src/lib/turnstile.js';
 
@@ -9,6 +10,9 @@ export const testConfig = {
   SITE_URL: 'http://localhost:3001',
   CORS_ORIGINS: '',
   SENTRY_DSN_API: undefined,
+  AUTH_SECRET: '01234567890123456789012345678901',
+  GOOGLE_CLIENT_ID: undefined,
+  GOOGLE_CLIENT_SECRET: undefined,
 };
 
 export function fakePool(healthy = true): pg.Pool {
@@ -21,17 +25,37 @@ export function fakePool(healthy = true): pg.Pool {
 
 export function fakeRepos() {
   const join = vi.fn<Repositories['waitlist']['join']>().mockResolvedValue(undefined);
-  const repos = { waitlist: { join } } as unknown as Repositories;
+  const repos = {
+    waitlist: { join },
+    users: {
+      findById: vi.fn().mockResolvedValue(null),
+      findByEmail: vi.fn().mockResolvedValue(null),
+      update: vi.fn().mockResolvedValue(null),
+      listMemberships: vi.fn().mockResolvedValue([]),
+      listClientAccess: vi.fn().mockResolvedValue([]),
+      isSoleOwnerOfActiveOrg: vi.fn().mockResolvedValue(false),
+      softDelete: vi.fn().mockResolvedValue(null),
+    },
+  } as unknown as Repositories;
   return { repos, join };
 }
 
-export function buildTestApp(options: { healthy?: boolean; turnstile?: TurnstileVerifier } = {}) {
-  const { repos, join } = fakeRepos();
+export function buildTestApp(
+  options: {
+    healthy?: boolean;
+    turnstile?: TurnstileVerifier;
+    auth?: Auth;
+    repos?: Repositories;
+  } = {},
+) {
+  const defaultRepos = fakeRepos();
+  const repos = options.repos ?? defaultRepos.repos;
   const app = createApp({
     config: testConfig,
     pool: fakePool(options.healthy ?? true),
     repos,
     verifyTurnstile: options.turnstile ?? (() => Promise.resolve(true)),
+    auth: options.auth,
   });
-  return { app, join };
+  return { app, join: defaultRepos.join, repos };
 }
