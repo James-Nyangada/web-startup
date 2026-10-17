@@ -98,7 +98,7 @@ const NAV_ITEMS: CommandItem[] = [
     category: "Navigation",
     label: "All Sites",
     subtext: "View and filter all monitored stores",
-    href: "/sites/oakhaus",
+    href: "/sites",
     icon: I.globe,
     keywords: ["sites", "stores", "websites"],
   },

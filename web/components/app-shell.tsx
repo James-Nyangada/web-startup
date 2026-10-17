@@ -17,7 +17,7 @@ export type NavKey = "overview" | "sites" | "tasks" | "reports" | "settings";
 
 const NAV_ITEMS: { key: NavKey; label: string; href: string; icon: string; count?: number }[] = [
   { key: "overview", label: "Overview", href: "/overview", icon: I.layout },
-  { key: "sites", label: "Sites", href: "/sites/oakhaus", icon: I.globe },
+  { key: "sites", label: "Sites", href: "/sites", icon: I.globe },
   { key: "tasks", label: "My tasks", href: "/tasks", icon: I.check, count: 4 },
   { key: "reports", label: "Reports", href: "/reports", icon: I.fileText },
 ];

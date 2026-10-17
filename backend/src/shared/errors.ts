@@ -20,6 +20,9 @@ export const ErrorCode = {
   USER_NOT_FOUND: 'USER_NOT_FOUND',
   ACCOUNT_DELETION_BLOCKED: 'ACCOUNT_DELETION_BLOCKED',
   EMAIL_NOT_VERIFIED: 'EMAIL_NOT_VERIFIED',
+  PLAN_LIMIT: 'PLAN_LIMIT',
+  DUPLICATE_SITE: 'DUPLICATE_SITE',
+  SCAN_IN_PROGRESS: 'SCAN_IN_PROGRESS',
 } as const;
 
 export type ErrorCode = (typeof ErrorCode)[keyof typeof ErrorCode];

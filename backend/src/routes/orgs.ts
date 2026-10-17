@@ -6,6 +6,7 @@ import type { Auth } from '../lib/auth.js';
 import { slugify } from '../lib/slugs.js';
 import { requireAuth } from '../middleware/auth.js';
 import { requireOrgRole, resolveOrgContext } from '../middleware/org.js';
+import { orgSitesRouter } from './sites.js';
 import { ErrorCode } from '../shared/errors.js';
 
 const createOrgSchema = z.object({
@@ -448,6 +449,9 @@ export function orgsRouter(auth: Auth, repos: Repositories): Router {
       res.status(200).json({ data: { entries } });
     },
   );
+
+  // Mount Section 7.3 Sites router under orgScoped
+  orgScoped.use('/sites', orgSitesRouter(repos));
 
   router.use('/:orgId', orgScoped);
 

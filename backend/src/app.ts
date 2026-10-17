@@ -14,6 +14,7 @@ import { authRouter } from './routes/auth.js';
 import { healthRouter } from './routes/health.js';
 import { meRouter } from './routes/me.js';
 import { orgsRouter } from './routes/orgs.js';
+import { detectPlatformRouter } from './routes/sites.js';
 import { waitlistRouter } from './routes/public/waitlist.js';
 
 export interface AppDeps {
@@ -76,6 +77,7 @@ export function createApp({
   v1.use('/auth', authRouter(auth, verifyTurnstile, config));
   v1.use('/me', meRouter(auth, repos));
   v1.use('/orgs', orgsRouter(auth, repos));
+  v1.use('/sites', detectPlatformRouter(auth));
   v1.use('/public', waitlistRouter(repos, verifyTurnstile));
   app.use('/v1', v1);
 
