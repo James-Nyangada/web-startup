@@ -16,12 +16,44 @@ import {
 import type { WorkerContext } from '../../src/worker/types.js';
 import { page, rule } from '../helpers/scan-data.js';
 import type { Repositories } from '../../src/db/repositories/index.js';
-import type { ScanDiff, PreviousIssue } from '../../src/scanner/results/diff.js';
+import type { PreviousIssue } from '../../src/scanner/results/diff.js';
+import type { PageUpsertInput } from '../../src/db/repositories/pages.js';
+import type { scans } from '../../src/db/schema/index.js';
 
 describe('Worker & Queue Engine (Chunk P2-08)', () => {
   const orgId = '11111111-1111-4111-a111-111111111111';
   const siteId = 'site-11111111-1111-4111-a111-111111111111';
   const scanId = 'scan-11111111-1111-4111-a111-111111111111';
+
+  function createTestScan(overrides: Partial<typeof scans.$inferSelect> = {}): typeof scans.$inferSelect {
+    return {
+      id: scanId,
+      orgId,
+      siteId,
+      trigger: 'manual',
+      status: 'queued',
+      queuedAt: new Date(),
+      startedAt: null,
+      finishedAt: null,
+      pagesDiscovered: 0,
+      pagesPlanned: 10,
+      pagesScanned: 0,
+      pagesFailed: 0,
+      templatesFound: 0,
+      axeVersion: '4.14.0',
+      engineVersion: '1.0.0',
+      standard: 'wcag22aa',
+      score: null,
+      counts: {},
+      rawKey: null,
+      errorCode: null,
+      errorMessage: null,
+      requestedBy: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      ...overrides,
+    };
+  }
 
   let storage: MemoryStorageService;
   let mockRepos: Repositories;
@@ -87,10 +119,13 @@ describe('Worker & Queue Engine (Chunk P2-08)', () => {
         setVerified: vi.fn(),
       },
       pages: {
-        upsertPages: vi.fn().mockImplementation((_orgId, _siteId, pagesList) => {
+        upsertPages: vi.fn().mockImplementation((_orgId, _siteId, pagesList: PageUpsertInput[]) => {
           const map = new Map<string, string>();
           for (let i = 0; i < pagesList.length; i++) {
-            map.set(pagesList[i].url, `page-id-${i}`);
+            const p = pagesList[i];
+            if (p) {
+              map.set(p.url, `page-id-${i}`);
+            }
           }
           return Promise.resolve(map);
         }),
@@ -154,16 +189,14 @@ describe('Worker & Queue Engine (Chunk P2-08)', () => {
     });
 
     it('ignores terminal scans (completed/failed/canceled)', async () => {
-      vi.mocked(mockRepos.scans.findRawById).mockResolvedValueOnce({
-        id: scanId,
-        orgId,
-        siteId,
-        status: 'completed',
-        pagesPlanned: 10,
-        pagesScanned: 10,
-        rawKey: 'some-key',
-        standard: 'wcag22aa',
-      } as any);
+      vi.mocked(mockRepos.scans.findRawById).mockResolvedValueOnce(
+        createTestScan({
+          status: 'completed',
+          pagesPlanned: 10,
+          pagesScanned: 10,
+          rawKey: 'some-key',
+        }),
+      );
 
       const ctx: WorkerContext = {
         repos: mockRepos,
@@ -251,16 +284,14 @@ describe('Worker & Queue Engine (Chunk P2-08)', () => {
       const rawKey = `scans/${orgId}/${scanId}/raw.json`;
       await storage.putObject(rawKey, JSON.stringify(scanResult));
 
-      vi.mocked(mockRepos.scans.findRawById).mockResolvedValueOnce({
-        id: scanId,
-        orgId,
-        siteId,
-        status: 'processing',
-        pagesPlanned: 2,
-        pagesScanned: 2,
-        rawKey,
-        standard: 'wcag22aa',
-      } as any);
+      vi.mocked(mockRepos.scans.findRawById).mockResolvedValueOnce(
+        createTestScan({
+          status: 'processing',
+          pagesPlanned: 2,
+          pagesScanned: 2,
+          rawKey,
+        }),
+      );
 
       // No previous issues
       vi.mocked(mockRepos.issues.listForDiff).mockResolvedValueOnce([]);
@@ -302,16 +333,14 @@ describe('Worker & Queue Engine (Chunk P2-08)', () => {
       const rawKey = `scans/${orgId}/${scanId}/raw.json`;
       await storage.putObject(rawKey, JSON.stringify(scanResult));
 
-      vi.mocked(mockRepos.scans.findRawById).mockResolvedValueOnce({
-        id: scanId,
-        orgId,
-        siteId,
-        status: 'processing',
-        pagesPlanned: 2,
-        pagesScanned: 2,
-        rawKey,
-        standard: 'wcag22aa',
-      } as any);
+      vi.mocked(mockRepos.scans.findRawById).mockResolvedValueOnce(
+        createTestScan({
+          status: 'processing',
+          pagesPlanned: 2,
+          pagesScanned: 2,
+          rawKey,
+        }),
+      );
 
       const foundFp = scanResult.issues[0]!.fingerprint;
 
@@ -353,16 +382,14 @@ describe('Worker & Queue Engine (Chunk P2-08)', () => {
       const rawKey = `scans/${orgId}/${scanId}/raw.json`;
       await storage.putObject(rawKey, JSON.stringify(scanResult));
 
-      vi.mocked(mockRepos.scans.findRawById).mockResolvedValueOnce({
-        id: scanId,
-        orgId,
-        siteId,
-        status: 'processing',
-        pagesPlanned: 2,
-        pagesScanned: 2,
-        rawKey,
-        standard: 'wcag22aa',
-      } as any);
+      vi.mocked(mockRepos.scans.findRawById).mockResolvedValueOnce(
+        createTestScan({
+          status: 'processing',
+          pagesPlanned: 2,
+          pagesScanned: 2,
+          rawKey,
+        }),
+      );
 
       // Previous open issue on https://example.com
       const previousIssues: PreviousIssue[] = [
@@ -401,16 +428,14 @@ describe('Worker & Queue Engine (Chunk P2-08)', () => {
       const rawKey = `scans/${orgId}/${scanId}/raw.json`;
       await storage.putObject(rawKey, JSON.stringify(scanResult));
 
-      vi.mocked(mockRepos.scans.findRawById).mockResolvedValueOnce({
-        id: scanId,
-        orgId,
-        siteId,
-        status: 'processing',
-        pagesPlanned: 2,
-        pagesScanned: 0,
-        rawKey,
-        standard: 'wcag22aa',
-      } as any);
+      vi.mocked(mockRepos.scans.findRawById).mockResolvedValueOnce(
+        createTestScan({
+          status: 'processing',
+          pagesPlanned: 2,
+          pagesScanned: 0,
+          rawKey,
+        }),
+      );
 
       const previousIssues: PreviousIssue[] = [
         {
@@ -464,9 +489,9 @@ describe('Worker & Queue Engine (Chunk P2-08)', () => {
   describe('Interrupted Scan Recovery (Worker Restart)', () => {
     it('re-queues discovering and scanning scans back to queued on worker restart', async () => {
       vi.mocked(mockRepos.scans.findInterruptedScans).mockResolvedValueOnce([
-        { id: 'scan-interrupted-1', status: 'discovering', rawKey: null } as any,
-        { id: 'scan-interrupted-2', status: 'scanning', rawKey: null } as any,
-        { id: 'scan-interrupted-3', status: 'processing', rawKey: 'scans/raw.json' } as any,
+        createTestScan({ id: 'scan-interrupted-1', status: 'discovering', rawKey: null }),
+        createTestScan({ id: 'scan-interrupted-2', status: 'scanning', rawKey: null }),
+        createTestScan({ id: 'scan-interrupted-3', status: 'processing', rawKey: 'scans/raw.json' }),
       ]);
 
       const count = await recoverInterruptedScans(mockRepos, mockBoss as unknown as PgBoss);

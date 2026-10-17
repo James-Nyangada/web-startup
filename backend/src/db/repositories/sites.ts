@@ -1,13 +1,15 @@
-import { and, asc, desc, eq, ilike, isNull, or, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, ilike, isNotNull, isNull, lte, ne, or, sql } from 'drizzle-orm';
 import { randomBytes } from 'node:crypto';
 import type { Database } from '../client.js';
 import type { Platform, Standard } from '../../scanner/types.js';
 import {
+  organizations,
   sites,
   type ScanFrequency,
   type SiteStatus,
   type VerifyMethod,
 } from '../schema/index.js';
+import { computeNextScanAt } from '../../lib/schedule.js';
 import type { OrgId } from './org-scope.js';
 
 export interface SiteListOptions {
@@ -30,6 +32,7 @@ export interface CreateSiteInput {
   standard?: Standard;
   pinnedUrls?: string[];
   excludedPaths?: string[];
+  timeZone?: string;
 }
 
 export interface UpdateSiteInput {
@@ -42,6 +45,7 @@ export interface UpdateSiteInput {
   standard?: Standard;
   pinnedUrls?: string[];
   excludedPaths?: string[];
+  timeZone?: string;
 }
 
 export function sitesRepository(db: Database) {
@@ -120,6 +124,16 @@ export function sitesRepository(db: Database) {
 
     async create(orgId: OrgId, input: CreateSiteInput) {
       const verifyToken = `ps_${randomBytes(16).toString('hex')}`;
+      const scanFrequency = input.scanFrequency ?? 'weekly';
+      const scanDay = input.scanDay ?? 1;
+      const scanHour = input.scanHour ?? 2;
+      const nextScanAt = computeNextScanAt({
+        frequency: scanFrequency,
+        scanDay,
+        scanHour,
+        timeZone: input.timeZone ?? 'UTC',
+      });
+
       const [row] = await db
         .insert(sites)
         .values({
@@ -129,9 +143,10 @@ export function sitesRepository(db: Database) {
           platform: input.platform ?? 'unknown',
           clientName: input.clientName ?? null,
           verifyToken,
-          scanFrequency: input.scanFrequency ?? 'weekly',
-          scanDay: input.scanDay ?? 1,
-          scanHour: input.scanHour ?? 2,
+          scanFrequency,
+          scanDay,
+          scanHour,
+          nextScanAt,
           pageLimit: input.pageLimit ?? 50,
           standard: input.standard ?? 'wcag22aa',
           pinnedUrls: input.pinnedUrls ?? [],
@@ -145,12 +160,37 @@ export function sitesRepository(db: Database) {
     },
 
     async update(orgId: OrgId, siteId: string, patch: UpdateSiteInput) {
+      let nextScanAt: Date | null | undefined = undefined;
+      if (
+        patch.scanFrequency !== undefined ||
+        patch.scanDay !== undefined ||
+        patch.scanHour !== undefined ||
+        patch.timeZone !== undefined
+      ) {
+        const existing = await this.findById(orgId, siteId);
+        if (existing) {
+          nextScanAt = computeNextScanAt({
+            frequency: patch.scanFrequency ?? existing.scanFrequency,
+            scanDay: patch.scanDay ?? existing.scanDay,
+            scanHour: patch.scanHour ?? existing.scanHour,
+            timeZone: patch.timeZone ?? 'UTC',
+          });
+        }
+      }
+
+      const directPatch = { ...patch };
+      delete directPatch.timeZone;
+      const updateData: Record<string, unknown> = {
+        ...directPatch,
+        updatedAt: new Date(),
+      };
+      if (nextScanAt !== undefined) {
+        updateData.nextScanAt = nextScanAt;
+      }
+
       const [row] = await db
         .update(sites)
-        .set({
-          ...patch,
-          updatedAt: new Date(),
-        })
+        .set(updateData)
         .where(and(eq(sites.orgId, orgId), eq(sites.id, siteId), isNull(sites.deletedAt)))
         .returning();
       return row ?? null;
@@ -216,6 +256,42 @@ export function sitesRepository(db: Database) {
         .select()
         .from(sites)
         .where(and(eq(sites.id, siteId), isNull(sites.deletedAt)));
+      return row ?? null;
+    },
+
+    async findDueForScheduledScan(limit = 20) {
+      return db
+        .select({
+          site: sites,
+          orgTimeZone: organizations.timeZone,
+          orgPlan: organizations.plan,
+          orgBillingStatus: organizations.billingStatus,
+        })
+        .from(sites)
+        .innerJoin(organizations, eq(sites.orgId, organizations.id))
+        .where(
+          and(
+            eq(sites.status, 'active'),
+            isNull(sites.deletedAt),
+            isNotNull(sites.nextScanAt),
+            lte(sites.nextScanAt, new Date()),
+            isNull(organizations.deletedAt),
+            ne(organizations.billingStatus, 'read_only'),
+          ),
+        )
+        .orderBy(asc(sites.nextScanAt))
+        .limit(limit);
+    },
+
+    async updateNextScanAt(siteId: string, nextScanAt: Date | null) {
+      const [row] = await db
+        .update(sites)
+        .set({
+          nextScanAt,
+          updatedAt: new Date(),
+        })
+        .where(eq(sites.id, siteId))
+        .returning();
       return row ?? null;
     },
   };

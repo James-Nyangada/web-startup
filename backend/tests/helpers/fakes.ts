@@ -69,6 +69,9 @@ export function fakeRepos() {
       resume: vi.fn().mockResolvedValue(null),
       softDelete: vi.fn().mockResolvedValue(null),
       setVerified: vi.fn().mockResolvedValue(null),
+      findDueForScheduledScan: vi.fn().mockResolvedValue([]),
+      updateNextScanAt: vi.fn().mockResolvedValue(null),
+      findRawById: vi.fn().mockResolvedValue(null),
     },
     scans: {
       create: vi.fn().mockResolvedValue(null),
@@ -83,6 +86,8 @@ export function fakeRepos() {
       findInterruptedScans: vi.fn().mockResolvedValue([]),
       requeueInterrupted: vi.fn().mockResolvedValue(null),
       markFailed: vi.fn().mockResolvedValue(null),
+      countManualScansSince: vi.fn().mockResolvedValue(0),
+      cancelScan: vi.fn().mockResolvedValue(null),
     },
     pages: {
       upsertPages: vi.fn().mockResolvedValue(new Map()),

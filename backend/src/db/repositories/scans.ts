@@ -1,4 +1,4 @@
-import { and, desc, eq, isNull, sql } from 'drizzle-orm';
+import { and, desc, eq, gte, isNull, ne, sql } from 'drizzle-orm';
 import type { Database } from '../client.js';
 import type { Standard } from '../../scanner/types.js';
 import {
@@ -130,6 +130,41 @@ export function scansRepository(db: Database) {
           ),
         );
       return row?.count ?? 0;
+    },
+
+    async countManualScansSince(orgId: OrgId, siteId: string, sinceDate: Date) {
+      const [row] = await db
+        .select({ count: sql<number>`count(*)::int` })
+        .from(scans)
+        .where(
+          and(
+            eq(scans.orgId, orgId),
+            eq(scans.siteId, siteId),
+            eq(scans.trigger, 'manual'),
+            gte(scans.queuedAt, sinceDate),
+            ne(scans.status, 'canceled'),
+          ),
+        );
+      return row?.count ?? 0;
+    },
+
+    async cancelScan(orgId: OrgId, scanId: string) {
+      const [row] = await db
+        .update(scans)
+        .set({
+          status: 'canceled',
+          finishedAt: new Date(),
+          updatedAt: new Date(),
+        })
+        .where(
+          and(
+            eq(scans.orgId, orgId),
+            eq(scans.id, scanId),
+            sql`${scans.status} in ('queued', 'discovering', 'scanning', 'processing')`,
+          ),
+        )
+        .returning();
+      return row ?? null;
     },
 
     async findRawById(scanId: string) {

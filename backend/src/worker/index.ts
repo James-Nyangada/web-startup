@@ -2,7 +2,7 @@ import { getDb, closeDb } from '../db/index.js';
 import { createRepositories } from '../db/repositories/index.js';
 import { ensureRulesSeeded } from '../db/seed-rules.js';
 import { getStorage } from '../storage/index.js';
-import { createBoss, registerWorkers } from './boss.js';
+import { createBoss, registerWorkers, registerSchedules } from './boss.js';
 import { recoverInterruptedScans } from './recovery.js';
 import type { WorkerContext } from './types.js';
 
@@ -36,8 +36,11 @@ export async function startWorker() {
     console.log(`[worker] Re-enqueued ${recovered} interrupted scan(s).`);
   }
 
-  console.log('[worker] Registering job workers (scan.run, scan.process)...');
+  console.log('[worker] Registering job workers (scan.run, scan.process, scan.schedule)...');
   await registerWorkers(boss, ctx);
+
+  console.log('[worker] Registering recurring cron schedules...');
+  await registerSchedules(boss);
 
   console.log('[worker] Background worker is active and listening for jobs.');
 

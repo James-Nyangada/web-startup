@@ -210,11 +210,13 @@ export function orgSitesRouter(repos: Repositories): Router {
         }
       }
 
+      const org = await repos.organizations.findById(req.orgId!);
       const site = await repos.sites.create(req.orgId!, {
         name,
         rootUrl: normalizedRoot,
         platform: finalPlatform,
         clientName: clientName ?? null,
+        timeZone: org?.timeZone ?? 'UTC',
       });
 
       // Audit log
@@ -339,7 +341,11 @@ export function orgSitesRouter(repos: Repositories): Router {
         return;
       }
 
-      const updated = await repos.sites.update(req.orgId!, siteId, parse.data as UpdateSiteInput);
+      const org = await repos.organizations.findById(req.orgId!);
+      const updated = await repos.sites.update(req.orgId!, siteId, {
+        ...(parse.data as UpdateSiteInput),
+        timeZone: org?.timeZone ?? 'UTC',
+      });
 
       // Audit log
       await repos.auditLog.write(req.orgId!, {

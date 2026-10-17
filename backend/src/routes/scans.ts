@@ -6,6 +6,8 @@ import { requireOrgRole } from '../middleware/org.js';
 import { ErrorCode } from '../shared/errors.js';
 import { STANDARDS, type Standard } from '../scanner/types.js';
 import { enqueueScanRun } from '../worker/boss.js';
+import { getPlanLimits } from '../shared/plans.js';
+import { getZonedParts, zonedWallClockToUtc } from '../lib/schedule.js';
 
 const createScanSchema = z.object({
   trigger: z.enum(['manual', 'onboarding']).default('manual'),
@@ -146,6 +148,52 @@ export function orgScansRouter(repos: Repositories, options?: ScansRouterOptions
           },
         });
         return;
+      }
+
+      // Enforce daily manual scan limit per site based on org plan
+      if (trigger === 'manual') {
+        const org = await repos.organizations.findById(req.orgId!);
+        const timeZone = org?.timeZone ?? 'UTC';
+        const planLimits = getPlanLimits(org?.plan);
+        const maxManualScans = planLimits.manualScansPerDayPerSite;
+
+        const currentParts = getZonedParts(new Date(), timeZone);
+        const startOfDay = zonedWallClockToUtc(
+          currentParts.year,
+          currentParts.month,
+          currentParts.day,
+          0,
+          0,
+          timeZone,
+        );
+
+        const manualCountToday = await repos.scans.countManualScansSince(
+          req.orgId!,
+          siteId,
+          startOfDay,
+        );
+
+        if (manualCountToday >= maxManualScans) {
+          res.status(422).json({
+            error: {
+              code: ErrorCode.PLAN_LIMIT,
+              message: `You have reached your daily limit of ${maxManualScans} manual scan${maxManualScans === 1 ? '' : 's'} for this site on the ${planLimits.name} plan.`,
+              details: {
+                limit: maxManualScans,
+                current: manualCountToday,
+                upgradeTo:
+                  org?.plan === 'trial'
+                    ? 'store'
+                    : org?.plan === 'store'
+                      ? 'growth'
+                      : org?.plan === 'growth'
+                        ? 'agency'
+                        : 'agency_pro',
+              },
+            },
+          });
+          return;
+        }
       }
 
       const effectivePagesPlanned = trigger === 'onboarding' ? 10 : (pagesPlanned ?? site.pageLimit ?? 50);
@@ -359,6 +407,83 @@ export function orgScansRouter(repos: Repositories, options?: ScansRouterOptions
           }
         }
       });
+    },
+  );
+
+  // POST /v1/orgs/:orgId/scans/:scanId/cancel - Cancel queued/running scan (O A M)
+  router.post(
+    '/scans/:scanId/cancel',
+    requireOrgRole('member'),
+    async (req: Request, res: Response): Promise<void> => {
+      const scanIdParam = req.params.scanId;
+      const scanId = Array.isArray(scanIdParam) ? scanIdParam[0] : scanIdParam;
+
+      if (!scanId) {
+        res.status(400).json({
+          error: {
+            code: ErrorCode.VALIDATION_ERROR,
+            message: 'Scan ID is required.',
+            details: {},
+          },
+        });
+        return;
+      }
+
+      const scan = await repos.scans.findById(req.orgId!, scanId);
+      if (!scan) {
+        res.status(404).json({
+          error: {
+            code: ErrorCode.NOT_FOUND,
+            message: 'Scan not found.',
+            details: {},
+          },
+        });
+        return;
+      }
+
+      if (['completed', 'failed', 'canceled'].includes(scan.status)) {
+        res.status(409).json({
+          error: {
+            code: ErrorCode.CONFLICT,
+            message: `Cannot cancel a scan that has already ${scan.status}.`,
+            details: { scanId, status: scan.status },
+          },
+        });
+        return;
+      }
+
+      const canceled = await repos.scans.cancelScan(req.orgId!, scanId);
+      if (!canceled) {
+        res.status(409).json({
+          error: {
+            code: ErrorCode.CONFLICT,
+            message: 'Unable to cancel this scan. It may have already finished.',
+            details: { scanId },
+          },
+        });
+        return;
+      }
+
+      broadcastScanProgress(scanId, {
+        phase: 'canceled',
+        status: 'canceled',
+        pagesScanned: canceled.pagesScanned,
+        pagesPlanned: canceled.pagesPlanned,
+        score: canceled.score,
+      });
+
+      await repos.auditLog.write(req.orgId!, {
+        actorId: req.auth!.user.id,
+        actorType: 'user',
+        action: 'scan.canceled',
+        targetId: scan.id,
+        targetType: 'scan',
+        data: { siteId: scan.siteId },
+        ip: req.ip ?? null,
+        userAgent: req.get('user-agent') ?? null,
+      });
+
+      res.status(200).json({ data: { scan: canceled } });
     },
   );
 

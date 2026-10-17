@@ -2,9 +2,11 @@ import { PgBoss, type ConstructorOptions } from 'pg-boss';
 import type { ScanJobPayload, WorkerContext } from './types.js';
 import { handleScanRun } from './jobs/scan-run.js';
 import { handleScanProcess } from './jobs/scan-process.js';
+import { handleScanSchedule } from './jobs/scan-schedule.js';
 
 export const QUEUE_SCAN_RUN = 'scan.run';
 export const QUEUE_SCAN_PROCESS = 'scan.process';
+export const QUEUE_SCAN_SCHEDULE = 'scan.schedule';
 
 export interface CreateBossOptions {
   connectionString?: string;
@@ -92,4 +94,22 @@ export async function registerWorkers(boss: PgBoss, ctx: WorkerContext): Promise
       }
     },
   );
+
+  // Concurrency 1 for scan.schedule cron
+  await boss.work(
+    QUEUE_SCAN_SCHEDULE,
+    { localConcurrency: 1, batchSize: 1 },
+    async () => {
+      await handleScanSchedule(ctx);
+    },
+  );
 }
+
+/**
+ * Registers recurring schedules with pg-boss (cron jobs from spec Section 9).
+ */
+export async function registerSchedules(boss: PgBoss): Promise<void> {
+  // scan.schedule runs every 10 minutes (cron: '*/10 * * * *')
+  await boss.schedule(QUEUE_SCAN_SCHEDULE, '*/10 * * * *', {});
+}
+

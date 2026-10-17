@@ -94,6 +94,11 @@ export async function handleScanRun(
       },
     });
 
+    const checkCanceled = await ctx.repos.scans.findRawById(scan.id);
+    if (checkCanceled?.status === 'canceled') {
+      return;
+    }
+
     // 1. Persist discovered and planned pages to pages table
     const pagesToUpsert: PageUpsertInput[] = scanResult.pages.map((p) => ({
       url: p.url,
