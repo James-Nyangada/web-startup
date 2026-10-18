@@ -1,0 +1,69 @@
+name: Web CI
+
+on:
+  pull_request:
+    paths: ['web/**', 'backend/**', '.github/workflows/web-ci.yml']
+  push:
+    branches: [main]
+    paths: ['web/**', 'backend/**', '.github/workflows/web-ci.yml']
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: app_ci
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres" --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      DATABASE_URL: postgres://postgres:postgres@localhost:5432/app_ci
+      DATABASE_SSL: 'false'
+      APP_URL: http://localhost:3000
+      SITE_URL: http://localhost:3000
+      PORT: '4000'
+      NEXT_PUBLIC_API_URL: http://localhost:4000
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Install backend
+        working-directory: backend
+        run: npm ci
+      - name: Migrate and start the API
+        working-directory: backend
+        run: |
+          npm run db:migrate
+          nohup npx tsx src/server.ts > ../api.log 2>&1 &
+
+      - name: Install web
+        working-directory: web
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+      - name: Type-check
+        working-directory: web
+        run: npm run typecheck
+      - name: Build
+        working-directory: web
+        run: npm run build
+      - name: Start the web app
+        working-directory: web
+        run: |
+          nohup npx next start -p 3000 > ../web.log 2>&1 &
+          npx --yes wait-on@8.0.3 --timeout 60000 http://localhost:3000/sign-in http://localhost:4000/health
+
+      # Definition of Done (section 0.2): zero axe-core violations on every screen.
+      - name: Accessibility audit (axe-core)
+        working-directory: web
+        run: npm run test:a11y
+
+      - name: Server logs
+        if: failure()
+        run: tail -n 100 api.log web.log
