@@ -281,8 +281,66 @@ describe('Scans API & Onboarding Scans (Section 7.4 & Chunk P2-05)', () => {
   });
 
   describe('GET /v1/orgs/:orgId/scans/:scanId', () => {
-    it('returns scan detail', async () => {
-      vi.mocked(repos.scans.findById).mockResolvedValue(mockScan);
+    it('returns scan detail with diff (regressed first) and counts', async () => {
+      vi.mocked(repos.scans.findById).mockResolvedValue({
+        ...mockScan,
+        status: 'completed',
+        score: 85,
+        counts: { critical: 1, serious: 2, moderate: 0, minor: 0, new: 1, fixed: 1, regressed: 1 },
+      });
+
+      const mockDiff = {
+        regressed: [
+          {
+            id: 'issue-reg',
+            ruleId: 'color-contrast',
+            title: 'Color contrast',
+            impact: 'serious' as const,
+            wcagCriteria: ['1.4.3'],
+            wcagLevel: 'AA' as const,
+            templateKey: 'product',
+            selector: 'button.checkout',
+            occurrenceCount: 2,
+            status: 'open' as const,
+            isRegression: true,
+            regressionCount: 1,
+          },
+        ],
+        new: [
+          {
+            id: 'issue-new',
+            ruleId: 'image-alt',
+            title: 'Image alternative text',
+            impact: 'critical' as const,
+            wcagCriteria: ['1.1.1'],
+            wcagLevel: 'A' as const,
+            templateKey: 'product',
+            selector: 'img.hero',
+            occurrenceCount: 1,
+            status: 'open' as const,
+            isRegression: false,
+            regressionCount: 0,
+          },
+        ],
+        fixed: [
+          {
+            id: 'issue-fix',
+            ruleId: 'label',
+            title: 'Form label',
+            impact: 'serious' as const,
+            wcagCriteria: ['1.3.1'],
+            wcagLevel: 'A' as const,
+            templateKey: 'cart',
+            selector: 'input#qty',
+            occurrenceCount: 0,
+            status: 'fixed' as const,
+            isRegression: false,
+            regressionCount: 0,
+          },
+        ],
+      };
+
+      vi.mocked(repos.issues.getScanDiff).mockResolvedValue(mockDiff);
 
       const res = await request(app)
         .get(`/v1/orgs/${orgId}/scans/${scanId}`)
@@ -290,12 +348,121 @@ describe('Scans API & Onboarding Scans (Section 7.4 & Chunk P2-05)', () => {
         .expect(200);
 
       expect(res.body.data.scan.id).toBe(scanId);
+      expect(res.body.data.diff.regressed).toHaveLength(1);
+      expect(res.body.data.diff.new).toHaveLength(1);
+      expect(res.body.data.diff.fixed).toHaveLength(1);
+      // Verify regressed is first
+      expect(res.body.data.diff.regressed[0].id).toBe('issue-reg');
+    });
+
+    it('returns failure reason and whatToDo hint for partial scan', async () => {
+      vi.mocked(repos.scans.findById).mockResolvedValue({
+        ...mockScan,
+        status: 'partial',
+        pagesScanned: 20,
+        pagesPlanned: 50,
+        pagesFailed: 30,
+        score: 72,
+      });
+
+      const res = await request(app)
+        .get(`/v1/orgs/${orgId}/scans/${scanId}`)
+        .set('Cookie', adminCookie)
+        .expect(200);
+
+      expect(res.body.data.hint).toBeDefined();
+      expect(res.body.data.hint.reason).toContain('30 of 50 planned pages');
+      expect(res.body.data.hint.whatToDo).toContain('Partial scans never mark issues as fixed');
+    });
+
+    it('returns failure reason and whatToDo hint for failed scan with error code', async () => {
+      vi.mocked(repos.scans.findById).mockResolvedValue({
+        ...mockScan,
+        status: 'failed',
+        errorCode: 'RATE_LIMITED_429',
+        errorMessage: 'Server returned HTTP 429 Too Many Requests.',
+      });
+
+      const res = await request(app)
+        .get(`/v1/orgs/${orgId}/scans/${scanId}`)
+        .set('Cookie', adminCookie)
+        .expect(200);
+
+      expect(res.body.data.hint).toBeDefined();
+      expect(res.body.data.hint.reason).toContain('rate-limited or blocked');
+      expect(res.body.data.hint.whatToDo).toContain('allowlist');
     });
 
     it('returns 404 for cross-org scan detail', async () => {
       await assertCrossOrg404(app, {
         method: 'get',
         path: `/v1/orgs/${otherOrgId}/scans/${scanId}`,
+        sessionCookie: adminCookie,
+      });
+    });
+  });
+
+  describe('GET /v1/orgs/:orgId/scans/:scanId/pages', () => {
+    it('returns per-page scan results', async () => {
+      vi.mocked(repos.scans.findById).mockResolvedValue(mockScan);
+      vi.mocked(repos.pages.listResultsByScan).mockResolvedValue([
+        {
+          id: 'res-1',
+          pageId: 'page-1',
+          url: 'https://oakhaus.com/products/table',
+          templateKey: 'product',
+          title: 'Dining Table',
+          status: 'ok',
+          httpStatus: 200,
+          loadMs: 420,
+          violations: 3,
+          passes: 45,
+          incomplete: 1,
+          score: 82,
+          screenshotKey: null,
+          createdAt: new Date(),
+        },
+      ]);
+
+      const res = await request(app)
+        .get(`/v1/orgs/${orgId}/scans/${scanId}/pages`)
+        .set('Cookie', adminCookie)
+        .expect(200);
+
+      expect(res.body.data.pages).toHaveLength(1);
+      expect(res.body.data.pages[0].url).toBe('https://oakhaus.com/products/table');
+      expect(res.body.data.pages[0].loadMs).toBe(420);
+    });
+
+    it('returns 404 for cross-org scan pages', async () => {
+      await assertCrossOrg404(app, {
+        method: 'get',
+        path: `/v1/orgs/${otherOrgId}/scans/${scanId}/pages`,
+        sessionCookie: adminCookie,
+      });
+    });
+  });
+
+  describe('GET /v1/orgs/:orgId/scans/:scanId/raw', () => {
+    it('returns raw key and download URL for admin', async () => {
+      vi.mocked(repos.scans.findById).mockResolvedValue({
+        ...mockScan,
+        rawKey: 'raw-scans/scan-123.json',
+      });
+
+      const res = await request(app)
+        .get(`/v1/orgs/${orgId}/scans/${scanId}/raw`)
+        .set('Cookie', adminCookie)
+        .expect(200);
+
+      expect(res.body.data.rawKey).toBe('raw-scans/scan-123.json');
+      expect(res.body.data.downloadUrl).toContain('/storage/raw-scans/scan-123.json');
+    });
+
+    it('returns 404 for cross-org raw scan download', async () => {
+      await assertCrossOrg404(app, {
+        method: 'get',
+        path: `/v1/orgs/${otherOrgId}/scans/${scanId}/raw`,
         sessionCookie: adminCookie,
       });
     });

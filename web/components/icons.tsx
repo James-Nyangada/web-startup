@@ -44,6 +44,8 @@ export const I = {
   loader: "M12 2v4 M12 18v4 M4.93 4.93l2.83 2.83 M16.24 16.24l2.83 2.83 M2 12h4 M18 12h4 M4.93 19.07l2.83-2.83 M16.24 7.76l2.83-2.83",
   stop: "M9 9h6v6H9z",
   arrowLeft: "M19 12H5 M12 19l-7-7 7-7",
+  arrowRight: "M5 12h14 M12 5l7 7-7 7",
+  alert: "M21.73 18l-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3z M12 9v4 M12 17h.01",
 };
 
 export function Icon({

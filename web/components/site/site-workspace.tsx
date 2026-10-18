@@ -6,6 +6,7 @@ import { AppShell } from "@/components/app-shell";
 import { Icon, I } from "@/components/icons";
 import { OverviewTab } from "./overview-tab";
 import { IssuesTab } from "./issues-tab";
+import { ScansTab, type ScanHistoryItem } from "./scans-tab";
 import { IssueDrawer } from "./issue-drawer";
 import { IgnoreDialog } from "./ignore-dialog";
 import { Toast } from "./toast";
@@ -20,6 +21,7 @@ export interface SiteWorkspaceProps {
   orgSlug?: string;
   siteSlug?: string;
   siteName?: string;
+  initialScans?: ScanHistoryItem[];
   initialSite?: {
     id: string;
     name: string;
@@ -69,6 +71,7 @@ export function SiteWorkspace({
   siteName,
   initialSite,
   initialOverview,
+  initialScans,
 }: SiteWorkspaceProps) {
   const [tab, setTab] = useState(startTab);
   const [issues, setIssues] = useState<Issue[]>(() => {
@@ -329,9 +332,22 @@ export function SiteWorkspace({
             }}
           />
         )}
-        {tab > 1 && (
+        {tab === 2 && (
+          <ScansTab
+            orgSlug={orgSlug || "default"}
+            siteSlug={siteSlug || "oakhaus"}
+            scans={initialScans}
+            onTriggerScan={() => {
+              showToast("New manual scan queued. Navigating to live progress...");
+              setTimeout(() => {
+                window.location.href = scanHref;
+              }, 1200);
+            }}
+          />
+        )}
+        {tab > 2 && (
           <div className="rounded-lg border border-dashed border-line-strong px-6 py-12 text-center text-sm text-muted">
-            {SITE_TABS[tab]} is not part of this design pass. Overview and Issues are interactive.
+            {SITE_TABS[tab]} is not part of this design pass. Overview, Issues, and Scans are interactive.
           </div>
         )}
       </div>

@@ -48,6 +48,32 @@ export interface ScanRecord {
   currentUrl?: string;
 }
 
+export interface ScanDiffItem {
+  id: string;
+  ruleId: string;
+  title: string;
+  impact: string;
+  wcagCriteria?: string[];
+  wcagLevel?: string;
+  templateKey?: string;
+  selector?: string;
+  occurrenceCount?: number;
+  status?: string;
+  isRegression?: boolean;
+  regressionCount?: number;
+}
+
+export interface ScanDiffState {
+  regressed: ScanDiffItem[];
+  new: ScanDiffItem[];
+  fixed: ScanDiffItem[];
+}
+
+export interface ScanFailureHint {
+  reason: string;
+  whatToDo: string;
+}
+
 export interface ScanProgressState {
   scan: ScanRecord | null;
   status: ScanStatus;
@@ -58,6 +84,8 @@ export interface ScanProgressState {
   currentUrl?: string;
   score?: number | null;
   counts?: ScanCounts;
+  diff?: ScanDiffState;
+  hint?: ScanFailureHint | null;
   errorCode?: string | null;
   errorMessage?: string | null;
   isLive: boolean;
@@ -82,6 +110,8 @@ export function useScanProgress(orgId: string, scanId: string, initialScan?: Sca
   const [currentUrl, setCurrentUrl] = useState<string | undefined>(undefined);
   const [score, setScore] = useState<number | null | undefined>(initialScan?.score);
   const [counts, setCounts] = useState<ScanCounts | undefined>(initialScan?.counts);
+  const [diff, setDiff] = useState<ScanDiffState | undefined>(undefined);
+  const [hint, setHint] = useState<ScanFailureHint | null | undefined>(undefined);
   const [errorCode, setErrorCode] = useState<string | null | undefined>(initialScan?.errorCode);
   const [errorMessage, setErrorMessage] = useState<string | null | undefined>(initialScan?.errorMessage);
   const [isPolling, setIsPolling] = useState(false);
@@ -260,7 +290,11 @@ export function useScanProgress(orgId: string, scanId: string, initialScan?: Sca
     // Initial fetch to load scan data
     void (async () => {
       try {
-        const res = await apiClient<{ scan: ScanRecord }>(`/v1/orgs/${orgId}/scans/${scanId}`);
+        const res = await apiClient<{
+          scan: ScanRecord;
+          diff?: ScanDiffState;
+          hint?: ScanFailureHint | null;
+        }>(`/v1/orgs/${orgId}/scans/${scanId}`);
         if (isDisposed) return;
         const s = res.scan;
         setScan(s);
@@ -269,6 +303,8 @@ export function useScanProgress(orgId: string, scanId: string, initialScan?: Sca
         setPagesScanned(s.pagesScanned);
         setPagesPlanned(s.pagesPlanned);
         setPagesDiscovered(s.pagesDiscovered);
+        if (res.diff) setDiff(res.diff);
+        if (res.hint !== undefined) setHint(res.hint);
         if (s.score !== undefined) setScore(s.score);
         if (s.counts) setCounts(s.counts);
         if (s.errorCode) setErrorCode(s.errorCode);
@@ -301,6 +337,8 @@ export function useScanProgress(orgId: string, scanId: string, initialScan?: Sca
     currentUrl,
     score,
     counts,
+    diff,
+    hint,
     errorCode,
     errorMessage,
     isLive,

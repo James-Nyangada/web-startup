@@ -8,6 +8,7 @@ import { STANDARDS, type Standard } from '../scanner/types.js';
 import { enqueueScanRun } from '../worker/boss.js';
 import { getPlanLimits } from '../shared/plans.js';
 import { getZonedParts, zonedWallClockToUtc } from '../lib/schedule.js';
+import { getScanFailureHint } from '../shared/scan-hints.js';
 
 const createScanSchema = z.object({
   trigger: z.enum(['manual', 'onboarding']).default('manual'),
@@ -281,16 +282,27 @@ export function orgScansRouter(repos: Repositories, options?: ScansRouterOptions
       const items = await repos.scans.listBySite(req.orgId!, siteId, limit, offset);
       const total = await repos.scans.countBySite(req.orgId!, siteId);
 
+      const scansWithHints = items.map((scan) => ({
+        ...scan,
+        hint: getScanFailureHint(
+          scan.status,
+          scan.errorCode,
+          scan.errorMessage,
+          scan.pagesFailed,
+          scan.pagesPlanned,
+        ),
+      }));
+
       res.status(200).json({
         data: {
-          scans: items,
+          scans: scansWithHints,
           pagination: { total, limit, offset },
         },
       });
     },
   );
 
-  // GET /v1/orgs/:orgId/scans/:scanId - Scan detail (O A M C)
+  // GET /v1/orgs/:orgId/scans/:scanId - Scan detail with diff vs previous and failure hint (O A M C)
   router.get(
     '/scans/:scanId',
     requireOrgRole('member'),
@@ -321,7 +333,106 @@ export function orgScansRouter(repos: Repositories, options?: ScansRouterOptions
         return;
       }
 
-      res.status(200).json({ data: { scan } });
+      const diff = await repos.issues.getScanDiff(req.orgId!, scanId);
+      const hint = getScanFailureHint(
+        scan.status,
+        scan.errorCode,
+        scan.errorMessage,
+        scan.pagesFailed,
+        scan.pagesPlanned,
+      );
+
+      res.status(200).json({
+        data: {
+          scan: {
+            ...scan,
+            hint,
+          },
+          diff,
+          hint,
+        },
+      });
+    },
+  );
+
+  // GET /v1/orgs/:orgId/scans/:scanId/pages - Per-page scan results (O A M C)
+  router.get(
+    '/scans/:scanId/pages',
+    requireOrgRole('member'),
+    async (req: Request, res: Response): Promise<void> => {
+      const scanIdParam = req.params.scanId;
+      const scanId = Array.isArray(scanIdParam) ? scanIdParam[0] : scanIdParam;
+
+      if (!scanId) {
+        res.status(400).json({
+          error: {
+            code: ErrorCode.VALIDATION_ERROR,
+            message: 'Scan ID is required.',
+            details: {},
+          },
+        });
+        return;
+      }
+
+      const scan = await repos.scans.findById(req.orgId!, scanId);
+      if (!scan) {
+        res.status(404).json({
+          error: {
+            code: ErrorCode.NOT_FOUND,
+            message: 'Scan not found.',
+            details: {},
+          },
+        });
+        return;
+      }
+
+      const pages = await repos.pages.listResultsByScan(req.orgId!, scanId);
+
+      res.status(200).json({
+        data: {
+          pages,
+        },
+      });
+    },
+  );
+
+  // GET /v1/orgs/:orgId/scans/:scanId/raw - Short-lived signed URL or raw JSON info (O A)
+  router.get(
+    '/scans/:scanId/raw',
+    requireOrgRole('admin'),
+    async (req: Request, res: Response): Promise<void> => {
+      const scanIdParam = req.params.scanId;
+      const scanId = Array.isArray(scanIdParam) ? scanIdParam[0] : scanIdParam;
+
+      if (!scanId) {
+        res.status(400).json({
+          error: {
+            code: ErrorCode.VALIDATION_ERROR,
+            message: 'Scan ID is required.',
+            details: {},
+          },
+        });
+        return;
+      }
+
+      const scan = await repos.scans.findById(req.orgId!, scanId);
+      if (!scan) {
+        res.status(404).json({
+          error: {
+            code: ErrorCode.NOT_FOUND,
+            message: 'Scan not found.',
+            details: {},
+          },
+        });
+        return;
+      }
+
+      res.status(200).json({
+        data: {
+          rawKey: scan.rawKey,
+          downloadUrl: scan.rawKey ? `/v1/orgs/${req.orgId}/storage/${scan.rawKey}` : null,
+        },
+      });
     },
   );
 

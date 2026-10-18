@@ -1428,6 +1428,116 @@ export function issuesRepository(db: Database) {
         return { updatedCount: matchedIds.length };
       });
     },
+
+    /**
+     * Retrieves the diff of issues for a specific scan:
+     * - regressed: issues regressed in this scan (Spec S-28: regressed first)
+     * - new: issues created / first seen in this scan
+     * - fixed: issues marked fixed in this scan
+     */
+    async getScanDiff(orgId: OrgId, scanId: string) {
+      // 1. Fetch events for this scan
+      const events = await db
+        .select({
+          issueId: issueEvents.issueId,
+          type: issueEvents.type,
+        })
+        .from(issueEvents)
+        .where(
+          and(
+            eq(issueEvents.orgId, orgId),
+            eq(issueEvents.scanId, scanId),
+            inArray(issueEvents.type, ['created', 'fixed', 'regressed']),
+          ),
+        );
+
+      const createdIds = new Set<string>();
+      const fixedIds = new Set<string>();
+      const regressedIds = new Set<string>();
+
+      for (const e of events) {
+        if (e.type === 'created') createdIds.add(e.issueId);
+        else if (e.type === 'fixed') fixedIds.add(e.issueId);
+        else if (e.type === 'regressed') regressedIds.add(e.issueId);
+      }
+
+      // Fallback: If no events were recorded for this scanId (e.g. historical data or mock scans)
+      if (events.length === 0) {
+        const matchingIssues = await db
+          .select({
+            id: issues.id,
+            firstSeenScanId: issues.firstSeenScanId,
+            fixedScanId: issues.fixedScanId,
+            lastSeenScanId: issues.lastSeenScanId,
+            isRegression: issues.isRegression,
+          })
+          .from(issues)
+          .where(
+            and(
+              eq(issues.orgId, orgId),
+              or(
+                eq(issues.firstSeenScanId, scanId),
+                eq(issues.fixedScanId, scanId),
+                and(eq(issues.lastSeenScanId, scanId), eq(issues.isRegression, true)),
+              ),
+            ),
+          );
+
+        for (const i of matchingIssues) {
+          if (i.firstSeenScanId === scanId) createdIds.add(i.id);
+          if (i.fixedScanId === scanId) fixedIds.add(i.id);
+          if (i.lastSeenScanId === scanId && i.isRegression) regressedIds.add(i.id);
+        }
+      }
+
+      const allIds = Array.from(new Set([...createdIds, ...fixedIds, ...regressedIds]));
+      if (allIds.length === 0) {
+        return {
+          regressed: [],
+          new: [],
+          fixed: [],
+        };
+      }
+
+      const rows = await db
+        .select({
+          id: issues.id,
+          ruleId: issues.ruleId,
+          title: rules.title,
+          impact: issues.impact,
+          wcagCriteria: issues.wcagCriteria,
+          wcagLevel: issues.wcagLevel,
+          templateKey: issues.templateKey,
+          selector: issues.selector,
+          occurrenceCount: issues.occurrenceCount,
+          status: issues.status,
+          isRegression: issues.isRegression,
+          regressionCount: issues.regressionCount,
+        })
+        .from(issues)
+        .leftJoin(rules, eq(issues.ruleId, rules.ruleId))
+        .where(and(eq(issues.orgId, orgId), inArray(issues.id, allIds)));
+
+      const issueMap = new Map(rows.map((r) => [r.id, r]));
+
+      const regressed = Array.from(regressedIds)
+        .map((id) => issueMap.get(id))
+        .filter((i): i is NonNullable<typeof i> => Boolean(i));
+
+      const newIssues = Array.from(createdIds)
+        .map((id) => issueMap.get(id))
+        .filter((i): i is NonNullable<typeof i> => Boolean(i));
+
+      const fixed = Array.from(fixedIds)
+        .map((id) => issueMap.get(id))
+        .filter((i): i is NonNullable<typeof i> => Boolean(i));
+
+      return {
+        regressed,
+        new: newIssues,
+        fixed,
+      };
+    },
   };
 }
 

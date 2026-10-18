@@ -107,6 +107,7 @@ export function fakeRepos() {
       listTopIssues: vi.fn().mockResolvedValue([]),
       getSeverityCounts: vi.fn().mockResolvedValue({ critical: 0, serious: 0, moderate: 0, minor: 0 }),
       getDiffSummary: vi.fn().mockResolvedValue({ newCount: 0, fixedCount: 0, regressedCount: 0, sinceDate: null }),
+      getScanDiff: vi.fn().mockResolvedValue({ regressed: [], new: [], fixed: [] }),
       listRecentlyFixed: vi.fn().mockResolvedValue([]),
       listTemplatesBySite: vi.fn().mockResolvedValue([]),
       listCrossSite: vi.fn().mockResolvedValue([]),

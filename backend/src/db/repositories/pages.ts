@@ -174,8 +174,24 @@ export function pagesRepository(db: Database) {
 
     async listResultsByScan(orgId: OrgId, scanId: string) {
       return db
-        .select()
+        .select({
+          id: pageResults.id,
+          pageId: pageResults.pageId,
+          url: pages.url,
+          templateKey: pages.templateKey,
+          title: pages.title,
+          status: pageResults.status,
+          httpStatus: pageResults.httpStatus,
+          loadMs: pageResults.loadMs,
+          violations: pageResults.violations,
+          passes: pageResults.passes,
+          incomplete: pageResults.incomplete,
+          score: pageResults.score,
+          screenshotKey: pageResults.screenshotKey,
+          createdAt: pageResults.createdAt,
+        })
         .from(pageResults)
+        .leftJoin(pages, eq(pageResults.pageId, pages.id))
         .where(and(eq(pageResults.orgId, orgId), eq(pageResults.scanId, scanId)))
         .orderBy(desc(pageResults.violations));
     },
