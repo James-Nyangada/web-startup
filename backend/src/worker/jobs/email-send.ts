@@ -1,6 +1,5 @@
 import type { EmailSendJobPayload, WorkerContext } from '../types.js';
 import { EmailSender } from '../../emails/sender.js';
-import type { EmailTemplateId } from '../../emails/types.js';
 
 /**
  * Handles email.send background job (Spec Section 9, P2-18).
@@ -13,7 +12,7 @@ export async function handleEmailSend(
   const sender = ctx.emailSender ?? new EmailSender();
   const res = await sender.send({
     to: job.to,
-    templateId: job.templateId as EmailTemplateId,
+    templateId: job.templateId,
     data: job.data as never,
     branding: job.branding,
   });

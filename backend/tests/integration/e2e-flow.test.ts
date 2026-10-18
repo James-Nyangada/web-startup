@@ -1,7 +1,7 @@
 import request from 'supertest';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { buildTestApp } from '../helpers/fakes.js';
-import { ErrorCode } from '../../src/shared/errors.js';
+import type { Auth } from '../../src/lib/auth.js';
 import { assertCrossOrg404 } from '../helpers/cross-org.js';
 
 import { verifyOwnership } from '../../src/scanner/verification/verify.js';
@@ -21,7 +21,6 @@ describe('Phase 2 End-to-End Core App Flow (Section 13.2, Chunk P2-23)', () => {
   const newMemberId = 'user-member-456';
 
   const ownerCookie = 'better-auth.session_token=token-owner';
-  const memberCookie = 'better-auth.session_token=token-member';
 
   const mockOrg = {
     id: orgId,
@@ -103,6 +102,7 @@ describe('Phase 2 End-to-End Core App Flow (Section 13.2, Chunk P2-23)', () => {
       id: userId,
       email: 'owner@brightline.studio',
       name: 'Daniel Mwangi',
+      emailVerified: true,
       emailVerifiedAt: new Date(),
       avatarUrl: null,
       timeZone: 'Europe/London',
@@ -123,28 +123,41 @@ describe('Phase 2 End-to-End Core App Flow (Section 13.2, Chunk P2-23)', () => {
     };
 
     const api = {
-      getSession: vi.fn().mockImplementation(({ headers }: { headers?: Headers | Record<string, string | undefined> }) => {
-        let cookie = '';
-        if (headers instanceof Headers) {
-          cookie = headers.get('cookie') || '';
-        } else if (headers && typeof headers === 'object' && 'cookie' in headers) {
-          cookie = String(headers.cookie || '');
-        }
-        if (cookie.includes('token-owner')) {
-          return Promise.resolve({ user: mockUser, session: mockSession });
-        }
-        if (cookie.includes('token-member')) {
-          return Promise.resolve({
-            user: { ...mockUser, id: newMemberId, email: 'member@brightline.studio', name: 'Aisha Kamau' },
-            session: { ...mockSession, userId: newMemberId, token: 'token-member' },
-          });
-        }
-        return Promise.resolve(null);
-      }),
+      getSession: vi
+        .fn()
+        .mockImplementation(
+          ({ headers }: { headers?: Headers | Record<string, string | undefined> }) => {
+            let cookie = '';
+            if (headers instanceof Headers) {
+              cookie = headers.get('cookie') || '';
+            } else if (headers && typeof headers === 'object' && 'cookie' in headers) {
+              cookie = String(headers.cookie || '');
+            }
+            if (cookie.includes('token-owner')) {
+              return Promise.resolve({ user: mockUser, session: mockSession });
+            }
+            if (cookie.includes('token-member')) {
+              return Promise.resolve({
+                user: {
+                  ...mockUser,
+                  id: newMemberId,
+                  email: 'member@brightline.studio',
+                  name: 'Aisha Kamau',
+                },
+                session: { ...mockSession, userId: newMemberId, token: 'token-member' },
+              });
+            }
+            return Promise.resolve(null);
+          },
+        ),
       listSessions: vi.fn().mockResolvedValue([mockSession]),
       revokeSession: vi.fn().mockResolvedValue({ success: true }),
-      changePassword: vi.fn().mockResolvedValue(new Response(JSON.stringify({ success: true }), { status: 200 })),
-      signOut: vi.fn().mockResolvedValue(new Response(JSON.stringify({ success: true }), { status: 200 })),
+      changePassword: vi
+        .fn()
+        .mockResolvedValue(new Response(JSON.stringify({ success: true }), { status: 200 })),
+      signOut: vi
+        .fn()
+        .mockResolvedValue(new Response(JSON.stringify({ success: true }), { status: 200 })),
     };
 
     return { api, mockUser, mockSession };
@@ -157,7 +170,7 @@ describe('Phase 2 End-to-End Core App Flow (Section 13.2, Chunk P2-23)', () => {
   });
 
   it('completes the full flow: onboarding -> site -> scan -> issues -> ignore -> export CSV -> report -> invite', async () => {
-    const { app, repos } = buildTestApp({ auth: mockAuth as any });
+    const { app, repos } = buildTestApp({ auth: mockAuth as unknown as Auth });
 
     // Mock initial user and memberships
     vi.mocked(repos.users.findById).mockResolvedValue(mockAuth.mockUser);
@@ -186,7 +199,7 @@ describe('Phase 2 End-to-End Core App Flow (Section 13.2, Chunk P2-23)', () => {
       }
       return Promise.resolve(null);
     });
-    vi.mocked(repos.sites.findById).mockResolvedValue(mockSite as never);
+    vi.mocked(repos.sites.findById).mockResolvedValue(mockSite);
     vi.mocked(repos.sites.count).mockResolvedValue(1);
     vi.mocked(verifyOwnership).mockResolvedValue({
       ok: true,
@@ -194,10 +207,7 @@ describe('Phase 2 End-to-End Core App Flow (Section 13.2, Chunk P2-23)', () => {
     });
 
     // 1. Account details check (S-48 Account settings)
-    const meRes = await request(app)
-      .get('/v1/me')
-      .set('Cookie', ownerCookie)
-      .expect(200);
+    const meRes = await request(app).get('/v1/me').set('Cookie', ownerCookie).expect(200);
 
     expect(meRes.body.data.user.email).toBe('owner@brightline.studio');
     expect(meRes.body.data.user.name).toBe('Daniel Mwangi');

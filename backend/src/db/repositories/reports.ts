@@ -116,10 +116,7 @@ export function reportsRepository(db: Database) {
 
       const whereClause = and(...conditions);
 
-      const [totalRow] = await db
-        .select({ count: count() })
-        .from(reports)
-        .where(whereClause);
+      const [totalRow] = await db.select({ count: count() }).from(reports).where(whereClause);
 
       const total = Number(totalRow?.count ?? 0);
 

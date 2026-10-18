@@ -3,6 +3,7 @@ import { drizzleAdapter } from 'better-auth/adapters/drizzle';
 import { magicLink } from 'better-auth/plugins';
 import type { Database } from '../db/client.js';
 import * as schema from '../db/schema/index.js';
+import { newId } from './ids.js';
 
 export interface EmailData {
   email: string;
@@ -38,10 +39,33 @@ export function createAuth(db: Database, options: CreateAuthOptions) {
     }),
     user: {
       fields: {
-        emailVerified: 'emailVerifiedAt',
         image: 'avatarUrl',
       },
+      additionalFields: {
+        emailVerifiedAt: { type: 'date', required: false, input: false },
+      },
     },
+    databaseHooks: {
+      user: {
+        // Keep email_verified_at in step with Better Auth's boolean (sign-up via Google, link click).
+        create: {
+          before: (user) =>
+            Promise.resolve(
+              user.emailVerified ? { data: { ...user, emailVerifiedAt: new Date() } } : undefined,
+            ),
+        },
+        update: {
+          before: (data) =>
+            Promise.resolve(
+              data.emailVerified === true && !data.emailVerifiedAt
+                ? { data: { ...data, emailVerifiedAt: new Date() } }
+                : undefined,
+            ),
+        },
+      },
+    },
+    // All ids are UUIDv7 columns, so Better Auth must not invent its own string ids.
+    advanced: { database: { generateId: () => newId() } },
     secret: options.secret,
     baseURL: options.baseURL,
     basePath: '/v1/auth',

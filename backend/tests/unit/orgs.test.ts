@@ -46,18 +46,22 @@ function createMockAuth(userId = 'user-owner', isStaff = false) {
   };
 
   const api = {
-    getSession: vi.fn().mockImplementation(({ headers }: { headers?: Headers | Record<string, string | undefined> }) => {
-      let cookie: string | null = null;
-      if (headers instanceof Headers) {
-        cookie = headers.get('cookie');
-      } else if (headers && typeof headers === 'object' && 'cookie' in headers) {
-        cookie = (headers.cookie as string) ?? null;
-      }
-      if (cookie && cookie.includes(`token-${userId}`)) {
-        return Promise.resolve({ user: mockUser, session: mockSession });
-      }
-      return Promise.resolve(null);
-    }),
+    getSession: vi
+      .fn()
+      .mockImplementation(
+        ({ headers }: { headers?: Headers | Record<string, string | undefined> }) => {
+          let cookie: string | null = null;
+          if (headers instanceof Headers) {
+            cookie = headers.get('cookie');
+          } else if (headers && typeof headers === 'object' && 'cookie' in headers) {
+            cookie = (headers.cookie as string) ?? null;
+          }
+          if (cookie && cookie.includes(`token-${userId}`)) {
+            return Promise.resolve({ user: mockUser, session: mockSession });
+          }
+          return Promise.resolve(null);
+        },
+      ),
   };
 
   return { api, mockUser, mockSession } as unknown as Auth & {
@@ -77,6 +81,7 @@ describe('organisations router and authorization core', () => {
     id: '11111111-1111-4111-a111-111111111111',
     name: 'Org A Corp',
     slug: 'org-a-corp',
+    type: 'store' as const,
     plan: 'trial' as const,
     billingStatus: 'trialing' as const,
     trialEndsAt: new Date(Date.now() + 14 * 86400000),
@@ -515,8 +520,20 @@ describe('organisations router and authorization core', () => {
         updatedAt: new Date(),
       });
       vi.mocked(repos.memberships.list).mockResolvedValue([
-        { userId: ownerAuth.mockUser.id, email: 'owner@example.com', name: 'Owner', role: 'owner', joinedAt: new Date() },
-        { userId: memberAuth.mockUser.id, email: 'member@example.com', name: 'Member', role: 'member', joinedAt: new Date() },
+        {
+          userId: ownerAuth.mockUser.id,
+          email: 'owner@example.com',
+          name: 'Owner',
+          role: 'owner',
+          joinedAt: new Date(),
+        },
+        {
+          userId: memberAuth.mockUser.id,
+          email: 'member@example.com',
+          name: 'Member',
+          role: 'member',
+          joinedAt: new Date(),
+        },
       ]);
 
       const res = await request(app)
@@ -545,7 +562,9 @@ describe('organisations router and authorization core', () => {
         .send({ role: 'member' })
         .expect(400);
 
-      expect(patchRes.body.error.message).toContain('Cannot change the role of the organisation owner');
+      expect(patchRes.body.error.message).toContain(
+        'Cannot change the role of the organisation owner',
+      );
 
       const delRes = await request(app)
         .delete(`/v1/orgs/${orgA.id}/members/${ownerAuth.mockUser.id}`)
@@ -589,7 +608,10 @@ describe('organisations router and authorization core', () => {
         .expect(200);
 
       expect(res.body.data.success).toBe(true);
-      expect(repos.memberships.remove).toHaveBeenCalledWith(asOrgId(orgA.id), memberAuth.mockUser.id);
+      expect(repos.memberships.remove).toHaveBeenCalledWith(
+        asOrgId(orgA.id),
+        memberAuth.mockUser.id,
+      );
     });
   });
 

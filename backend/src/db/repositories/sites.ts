@@ -3,7 +3,9 @@ import { randomBytes } from 'node:crypto';
 import type { Database } from '../client.js';
 import type { Platform, Standard } from '../../scanner/types.js';
 import {
+  issues,
   organizations,
+  scans,
   sites,
   type ScanFrequency,
   type SiteStatus,
@@ -18,6 +20,17 @@ export interface SiteListOptions {
   client?: string;
   q?: string;
   sort?: 'score' | 'name' | 'lastScan' | 'openCritical';
+}
+
+/** Per-site numbers for the sites list (S-21) and organisation overview (S-20). */
+export interface SiteSummary {
+  openCritical: number;
+  openSerious: number;
+  regressions: number;
+  lastScanAt: Date | null;
+  lastScanStatus: string | null;
+  lastScanError: string | null;
+  previousScore: number | null;
 }
 
 export interface CreateSiteInput {
@@ -94,6 +107,93 @@ export function sitesRepository(db: Database) {
       }
 
       return query;
+    },
+
+    async listSummaries(orgId: OrgId, siteIds: string[]): Promise<Map<string, SiteSummary>> {
+      const summaries = new Map<string, SiteSummary>();
+      if (siteIds.length === 0) return summaries;
+      for (const id of siteIds) {
+        summaries.set(id, {
+          openCritical: 0,
+          openSerious: 0,
+          regressions: 0,
+          lastScanAt: null,
+          lastScanStatus: null,
+          lastScanError: null,
+          previousScore: null,
+        });
+      }
+      const idList = sql.join(
+        siteIds.map((id) => sql`${id}::uuid`),
+        sql`, `,
+      );
+
+      const counts = await db
+        .select({
+          siteId: issues.siteId,
+          critical: sql<number>`count(*) filter (where ${issues.impact} = 'critical')::int`,
+          serious: sql<number>`count(*) filter (where ${issues.impact} = 'serious')::int`,
+          regressions: sql<number>`count(*) filter (where ${issues.isRegression})::int`,
+        })
+        .from(issues)
+        .where(
+          and(
+            eq(issues.orgId, orgId),
+            sql`${issues.siteId} in (${idList})`,
+            eq(issues.status, 'open'),
+          ),
+        )
+        .groupBy(issues.siteId);
+      for (const row of counts) {
+        const summary = summaries.get(row.siteId);
+        if (!summary) continue;
+        summary.openCritical = row.critical;
+        summary.openSerious = row.serious;
+        summary.regressions = row.regressions;
+      }
+
+      // Latest scan of any status, plus the score of the second-latest finished scan for the delta.
+      const ranked = db
+        .select({
+          siteId: scans.siteId,
+          status: scans.status,
+          score: scans.score,
+          errorMessage: scans.errorMessage,
+          at: sql<Date>`coalesce(${scans.finishedAt}, ${scans.queuedAt})`.as('at'),
+          anyRank:
+            sql<number>`row_number() over (partition by ${scans.siteId} order by ${scans.queuedAt} desc)`.as(
+              'any_rank',
+            ),
+          doneRank:
+            sql<number>`row_number() over (partition by ${scans.siteId}, ${scans.status} in ('completed', 'partial') order by ${scans.queuedAt} desc)`.as(
+              'done_rank',
+            ),
+        })
+        .from(scans)
+        .where(and(eq(scans.orgId, orgId), sql`${scans.siteId} in (${idList})`))
+        .as('ranked');
+      const scanRows = await db
+        .select()
+        .from(ranked)
+        .where(
+          or(
+            eq(ranked.anyRank, 1),
+            and(sql`${ranked.status} in ('completed', 'partial')`, eq(ranked.doneRank, 2)),
+          ),
+        );
+      for (const row of scanRows) {
+        const summary = summaries.get(row.siteId);
+        if (!summary) continue;
+        if (Number(row.anyRank) === 1) {
+          summary.lastScanAt = new Date(row.at);
+          summary.lastScanStatus = row.status;
+          summary.lastScanError = row.errorMessage;
+        }
+        if (Number(row.doneRank) === 2 && ['completed', 'partial'].includes(row.status)) {
+          summary.previousScore = row.score;
+        }
+      }
+      return summaries;
     },
 
     async findById(orgId: OrgId, siteId: string) {

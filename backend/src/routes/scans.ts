@@ -34,10 +34,7 @@ export type ProgressListener = (event: ScanProgressEvent) => void;
 
 const scanListeners = new Map<string, Set<ProgressListener>>();
 
-export function broadcastScanProgress(
-  scanId: string,
-  event: ScanProgressEvent,
-) {
+export function broadcastScanProgress(scanId: string, event: ScanProgressEvent) {
   const set = scanListeners.get(scanId);
   if (set) {
     for (const listener of set) {
@@ -114,7 +111,8 @@ export function orgScansRouter(repos: Repositories, options?: ScansRouterOptions
           res.status(422).json({
             error: {
               code: ErrorCode.FORBIDDEN,
-              message: 'Unverified sites can only run one onboarding scan. Please verify ownership to run manual scans.',
+              message:
+                'Unverified sites can only run one onboarding scan. Please verify ownership to run manual scans.',
               details: { status: site.status },
             },
           });
@@ -126,7 +124,8 @@ export function orgScansRouter(repos: Repositories, options?: ScansRouterOptions
           res.status(422).json({
             error: {
               code: ErrorCode.FORBIDDEN,
-              message: 'This site has already completed its unverified onboarding scan. Please verify ownership to continue.',
+              message:
+                'This site has already completed its unverified onboarding scan. Please verify ownership to continue.',
               details: { existingScans: count },
             },
           });
@@ -193,7 +192,8 @@ export function orgScansRouter(repos: Repositories, options?: ScansRouterOptions
         }
       }
 
-      const effectivePagesPlanned = trigger === 'onboarding' ? 10 : (pagesPlanned ?? site.pageLimit ?? 50);
+      const effectivePagesPlanned =
+        trigger === 'onboarding' ? 10 : (pagesPlanned ?? site.pageLimit ?? 50);
 
       const scan = await repos.scans.create(req.orgId!, {
         siteId,

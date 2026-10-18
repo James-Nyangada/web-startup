@@ -1,12 +1,6 @@
 import { and, eq, isNull, sql } from 'drizzle-orm';
 import type { Database } from '../client.js';
-import {
-  clientAccess,
-  memberships,
-  organizations,
-  sites,
-  users,
-} from '../schema/index.js';
+import { clientAccess, memberships, organizations, sites, users } from '../schema/index.js';
 
 export function usersRepository(db: Database) {
   return {
@@ -56,6 +50,7 @@ export function usersRepository(db: Database) {
             id: organizations.id,
             name: organizations.name,
             slug: organizations.slug,
+            type: organizations.type,
             plan: organizations.plan,
             billingStatus: organizations.billingStatus,
             timeZone: organizations.timeZone,

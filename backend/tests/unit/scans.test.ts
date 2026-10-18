@@ -26,18 +26,20 @@ function createMockAuth(userId: string) {
     updatedAt: new Date(),
   };
   const api = {
-    getSession: vi.fn(({ headers }: { headers?: Headers | Record<string, string | string[] | undefined> }) => {
-      let cookie: string | null = null;
-      if (headers instanceof Headers) {
-        cookie = headers.get('cookie');
-      } else if (headers && typeof headers === 'object' && 'cookie' in headers) {
-        cookie = (headers.cookie as string) ?? null;
-      }
-      if (cookie && cookie.includes(`token-${userId}`)) {
-        return Promise.resolve({ user: mockUser, session: mockSession });
-      }
-      return Promise.resolve(null);
-    }),
+    getSession: vi.fn(
+      ({ headers }: { headers?: Headers | Record<string, string | string[] | undefined> }) => {
+        let cookie: string | null = null;
+        if (headers instanceof Headers) {
+          cookie = headers.get('cookie');
+        } else if (headers && typeof headers === 'object' && 'cookie' in headers) {
+          cookie = (headers.cookie as string) ?? null;
+        }
+        if (cookie && cookie.includes(`token-${userId}`)) {
+          return Promise.resolve({ user: mockUser, session: mockSession });
+        }
+        return Promise.resolve(null);
+      },
+    ),
   };
   return {
     mockUser,

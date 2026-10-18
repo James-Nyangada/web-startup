@@ -3,6 +3,7 @@ import type { PgBoss } from 'pg-boss';
 import type { Repositories } from '../db/repositories/index.js';
 import type { StorageService } from '../storage/index.js';
 import type { ScanLogger } from '../scanner/types.js';
+import type { GuardPolicy } from '../scanner/net/guard.js';
 
 import type { EmailSender } from '../emails/sender.js';
 import type { EmailBranding, EmailTemplateId } from '../emails/types.js';
@@ -19,6 +20,8 @@ export interface WorkerContext {
   autoProcess?: boolean;
   logger?: ScanLogger;
   emailSender?: EmailSender;
+  /** SSRF policy override for the scanner; tests use it to reach the local fixture server. */
+  scannerPolicy?: GuardPolicy;
 }
 
 export interface ScanJobPayload {
@@ -34,6 +37,10 @@ export interface EmailSendJobPayload {
   templateId: EmailTemplateId;
   data: Record<string, unknown>;
   branding?: EmailBranding;
+}
+
+export interface FreeCheckJobPayload {
+  checkId: string;
 }
 
 export interface ReportRenderJobPayload {

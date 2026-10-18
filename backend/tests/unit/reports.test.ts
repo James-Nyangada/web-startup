@@ -7,11 +7,13 @@ import { signReportDownloadToken, verifyReportDownloadToken } from '../../src/re
 import { handleReportRender } from '../../src/worker/jobs/report-render.js';
 import { MemoryStorageService } from '../../src/storage/index.js';
 import { renderReportShared } from '../../src/emails/templates/index.js';
-import { EmailSender, MockTransport } from '../../src/emails/sender.js';
 import type { Auth } from '../../src/lib/auth.js';
 
 function createMockAuth() {
-  const usersMap = new Map<string, { user: any; session: any }>();
+  const usersMap = new Map<
+    string,
+    { user: Record<string, unknown>; session: Record<string, unknown> }
+  >();
 
   const getUser = (userId: string) => {
     if (!usersMap.has(userId)) {
@@ -39,21 +41,23 @@ function createMockAuth() {
   };
 
   const api = {
-    getSession: vi.fn(({ headers }: { headers?: Headers | Record<string, string | string[] | undefined> }) => {
-      let cookie: string | null = null;
-      if (headers instanceof Headers) {
-        cookie = headers.get('cookie');
-      } else if (headers && typeof headers === 'object' && 'cookie' in headers) {
-        cookie = (headers.cookie as string) ?? null;
-      }
-      if (cookie) {
-        const match = cookie.match(/token-([a-zA-Z0-9_-]+)/);
-        if (match && match[1]) {
-          return Promise.resolve(getUser(match[1]));
+    getSession: vi.fn(
+      ({ headers }: { headers?: Headers | Record<string, string | string[] | undefined> }) => {
+        let cookie: string | null = null;
+        if (headers instanceof Headers) {
+          cookie = headers.get('cookie');
+        } else if (headers && typeof headers === 'object' && 'cookie' in headers) {
+          cookie = (headers.cookie as string) ?? null;
         }
-      }
-      return Promise.resolve(null);
-    }),
+        if (cookie) {
+          const match = cookie.match(/token-([a-zA-Z0-9_-]+)/);
+          if (match && match[1]) {
+            return Promise.resolve(getUser(match[1]));
+          }
+        }
+        return Promise.resolve(null);
+      },
+    ),
   };
 
   return { api, getUser } as unknown as Auth & {
@@ -129,7 +133,6 @@ describe('E-11: Report ready / shared email template', () => {
 
 describe('Reports API Endpoints (Chunk P2-19)', () => {
   const orgId = '11111111-1111-4111-a111-111111111111';
-  const otherOrgId = '22222222-2222-4222-a222-222222222222';
   const memberId = 'user-member-123';
   const memberCookie = `better-auth.session_token=token-${memberId}`;
 
@@ -150,13 +153,9 @@ describe('Reports API Endpoints (Chunk P2-19)', () => {
 
   let repos: Repositories;
   let app: Express;
-  let transport: MockTransport;
-  let emailSender: EmailSender;
 
   beforeEach(() => {
     const auth = createMockAuth();
-    transport = new MockTransport();
-    emailSender = new EmailSender({ transport });
 
     const testApp = buildTestApp({ auth });
     repos = testApp.repos;
@@ -171,7 +170,13 @@ describe('Reports API Endpoints (Chunk P2-19)', () => {
     vi.mocked(repos.memberships.find).mockImplementation((oid: string, uid: string) =>
       Promise.resolve(
         oid === orgId && uid === memberId
-          ? ({ orgId, userId: memberId, role: 'member', createdAt: new Date(), updatedAt: new Date() } as never)
+          ? ({
+              orgId,
+              userId: memberId,
+              role: 'member',
+              createdAt: new Date(),
+              updatedAt: new Date(),
+            } as never)
           : null,
       ),
     );
@@ -180,7 +185,6 @@ describe('Reports API Endpoints (Chunk P2-19)', () => {
   describe('POST /v1/orgs/:orgId/reports', () => {
     it('generates a scan_summary report (R-01) for a valid scan', async () => {
       const validScanId = '33333333-3333-4333-a333-333333333333';
-      const crossOrgScanId = '44444444-4444-4444-a444-444444444444';
 
       vi.mocked(repos.scans.findById).mockResolvedValueOnce({
         id: validScanId,
@@ -259,9 +263,7 @@ describe('Reports API Endpoints (Chunk P2-19)', () => {
         total: 1,
       });
 
-      const res = await request(app)
-        .get(`/v1/orgs/${orgId}/reports`)
-        .set('Cookie', [memberCookie]);
+      const res = await request(app).get(`/v1/orgs/${orgId}/reports`).set('Cookie', [memberCookie]);
 
       expect(res.status).toBe(200);
       expect(res.body.data).toHaveLength(1);
@@ -424,7 +426,7 @@ describe('Worker job: handleReportRender', () => {
       auditLog: {
         write: writeAudit,
       },
-    } as any;
+    } as unknown as Repositories;
 
     await handleReportRender({ reportId: 'rep-1' }, { repos, storage });
 

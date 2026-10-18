@@ -5,7 +5,6 @@ import type { Auth } from '../lib/auth.js';
 import { validatePassword } from '../lib/passwords.js';
 import { asOrgId } from '../db/repositories/org-scope.js';
 import { ErrorCode } from '../shared/errors.js';
-import type { OrgRole } from '../db/schema/index.js';
 
 const acceptSchema = z.object({
   token: z.string().trim().min(1, 'Invitation token is required'),
@@ -48,7 +47,8 @@ export function invitationsRouter(repos: Repositories, auth: Auth): Router {
       res.status(410).json({
         error: {
           code: ErrorCode.INVITATION_EXPIRED,
-          message: 'This invitation has expired (tokens are valid for 7 days). Please request a new invite.',
+          message:
+            'This invitation has expired (tokens are valid for 7 days). Please request a new invite.',
           details: {},
         },
       });
@@ -221,7 +221,7 @@ export function invitationsRouter(repos: Repositories, auth: Auth): Router {
       await repos.memberships.add(
         orgId,
         userId,
-        (resolved.invitation.role === 'client_viewer' ? 'member' : resolved.invitation.role) as OrgRole,
+        resolved.invitation.role === 'client_viewer' ? 'member' : resolved.invitation.role,
       );
     }
 

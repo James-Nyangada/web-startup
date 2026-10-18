@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 
 export interface FixGuideFrontMatter {
   rule_id: string;
-  platform: 'shopify' | 'wordpress' | string;
+  platform: string;
   title: string;
   summary: string;
   reviewed_at: string;
@@ -12,7 +12,7 @@ export interface FixGuideFrontMatter {
 
 export interface FixGuide {
   ruleId: string;
-  platform: 'shopify' | 'wordpress' | string;
+  platform: string;
   slug: string;
   title: string;
   summary: string;
@@ -78,14 +78,21 @@ export function validateFixGuideContent(content: string, filename: string): Vali
     return errors;
   }
 
-  if (!data.rule_id) errors.push({ file: filename, message: 'Missing required front matter: rule_id' });
-  if (!data.platform) errors.push({ file: filename, message: 'Missing required front matter: platform' });
+  if (!data.rule_id)
+    errors.push({ file: filename, message: 'Missing required front matter: rule_id' });
+  if (!data.platform)
+    errors.push({ file: filename, message: 'Missing required front matter: platform' });
   if (!data.title) errors.push({ file: filename, message: 'Missing required front matter: title' });
-  if (!data.summary) errors.push({ file: filename, message: 'Missing required front matter: summary' });
-  if (!data.reviewed_at) errors.push({ file: filename, message: 'Missing required front matter: reviewed_at' });
+  if (!data.summary)
+    errors.push({ file: filename, message: 'Missing required front matter: summary' });
+  if (!data.reviewed_at)
+    errors.push({ file: filename, message: 'Missing required front matter: reviewed_at' });
 
   if (data.reviewed_at && isNaN(Date.parse(data.reviewed_at))) {
-    errors.push({ file: filename, message: `Invalid date format in reviewed_at: ${data.reviewed_at}` });
+    errors.push({
+      file: filename,
+      message: `Invalid date format in reviewed_at: ${data.reviewed_at}`,
+    });
   }
 
   for (const req of REQUIRED_SECTIONS) {
@@ -104,7 +111,9 @@ export function parseFixGuide(content: string, filePath: string): FixGuide {
   const filename = path.basename(filePath);
   const errors = validateFixGuideContent(content, filename);
   if (errors.length > 0) {
-    throw new Error(`Validation failed for ${filename}: ${errors.map((e) => e.message).join(', ')}`);
+    throw new Error(
+      `Validation failed for ${filename}: ${errors.map((e) => e.message).join(', ')}`,
+    );
   }
 
   const { data, body } = parseFrontMatter(content);

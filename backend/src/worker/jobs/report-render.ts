@@ -89,7 +89,7 @@ export async function handleReportRender(
     const reportType = report.type === 'scan_summary' ? 'summary' : 'full';
     let pdfBuffer: Buffer;
     try {
-      pdfBuffer = await renderReportPdf(scanResult!, { type: reportType, paper: 'a4' });
+      pdfBuffer = await renderReportPdf(scanResult, { type: reportType, paper: 'a4' });
     } catch {
       // Fallback valid minimal PDF for environments without Chromium
       pdfBuffer = Buffer.from(

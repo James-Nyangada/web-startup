@@ -5,16 +5,17 @@ import {
   organizations,
   users,
   type BillingStatus,
+  type OrgType,
   type Plan,
 } from '../schema/index.js';
 import type { OrgId } from './org-scope.js';
 
-const UUID_REGEX =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 export interface CreateOrgData {
   name: string;
   slug: string;
+  type?: OrgType;
   timeZone?: string;
   plan?: Plan;
   billingStatus?: BillingStatus;
@@ -29,6 +30,7 @@ export function organizationsRepository(db: Database) {
         .values({
           name: data.name,
           slug: data.slug,
+          type: data.type ?? 'store',
           timeZone: data.timeZone ?? 'UTC',
           plan: data.plan ?? 'trial',
           billingStatus: data.billingStatus ?? 'trialing',
@@ -127,6 +129,7 @@ export function organizationsRepository(db: Database) {
           .values({
             name: data.name,
             slug: data.slug,
+            type: data.type ?? 'store',
             timeZone: data.timeZone ?? 'UTC',
             plan: data.plan ?? 'trial',
             billingStatus: data.billingStatus ?? 'trialing',
@@ -151,10 +154,7 @@ export function organizationsRepository(db: Database) {
           throw new Error('Failed to insert initial membership.');
         }
 
-        await tx
-          .update(users)
-          .set({ lastActiveOrgId: org.id })
-          .where(eq(users.id, userId));
+        await tx.update(users).set({ lastActiveOrgId: org.id }).where(eq(users.id, userId));
 
         return { org, membership };
       });

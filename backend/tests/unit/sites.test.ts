@@ -33,18 +33,20 @@ function createMockAuth(userId: string, isStaff = false) {
   };
 
   const api = {
-    getSession: vi.fn(({ headers }: { headers?: Headers | Record<string, string | string[] | undefined> }) => {
-      let cookie: string | null = null;
-      if (headers instanceof Headers) {
-        cookie = headers.get('cookie');
-      } else if (headers && typeof headers === 'object' && 'cookie' in headers) {
-        cookie = (headers.cookie as string) ?? null;
-      }
-      if (cookie && cookie.includes(`token-${userId}`)) {
-        return Promise.resolve({ user: mockUser, session: mockSession });
-      }
-      return Promise.resolve(null);
-    }),
+    getSession: vi.fn(
+      ({ headers }: { headers?: Headers | Record<string, string | string[] | undefined> }) => {
+        let cookie: string | null = null;
+        if (headers instanceof Headers) {
+          cookie = headers.get('cookie');
+        } else if (headers && typeof headers === 'object' && 'cookie' in headers) {
+          cookie = (headers.cookie as string) ?? null;
+        }
+        if (cookie && cookie.includes(`token-${userId}`)) {
+          return Promise.resolve({ user: mockUser, session: mockSession });
+        }
+        return Promise.resolve(null);
+      },
+    ),
   };
 
   return { api, mockUser, mockSession } as unknown as Auth & {
@@ -124,7 +126,13 @@ describe('Sites API (Chunk P2-06 & Section 7.3)', () => {
     vi.mocked(repos.memberships.find).mockImplementation((oid: string, uid: string) =>
       Promise.resolve(
         oid === orgId && uid === userId
-          ? ({ orgId, userId, role: 'admin', createdAt: new Date(), updatedAt: new Date() } as never)
+          ? ({
+              orgId,
+              userId,
+              role: 'admin',
+              createdAt: new Date(),
+              updatedAt: new Date(),
+            } as never)
           : null,
       ),
     );
@@ -494,7 +502,9 @@ describe('Sites API (Chunk P2-06 & Section 7.3)', () => {
         .expect(200);
 
       expect(res.body.data.verifyToken).toBe('ps_test_token');
-      expect(res.body.data.methods.meta.tag).toBe('<meta name="plainsight-verify" content="ps_test_token">');
+      expect(res.body.data.methods.meta.tag).toBe(
+        '<meta name="plainsight-verify" content="ps_test_token">',
+      );
       expect(res.body.data.methods.dns.value).toBe('plainsight-verify=ps_test_token');
       expect(res.body.data.methods.file.path).toBe('/.well-known/plainsight-verify.txt');
     });
@@ -559,7 +569,9 @@ describe('Sites API (Chunk P2-06 & Section 7.3)', () => {
         .expect(400);
 
       expect(res.body.error.code).toBe(ErrorCode.VERIFICATION_FAILED);
-      expect(res.body.error.message).toContain("No meta tag with name='plainsight-verify' was found");
+      expect(res.body.error.message).toContain(
+        "No meta tag with name='plainsight-verify' was found",
+      );
     });
 
     it('rejects invalid verification method with 400 VALIDATION_ERROR', async () => {

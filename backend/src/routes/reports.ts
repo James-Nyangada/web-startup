@@ -1,7 +1,6 @@
 import { Router, type Request, type Response } from 'express';
 import { z } from 'zod';
 import type { Repositories } from '../db/repositories/index.js';
-import { asOrgId } from '../db/repositories/org-scope.js';
 import type { StorageService } from '../storage/index.js';
 import type { EmailSender } from '../emails/sender.js';
 import type { PgBoss } from 'pg-boss';
@@ -43,128 +42,117 @@ export interface ReportsRouterOptions {
 /**
  * Org-scoped reports router: mounted at /v1/orgs/:orgId/reports
  */
-export function orgReportsRouter(
-  repos: Repositories,
-  options?: ReportsRouterOptions,
-): Router {
+export function orgReportsRouter(repos: Repositories, options?: ReportsRouterOptions): Router {
   const router = Router();
 
   // POST /v1/orgs/:orgId/reports - Generate report (O A M)
-  router.post(
-    '/',
-    requireOrgRole('member'),
-    async (req: Request, res: Response): Promise<void> => {
-      const orgId = req.orgId!;
-      const parse = createReportSchema.safeParse(req.body);
-      if (!parse.success) {
-        res.status(400).json({
-          error: {
-            code: ErrorCode.VALIDATION_ERROR,
-            message: 'Invalid report parameters.',
-            details: { issues: parse.error.issues },
-          },
-        });
-        return;
-      }
+  router.post('/', requireOrgRole('member'), async (req: Request, res: Response): Promise<void> => {
+    const orgId = req.orgId!;
+    const parse = createReportSchema.safeParse(req.body);
+    if (!parse.success) {
+      res.status(400).json({
+        error: {
+          code: ErrorCode.VALIDATION_ERROR,
+          message: 'Invalid report parameters.',
+          details: { issues: parse.error.issues },
+        },
+      });
+      return;
+    }
 
-      const { type, scanId, branded } = parse.data;
-      let { siteId } = parse.data;
+    const { type, scanId, branded } = parse.data;
+    let { siteId } = parse.data;
 
-      if (!siteId && !scanId) {
-        res.status(400).json({
+    if (!siteId && !scanId) {
+      res.status(400).json({
+        error: {
+          code: ErrorCode.VALIDATION_ERROR,
+          message: 'Either siteId or scanId must be provided to generate a report.',
+          details: {},
+        },
+      });
+      return;
+    }
+
+    // If scanId is provided, verify scan belongs to this org
+    if (scanId) {
+      const scan = await repos.scans.findById(orgId, scanId);
+      if (!scan) {
+        res.status(404).json({
           error: {
-            code: ErrorCode.VALIDATION_ERROR,
-            message: 'Either siteId or scanId must be provided to generate a report.',
+            code: ErrorCode.NOT_FOUND,
+            message: 'Scan not found.',
             details: {},
           },
         });
         return;
       }
-
-      // If scanId is provided, verify scan belongs to this org
-      if (scanId) {
-        const scan = await repos.scans.findById(orgId, scanId);
-        if (!scan) {
-          res.status(404).json({
-            error: {
-              code: ErrorCode.NOT_FOUND,
-              message: 'Scan not found.',
-              details: {},
-            },
-          });
-          return;
-        }
-        if (!siteId) {
-          siteId = scan.siteId;
-        }
+      if (!siteId) {
+        siteId = scan.siteId;
       }
+    }
 
-      // If siteId is provided, verify site belongs to this org
-      if (siteId) {
-        const site = await repos.sites.findById(orgId, siteId);
-        if (!site) {
-          res.status(404).json({
-            error: {
-              code: ErrorCode.NOT_FOUND,
-              message: 'Site not found.',
-              details: {},
-            },
-          });
-          return;
-        }
-      }
-
-      const report = await repos.reports.create(orgId, {
-        siteId: siteId ?? null,
-        scanId: scanId ?? null,
-        type,
-        branded,
-        requestedBy: req.auth?.user?.id ?? null,
-      });
-
-      // Enqueue worker job or execute handler
-      if (options?.boss) {
-        await enqueueReportRender(options.boss, report.id);
-      } else if (options?.storage) {
-        handleReportRender(
-          { reportId: report.id },
-          {
-            repos,
-            storage: options.storage,
-            emailSender: options.emailSender,
+    // If siteId is provided, verify site belongs to this org
+    if (siteId) {
+      const site = await repos.sites.findById(orgId, siteId);
+      if (!site) {
+        res.status(404).json({
+          error: {
+            code: ErrorCode.NOT_FOUND,
+            message: 'Site not found.',
+            details: {},
           },
-        ).catch((err) => {
-          console.error('[report-render] Immediate rendering failed:', err);
         });
+        return;
       }
+    }
 
-      res.status(201).json({ data: report });
-    },
-  );
+    const report = await repos.reports.create(orgId, {
+      siteId: siteId ?? null,
+      scanId: scanId ?? null,
+      type,
+      branded,
+      requestedBy: req.auth?.user?.id ?? null,
+    });
+
+    // Enqueue worker job or execute handler
+    if (options?.boss) {
+      await enqueueReportRender(options.boss, report.id);
+    } else if (options?.storage) {
+      handleReportRender(
+        { reportId: report.id },
+        {
+          repos,
+          storage: options.storage,
+          emailSender: options.emailSender,
+        },
+      ).catch((err) => {
+        console.error('[report-render] Immediate rendering failed:', err);
+      });
+    }
+
+    res.status(201).json({ data: report });
+  });
 
   // GET /v1/orgs/:orgId/reports - List reports (O A M)
-  router.get(
-    '/',
-    requireOrgRole('member'),
-    async (req: Request, res: Response): Promise<void> => {
-      const orgId = req.orgId!;
-      const siteIdQuery = req.query.siteId;
-      const siteId = typeof siteIdQuery === 'string' ? siteIdQuery : undefined;
-      const limit = req.query.limit ? Math.min(100, Math.max(1, Number(req.query.limit))) : 50;
-      const offset = req.query.offset ? Math.max(0, Number(req.query.offset)) : 0;
+  router.get('/', requireOrgRole('member'), async (req: Request, res: Response): Promise<void> => {
+    const orgId = req.orgId!;
+    const siteIdQuery = req.query.siteId;
+    const siteId = typeof siteIdQuery === 'string' ? siteIdQuery : undefined;
+    const limit = req.query.limit ? Math.min(100, Math.max(1, Number(req.query.limit))) : 50;
+    const offset = req.query.offset ? Math.max(0, Number(req.query.offset)) : 0;
 
-      const result = await repos.reports.listByOrg(orgId, {
-        siteId,
-        limit,
-        offset,
-      });
+    const result = await repos.reports.listByOrg(orgId, {
+      siteId,
+      limit,
+      offset,
+    });
 
-      res.status(200).json({
-        data: result.reports,
-        total: result.total,
-      });
-    },
-  );
+    res.status(200).json({
+      data: result.reports,
+      total: result.total,
+    });
+  });
 
   // GET /v1/orgs/:orgId/reports/:id - Get report details (O A M)
   router.get(
@@ -383,10 +371,7 @@ export function orgReportsRouter(
 /**
  * Public router for token-signed downloads: mounted at /v1/reports
  */
-export function reportsPublicRouter(
-  repos: Repositories,
-  storage: StorageService,
-): Router {
+export function reportsPublicRouter(repos: Repositories, storage: StorageService): Router {
   const router = Router();
 
   // GET /v1/reports/download/:token - Download report PDF with signed token

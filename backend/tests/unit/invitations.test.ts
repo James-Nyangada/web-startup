@@ -6,10 +6,12 @@ import type { Repositories } from '../../src/db/repositories/index.js';
 import { ErrorCode } from '../../src/shared/errors.js';
 import { assertCrossOrg404 } from '../helpers/cross-org.js';
 import { buildTestApp } from '../helpers/fakes.js';
-import { EmailSender, MockTransport } from '../../src/emails/sender.js';
 
 function createMockAuth() {
-  const usersMap = new Map<string, { user: any; session: any }>();
+  const usersMap = new Map<
+    string,
+    { user: Record<string, unknown>; session: Record<string, unknown> }
+  >();
 
   const getUser = (userId: string) => {
     if (!usersMap.has(userId)) {
@@ -37,21 +39,23 @@ function createMockAuth() {
   };
 
   const api = {
-    getSession: vi.fn(({ headers }: { headers?: Headers | Record<string, string | string[] | undefined> }) => {
-      let cookie: string | null = null;
-      if (headers instanceof Headers) {
-        cookie = headers.get('cookie');
-      } else if (headers && typeof headers === 'object' && 'cookie' in headers) {
-        cookie = (headers.cookie as string) ?? null;
-      }
-      if (cookie) {
-        const match = cookie.match(/token-([a-zA-Z0-9_-]+)/);
-        if (match && match[1]) {
-          return Promise.resolve(getUser(match[1]));
+    getSession: vi.fn(
+      ({ headers }: { headers?: Headers | Record<string, string | string[] | undefined> }) => {
+        let cookie: string | null = null;
+        if (headers instanceof Headers) {
+          cookie = headers.get('cookie');
+        } else if (headers && typeof headers === 'object' && 'cookie' in headers) {
+          cookie = (headers.cookie as string) ?? null;
         }
-      }
-      return Promise.resolve(null);
-    }),
+        if (cookie) {
+          const match = cookie.match(/token-([a-zA-Z0-9_-]+)/);
+          if (match && match[1]) {
+            return Promise.resolve(getUser(match[1]));
+          }
+        }
+        return Promise.resolve(null);
+      },
+    ),
     signUpEmail: vi.fn(({ body }: { body: { email: string; name?: string } }) => {
       return Promise.resolve({
         user: {
@@ -94,13 +98,10 @@ describe('Team Members and Invitations (Chunk P2-17)', () => {
 
   let repos: Repositories;
   let app: Express;
-  let transport: MockTransport;
-  let emailSender: EmailSender;
+  let auth: ReturnType<typeof createMockAuth>;
 
   beforeEach(() => {
-    const auth = createMockAuth();
-    transport = new MockTransport();
-    emailSender = new EmailSender({ transport });
+    auth = createMockAuth();
 
     const testApp = buildTestApp({ auth });
     repos = testApp.repos;
@@ -115,14 +116,32 @@ describe('Team Members and Invitations (Chunk P2-17)', () => {
     vi.mocked(repos.memberships.find).mockImplementation((oid: string, uid: string) =>
       Promise.resolve(
         oid === orgId && uid === adminId
-          ? ({ orgId, userId: adminId, role: 'admin', createdAt: new Date(), updatedAt: new Date() } as never)
+          ? ({
+              orgId,
+              userId: adminId,
+              role: 'admin',
+              createdAt: new Date(),
+              updatedAt: new Date(),
+            } as never)
           : oid === orgId && uid === memberId
-            ? ({ orgId, userId: memberId, role: 'member', createdAt: new Date(), updatedAt: new Date() } as never)
+            ? ({
+                orgId,
+                userId: memberId,
+                role: 'member',
+                createdAt: new Date(),
+                updatedAt: new Date(),
+              } as never)
             : null,
       ),
     );
     vi.mocked(repos.memberships.findRole).mockImplementation((oid: string, uid: string) =>
-      Promise.resolve(oid === orgId && uid === adminId ? 'admin' : oid === orgId && uid === memberId ? 'member' : null),
+      Promise.resolve(
+        oid === orgId && uid === adminId
+          ? 'admin'
+          : oid === orgId && uid === memberId
+            ? 'member'
+            : null,
+      ),
     );
 
     app = testApp.app;
@@ -204,12 +223,26 @@ describe('Team Members and Invitations (Chunk P2-17)', () => {
       );
     });
 
+    it('refuses invitations from users who have not verified their email (P2-02)', async () => {
+      auth.getUser(adminId).user.emailVerified = false;
+
+      const res = await request(app)
+        .post(`/v1/orgs/${orgId}/invitations`)
+        .set('Cookie', adminCookie)
+        .send({ email: 'colleague@example.com', role: 'member' })
+        .expect(403);
+
+      expect(res.body.error.code).toBe('EMAIL_NOT_VERIFIED');
+      expect(repos.invitations.create).not.toHaveBeenCalled();
+    });
+
     it('returns 409 ALREADY_MEMBER when invitee is already an org member', async () => {
       vi.mocked(repos.users.findByEmail).mockResolvedValueOnce({
         id: memberId,
         email: 'mark@brightline.studio',
         name: 'Mark Otieno',
         isStaff: false,
+        emailVerified: true,
         emailVerifiedAt: new Date(),
         avatarUrl: null,
         timeZone: 'UTC',
@@ -362,9 +395,7 @@ describe('Team Members and Invitations (Chunk P2-17)', () => {
         isRevoked: false,
       });
 
-      const res = await request(app)
-        .get('/v1/invitations/raw-tok-123')
-        .expect(200);
+      const res = await request(app).get('/v1/invitations/raw-tok-123').expect(200);
 
       expect(res.body.data.valid).toBe(true);
       expect(res.body.data.orgName).toBe('Brightline Studio');
@@ -382,9 +413,7 @@ describe('Team Members and Invitations (Chunk P2-17)', () => {
         isRevoked: false,
       });
 
-      const res = await request(app)
-        .get('/v1/invitations/expired-tok')
-        .expect(410);
+      const res = await request(app).get('/v1/invitations/expired-tok').expect(410);
 
       expect(res.body.error.code).toBe(ErrorCode.INVITATION_EXPIRED);
     });
@@ -400,9 +429,7 @@ describe('Team Members and Invitations (Chunk P2-17)', () => {
         isRevoked: true,
       });
 
-      const res = await request(app)
-        .get('/v1/invitations/revoked-tok')
-        .expect(400);
+      const res = await request(app).get('/v1/invitations/revoked-tok').expect(400);
 
       expect(res.body.error.code).toBe(ErrorCode.INVITATION_REVOKED);
     });
@@ -418,9 +445,7 @@ describe('Team Members and Invitations (Chunk P2-17)', () => {
         isRevoked: false,
       });
 
-      const res = await request(app)
-        .get('/v1/invitations/accepted-tok')
-        .expect(400);
+      const res = await request(app).get('/v1/invitations/accepted-tok').expect(400);
 
       expect(res.body.error.code).toBe(ErrorCode.INVITATION_ALREADY_ACCEPTED);
     });

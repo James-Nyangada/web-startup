@@ -114,7 +114,8 @@ export function getSampleTemplateData(templateId: EmailTemplateId): unknown {
         reportTitle: 'Accessibility Scan Summary',
         siteName: 'Oakhaus Furniture',
         senderName: 'Daniel Mwangi',
-        message: 'Here is the latest scan report for our staging deployment ahead of tomorrow’s product release.',
+        message:
+          'Here is the latest scan report for our staging deployment ahead of tomorrow’s product release.',
         downloadUrl: 'http://localhost:3000/v1/reports/download/sample_token_123',
         expiresInHours: 24,
       };

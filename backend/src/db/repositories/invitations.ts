@@ -1,12 +1,7 @@
 import { and, desc, eq, gt, isNull } from 'drizzle-orm';
 import { createHash, randomBytes } from 'node:crypto';
 import type { Database } from '../client.js';
-import {
-  invitations,
-  organizations,
-  users,
-  type InvitationRole,
-} from '../schema/index.js';
+import { invitations, organizations, users, type InvitationRole } from '../schema/index.js';
 import type { OrgId } from './org-scope.js';
 
 export function hashInvitationToken(token: string): string {

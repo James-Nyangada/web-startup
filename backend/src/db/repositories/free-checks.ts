@@ -25,7 +25,11 @@ export function freeChecksRepository(db: Database) {
       return row ?? null;
     },
 
-    async updateStatus(id: string, status: 'running' | 'completed' | 'failed', errorMessage?: string) {
+    async updateStatus(
+      id: string,
+      status: 'running' | 'completed' | 'failed',
+      errorMessage?: string,
+    ) {
       const [row] = await db
         .update(freeChecks)
         .set({

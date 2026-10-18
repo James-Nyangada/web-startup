@@ -1,0 +1,2 @@
+ALTER TABLE "issue_events" DROP CONSTRAINT "issue_events_type_check";--> statement-breakpoint
+ALTER TABLE "issue_events" ADD CONSTRAINT "issue_events_type_check" CHECK ("issue_events"."type" in ('created', 'fixed', 'regressed', 'ignored', 'unignored', 'assigned', 'due_date_set', 'note_added', 'rechecked'));

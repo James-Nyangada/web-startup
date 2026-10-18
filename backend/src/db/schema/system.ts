@@ -83,11 +83,16 @@ export const freeChecks = pgTable(
     domain: text('domain').notNull(),
     email: citext('email'),
     ipHash: text('ip_hash').notNull(),
-    status: text('status').$type<'pending' | 'running' | 'completed' | 'failed'>().notNull().default('pending'),
+    status: text('status')
+      .$type<'pending' | 'running' | 'completed' | 'failed'>()
+      .notNull()
+      .default('pending'),
     result: jsonb('result').$type<FreeCheckResultPayload>(),
     reportKey: text('report_key'),
     marketingConsent: boolean('marketing_consent').notNull().default(false),
-    convertedOrgId: uuid('converted_org_id').references(() => organizations.id, { onDelete: 'set null' }),
+    convertedOrgId: uuid('converted_org_id').references(() => organizations.id, {
+      onDelete: 'set null',
+    }),
     errorMessage: text('error_message'),
     ...timestamps(),
   },

@@ -8,7 +8,12 @@ export async function seed(db: Database): Promise<void> {
   await db.transaction(async (tx) => {
     const [owner] = await tx
       .insert(users)
-      .values({ email: 'owner@example.com', name: 'Demo Owner', emailVerifiedAt: new Date() })
+      .values({
+        email: 'owner@example.com',
+        name: 'Demo Owner',
+        emailVerified: true,
+        emailVerifiedAt: new Date(),
+      })
       .onConflictDoUpdate({ target: users.email, set: { name: sql`excluded.name` } })
       .returning({ id: users.id });
 

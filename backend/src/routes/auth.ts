@@ -15,9 +15,8 @@ export function copyResponseHeaders(webRes: globalThis.Response, res: Response):
       return;
     }
     if (lower === 'set-cookie') {
-      const getSetCookie = (
-        webRes.headers as unknown as { getSetCookie?: () => string[] }
-      ).getSetCookie;
+      const getSetCookie = (webRes.headers as unknown as { getSetCookie?: () => string[] })
+        .getSetCookie;
       if (typeof getSetCookie === 'function') {
         const cookies = getSetCookie.call(webRes.headers);
         res.setHeader('Set-Cookie', cookies);
@@ -316,8 +315,16 @@ export function authRouter(
 
   // POST /v1/auth/verify-email
   router.post('/verify-email', async (req: Request, res: Response): Promise<void> => {
-    const body = (typeof req.body === 'object' && req.body !== null ? req.body : {}) as Record<string, unknown>;
-    const token = typeof body.token === 'string' ? body.token : typeof req.query.token === 'string' ? req.query.token : undefined;
+    const body = (typeof req.body === 'object' && req.body !== null ? req.body : {}) as Record<
+      string,
+      unknown
+    >;
+    const token =
+      typeof body.token === 'string'
+        ? body.token
+        : typeof req.query.token === 'string'
+          ? req.query.token
+          : undefined;
     if (!token) {
       res.status(400).json({
         error: {

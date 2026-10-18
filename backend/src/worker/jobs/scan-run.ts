@@ -6,10 +6,7 @@ import type { ScanJobPayload, WorkerContext } from '../types.js';
 import { publishScanProgress } from '../progress.js';
 import { handleScanProcess } from './scan-process.js';
 
-export async function handleScanRun(
-  job: ScanJobPayload,
-  ctx: WorkerContext,
-): Promise<void> {
+export async function handleScanRun(job: ScanJobPayload, ctx: WorkerContext): Promise<void> {
   const scan = await ctx.repos.scans.findRawById(job.scanId);
   if (!scan) return;
 

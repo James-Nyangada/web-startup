@@ -1,13 +1,7 @@
 import { and, desc, eq, inArray, isNull, sql } from 'drizzle-orm';
 import { createHash } from 'node:crypto';
 import type { Database } from '../client.js';
-import {
-  issues,
-  pages,
-  pageResults,
-  sites,
-  type PageResultStatus,
-} from '../schema/index.js';
+import { issues, pages, pageResults, sites, type PageResultStatus } from '../schema/index.js';
 import { createExcludedPathMatcher } from '../../scanner/url/skip-patterns.js';
 import type { OrgId } from './org-scope.js';
 
@@ -231,13 +225,7 @@ export function pagesRepository(db: Database) {
           openCount: sql<number>`count(*)::int`,
         })
         .from(issues)
-        .where(
-          and(
-            eq(issues.orgId, orgId),
-            eq(issues.siteId, siteId),
-            eq(issues.status, 'open'),
-          ),
-        )
+        .where(and(eq(issues.orgId, orgId), eq(issues.siteId, siteId), eq(issues.status, 'open')))
         .groupBy(issues.templateKey);
 
       const templateIssueCountMap = new Map<string, number>(
@@ -337,12 +325,7 @@ export function pagesRepository(db: Database) {
     /**
      * Toggles pin status for a page and synchronizes sites.pinnedUrls (Spec S-29, S-34).
      */
-    async setPin(
-      orgId: OrgId,
-      siteId: string,
-      pageIdOrUrl: string,
-      isPinned: boolean,
-    ) {
+    async setPin(orgId: OrgId, siteId: string, pageIdOrUrl: string, isPinned: boolean) {
       let [page] = await db
         .select()
         .from(pages)

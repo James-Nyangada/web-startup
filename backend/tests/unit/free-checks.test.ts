@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import request from 'supertest';
 import { buildTestApp } from '../helpers/fakes.js';
+import type { PgBoss } from 'pg-boss';
 import { ErrorCode } from '../../src/shared/errors.js';
 
 describe('Free Checker Backend API (Chunk P3-03, Screen S-03, Sections 7.10 & 11.4)', () => {
@@ -53,10 +54,7 @@ describe('Free Checker Backend API (Chunk P3-03, Screen S-03, Sections 7.10 & 11
     ];
 
     for (const url of targets) {
-      const res = await request(app)
-        .post('/public/free-checks')
-        .send({ url })
-        .expect(400);
+      const res = await request(app).post('/public/free-checks').send({ url }).expect(400);
 
       expect(res.body.error.code).toBe(ErrorCode.VALIDATION_ERROR);
       expect(res.body.error.message).toContain('Blocked address');
@@ -74,6 +72,49 @@ describe('Free Checker Backend API (Chunk P3-03, Screen S-03, Sections 7.10 & 11
       .expect(400);
 
     expect(res.body.error.code).toBe(ErrorCode.BOT_CHECK_FAILED);
+  });
+
+  it('rejects a request with no turnstile token once bot protection is configured', async () => {
+    const turnstile = vi.fn((token: string | undefined) => Promise.resolve(Boolean(token)));
+    const { app } = buildTestApp({ turnstile });
+
+    const res = await request(app)
+      .post('/public/free-checks')
+      .send({ url: 'https://example.com' })
+      .expect(400);
+
+    expect(res.body.error.code).toBe(ErrorCode.BOT_CHECK_FAILED);
+    expect(turnstile).toHaveBeenCalledWith(undefined, expect.any(String));
+  });
+
+  it('queues the scan on the free-check.run lane when a queue is configured', async () => {
+    const send = vi.fn().mockResolvedValue('job-1');
+    const boss = { send } as unknown as PgBoss;
+    const { app, repos } = buildTestApp({ freeChecksOptions: { boss, customRunner: undefined } });
+
+    vi.mocked(repos.freeChecks.create).mockResolvedValueOnce({
+      id: 'fc-queued-1',
+      url: 'https://soraskin.co/',
+      domain: 'soraskin.co',
+      ipHash: 'hash-ip',
+      status: 'pending',
+      email: null,
+      result: null,
+      reportKey: null,
+      marketingConsent: false,
+      convertedOrgId: null,
+      errorMessage: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+
+    await request(app).post('/public/free-checks').send({ url: 'soraskin.co' }).expect(201);
+
+    expect(send).toHaveBeenCalledWith(
+      'free-check.run',
+      { checkId: 'fc-queued-1' },
+      { expireInSeconds: 90, retryLimit: 0 },
+    );
   });
 
   it('enforces IP rate limit: max 3 checks per hour', async () => {
@@ -182,9 +223,7 @@ describe('Free Checker Backend API (Chunk P3-03, Screen S-03, Sections 7.10 & 11
       updatedAt: new Date(),
     });
 
-    const res = await request(app)
-      .get('/public/free-checks/fc-test-456')
-      .expect(200);
+    const res = await request(app).get('/public/free-checks/fc-test-456').expect(200);
 
     expect(res.body.data.id).toBe('fc-test-456');
     expect(res.body.data.status).toBe('completed');
@@ -199,9 +238,7 @@ describe('Free Checker Backend API (Chunk P3-03, Screen S-03, Sections 7.10 & 11
 
     vi.mocked(repos.freeChecks.findById).mockResolvedValueOnce(null);
 
-    const res = await request(app)
-      .get('/public/free-checks/unknown-id')
-      .expect(404);
+    const res = await request(app).get('/public/free-checks/unknown-id').expect(404);
 
     expect(res.body.error.code).toBe(ErrorCode.NOT_FOUND);
   });
@@ -276,9 +313,7 @@ describe('Free Checker Backend API (Chunk P3-03, Screen S-03, Sections 7.10 & 11
       updatedAt: new Date(),
     });
 
-    const res = await request(app)
-      .get('/v1/public/free-checks/fc-v1-test')
-      .expect(200);
+    const res = await request(app).get('/v1/public/free-checks/fc-v1-test').expect(200);
 
     expect(res.body.data.id).toBe('fc-v1-test');
   });

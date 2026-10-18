@@ -66,7 +66,9 @@ export function createEmailPreviewRouter(): Router {
     const templateId = (Array.isArray(paramVal) ? paramVal[0] : paramVal) as EmailTemplateId;
 
     if (!VALID_TEMPLATES.includes(templateId)) {
-      res.status(404).send(`Unknown template "${templateId}". Valid templates: ${VALID_TEMPLATES.join(', ')}`);
+      res
+        .status(404)
+        .send(`Unknown template "${templateId}". Valid templates: ${VALID_TEMPLATES.join(', ')}`);
       return;
     }
 

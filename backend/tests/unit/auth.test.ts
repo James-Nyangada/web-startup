@@ -60,6 +60,7 @@ function createMockAuth() {
     id: 'user-123',
     email: 'test@example.com',
     name: 'Test User',
+    emailVerified: true,
     emailVerifiedAt: new Date(),
     avatarUrl: null,
     timeZone: 'UTC',
@@ -80,14 +81,16 @@ function createMockAuth() {
   };
 
   const api = {
-    signUpEmail: vi.fn().mockImplementation(({ body }: { body: { email: string; name?: string } }) => {
-      return Promise.resolve(
-        new Response(JSON.stringify({ user: { id: 'u1', email: body.email } }), {
-          status: 200,
-          headers: { 'Content-Type': 'application/json' },
-        }),
-      );
-    }),
+    signUpEmail: vi
+      .fn()
+      .mockImplementation(({ body }: { body: { email: string; name?: string } }) => {
+        return Promise.resolve(
+          new Response(JSON.stringify({ user: { id: 'u1', email: body.email } }), {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' },
+          }),
+        );
+      }),
     signInEmail: vi.fn().mockImplementation(({ body }: { body: { password: string } }) => {
       if (body.password === 'WrongPassword123!') {
         return Promise.resolve(
@@ -98,22 +101,21 @@ function createMockAuth() {
         );
       }
       return Promise.resolve(
-        new Response(
-          JSON.stringify({ user: mockUser, session: mockSession }),
-          {
-            status: 200,
-            headers: {
-              'Content-Type': 'application/json',
-              'Set-Cookie': 'better-auth.session_token=token-xyz; Path=/; HttpOnly; SameSite=Lax',
-            },
+        new Response(JSON.stringify({ user: mockUser, session: mockSession }), {
+          status: 200,
+          headers: {
+            'Content-Type': 'application/json',
+            'Set-Cookie': 'better-auth.session_token=token-xyz; Path=/; HttpOnly; SameSite=Lax',
           },
-        ),
+        }),
       );
     }),
     signInMagicLink: vi.fn().mockResolvedValue({ status: true }),
     verifyEmail: vi.fn().mockImplementation(({ query }: { query?: { token?: string } }) => {
       if (query?.token === 'invalid-token') {
-        return Promise.resolve(new Response(JSON.stringify({ message: 'Invalid token' }), { status: 400 }));
+        return Promise.resolve(
+          new Response(JSON.stringify({ message: 'Invalid token' }), { status: 400 }),
+        );
       }
       return Promise.resolve(new Response(JSON.stringify({ status: true }), { status: 200 }));
     }),
@@ -122,7 +124,8 @@ function createMockAuth() {
         new Response(JSON.stringify({ success: true }), {
           status: 200,
           headers: {
-            'Set-Cookie': 'better-auth.session_token=; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT',
+            'Set-Cookie':
+              'better-auth.session_token=; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT',
           },
         }),
       );
@@ -130,30 +133,42 @@ function createMockAuth() {
     requestPasswordReset: vi.fn().mockResolvedValue({ status: true }),
     resetPassword: vi.fn().mockImplementation(({ body }: { body: { token?: string } }) => {
       if (body?.token === 'expired-token') {
-        return Promise.resolve(new Response(JSON.stringify({ message: 'Invalid token' }), { status: 400 }));
+        return Promise.resolve(
+          new Response(JSON.stringify({ message: 'Invalid token' }), { status: 400 }),
+        );
       }
       return Promise.resolve(new Response(JSON.stringify({ status: true }), { status: 200 }));
     }),
-    changePassword: vi.fn().mockImplementation(({ body }: { body: { currentPassword?: string } }) => {
-      if (body?.currentPassword === 'wrong') {
-        return Promise.resolve(new Response(JSON.stringify({ message: 'Incorrect current password' }), { status: 400 }));
-      }
-      return Promise.resolve(new Response(JSON.stringify({ status: true }), { status: 200 }));
-    }),
+    changePassword: vi
+      .fn()
+      .mockImplementation(({ body }: { body: { currentPassword?: string } }) => {
+        if (body?.currentPassword === 'wrong') {
+          return Promise.resolve(
+            new Response(JSON.stringify({ message: 'Incorrect current password' }), {
+              status: 400,
+            }),
+          );
+        }
+        return Promise.resolve(new Response(JSON.stringify({ status: true }), { status: 200 }));
+      }),
     listSessions: vi.fn().mockResolvedValue([mockSession]),
     revokeSession: vi.fn().mockResolvedValue({ status: true }),
-    getSession: vi.fn().mockImplementation(({ headers }: { headers?: Headers | Record<string, string | undefined> }) => {
-      let cookie: string | null = null;
-      if (headers instanceof Headers) {
-        cookie = headers.get('cookie');
-      } else if (headers && typeof headers === 'object' && 'cookie' in headers) {
-        cookie = (headers.cookie as string) ?? null;
-      }
-      if (cookie && cookie.includes('token-xyz')) {
-        return Promise.resolve({ user: mockUser, session: mockSession });
-      }
-      return Promise.resolve(null);
-    }),
+    getSession: vi
+      .fn()
+      .mockImplementation(
+        ({ headers }: { headers?: Headers | Record<string, string | undefined> }) => {
+          let cookie: string | null = null;
+          if (headers instanceof Headers) {
+            cookie = headers.get('cookie');
+          } else if (headers && typeof headers === 'object' && 'cookie' in headers) {
+            cookie = (headers.cookie as string) ?? null;
+          }
+          if (cookie && cookie.includes('token-xyz')) {
+            return Promise.resolve({ user: mockUser, session: mockSession });
+          }
+          return Promise.resolve(null);
+        },
+      ),
   };
 
   return { api, mockUser, mockSession } as unknown as Auth & {
@@ -173,10 +188,7 @@ describe('auth endpoints', () => {
   describe('POST /v1/auth/sign-up', () => {
     it('returns 400 when missing email or password', async () => {
       const { app } = buildTestApp({ auth: mockAuth });
-      const res = await request(app)
-        .post('/v1/auth/sign-up')
-        .send({ email: 'bad' })
-        .expect(400);
+      const res = await request(app).post('/v1/auth/sign-up').send({ email: 'bad' }).expect(400);
 
       expect(res.body.error.code).toBe(ErrorCode.VALIDATION_ERROR);
     });
@@ -424,6 +436,7 @@ describe('profile (/v1/me) endpoints', () => {
           id: 'org-1',
           name: 'Acme Corp',
           slug: 'acme-corp',
+          type: 'store' as const,
           plan: 'trial',
           billingStatus: 'trialing',
           timeZone: 'UTC',

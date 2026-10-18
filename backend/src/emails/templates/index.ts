@@ -58,10 +58,7 @@ This link is valid for 7 days. If you did not create this account, you can safel
 }
 
 // E-02: Magic sign-in link
-export function renderMagicLink(
-  data: MagicLinkData,
-  branding?: EmailBranding,
-): EmailRenderOutput {
+export function renderMagicLink(data: MagicLinkData, branding?: EmailBranding): EmailRenderOutput {
   const brandName = branding?.displayName || 'Plainsight';
   const subject = `Your sign-in link for ${brandName}`;
 
@@ -315,13 +312,7 @@ export function renderScanSummary(
       ? data.score - data.previousScore
       : null;
   const deltaText =
-    delta !== null
-      ? delta > 0
-        ? ` (+${delta})`
-        : delta < 0
-          ? ` (${delta})`
-          : ' (unchanged)'
-      : '';
+    delta !== null ? (delta > 0 ? ` (+${delta})` : delta < 0 ? ` (${delta})` : ' (unchanged)') : '';
 
   const subject = `Scan summary for ${data.siteName}: Score ${data.score}/100${deltaText}`;
 

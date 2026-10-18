@@ -23,10 +23,7 @@ export function signReportDownloadToken(
   secret?: string,
 ): string {
   const data = Buffer.from(JSON.stringify(payload)).toString('base64url');
-  const signature = crypto
-    .createHmac('sha256', getSecret(secret))
-    .update(data)
-    .digest('base64url');
+  const signature = crypto.createHmac('sha256', getSecret(secret)).update(data).digest('base64url');
   return `${data}.${signature}`;
 }
 

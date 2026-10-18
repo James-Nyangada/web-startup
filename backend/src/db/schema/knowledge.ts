@@ -85,9 +85,7 @@ export const aiSuggestions = pgTable(
     flagged: boolean('flagged').notNull().default(false),
     ...timestamps(),
   },
-  (t) => [
-    index('ai_suggestions_rule_platform_idx').on(t.ruleId, t.platform),
-  ],
+  (t) => [index('ai_suggestions_rule_platform_idx').on(t.ruleId, t.platform)],
 );
 
 export const aiUsage = pgTable(
@@ -101,7 +99,5 @@ export const aiUsage = pgTable(
     requests: integer('requests').notNull().default(0),
     ...timestamps(),
   },
-  (t) => [
-    uniqueIndex('ai_usage_org_month_unique').on(t.orgId, t.month),
-  ],
+  (t) => [uniqueIndex('ai_usage_org_month_unique').on(t.orgId, t.month)],
 );

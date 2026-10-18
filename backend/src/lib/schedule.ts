@@ -76,7 +76,14 @@ export function zonedWallClockToUtc(
   const guess = new Date(Date.UTC(year, month - 1, day, hour, minute, 0));
   const getOffset = (d: Date): number => {
     const parts = getZonedParts(d, timeZone);
-    const asUtc = Date.UTC(parts.year, parts.month - 1, parts.day, parts.hour, parts.minute, parts.second);
+    const asUtc = Date.UTC(
+      parts.year,
+      parts.month - 1,
+      parts.day,
+      parts.hour,
+      parts.minute,
+      parts.second,
+    );
     return asUtc - d.getTime();
   };
   const offset = getOffset(guess);
@@ -107,27 +114,57 @@ export function computeNextScanAt(options: NextScanOptions): Date | null {
   const targetDay = currentParts.day;
 
   if (options.frequency === 'daily') {
-    const candidate = zonedWallClockToUtc(targetYear, targetMonth, targetDay, options.scanHour, 0, timeZone);
+    const candidate = zonedWallClockToUtc(
+      targetYear,
+      targetMonth,
+      targetDay,
+      options.scanHour,
+      0,
+      timeZone,
+    );
     if (candidate.getTime() > from.getTime()) {
       return candidate;
     }
     const nextDay = new Date(candidate.getTime() + 24 * 3600 * 1000);
     const nextParts = getZonedParts(nextDay, timeZone);
-    return zonedWallClockToUtc(nextParts.year, nextParts.month, nextParts.day, options.scanHour, 0, timeZone);
+    return zonedWallClockToUtc(
+      nextParts.year,
+      nextParts.month,
+      nextParts.day,
+      options.scanHour,
+      0,
+      timeZone,
+    );
   }
 
   if (options.frequency === 'weekly') {
     let daysToAdd = (options.scanDay - currentDow + 7) % 7;
     if (daysToAdd === 0) {
-      const candidate = zonedWallClockToUtc(targetYear, targetMonth, targetDay, options.scanHour, 0, timeZone);
+      const candidate = zonedWallClockToUtc(
+        targetYear,
+        targetMonth,
+        targetDay,
+        options.scanHour,
+        0,
+        timeZone,
+      );
       if (candidate.getTime() > from.getTime()) {
         return candidate;
       }
       daysToAdd = 7;
     }
-    const futureApprox = new Date(Date.UTC(targetYear, targetMonth - 1, targetDay + daysToAdd, 12, 0, 0));
+    const futureApprox = new Date(
+      Date.UTC(targetYear, targetMonth - 1, targetDay + daysToAdd, 12, 0, 0),
+    );
     const futureParts = getZonedParts(futureApprox, timeZone);
-    return zonedWallClockToUtc(futureParts.year, futureParts.month, futureParts.day, options.scanHour, 0, timeZone);
+    return zonedWallClockToUtc(
+      futureParts.year,
+      futureParts.month,
+      futureParts.day,
+      options.scanHour,
+      0,
+      timeZone,
+    );
   }
 
   return null;

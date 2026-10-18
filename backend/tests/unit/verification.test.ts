@@ -7,7 +7,11 @@ import {
 } from '../../src/scanner/verification/verify.js';
 import type { GuardedFetch, GuardedResponse } from '../../src/scanner/net/guarded-fetch.js';
 
-function makeGuardedResponse(status: number, textContent: string, url = 'https://oakhaus.com'): GuardedResponse {
+function makeGuardedResponse(
+  status: number,
+  textContent: string,
+  url = 'https://oakhaus.com',
+): GuardedResponse {
   return {
     url,
     status,
@@ -63,13 +67,14 @@ describe('Site Ownership Verification (Chunk P2-07 & Section 6.9)', () => {
 
       const result = await verifyMetaTag(rootUrl, expectedToken, mockFetch);
       expect(result.ok).toBe(false);
-      expect(result.reason).toContain("Found meta tag 'plainsight-verify', but the token does not match");
+      expect(result.reason).toContain(
+        "Found meta tag 'plainsight-verify', but the token does not match",
+      );
       expect(result.details?.foundToken).toBe('ps_wrong_token');
     });
 
     it('fails with clear error on HTTP 404', async () => {
-      const mockFetch: GuardedFetch = () =>
-        Promise.resolve(makeGuardedResponse(404, 'Not found'));
+      const mockFetch: GuardedFetch = () => Promise.resolve(makeGuardedResponse(404, 'Not found'));
 
       const result = await verifyMetaTag(rootUrl, expectedToken, mockFetch);
       expect(result.ok).toBe(false);
@@ -91,7 +96,9 @@ describe('Site Ownership Verification (Chunk P2-07 & Section 6.9)', () => {
 
     it('succeeds when file has plainsight-verify=<token> format', async () => {
       const mockFetch: GuardedFetch = (url) =>
-        Promise.resolve(makeGuardedResponse(200, `plainsight-verify = ${expectedToken}\n`, String(url)));
+        Promise.resolve(
+          makeGuardedResponse(200, `plainsight-verify = ${expectedToken}\n`, String(url)),
+        );
 
       const result = await verifyFile(rootUrl, expectedToken, mockFetch);
       expect(result.ok).toBe(true);

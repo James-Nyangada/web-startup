@@ -92,10 +92,7 @@ export function aiSuggestionsRepository(db: Database) {
     },
 
     async isFeatureEnabled(key: string, orgId?: string): Promise<boolean> {
-      const [flag] = await db
-        .select()
-        .from(featureFlags)
-        .where(eq(featureFlags.key, key));
+      const [flag] = await db.select().from(featureFlags).where(eq(featureFlags.key, key));
 
       if (!flag) {
         // If not explicitly configured in DB, feature flag defaults to enabled

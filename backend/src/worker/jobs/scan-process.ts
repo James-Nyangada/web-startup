@@ -5,10 +5,7 @@ import { asOrgId } from '../../db/repositories/index.js';
 import type { ScanJobPayload, WorkerContext } from '../types.js';
 import { publishScanProgress } from '../progress.js';
 
-export async function handleScanProcess(
-  job: ScanJobPayload,
-  ctx: WorkerContext,
-): Promise<void> {
+export async function handleScanProcess(job: ScanJobPayload, ctx: WorkerContext): Promise<void> {
   const scan = await ctx.repos.scans.findRawById(job.scanId);
   if (!scan) return;
 

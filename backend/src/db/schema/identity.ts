@@ -26,6 +26,8 @@ export const ORG_ROLES = ['owner', 'admin', 'member'] as const;
 export const INVITATION_ROLES = ['admin', 'member', 'client_viewer'] as const;
 
 export type Plan = (typeof PLANS)[number];
+export const ORG_TYPES = ['agency', 'store'] as const;
+export type OrgType = (typeof ORG_TYPES)[number];
 export type BillingStatus = (typeof BILLING_STATUSES)[number];
 export type OrgRole = (typeof ORG_ROLES)[number];
 export type InvitationRole = (typeof INVITATION_ROLES)[number];
@@ -34,6 +36,8 @@ export const users = pgTable('users', {
   id: id(),
   email: citext('email').notNull().unique(),
   name: text('name'),
+  /** Better Auth's verified flag; email_verified_at records when it happened. */
+  emailVerified: boolean('email_verified').notNull().default(false),
   emailVerifiedAt: timestamp('email_verified_at', { withTimezone: true }),
   avatarUrl: text('avatar_url'),
   timeZone: text('time_zone').notNull().default('UTC'),
@@ -51,6 +55,8 @@ export const organizations = pgTable(
     id: id(),
     name: text('name').notNull(),
     slug: citext('slug').unique(),
+    /** Chosen in onboarding (S-14); drives agency defaults and the S-20 store redirect. */
+    type: text('type').$type<OrgType>().notNull().default('store'),
     plan: text('plan').$type<Plan>().notNull().default('trial'),
     billingStatus: text('billing_status').$type<BillingStatus>().notNull().default('trialing'),
     trialEndsAt: timestamp('trial_ends_at', { withTimezone: true }),
@@ -61,6 +67,7 @@ export const organizations = pgTable(
   },
   (t) => [
     check('organizations_plan_check', sql`${t.plan} in (${inList(PLANS)})`),
+    check('organizations_type_check', sql`${t.type} in (${inList(ORG_TYPES)})`),
     check(
       'organizations_billing_status_check',
       sql`${t.billingStatus} in (${inList(BILLING_STATUSES)})`,

@@ -36,6 +36,41 @@
       "when": 1792240632000,
       "tag": "0004_core_app_triggers_and_rls",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1792347335948,
+      "tag": "0005_phase3_tables",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1792347350334,
+      "tag": "0006_phase3_triggers_and_rls",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1792348500631,
+      "tag": "0007_issue_event_rechecked",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1792350523487,
+      "tag": "0008_users_email_verified",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1792351411120,
+      "tag": "0009_organizations_type",
+      "breakpoints": true
     }
   ]
 }

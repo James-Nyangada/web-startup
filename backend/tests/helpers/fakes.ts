@@ -65,6 +65,7 @@ export function fakeRepos() {
       list: vi.fn().mockResolvedValue([]),
       findById: vi.fn().mockResolvedValue(null),
       findByRootUrl: vi.fn().mockResolvedValue(null),
+      listSummaries: vi.fn().mockResolvedValue(new Map()),
       count: vi.fn().mockResolvedValue(0),
       create: vi.fn().mockResolvedValue(null),
       update: vi.fn().mockResolvedValue(null),
@@ -101,9 +102,11 @@ export function fakeRepos() {
       insertPageResults: vi.fn().mockResolvedValue(undefined),
       listResultsByScan: vi.fn().mockResolvedValue([]),
       listGroupedByTemplate: vi.fn().mockResolvedValue([]),
-      setPin: vi.fn().mockImplementation((_orgId, _siteId, pageIdOrUrl, isPinned) =>
-        Promise.resolve({ id: 'p-1', url: pageIdOrUrl, isPinned }),
-      ),
+      setPin: vi
+        .fn()
+        .mockImplementation((_orgId, _siteId, pageIdOrUrl, isPinned) =>
+          Promise.resolve({ id: 'p-1', url: pageIdOrUrl, isPinned }),
+        ),
       previewExclusions: vi.fn().mockImplementation((_orgId, _siteId, patterns) =>
         Promise.resolve({
           matchCount: patterns.length > 0 ? 1 : 0,
@@ -113,13 +116,19 @@ export function fakeRepos() {
     },
     issues: {
       listForDiff: vi.fn().mockResolvedValue([]),
-      applyScanDiff: vi.fn().mockResolvedValue({ createdCount: 0, fixedCount: 0, regressedCount: 0 }),
+      applyScanDiff: vi
+        .fn()
+        .mockResolvedValue({ createdCount: 0, fixedCount: 0, regressedCount: 0 }),
       listBySite: vi.fn().mockResolvedValue([]),
       countBySite: vi.fn().mockResolvedValue(0),
       findById: vi.fn().mockResolvedValue(null),
       listTopIssues: vi.fn().mockResolvedValue([]),
-      getSeverityCounts: vi.fn().mockResolvedValue({ critical: 0, serious: 0, moderate: 0, minor: 0 }),
-      getDiffSummary: vi.fn().mockResolvedValue({ newCount: 0, fixedCount: 0, regressedCount: 0, sinceDate: null }),
+      getSeverityCounts: vi
+        .fn()
+        .mockResolvedValue({ critical: 0, serious: 0, moderate: 0, minor: 0 }),
+      getDiffSummary: vi
+        .fn()
+        .mockResolvedValue({ newCount: 0, fixedCount: 0, regressedCount: 0, sinceDate: null }),
       getScanDiff: vi.fn().mockResolvedValue({ regressed: [], new: [], fixed: [] }),
       listRecentlyFixed: vi.fn().mockResolvedValue([]),
       listTemplatesBySite: vi.fn().mockResolvedValue([]),
@@ -173,6 +182,7 @@ export function fakeRepos() {
           dueDate,
         }),
       ),
+      recordRecheck: vi.fn().mockResolvedValue(undefined),
       markFixed: vi.fn().mockImplementation((_orgId, issueId, actorId, scanId) =>
         Promise.resolve({
           id: issueId,
@@ -384,12 +394,12 @@ export function fakeRepos() {
 export const testGuardPolicy: GuardPolicy = {
   allowedPorts: [80, 443],
   isAllowedAddress: isPublicAddress,
-  resolve: async (hostname) => {
-    if (hostname.includes('internal') || hostname.includes('private')) {
-      return ['10.0.0.1'];
-    }
-    return ['93.184.216.34'];
-  },
+  resolve: (hostname) =>
+    Promise.resolve(
+      hostname.includes('internal') || hostname.includes('private')
+        ? ['10.0.0.1']
+        : ['93.184.216.34'],
+    ),
 };
 
 export function buildTestApp(

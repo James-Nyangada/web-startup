@@ -31,6 +31,12 @@ const envSchema = z.object({
   GEMINI_MODEL: z.string().default('gemini-2.5-flash'),
   AI_SUGGESTIONS_MONTHLY_CAP: z.coerce.number().int().positive().default(50),
   FEATURE_AI_SUGGESTIONS: booleanString.default(true),
+  /** Cloudflare R2. When all four are set, files go to R2; otherwise to STORAGE_DIR on disk. */
+  R2_ACCOUNT_ID: z.string().optional(),
+  R2_ACCESS_KEY_ID: z.string().optional(),
+  R2_SECRET_ACCESS_KEY: z.string().optional(),
+  R2_BUCKET: z.string().optional(),
+  STORAGE_DIR: z.string().optional(),
 });
 
 export type Env = z.infer<typeof envSchema>;

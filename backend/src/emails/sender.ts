@@ -2,6 +2,7 @@ import { renderEmail } from './renderer.js';
 import type {
   EmailBranding,
   EmailTemplateId,
+  FreeCheckReportData,
   TemplateDataMap,
 } from './types.js';
 import type { AuthMailer, EmailData } from '../lib/auth.js';
@@ -28,7 +29,7 @@ export interface EmailTransport {
 export class MockTransport implements EmailTransport {
   public sent: SentEmail[] = [];
 
-  async send(message: {
+  send(message: {
     to: string;
     subject: string;
     html: string;
@@ -43,7 +44,7 @@ export class MockTransport implements EmailTransport {
       text: message.text,
       sentAt: new Date(),
     });
-    return { id, ok: true };
+    return Promise.resolve({ id, ok: true });
   }
 
   clear() {
@@ -158,7 +159,7 @@ export class EmailSender implements AuthMailer {
     });
   }
 
-  async sendFreeCheckReport(to: string, data: import('./types.js').FreeCheckReportData): Promise<void> {
+  async sendFreeCheckReport(to: string, data: FreeCheckReportData): Promise<void> {
     await this.send({
       to,
       templateId: 'E-13',

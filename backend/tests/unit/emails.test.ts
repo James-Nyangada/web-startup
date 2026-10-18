@@ -7,28 +7,23 @@ import type { EmailTemplateId } from '../../src/emails/types.js';
 import { buildTestApp } from '../helpers/fakes.js';
 
 describe('Email Infrastructure (Chunk P2-18)', () => {
-  const templates: EmailTemplateId[] = [
-    'E-01',
-    'E-02',
-    'E-03',
-    'E-04',
-    'E-05',
-    'E-06',
-    'E-07',
-  ];
+  const templates: EmailTemplateId[] = ['E-01', 'E-02', 'E-03', 'E-04', 'E-05', 'E-06', 'E-07'];
 
   describe('Template rendering & plain-text generation', () => {
-    it.each(templates)('template %s renders valid subject, accessible HTML, and plain text', (templateId) => {
-      const sample = getSampleTemplateData(templateId);
-      const rendered = renderEmail(templateId, sample as never);
+    it.each(templates)(
+      'template %s renders valid subject, accessible HTML, and plain text',
+      (templateId) => {
+        const sample = getSampleTemplateData(templateId);
+        const rendered = renderEmail(templateId, sample as never);
 
-      expect(rendered.subject).toBeTruthy();
-      expect(rendered.html).toContain('<!DOCTYPE html>');
-      expect(rendered.html).toContain('role="presentation"');
-      expect(rendered.text).toBeTruthy();
-      expect(typeof rendered.text).toBe('string');
-      expect(rendered.text.length).toBeGreaterThan(20);
-    });
+        expect(rendered.subject).toBeTruthy();
+        expect(rendered.html).toContain('<!DOCTYPE html>');
+        expect(rendered.html).toContain('role="presentation"');
+        expect(rendered.text).toBeTruthy();
+        expect(typeof rendered.text).toBe('string');
+        expect(rendered.text.length).toBeGreaterThan(20);
+      },
+    );
 
     it('uses accessible primary color contrast (default #0F3D3E has >10:1 contrast on #FFFFFF)', () => {
       const sample = getSampleTemplateData('E-04');
@@ -52,9 +47,7 @@ describe('Email Infrastructure (Chunk P2-18)', () => {
     const { app } = buildTestApp();
 
     it('GET /v1/emails/preview lists all 7 templates', async () => {
-      const res = await request(app)
-        .get('/v1/emails/preview')
-        .expect(200);
+      const res = await request(app).get('/v1/emails/preview').expect(200);
 
       expect(res.headers['content-type']).toContain('text/html');
       for (const t of templates) {
@@ -63,28 +56,27 @@ describe('Email Infrastructure (Chunk P2-18)', () => {
     });
 
     it.each(templates)('GET /v1/emails/preview/%s returns HTML preview', async (templateId) => {
-      const res = await request(app)
-        .get(`/v1/emails/preview/${templateId}`)
-        .expect(200);
+      const res = await request(app).get(`/v1/emails/preview/${templateId}`).expect(200);
 
       expect(res.headers['content-type']).toContain('text/html');
       expect(res.text).toContain('<!DOCTYPE html>');
     });
 
-    it.each(templates)('GET /v1/emails/preview/%s?format=text returns plain text', async (templateId) => {
-      const res = await request(app)
-        .get(`/v1/emails/preview/${templateId}?format=text`)
-        .expect(200);
+    it.each(templates)(
+      'GET /v1/emails/preview/%s?format=text returns plain text',
+      async (templateId) => {
+        const res = await request(app)
+          .get(`/v1/emails/preview/${templateId}?format=text`)
+          .expect(200);
 
-      expect(res.headers['content-type']).toContain('text/plain');
-      expect(res.text).not.toContain('<!DOCTYPE html>');
-      expect(res.text.length).toBeGreaterThan(20);
-    });
+        expect(res.headers['content-type']).toContain('text/plain');
+        expect(res.text).not.toContain('<!DOCTYPE html>');
+        expect(res.text.length).toBeGreaterThan(20);
+      },
+    );
 
     it('returns 404 for unknown template preview', async () => {
-      await request(app)
-        .get('/v1/emails/preview/E-99')
-        .expect(404);
+      await request(app).get('/v1/emails/preview/E-99').expect(404);
     });
   });
 

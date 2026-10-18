@@ -16,6 +16,7 @@ import {
   type IgnoredReason,
 } from '../schema/index.js';
 import { AUDIENCE_LABELS, RULE_CONTENT } from '../../scanner/rules/content.js';
+import { ruleInfo } from '../../scanner/rules/catalog.js';
 import type { OrgId } from './org-scope.js';
 
 export type BulkAction =
@@ -125,6 +126,31 @@ export function issuesRepository(db: Database) {
         let createdCount = 0;
         let fixedCount = 0;
         let regressedCount = 0;
+
+        // issues.rule_id references rules; axe can report rules the catalog doesn't list yet.
+        const ruleIds = [...new Set(allFoundIssues.map((issue) => issue.ruleId))];
+        if (ruleIds.length > 0) {
+          await tx
+            .insert(rules)
+            .values(
+              ruleIds.map((ruleId) => {
+                const info = ruleInfo(ruleId);
+                return {
+                  ruleId,
+                  title: info.title,
+                  description: info.description,
+                  whoIsAffected: info.whoIsAffected.join(', '),
+                  wcagCriteria: info.wcagCriteria,
+                  wcagLevel: info.wcagLevel,
+                  defaultImpact: info.defaultImpact,
+                  weight: info.weight,
+                  helpUrl: info.helpUrl,
+                  axeVersion: info.axeVersion,
+                };
+              }),
+            )
+            .onConflictDoNothing({ target: rules.ruleId });
+        }
 
         // 1. Process Created Issues
         if (diff.created.length > 0) {
@@ -600,9 +626,7 @@ export function issuesRepository(db: Database) {
         conditions.push(sql`${filters.wcag} = any(${issues.wcagCriteria})`);
       }
 
-      let query = db
-        .select({ count: sql<number>`count(*)::int` })
-        .from(issues);
+      let query = db.select({ count: sql<number>`count(*)::int` }).from(issues);
 
       if (filters.search && filters.search.trim()) {
         const q = `%${filters.search.trim()}%`;
@@ -638,7 +662,12 @@ export function issuesRepository(db: Database) {
     async listCrossSite(
       orgId: OrgId,
       filters: IssueListFilters & { siteId?: string } = {},
-      options: { limit?: number; offset?: number; sort?: IssueSortField; order?: IssueSortOrder } = {},
+      options: {
+        limit?: number;
+        offset?: number;
+        sort?: IssueSortField;
+        order?: IssueSortOrder;
+      } = {},
     ) {
       const limit = Math.min(200, Math.max(1, options.limit ?? 50));
       const offset = Math.max(0, options.offset ?? 0);
@@ -740,10 +769,7 @@ export function issuesRepository(db: Database) {
      * Finds an issue by ID without tenant scope (used by background workers).
      */
     async findRawById(issueId: string) {
-      const [row] = await db
-        .select()
-        .from(issues)
-        .where(eq(issues.id, issueId));
+      const [row] = await db.select().from(issues).where(eq(issues.id, issueId));
       return row ?? null;
     },
 
@@ -768,13 +794,7 @@ export function issuesRepository(db: Database) {
         })
         .from(issues)
         .leftJoin(rules, eq(issues.ruleId, rules.ruleId))
-        .where(
-          and(
-            eq(issues.orgId, orgId),
-            eq(issues.siteId, siteId),
-            eq(issues.status, 'open'),
-          ),
-        )
+        .where(and(eq(issues.orgId, orgId), eq(issues.siteId, siteId), eq(issues.status, 'open')))
         .orderBy(
           sql`(
             CASE ${issues.impact}
@@ -815,13 +835,7 @@ export function issuesRepository(db: Database) {
           count: sql<number>`count(*)::int`,
         })
         .from(issues)
-        .where(
-          and(
-            eq(issues.orgId, orgId),
-            eq(issues.siteId, siteId),
-            eq(issues.status, 'open'),
-          ),
-        )
+        .where(and(eq(issues.orgId, orgId), eq(issues.siteId, siteId), eq(issues.status, 'open')))
         .groupBy(issues.impact);
 
       const counts: Record<Impact, number> = {
@@ -919,13 +933,7 @@ export function issuesRepository(db: Database) {
         })
         .from(issues)
         .leftJoin(rules, eq(issues.ruleId, rules.ruleId))
-        .where(
-          and(
-            eq(issues.orgId, orgId),
-            eq(issues.siteId, siteId),
-            eq(issues.status, 'fixed'),
-          ),
-        )
+        .where(and(eq(issues.orgId, orgId), eq(issues.siteId, siteId), eq(issues.status, 'fixed')))
         .orderBy(desc(issues.fixedAt))
         .limit(limit);
 
@@ -1008,11 +1016,7 @@ export function issuesRepository(db: Database) {
     /**
      * Lists notes for an issue (Spec S-26, P2-13).
      */
-    async listNotes(
-      orgId: OrgId,
-      issueId: string,
-      options: { clientVisibleOnly?: boolean } = {},
-    ) {
+    async listNotes(orgId: OrgId, issueId: string, options: { clientVisibleOnly?: boolean } = {}) {
       const conditions = [
         eq(issueNotes.orgId, orgId),
         eq(issueNotes.issueId, issueId),
@@ -1234,12 +1238,7 @@ export function issuesRepository(db: Database) {
     /**
      * Assigns or unassigns an issue.
      */
-    async assign(
-      orgId: OrgId,
-      issueId: string,
-      actorId: string,
-      assigneeId: string | null,
-    ) {
+    async assign(orgId: OrgId, issueId: string, actorId: string, assigneeId: string | null) {
       const [updated] = await db
         .update(issues)
         .set({
@@ -1265,12 +1264,7 @@ export function issuesRepository(db: Database) {
     /**
      * Sets or clears an issue's due date.
      */
-    async setDueDate(
-      orgId: OrgId,
-      issueId: string,
-      actorId: string,
-      dueDate: string | null,
-    ) {
+    async setDueDate(orgId: OrgId, issueId: string, actorId: string, dueDate: string | null) {
       const [updated] = await db
         .update(issues)
         .set({
@@ -1325,6 +1319,15 @@ export function issuesRepository(db: Database) {
       });
 
       return updated;
+    },
+
+    /** Records the outcome of an issue.recheck job on the issue timeline. */
+    async recordRecheck(
+      orgId: OrgId,
+      issueId: string,
+      data: { outcome: 'fixed' | 'still_open' | 'unchecked'; pagesChecked: number },
+    ) {
+      await db.insert(issueEvents).values({ orgId, issueId, type: 'rechecked', data });
     },
 
     /**

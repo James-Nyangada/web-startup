@@ -28,7 +28,9 @@ export function renderEmailLayout(options: LayoutOptions): string {
   const brandName = branding?.displayName || 'Plainsight';
   const primaryColor = branding?.primaryColor || '#0F3D3E'; // 10.1:1 contrast on white
 
-  const buttonHtml = buttonLabel && buttonUrl ? `
+  const buttonHtml =
+    buttonLabel && buttonUrl
+      ? `
     <table role="presentation" border="0" cellpadding="0" cellspacing="0" style="margin: 28px 0 20px 0;">
       <tr>
         <td align="center">
@@ -40,20 +42,26 @@ export function renderEmailLayout(options: LayoutOptions): string {
         </td>
       </tr>
     </table>
-  ` : '';
+  `
+      : '';
 
-  const secondaryLinkHtml = secondaryLinkText && secondaryLinkUrl ? `
+  const secondaryLinkHtml =
+    secondaryLinkText && secondaryLinkUrl
+      ? `
     <p style="margin: 16px 0 0 0; font-size: 13px; line-height: 20px; color: #635F59;">
       Or paste this URL into your browser:<br />
       <a href="${secondaryLinkUrl}" style="color: ${primaryColor}; word-break: break-all; text-decoration: underline;">${secondaryLinkUrl}</a>
     </p>
-  ` : '';
+  `
+      : '';
 
-  const unsubscribeHtml = unsubscribeUrl ? `
+  const unsubscribeHtml = unsubscribeUrl
+    ? `
     <p style="margin: 8px 0 0 0; font-size: 12px; line-height: 18px; color: #76716B;">
       Don't want to receive these updates? <a href="${unsubscribeUrl}" style="color: #635F59; text-decoration: underline;">Unsubscribe here</a>.
     </p>
-  ` : '';
+  `
+    : '';
 
   return `<!DOCTYPE html>
 <html lang="en" dir="ltr" xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office">

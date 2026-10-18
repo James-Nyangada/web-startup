@@ -2,7 +2,7 @@ import { getDb, closeDb } from '../db/index.js';
 import { createRepositories } from '../db/repositories/index.js';
 import { ensureRulesSeeded } from '../db/seed-rules.js';
 import { getStorage } from '../storage/index.js';
-import { createBoss, registerWorkers, registerSchedules } from './boss.js';
+import { createBoss, ensureQueues, registerWorkers, registerSchedules } from './boss.js';
 import { recoverInterruptedScans } from './recovery.js';
 import type { WorkerContext } from './types.js';
 
@@ -17,6 +17,7 @@ export async function startWorker() {
   console.log('[worker] Starting pg-boss...');
   const boss = createBoss();
   await boss.start();
+  await ensureQueues(boss);
 
   const abortController = new AbortController();
 
@@ -36,7 +37,7 @@ export async function startWorker() {
     console.log(`[worker] Re-enqueued ${recovered} interrupted scan(s).`);
   }
 
-  console.log('[worker] Registering job workers (scan.run, scan.process, scan.schedule)...');
+  console.log('[worker] Registering job workers...');
   await registerWorkers(boss, ctx);
 
   console.log('[worker] Registering recurring cron schedules...');

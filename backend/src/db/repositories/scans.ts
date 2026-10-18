@@ -1,12 +1,7 @@
 import { and, desc, eq, gte, isNull, ne, sql } from 'drizzle-orm';
 import type { Database } from '../client.js';
 import type { Standard } from '../../scanner/types.js';
-import {
-  scans,
-  sites,
-  type ScanStatus,
-  type ScanTrigger,
-} from '../schema/index.js';
+import { scans, sites, type ScanStatus, type ScanTrigger } from '../schema/index.js';
 import type { OrgId } from './org-scope.js';
 
 export interface CreateScanInput {
@@ -150,11 +145,7 @@ export function scansRepository(db: Database) {
         .select({ count: sql<number>`count(*)::int` })
         .from(scans)
         .where(
-          and(
-            eq(scans.orgId, orgId),
-            eq(scans.siteId, siteId),
-            eq(scans.trigger, 'onboarding'),
-          ),
+          and(eq(scans.orgId, orgId), eq(scans.siteId, siteId), eq(scans.trigger, 'onboarding')),
         );
       return row?.count ?? 0;
     },

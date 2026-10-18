@@ -32,8 +32,10 @@ export function getScanFailureHint(
     msg.includes('cloudflare')
   ) {
     return {
-      reason: 'The server or web application firewall (WAF) rate-limited or blocked automated requests (HTTP 429).',
-      whatToDo: 'Add PlainsightBot to your CDN or firewall allowlist, or lower the scan page limit in site settings.',
+      reason:
+        'The server or web application firewall (WAF) rate-limited or blocked automated requests (HTTP 429).',
+      whatToDo:
+        'Add PlainsightBot to your CDN or firewall allowlist, or lower the scan page limit in site settings.',
     };
   }
 
@@ -41,31 +43,51 @@ export function getScanFailureHint(
   if (code.includes('TIMEOUT') || msg.includes('timed out') || msg.includes('timeout')) {
     return {
       reason: 'Multiple pages exceeded the 45-second rendering timeout.',
-      whatToDo: 'Check your server response times and verify heavy scripts or third-party widgets are not hanging page completion.',
+      whatToDo:
+        'Check your server response times and verify heavy scripts or third-party widgets are not hanging page completion.',
     };
   }
 
   // 3. SSRF / Private network guard
-  if (code.includes('SSRF') || code.includes('PRIVATE_IP') || msg.includes('private') || msg.includes('loopback')) {
+  if (
+    code.includes('SSRF') ||
+    code.includes('PRIVATE_IP') ||
+    msg.includes('private') ||
+    msg.includes('loopback')
+  ) {
     return {
       reason: 'Target URL resolved to a private or link-local address blocked by security guards.',
-      whatToDo: 'Ensure the root URL resolves to a public, routable IP address and check DNS configuration.',
+      whatToDo:
+        'Ensure the root URL resolves to a public, routable IP address and check DNS configuration.',
     };
   }
 
   // 4. HTTP Auth / Forbidden
-  if (code.includes('AUTH') || msg.includes('401') || msg.includes('403') || msg.includes('forbidden') || msg.includes('unauthorized')) {
+  if (
+    code.includes('AUTH') ||
+    msg.includes('401') ||
+    msg.includes('403') ||
+    msg.includes('forbidden') ||
+    msg.includes('unauthorized')
+  ) {
     return {
       reason: 'The server required authentication or denied access with HTTP 401/403.',
-      whatToDo: 'Ensure staging password protection or IP access restrictions allow automated testing, or verify public accessibility.',
+      whatToDo:
+        'Ensure staging password protection or IP access restrictions allow automated testing, or verify public accessibility.',
     };
   }
 
   // 5. DNS failure
-  if (code.includes('DNS') || msg.includes('enotfound') || msg.includes('getaddrinfo') || msg.includes('dns')) {
+  if (
+    code.includes('DNS') ||
+    msg.includes('enotfound') ||
+    msg.includes('getaddrinfo') ||
+    msg.includes('dns')
+  ) {
     return {
       reason: 'DNS lookup failed for the hostname.',
-      whatToDo: 'Confirm the domain name is active, registered, and public DNS records (A/AAAA) have propagated.',
+      whatToDo:
+        'Confirm the domain name is active, registered, and public DNS records (A/AAAA) have propagated.',
     };
   }
 
@@ -77,13 +99,16 @@ export function getScanFailureHint(
         : 'More than 50% of planned pages failed to scan.';
     return {
       reason: `Scan completed partially: ${failedText}`,
-      whatToDo: 'Partial scans never mark issues as fixed to prevent false positives. Review the failed pages below and re-run once the site is responsive.',
+      whatToDo:
+        'Partial scans never mark issues as fixed to prevent false positives. Review the failed pages below and re-run once the site is responsive.',
     };
   }
 
   // 7. General failed
   return {
-    reason: errorMessage || 'The scan encountered unrecoverable errors while loading or testing pages.',
-    whatToDo: 'Verify that the website is online and responsive, check robots.txt permissions for PlainsightBot, and retry the scan.',
+    reason:
+      errorMessage || 'The scan encountered unrecoverable errors while loading or testing pages.',
+    whatToDo:
+      'Verify that the website is online and responsive, check robots.txt permissions for PlainsightBot, and retry the scan.',
   };
 }

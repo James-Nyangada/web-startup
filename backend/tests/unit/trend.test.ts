@@ -8,7 +8,9 @@ describe('computeTrendSummary (Spec S-24, P2-11)', () => {
 
   it('handles a single scan correctly', () => {
     const single: TrendPoint[] = [['12 Oct', 85, 8]];
-    expect(computeTrendSummary(single)).toBe('Initial scan on 12 Oct scored 85 with 8 open problems.');
+    expect(computeTrendSummary(single)).toBe(
+      'Initial scan on 12 Oct scored 85 with 8 open problems.',
+    );
   });
 
   it('handles a single partial scan correctly', () => {

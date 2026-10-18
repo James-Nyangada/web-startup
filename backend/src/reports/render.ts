@@ -2,7 +2,12 @@ import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { chromium } from 'playwright';
 import type { ScanResult } from '../scanner/scan.js';
-import { FullReport, ScanSummaryReport, FreeCheckReport, type FreeCheckReportInput } from './templates.js';
+import {
+  FullReport,
+  ScanSummaryReport,
+  FreeCheckReport,
+  type FreeCheckReportInput,
+} from './templates.js';
 
 export type ReportType = 'summary' | 'full' | 'free_check';
 export type Paper = 'a4' | 'letter';

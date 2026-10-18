@@ -15,9 +15,7 @@ describe('Chunk P2-04: App shell, Command palette (S-81), and Global banners (S-
 
     function resolveHighestPriorityBanner(banners: { kind: BannerKind; id?: string }[]) {
       if (!banners.length) return null;
-      const sorted = [...banners].sort(
-        (a, b) => PRIORITY_ORDER[a.kind] - PRIORITY_ORDER[b.kind]
-      );
+      const sorted = [...banners].sort((a, b) => PRIORITY_ORDER[a.kind] - PRIORITY_ORDER[b.kind]);
       return sorted[0];
     }
 
@@ -69,10 +67,7 @@ describe('Chunk P2-04: App shell, Command palette (S-81), and Global banners (S-
     });
 
     it('picks verification over email', () => {
-      const active: { kind: BannerKind }[] = [
-        { kind: 'email' },
-        { kind: 'verification' },
-      ];
+      const active: { kind: BannerKind }[] = [{ kind: 'email' }, { kind: 'verification' }];
       expect(resolveHighestPriorityBanner(active)?.kind).toBe('verification');
     });
   });
@@ -93,17 +88,17 @@ describe('Chunk P2-04: App shell, Command palette (S-81), and Global banners (S-
       { id: 'settings-general', href: '/settings/general', label: 'General Settings' },
       { id: 'settings-members', href: '/settings/members', label: 'Team Members' },
       { id: 'settings-billing', href: '/settings/billing', label: 'Billing & Plans' },
-      { id: 'settings-notifications', href: '/settings/notifications', label: 'Notification Settings' },
+      {
+        id: 'settings-notifications',
+        href: '/settings/notifications',
+        label: 'Notification Settings',
+      },
       { id: 'settings-integrations', href: '/settings/integrations', label: 'Integrations' },
       { id: 'settings-audit', href: '/settings/audit-log', label: 'Audit Log' },
       { id: 'settings-account', href: '/settings/account', label: 'Account & Profile' },
     ];
 
-    const ACTIONS = [
-      'Add new site',
-      'Invite team member',
-      'Scan now: Oakhaus Furniture',
-    ];
+    const ACTIONS = ['Add new site', 'Invite team member', 'Scan now: Oakhaus Furniture'];
 
     it('can jump to every monitored site', () => {
       expect(SITES.length).toBeGreaterThanOrEqual(7);

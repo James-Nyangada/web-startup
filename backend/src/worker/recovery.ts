@@ -8,10 +8,7 @@ import { QUEUE_SCAN_PROCESS, QUEUE_SCAN_RUN } from './boss.js';
  * Scans stuck in 'processing' are re-enqueued to scan.process if raw data exists,
  * or reset to 'queued' and re-enqueued to scan.run.
  */
-export async function recoverInterruptedScans(
-  repos: Repositories,
-  boss?: PgBoss,
-): Promise<number> {
+export async function recoverInterruptedScans(repos: Repositories, boss?: PgBoss): Promise<number> {
   const interrupted = await repos.scans.findInterruptedScans();
   let recoveredCount = 0;
 

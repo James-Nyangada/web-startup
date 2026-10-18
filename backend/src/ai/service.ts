@@ -18,7 +18,7 @@ export interface GetAiSuggestionParams {
   ruleTitle: string;
   ruleDescription?: string | null;
   wcagCriteria?: string[] | null;
-  platform: Platform | string;
+  platform: string;
   htmlSnippet: string;
   failureSummary?: string | null;
 }
@@ -65,7 +65,10 @@ export class AiService {
 
   async getOrGenerateSuggestion(params: GetAiSuggestionParams): Promise<AiSuggestionResult> {
     // 1. Feature flag check
-    const isDbEnabled = await this.repos.aiSuggestions.isFeatureEnabled('ai_fix_suggestions', params.orgId);
+    const isDbEnabled = await this.repos.aiSuggestions.isFeatureEnabled(
+      'ai_fix_suggestions',
+      params.orgId,
+    );
     if (!this.featureEnabled || !isDbEnabled) {
       throw new AiServiceError(
         ErrorCode.FEATURE_DISABLED,

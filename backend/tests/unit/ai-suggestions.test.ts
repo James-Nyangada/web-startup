@@ -7,8 +7,8 @@ import {
   buildAiPrompt,
 } from '../../src/ai/scrubber.js';
 import { AiService, AiServiceError } from '../../src/ai/service.js';
-import type { AiProvider, AiSuggestionRequest } from '../../src/ai/provider.js';
-import { ErrorCode } from '../../src/shared/errors.js';
+import type { AiProvider } from '../../src/ai/provider.js';
+import type { Repositories } from '../../src/db/repositories/index.js';
 import { buildTestApp } from '../helpers/fakes.js';
 import type { Auth } from '../../src/lib/auth.js';
 
@@ -32,18 +32,20 @@ function createMockAuth(userId: string) {
   };
 
   const api = {
-    getSession: vi.fn(({ headers }: { headers?: Headers | Record<string, string | string[] | undefined> }) => {
-      let cookie: string | null = null;
-      if (headers instanceof Headers) {
-        cookie = headers.get('cookie');
-      } else if (headers && typeof headers === 'object' && 'cookie' in headers) {
-        cookie = (headers.cookie as string) ?? null;
-      }
-      if (cookie && cookie.includes(`token-${userId}`)) {
-        return Promise.resolve({ user: mockUser, session: mockSession });
-      }
-      return Promise.resolve(null);
-    }),
+    getSession: vi.fn(
+      ({ headers }: { headers?: Headers | Record<string, string | string[] | undefined> }) => {
+        let cookie: string | null = null;
+        if (headers instanceof Headers) {
+          cookie = headers.get('cookie');
+        } else if (headers && typeof headers === 'object' && 'cookie' in headers) {
+          cookie = (headers.cookie as string) ?? null;
+        }
+        if (cookie && cookie.includes(`token-${userId}`)) {
+          return Promise.resolve({ user: mockUser, session: mockSession });
+        }
+        return Promise.resolve(null);
+      },
+    ),
   };
 
   return { api, mockUser, mockSession } as unknown as Auth;
@@ -52,7 +54,8 @@ function createMockAuth(userId: string) {
 describe('AI Fix Suggestions (Phase 3 Chunk P3-07, Section 6.10)', () => {
   describe('Input Scrubber & Cache Key (scrubber.ts)', () => {
     it('strips all value attributes from HTML snippets', () => {
-      const input = '<input type="text" name="coupon" value="SECRET_CODE_123" placeholder="Enter coupon">';
+      const input =
+        '<input type="text" name="coupon" value="SECRET_CODE_123" placeholder="Enter coupon">';
       const scrubbed = scrubHtmlSnippet(input);
 
       expect(scrubbed).not.toContain('SECRET_CODE_123');
@@ -102,7 +105,8 @@ describe('AI Fix Suggestions (Phase 3 Chunk P3-07, Section 6.10)', () => {
       const prompt = buildAiPrompt({
         ruleId: 'image-alt',
         ruleTitle: 'Images must have alternate text',
-        ruleDescription: 'Ensures <img> elements have alternate text or a role of none or presentation',
+        ruleDescription:
+          'Ensures <img> elements have alternate text or a role of none or presentation',
         wcagCriteria: ['1.1.1'],
         platform: 'shopify',
         scrubbedSnippet: '<img src="product.jpg">',
@@ -120,7 +124,8 @@ describe('AI Fix Suggestions (Phase 3 Chunk P3-07, Section 6.10)', () => {
 
   describe('Output Validator (scrubber.ts)', () => {
     it('accepts valid markdown with fenced code block', () => {
-      const markdown = 'Add an alt attribute describing the image.\n\n```html\n<img src="hero.jpg" alt="Summer collection banner">\n```';
+      const markdown =
+        'Add an alt attribute describing the image.\n\n```html\n<img src="hero.jpg" alt="Summer collection banner">\n```';
       const result = validateAiOutput(markdown);
 
       expect(result.valid).toBe(true);
@@ -146,12 +151,13 @@ describe('AI Fix Suggestions (Phase 3 Chunk P3-07, Section 6.10)', () => {
 
   describe('AiService (service.ts)', () => {
     const orgId = '11111111-1111-4111-a111-111111111111';
-    let mockRepos: any;
+    let mockRepos: Repositories;
     let mockProvider: AiProvider;
-    let generateSpy: any;
+    let generateSpy: ReturnType<typeof vi.fn<AiProvider['generateSuggestion']>>;
+    let featureEnabledSpy: ReturnType<typeof vi.fn<() => Promise<boolean>>>;
 
     beforeEach(() => {
-      generateSpy = vi.fn().mockResolvedValue({
+      generateSpy = vi.fn<AiProvider['generateSuggestion']>().mockResolvedValue({
         markdown: 'Add alt attribute.\n\n```html\n<img src="pic.jpg" alt="Descriptive text">\n```',
         model: 'gemini-2.5-flash',
         tokensIn: 100,
@@ -162,13 +168,17 @@ describe('AI Fix Suggestions (Phase 3 Chunk P3-07, Section 6.10)', () => {
         generateSuggestion: generateSpy,
       };
 
-      const cache = new Map<string, any>();
+      type CachedSuggestion = { cacheKey: string; flagged: boolean } & Record<string, unknown>;
+      const cache = new Map<string, CachedSuggestion>();
       const usage = new Map<string, number>();
 
+      featureEnabledSpy = vi.fn<() => Promise<boolean>>().mockResolvedValue(true);
       mockRepos = {
         aiSuggestions: {
-          findByCacheKey: vi.fn().mockImplementation((key: string) => Promise.resolve(cache.get(key) ?? null)),
-          create: vi.fn().mockImplementation((data: any) => {
+          findByCacheKey: vi
+            .fn()
+            .mockImplementation((key: string) => Promise.resolve(cache.get(key) ?? null)),
+          create: vi.fn().mockImplementation((data: { cacheKey: string }) => {
             const record = { ...data, id: 'sug-1', flagged: false, createdAt: new Date() };
             cache.set(data.cacheKey, record);
             return Promise.resolve(record);
@@ -181,19 +191,23 @@ describe('AI Fix Suggestions (Phase 3 Chunk P3-07, Section 6.10)', () => {
             }
             return Promise.resolve(existing ?? null);
           }),
-          getMonthlyUsage: vi.fn().mockImplementation((_orgId: string, month: string) => Promise.resolve(usage.get(month) ?? 0)),
+          getMonthlyUsage: vi
+            .fn()
+            .mockImplementation((_orgId: string, month: string) =>
+              Promise.resolve(usage.get(month) ?? 0),
+            ),
           incrementMonthlyUsage: vi.fn().mockImplementation((_orgId: string, month: string) => {
             const count = (usage.get(month) ?? 0) + 1;
             usage.set(month, count);
             return Promise.resolve(count);
           }),
-          isFeatureEnabled: vi.fn().mockResolvedValue(true),
+          isFeatureEnabled: featureEnabledSpy,
         },
-      };
+      } as unknown as Repositories;
     });
 
     it('makes NO request to provider when a cached suggestion exists', async () => {
-      const service = new AiService(mockRepos as any, { provider: mockProvider });
+      const service = new AiService(mockRepos, { provider: mockProvider });
       const params = {
         orgId,
         issueId: 'issue-1',
@@ -216,7 +230,7 @@ describe('AI Fix Suggestions (Phase 3 Chunk P3-07, Section 6.10)', () => {
     });
 
     it('enforces per-org monthly cap and throws 422 PLAN_LIMIT when exceeded', async () => {
-      const service = new AiService(mockRepos as any, {
+      const service = new AiService(mockRepos, {
         provider: mockProvider,
         monthlyCap: 2,
       });
@@ -255,7 +269,7 @@ describe('AI Fix Suggestions (Phase 3 Chunk P3-07, Section 6.10)', () => {
     });
 
     it('reporting a bad suggestion flags the record and removes it from cache', async () => {
-      const service = new AiService(mockRepos as any, { provider: mockProvider });
+      const service = new AiService(mockRepos, { provider: mockProvider });
       const params = {
         orgId,
         issueId: 'issue-1',
@@ -279,8 +293,8 @@ describe('AI Fix Suggestions (Phase 3 Chunk P3-07, Section 6.10)', () => {
     });
 
     it('rejects with FEATURE_DISABLED when feature flag is turned off', async () => {
-      mockRepos.aiSuggestions.isFeatureEnabled.mockResolvedValue(false);
-      const service = new AiService(mockRepos as any, { provider: mockProvider });
+      featureEnabledSpy.mockResolvedValue(false);
+      const service = new AiService(mockRepos, { provider: mockProvider });
 
       await expect(
         service.getOrGenerateSuggestion({
@@ -342,8 +356,8 @@ describe('AI Fix Suggestions (Phase 3 Chunk P3-07, Section 6.10)', () => {
       const auth = createMockAuth(userId);
       const { app, repos } = buildTestApp({ auth });
 
-      (repos.organizations.findByIdOrSlug as any).mockResolvedValue(mockOrg);
-      (repos.memberships.find as any).mockResolvedValue({
+      vi.mocked(repos.organizations.findByIdOrSlug).mockResolvedValue(mockOrg as never);
+      vi.mocked(repos.memberships.find).mockResolvedValue({
         id: 'mem-1',
         orgId,
         userId,
@@ -351,9 +365,9 @@ describe('AI Fix Suggestions (Phase 3 Chunk P3-07, Section 6.10)', () => {
         createdAt: new Date(),
         updatedAt: new Date(),
       });
-      (repos.memberships.findRole as any).mockResolvedValue('member');
-      (repos.sites.findById as any).mockResolvedValue(mockSite);
-      (repos.issues.findById as any).mockResolvedValue(mockIssue);
+      vi.mocked(repos.memberships.findRole).mockResolvedValue('member');
+      vi.mocked(repos.sites.findById).mockResolvedValue(mockSite as never);
+      vi.mocked(repos.issues.findById).mockResolvedValue(mockIssue as never);
 
       const res = await request(app)
         .post(`/v1/orgs/${orgId}/issues/${issueId}/ai-suggestion`)
@@ -370,8 +384,8 @@ describe('AI Fix Suggestions (Phase 3 Chunk P3-07, Section 6.10)', () => {
       const auth = createMockAuth(userId);
       const { app, repos } = buildTestApp({ auth });
 
-      (repos.organizations.findByIdOrSlug as any).mockResolvedValue(mockOrg);
-      (repos.memberships.find as any).mockResolvedValue({
+      vi.mocked(repos.organizations.findByIdOrSlug).mockResolvedValue(mockOrg as never);
+      vi.mocked(repos.memberships.find).mockResolvedValue({
         id: 'mem-1',
         orgId,
         userId,
@@ -379,9 +393,9 @@ describe('AI Fix Suggestions (Phase 3 Chunk P3-07, Section 6.10)', () => {
         createdAt: new Date(),
         updatedAt: new Date(),
       });
-      (repos.memberships.findRole as any).mockResolvedValue('member');
-      (repos.sites.findById as any).mockResolvedValue(mockSite);
-      (repos.issues.findById as any).mockResolvedValue(mockIssue);
+      vi.mocked(repos.memberships.findRole).mockResolvedValue('member');
+      vi.mocked(repos.sites.findById).mockResolvedValue(mockSite as never);
+      vi.mocked(repos.issues.findById).mockResolvedValue(mockIssue as never);
 
       const res = await request(app)
         .post(`/v1/orgs/${orgId}/issues/${issueId}/ai-suggestion/report`)

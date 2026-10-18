@@ -84,6 +84,7 @@ export function orgsRouter(
         {
           name,
           slug: candidateSlug,
+          type,
           timeZone,
           trialEndsAt,
         },
@@ -147,87 +148,98 @@ export function orgsRouter(
   });
 
   // PATCH /v1/orgs/:orgId - Update org (O A)
-  orgScoped.patch('/', requireOrgRole('admin'), async (req: Request, res: Response): Promise<void> => {
-    const parse = patchOrgSchema.safeParse(req.body);
-    if (!parse.success) {
-      res.status(400).json({
-        error: {
-          code: ErrorCode.VALIDATION_ERROR,
-          message: 'Invalid organisation update data.',
-          details: { issues: parse.error.issues },
-        },
-      });
-      return;
-    }
-
-    const { name, timeZone, slug } = parse.data;
-
-    if (slug) {
-      const isAvailable = await repos.organizations.isSlugAvailable(slug, req.org!.id);
-      if (!isAvailable) {
-        res.status(409).json({
+  orgScoped.patch(
+    '/',
+    requireOrgRole('admin'),
+    async (req: Request, res: Response): Promise<void> => {
+      const parse = patchOrgSchema.safeParse(req.body);
+      if (!parse.success) {
+        res.status(400).json({
           error: {
-            code: ErrorCode.CONFLICT,
-            message: 'This organisation slug is already taken.',
-            details: { slug },
+            code: ErrorCode.VALIDATION_ERROR,
+            message: 'Invalid organisation update data.',
+            details: { issues: parse.error.issues },
           },
         });
         return;
       }
-    }
 
-    const updated = await repos.organizations.update(req.orgId!, {
-      name,
-      timeZone,
-      slug,
-    });
+      const { name, timeZone, slug } = parse.data;
 
-    await repos.auditLog.write(req.orgId!, {
-      actorId: req.auth!.user.id,
-      actorType: 'user',
-      action: 'org.updated',
-      targetType: 'organization',
-      targetId: req.org!.id,
-      ip: req.ip,
-      userAgent: req.headers['user-agent'],
-      data: { changes: parse.data },
-    });
+      if (slug) {
+        const isAvailable = await repos.organizations.isSlugAvailable(slug, req.org!.id);
+        if (!isAvailable) {
+          res.status(409).json({
+            error: {
+              code: ErrorCode.CONFLICT,
+              message: 'This organisation slug is already taken.',
+              details: { slug },
+            },
+          });
+          return;
+        }
+      }
 
-    res.status(200).json({ data: { org: updated } });
-  });
+      const updated = await repos.organizations.update(req.orgId!, {
+        name,
+        timeZone,
+        slug,
+      });
+
+      await repos.auditLog.write(req.orgId!, {
+        actorId: req.auth!.user.id,
+        actorType: 'user',
+        action: 'org.updated',
+        targetType: 'organization',
+        targetId: req.org!.id,
+        ip: req.ip,
+        userAgent: req.headers['user-agent'],
+        data: { changes: parse.data },
+      });
+
+      res.status(200).json({ data: { org: updated } });
+    },
+  );
 
   // DELETE /v1/orgs/:orgId - Soft delete org (O)
-  orgScoped.delete('/', requireOrgRole('owner'), async (req: Request, res: Response): Promise<void> => {
-    const body = (typeof req.body === 'object' && req.body !== null ? req.body : {}) as Record<string, unknown>;
-    const confirmName = typeof body.confirmName === 'string' ? body.confirmName : undefined;
-    if (confirmName !== req.org!.name) {
-      res.status(400).json({
-        error: {
-          code: ErrorCode.VALIDATION_ERROR,
-          message: 'Please enter the exact organisation name to confirm deletion.',
-          details: { expected: req.org!.name },
-        },
+  orgScoped.delete(
+    '/',
+    requireOrgRole('owner'),
+    async (req: Request, res: Response): Promise<void> => {
+      const body = (typeof req.body === 'object' && req.body !== null ? req.body : {}) as Record<
+        string,
+        unknown
+      >;
+      const confirmName = typeof body.confirmName === 'string' ? body.confirmName : undefined;
+      if (confirmName !== req.org!.name) {
+        res.status(400).json({
+          error: {
+            code: ErrorCode.VALIDATION_ERROR,
+            message: 'Please enter the exact organisation name to confirm deletion.',
+            details: { expected: req.org!.name },
+          },
+        });
+        return;
+      }
+
+      await repos.organizations.softDelete(req.orgId!);
+
+      await repos.auditLog.write(req.orgId!, {
+        actorId: req.auth!.user.id,
+        actorType: 'user',
+        action: 'org.deleted',
+        targetType: 'organization',
+        targetId: req.org!.id,
+        ip: req.ip,
+        userAgent: req.headers['user-agent'],
+        data: { name: req.org!.name },
       });
-      return;
-    }
 
-    await repos.organizations.softDelete(req.orgId!);
-
-    await repos.auditLog.write(req.orgId!, {
-      actorId: req.auth!.user.id,
-      actorType: 'user',
-      action: 'org.deleted',
-      targetType: 'organization',
-      targetId: req.org!.id,
-      ip: req.ip,
-      userAgent: req.headers['user-agent'],
-      data: { name: req.org!.name },
-    });
-
-    res.status(200).json({
-      data: { success: true, message: 'Organisation has been deleted.' },
-    });
-  });
+      res.status(200).json({
+        data: { success: true, message: 'Organisation has been deleted.' },
+      });
+    },
+  );
 
   // POST /v1/orgs/:orgId/transfer-ownership - Transfer ownership to existing member (O)
   orgScoped.post(
@@ -310,6 +322,18 @@ export function orgsRouter(
     '/invitations',
     requireOrgRole('admin'),
     async (req: Request, res: Response): Promise<void> => {
+      // P2-02: unverified users can use the app but cannot invite others.
+      if (!req.auth!.user.emailVerified) {
+        res.status(403).json({
+          error: {
+            code: ErrorCode.EMAIL_NOT_VERIFIED,
+            message: 'Verify your email address before inviting others.',
+            details: {},
+          },
+        });
+        return;
+      }
+
       const parse = createInvitationSchema.safeParse(req.body);
       if (!parse.success) {
         res.status(400).json({
@@ -559,7 +583,8 @@ export function orgsRouter(
         res.status(400).json({
           error: {
             code: ErrorCode.VALIDATION_ERROR,
-            message: 'Cannot change the role of the organisation owner. Transfer ownership instead.',
+            message:
+              'Cannot change the role of the organisation owner. Transfer ownership instead.',
             details: {},
           },
         });

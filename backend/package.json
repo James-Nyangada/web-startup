@@ -24,6 +24,7 @@
   },
   "type": "module",
   "dependencies": {
+    "@aws-sdk/client-s3": "3.1146.0",
     "@axe-core/playwright": "4.14.0",
     "@sentry/node": "^11.8.0",
     "axe-core": "4.14.0",

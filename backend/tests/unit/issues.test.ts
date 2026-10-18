@@ -27,18 +27,20 @@ function createMockAuth(userId: string) {
   };
 
   const api = {
-    getSession: vi.fn(({ headers }: { headers?: Headers | Record<string, string | string[] | undefined> }) => {
-      let cookie: string | null = null;
-      if (headers instanceof Headers) {
-        cookie = headers.get('cookie');
-      } else if (headers && typeof headers === 'object' && 'cookie' in headers) {
-        cookie = (headers.cookie as string) ?? null;
-      }
-      if (cookie && cookie.includes(`token-${userId}`)) {
-        return Promise.resolve({ user: mockUser, session: mockSession });
-      }
-      return Promise.resolve(null);
-    }),
+    getSession: vi.fn(
+      ({ headers }: { headers?: Headers | Record<string, string | string[] | undefined> }) => {
+        let cookie: string | null = null;
+        if (headers instanceof Headers) {
+          cookie = headers.get('cookie');
+        } else if (headers && typeof headers === 'object' && 'cookie' in headers) {
+          cookie = (headers.cookie as string) ?? null;
+        }
+        if (cookie && cookie.includes(`token-${userId}`)) {
+          return Promise.resolve({ user: mockUser, session: mockSession });
+        }
+        return Promise.resolve(null);
+      },
+    ),
   };
 
   return { api, mockUser, mockSession } as unknown as Auth & {
@@ -103,7 +105,8 @@ describe('Issues API (Chunk P2-12, Screen S-25, Section 7.5)', () => {
     fingerprint: 'fp-color-contrast-1',
     ruleId: 'color-contrast',
     title: 'Elements must have sufficient color contrast',
-    description: 'Ensures the contrast between foreground and background colors meets WCAG 2 AA thresholds',
+    description:
+      'Ensures the contrast between foreground and background colors meets WCAG 2 AA thresholds',
     impact: 'serious' as const,
     wcagCriteria: ['1.4.3'],
     wcagLevel: 'AA' as const,
@@ -153,7 +156,13 @@ describe('Issues API (Chunk P2-12, Screen S-25, Section 7.5)', () => {
     vi.mocked(repos.memberships.find).mockImplementation((oid: string, uid: string) =>
       Promise.resolve(
         oid === orgId && uid === userId
-          ? ({ orgId, userId, role: 'member', createdAt: new Date(), updatedAt: new Date() } as never)
+          ? ({
+              orgId,
+              userId,
+              role: 'member',
+              createdAt: new Date(),
+              updatedAt: new Date(),
+            } as never)
           : null,
       ),
     );
@@ -392,7 +401,8 @@ describe('Issues API (Chunk P2-12, Screen S-25, Section 7.5)', () => {
       fingerprint: 'fp-1',
       ruleId: 'color-contrast',
       title: 'Elements must have sufficient color contrast',
-      description: 'Ensures the contrast between foreground and background colors meets WCAG 2 AA minimum contrast thresholds',
+      description:
+        'Ensures the contrast between foreground and background colors meets WCAG 2 AA minimum contrast thresholds',
       whoIsAffected: 'People with low vision',
       helpUrl: 'https://dequeuniversity.com/rules/axe/4.14/color-contrast',
       impact: 'serious' as const,
@@ -401,7 +411,8 @@ describe('Issues API (Chunk P2-12, Screen S-25, Section 7.5)', () => {
       templateKey: 'product',
       selector: '.product-card button',
       htmlSnippet: '<button class="bg-gray text-white">Buy</button>',
-      failureSummary: 'Fix any of the following: Element has insufficient color contrast of 2.8:1 (foreground color: #ffffff, background color: #aaaaaa, font size: 12.0pt (16px), font weight: normal). Expected contrast ratio of 4.5:1',
+      failureSummary:
+        'Fix any of the following: Element has insufficient color contrast of 2.8:1 (foreground color: #ffffff, background color: #aaaaaa, font size: 12.0pt (16px), font weight: normal). Expected contrast ratio of 4.5:1',
       status: 'open' as const,
       ignoredReason: null,
       ignoredNote: null,
@@ -484,11 +495,10 @@ describe('Issues API (Chunk P2-12, Screen S-25, Section 7.5)', () => {
         expect(res.body.data.total).toBe(2);
         expect(res.body.data.page).toBe(1);
         expect(res.body.data.totalPages).toBe(1);
-        expect(repos.issues.listOccurrences).toHaveBeenCalledWith(
-          orgId,
-          'issue-1',
-          { limit: 10, offset: 0 },
-        );
+        expect(repos.issues.listOccurrences).toHaveBeenCalledWith(orgId, 'issue-1', {
+          limit: 10,
+          offset: 0,
+        });
       });
 
       it('returns 404 when issue not found', async () => {
@@ -873,8 +883,9 @@ describe('Issues API (Chunk P2-12, Screen S-25, Section 7.5)', () => {
       });
 
       it('rejects more than 200 issues in bulk action', async () => {
-        const tooManyIds = Array.from({ length: 201 }, (_, i) =>
-          `00000000-0000-4000-a000-${String(i).padStart(12, '0')}`,
+        const tooManyIds = Array.from(
+          { length: 201 },
+          (_, i) => `00000000-0000-4000-a000-${String(i).padStart(12, '0')}`,
         );
 
         const res = await request(app)
@@ -907,7 +918,8 @@ describe('Issues API (Chunk P2-12, Screen S-25, Section 7.5)', () => {
             templateKey: 'product',
             selector: 'div.product-card > h2',
             htmlSnippet: '<h2 class="title">"Discount" item</h2>',
-            failureSummary: 'Fix any of the following:\n  Element has insufficient color contrast of 2.5:1',
+            failureSummary:
+              'Fix any of the following:\n  Element has insufficient color contrast of 2.5:1',
             status: 'open',
             ignoredReason: null,
             ignoredNote: null,
@@ -989,4 +1001,3 @@ describe('Issues API (Chunk P2-12, Screen S-25, Section 7.5)', () => {
     });
   });
 });
-

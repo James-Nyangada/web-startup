@@ -25,7 +25,9 @@ describe('Worker & Queue Engine (Chunk P2-08)', () => {
   const siteId = 'site-11111111-1111-4111-a111-111111111111';
   const scanId = 'scan-11111111-1111-4111-a111-111111111111';
 
-  function createTestScan(overrides: Partial<typeof scans.$inferSelect> = {}): typeof scans.$inferSelect {
+  function createTestScan(
+    overrides: Partial<typeof scans.$inferSelect> = {},
+  ): typeof scans.$inferSelect {
     return {
       id: scanId,
       orgId,
@@ -83,7 +85,9 @@ describe('Worker & Queue Engine (Chunk P2-08)', () => {
           rawKey: null,
           standard: 'wcag22aa',
         }),
-        updateRaw: vi.fn().mockImplementation((_id, data) => Promise.resolve({ id: scanId, ...data })),
+        updateRaw: vi
+          .fn()
+          .mockImplementation((_id, data) => Promise.resolve({ id: scanId, ...data })),
         markFailed: vi.fn().mockResolvedValue({ id: scanId, status: 'failed' }),
         requeueInterrupted: vi.fn().mockResolvedValue({ id: scanId, status: 'queued' }),
         findInterruptedScans: vi.fn().mockResolvedValue([]),
@@ -140,15 +144,41 @@ describe('Worker & Queue Engine (Chunk P2-08)', () => {
       },
       issues: {
         listForDiff: vi.fn().mockResolvedValue([]),
-        applyScanDiff: vi.fn().mockResolvedValue({ createdCount: 1, fixedCount: 0, regressedCount: 0 }),
+        applyScanDiff: vi
+          .fn()
+          .mockResolvedValue({ createdCount: 1, fixedCount: 0, regressedCount: 0 }),
         listBySite: vi.fn().mockResolvedValue([]),
         countBySite: vi.fn().mockResolvedValue(0),
         findById: vi.fn(),
       },
       auditLog: { write: vi.fn(), list: vi.fn() },
-      memberships: { list: vi.fn(), findRole: vi.fn(), add: vi.fn(), find: vi.fn(), updateRole: vi.fn(), remove: vi.fn() },
-      organizations: { create: vi.fn(), findById: vi.fn(), findBySlug: vi.fn(), findByIdOrSlug: vi.fn(), update: vi.fn(), softDelete: vi.fn(), isSlugAvailable: vi.fn(), createWithInitialOwner: vi.fn() },
-      users: { findById: vi.fn(), findByEmail: vi.fn(), update: vi.fn(), listMemberships: vi.fn(), listClientAccess: vi.fn(), isSoleOwnerOfActiveOrg: vi.fn(), softDelete: vi.fn() },
+      memberships: {
+        list: vi.fn(),
+        findRole: vi.fn(),
+        add: vi.fn(),
+        find: vi.fn(),
+        updateRole: vi.fn(),
+        remove: vi.fn(),
+      },
+      organizations: {
+        create: vi.fn(),
+        findById: vi.fn(),
+        findBySlug: vi.fn(),
+        findByIdOrSlug: vi.fn(),
+        update: vi.fn(),
+        softDelete: vi.fn(),
+        isSlugAvailable: vi.fn(),
+        createWithInitialOwner: vi.fn(),
+      },
+      users: {
+        findById: vi.fn(),
+        findByEmail: vi.fn(),
+        update: vi.fn(),
+        listMemberships: vi.fn(),
+        listClientAccess: vi.fn(),
+        isSoleOwnerOfActiveOrg: vi.fn(),
+        softDelete: vi.fn(),
+      },
       waitlist: { join: vi.fn() },
     } as unknown as Repositories;
   });
@@ -211,19 +241,26 @@ describe('Worker & Queue Engine (Chunk P2-08)', () => {
   });
 
   describe('scan.process job & Section 6.7 status machine', () => {
-    function createMockScanResult(options: {
-      urls?: string[];
-      violations?: Array<{ ruleId: string; target: string; impact?: 'critical' | 'serious' | 'moderate' | 'minor' }>;
-      pagesFailed?: number;
-    } = {}): ScanResult {
+    function createMockScanResult(
+      options: {
+        urls?: string[];
+        violations?: Array<{
+          ruleId: string;
+          target: string;
+          impact?: 'critical' | 'serious' | 'moderate' | 'minor';
+        }>;
+        pagesFailed?: number;
+      } = {},
+    ): ScanResult {
       const urls = options.urls ?? ['https://example.com', 'https://example.com/about'];
       const pageResults = urls.map((url, idx) => {
         const isFailed = idx < (options.pagesFailed ?? 0);
         const v0 = options.violations?.[0];
-        const violations = v0 && !isFailed
-          ? [rule(v0.ruleId, [v0.target], v0.impact)]
-          : [];
-        return page(url, 'home', violations, { status: isFailed ? 'http_error' : 'ok', httpStatus: isFailed ? 500 : 200 });
+        const violations = v0 && !isFailed ? [rule(v0.ruleId, [v0.target], v0.impact)] : [];
+        return page(url, 'home', violations, {
+          status: isFailed ? 'http_error' : 'ok',
+          httpStatus: isFailed ? 500 : 200,
+        });
       });
 
       const foundIssues = groupIssues(pageResults);
@@ -234,7 +271,8 @@ describe('Worker & Queue Engine (Chunk P2-08)', () => {
         standard: 'wcag22aa',
         rootUrl: 'https://example.com',
         platform: 'custom',
-        status: options.pagesFailed && options.pagesFailed > urls.length / 2 ? 'partial' : 'completed',
+        status:
+          options.pagesFailed && options.pagesFailed > urls.length / 2 ? 'partial' : 'completed',
         startedAt: new Date().toISOString(),
         finishedAt: new Date().toISOString(),
         pagesDiscovered: urls.length,
@@ -462,7 +500,9 @@ describe('Worker & Queue Engine (Chunk P2-08)', () => {
         expect.objectContaining({
           partial: true,
           fixed: [],
-          unchecked: expect.arrayContaining([expect.objectContaining({ fingerprint: 'prev-fp-123' })]),
+          unchecked: expect.arrayContaining([
+            expect.objectContaining({ fingerprint: 'prev-fp-123' }),
+          ]),
         }),
         expect.any(Array),
         expect.any(Map),
@@ -491,7 +531,11 @@ describe('Worker & Queue Engine (Chunk P2-08)', () => {
       vi.mocked(mockRepos.scans.findInterruptedScans).mockResolvedValueOnce([
         createTestScan({ id: 'scan-interrupted-1', status: 'discovering', rawKey: null }),
         createTestScan({ id: 'scan-interrupted-2', status: 'scanning', rawKey: null }),
-        createTestScan({ id: 'scan-interrupted-3', status: 'processing', rawKey: 'scans/raw.json' }),
+        createTestScan({
+          id: 'scan-interrupted-3',
+          status: 'processing',
+          rawKey: 'scans/raw.json',
+        }),
       ]);
 
       const count = await recoverInterruptedScans(mockRepos, mockBoss as unknown as PgBoss);
@@ -501,7 +545,9 @@ describe('Worker & Queue Engine (Chunk P2-08)', () => {
       expect(mockRepos.scans.requeueInterrupted).toHaveBeenCalledWith('scan-interrupted-2');
       expect(mockBoss.send).toHaveBeenCalledWith(QUEUE_SCAN_RUN, { scanId: 'scan-interrupted-1' });
       expect(mockBoss.send).toHaveBeenCalledWith(QUEUE_SCAN_RUN, { scanId: 'scan-interrupted-2' });
-      expect(mockBoss.send).toHaveBeenCalledWith(QUEUE_SCAN_PROCESS, { scanId: 'scan-interrupted-3' });
+      expect(mockBoss.send).toHaveBeenCalledWith(QUEUE_SCAN_PROCESS, {
+        scanId: 'scan-interrupted-3',
+      });
     });
   });
 

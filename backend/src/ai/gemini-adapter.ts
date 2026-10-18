@@ -7,6 +7,11 @@ export interface GeminiAdapterOptions {
   mockMode?: boolean;
 }
 
+interface GeminiResponse {
+  candidates?: { content?: { parts?: { text?: string }[] } }[];
+  usageMetadata?: { promptTokenCount?: number; candidatesTokenCount?: number };
+}
+
 export class GeminiAdapter implements AiProvider {
   private readonly apiKey?: string;
   private readonly model: string;
@@ -57,7 +62,7 @@ export class GeminiAdapter implements AiProvider {
         throw new Error(`Gemini API error (HTTP ${res.status}): ${errorText}`);
       }
 
-      const data = (await res.json()) as any;
+      const data = (await res.json()) as GeminiResponse;
       const candidate = data.candidates?.[0];
       const text = candidate?.content?.parts?.[0]?.text ?? '';
       const tokensIn = data.usageMetadata?.promptTokenCount ?? Math.ceil(prompt.length / 4);
@@ -76,7 +81,10 @@ export class GeminiAdapter implements AiProvider {
     }
   }
 
-  private generateMockResponse(request: AiSuggestionRequest, scrubbed: string): AiSuggestionResponse {
+  private generateMockResponse(
+    request: AiSuggestionRequest,
+    scrubbed: string,
+  ): AiSuggestionResponse {
     const rule = request.ruleId.toLowerCase();
     const platform = request.platform.toLowerCase();
     let lang = 'html';
@@ -84,7 +92,7 @@ export class GeminiAdapter implements AiProvider {
     else if (platform === 'wordpress') lang = 'html';
 
     let codeFix = scrubbed;
-    let explanation = 'Add missing accessibility attributes to satisfy WCAG 2.2 AA requirements.';
+    let explanation: string;
 
     if (rule.includes('image-alt') || rule.includes('alt')) {
       if (codeFix.includes('alt=')) {
@@ -92,26 +100,36 @@ export class GeminiAdapter implements AiProvider {
       } else {
         codeFix = codeFix.replace(/<img\b/i, '<img alt="Descriptive text for this image"');
       }
-      explanation = 'Add a meaningful, descriptive `alt` attribute describing the content and context of the image.';
+      explanation =
+        'Add a meaningful, descriptive `alt` attribute describing the content and context of the image.';
     } else if (rule.includes('color-contrast')) {
       codeFix = codeFix.replace(/(style=(["']))/i, '$1color: #111827; background-color: #ffffff; ');
       if (!codeFix.includes('style=')) {
-        codeFix = codeFix.replace(/<([a-z0-9]+)\b/i, '<$1 style="color: #111827; background-color: #ffffff;"');
+        codeFix = codeFix.replace(
+          /<([a-z0-9]+)\b/i,
+          '<$1 style="color: #111827; background-color: #ffffff;"',
+        );
       }
-      explanation = 'Increase the contrast ratio between foreground text and background to at least 4.5:1 for normal text.';
+      explanation =
+        'Increase the contrast ratio between foreground text and background to at least 4.5:1 for normal text.';
     } else if (rule.includes('button-name') || rule.includes('link-name')) {
       if (codeFix.includes('aria-label=')) {
         codeFix = codeFix.replace(/aria-label=(["']).*?\1/i, 'aria-label="Action description"');
       } else {
         codeFix = codeFix.replace(/<(button|a)\b/i, '<$1 aria-label="Action description"');
       }
-      explanation = 'Provide an accessible name using an `aria-label` or visible text content so screen reader users understand the target or action.';
+      explanation =
+        'Provide an accessible name using an `aria-label` or visible text content so screen reader users understand the target or action.';
     } else if (rule.includes('label')) {
-      codeFix = `<label for="field-id">Field Label</label>\n` + codeFix.replace(/<input\b/i, '<input id="field-id"');
-      explanation = 'Explicitly associate an accessible `<label>` element with the input via matching `for` and `id` attributes.';
+      codeFix =
+        `<label for="field-id">Field Label</label>\n` +
+        codeFix.replace(/<input\b/i, '<input id="field-id"');
+      explanation =
+        'Explicitly associate an accessible `<label>` element with the input via matching `for` and `id` attributes.';
     } else {
       codeFix = codeFix.replace(/<([a-z0-9]+)\b/i, '<$1 aria-label="Accessible element"');
-      explanation = 'Ensure this interactive element has an accessible name and valid semantic role.';
+      explanation =
+        'Ensure this interactive element has an accessible name and valid semantic role.';
     }
 
     const markdown = `${explanation}\n\n\`\`\`${lang}\n${codeFix}\n\`\`\``;

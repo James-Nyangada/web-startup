@@ -7,10 +7,7 @@ import type { Repositories } from '../../src/db/repositories/index.js';
 import type { OrgId } from '../../src/db/repositories/org-scope.js';
 import { ErrorCode } from '../../src/shared/errors.js';
 import { buildTestApp } from '../helpers/fakes.js';
-import {
-  computeNextScanAt,
-  getZonedParts,
-} from '../../src/lib/schedule.js';
+import { computeNextScanAt, getZonedParts } from '../../src/lib/schedule.js';
 import { handleScanSchedule } from '../../src/worker/jobs/scan-schedule.js';
 import type { WorkerContext } from '../../src/worker/types.js';
 import type { scans, sites } from '../../src/db/schema/index.js';
@@ -34,18 +31,20 @@ function createMockAuth(userId: string) {
     updatedAt: new Date(),
   };
   const api = {
-    getSession: vi.fn(({ headers }: { headers?: Headers | Record<string, string | string[] | undefined> }) => {
-      let cookie: string | null = null;
-      if (headers instanceof Headers) {
-        cookie = headers.get('cookie');
-      } else if (headers && typeof headers === 'object' && 'cookie' in headers) {
-        cookie = (headers.cookie as string) ?? null;
-      }
-      if (cookie && cookie.includes(`token-${userId}`)) {
-        return Promise.resolve({ user: mockUser, session: mockSession });
-      }
-      return Promise.resolve(null);
-    }),
+    getSession: vi.fn(
+      ({ headers }: { headers?: Headers | Record<string, string | string[] | undefined> }) => {
+        let cookie: string | null = null;
+        if (headers instanceof Headers) {
+          cookie = headers.get('cookie');
+        } else if (headers && typeof headers === 'object' && 'cookie' in headers) {
+          cookie = (headers.cookie as string) ?? null;
+        }
+        if (cookie && cookie.includes(`token-${userId}`)) {
+          return Promise.resolve({ user: mockUser, session: mockSession });
+        }
+        return Promise.resolve(null);
+      },
+    ),
   };
   return {
     mockUser,
@@ -64,6 +63,7 @@ describe('Scheduling and Manual Scans (Chunk P2-09)', () => {
     id: orgId,
     name: 'Brightline Studio',
     slug: 'brightline',
+    type: 'agency' as const,
     plan: 'trial' as const,
     billingStatus: 'active' as const,
     timeZone: 'Europe/London',

@@ -54,6 +54,9 @@ const ALL_APP_TABLES = [
   'reports',
   'notification_preferences',
   'in_app_notifications',
+  'ai_suggestions',
+  'ai_usage',
+  'free_checks',
 ];
 
 describe.skipIf(!url)('database (integration)', () => {
@@ -204,6 +207,80 @@ describe.skipIf(!url)('database (integration)', () => {
     expect(scan?.id).toBeDefined();
     expect(page?.id).toBeDefined();
     expect(issue?.id).toBeDefined();
+  });
+
+  it('site summaries count open issues and the last two scans per site', async () => {
+    const [org] = await db
+      .select()
+      .from(organizations)
+      .where(eq(organizations.slug, 'demo-agency'));
+    const orgId = asOrgId(org!.id);
+    const [site] = await db
+      .insert(sites)
+      .values({
+        orgId: org!.id,
+        name: 'Summary Store',
+        rootUrl: 'https://summary.example.com',
+        verifyToken: 'summary-token',
+      })
+      .returning();
+    const base = {
+      orgId: org!.id,
+      siteId: site!.id,
+      wcagCriteria: ['1.1.1'],
+      wcagLevel: 'A' as const,
+      templateKey: 'home',
+      selector: 'img',
+      ruleId: 'image-alt',
+    };
+    await db.insert(issues).values([
+      { ...base, fingerprint: 's-1', impact: 'critical' },
+      { ...base, fingerprint: 's-2', impact: 'critical', isRegression: true },
+      { ...base, fingerprint: 's-3', impact: 'serious' },
+      { ...base, fingerprint: 's-4', impact: 'critical', status: 'fixed' },
+    ]);
+    const day = (n: number) => new Date(Date.UTC(2026, 9, n));
+    await db.insert(scans).values([
+      {
+        orgId: org!.id,
+        siteId: site!.id,
+        trigger: 'manual',
+        standard: 'wcag22aa',
+        status: 'completed',
+        score: 60,
+        queuedAt: day(1),
+        finishedAt: day(1),
+      },
+      {
+        orgId: org!.id,
+        siteId: site!.id,
+        trigger: 'manual',
+        standard: 'wcag22aa',
+        status: 'completed',
+        score: 70,
+        queuedAt: day(2),
+        finishedAt: day(2),
+      },
+      {
+        orgId: org!.id,
+        siteId: site!.id,
+        trigger: 'manual',
+        standard: 'wcag22aa',
+        status: 'failed',
+        queuedAt: day(3),
+        errorMessage: 'Site returned 503',
+      },
+    ]);
+
+    const summaries = await createRepositories(db).sites.listSummaries(orgId, [site!.id]);
+    expect(summaries.get(site!.id)).toMatchObject({
+      openCritical: 2,
+      openSerious: 1,
+      regressions: 1,
+      lastScanStatus: 'failed',
+      lastScanError: 'Site returned 503',
+      previousScore: 60,
+    });
   });
 
   it('audit_log is append-only', async () => {

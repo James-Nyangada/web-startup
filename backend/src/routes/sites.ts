@@ -133,129 +133,139 @@ export function orgSitesRouter(repos: Repositories): Router {
   const router = Router();
 
   // GET /v1/orgs/:orgId/sites - List sites (O A M)
-  router.get(
-    '/',
-    requireOrgRole('member'),
-    async (req: Request, res: Response): Promise<void> => {
-      const { status, platform, client, q, sort } = req.query;
+  router.get('/', requireOrgRole('member'), async (req: Request, res: Response): Promise<void> => {
+    const { status, platform, client, q, sort } = req.query;
 
-      const sitesList = await repos.sites.list(req.orgId!, {
-        status: typeof status === 'string' ? (status as SiteStatus) : undefined,
-        platform: typeof platform === 'string' ? (platform as Platform) : undefined,
-        client: typeof client === 'string' ? client : undefined,
-        q: typeof q === 'string' ? q : undefined,
-        sort: typeof sort === 'string' ? (sort as 'score' | 'name' | 'lastScan' | 'openCritical') : undefined,
-      });
+    const sitesList = await repos.sites.list(req.orgId!, {
+      status: typeof status === 'string' ? (status as SiteStatus) : undefined,
+      platform: typeof platform === 'string' ? (platform as Platform) : undefined,
+      client: typeof client === 'string' ? client : undefined,
+      q: typeof q === 'string' ? q : undefined,
+      sort:
+        typeof sort === 'string'
+          ? (sort as 'score' | 'name' | 'lastScan' | 'openCritical')
+          : undefined,
+    });
 
-      res.status(200).json({ data: { sites: sitesList } });
-    },
-  );
+    const summaries = await repos.sites.listSummaries(
+      req.orgId!,
+      sitesList.map((site) => site.id),
+    );
+    const withSummaries = sitesList.map(({ verifyToken: _verifyToken, ...site }) => ({
+      ...site,
+      ...summaries.get(site.id),
+    }));
+    if (sort === 'openCritical') {
+      withSummaries.sort(
+        (a, b) =>
+          (b.openCritical ?? 0) - (a.openCritical ?? 0) || (a.score ?? 101) - (b.score ?? 101),
+      );
+    }
+
+    res.status(200).json({ data: { sites: withSummaries } });
+  });
 
   // POST /v1/orgs/:orgId/sites - Add site (O A M)
-  router.post(
-    '/',
-    requireOrgRole('member'),
-    async (req: Request, res: Response): Promise<void> => {
-      const parse = createSiteSchema.safeParse(req.body);
-      if (!parse.success) {
-        res.status(400).json({
-          error: {
-            code: ErrorCode.VALIDATION_ERROR,
-            message: 'Invalid site payload.',
-            details: { issues: parse.error.issues },
-          },
-        });
-        return;
-      }
-
-      const { name, rootUrl, platform, clientName } = parse.data;
-
-      // Normalization requirement: `https://www.example.com/shop?x=1` stores `https://www.example.com`
-      const normalizedRoot = rootUrlOf(rootUrl);
-      if (!normalizedRoot) {
-        res.status(400).json({
-          error: {
-            code: ErrorCode.VALIDATION_ERROR,
-            message: 'Invalid site URL. Please enter a valid http(s) address.',
-            details: {},
-          },
-        });
-        return;
-      }
-
-      // Duplicate detection within org
-      const duplicate = await repos.sites.findByRootUrl(req.orgId!, normalizedRoot);
-      if (duplicate) {
-        res.status(409).json({
-          error: {
-            code: ErrorCode.DUPLICATE_SITE,
-            message: `A site with root URL "${normalizedRoot}" already exists in this organisation.`,
-            details: { existingSiteId: duplicate.id },
-          },
-        });
-        return;
-      }
-
-      // Plan limit check stub
-      const currentCount = await repos.sites.count(req.orgId!);
-      if (currentCount >= DEFAULT_SITE_LIMIT) {
-        res.status(422).json({
-          error: {
-            code: ErrorCode.PLAN_LIMIT,
-            message: `You have reached your plan limit of ${DEFAULT_SITE_LIMIT} monitored sites.`,
-            details: {
-              limit: DEFAULT_SITE_LIMIT,
-              current: currentCount,
-              upgradeTo: 'agency_plus',
-            },
-          },
-        });
-        return;
-      }
-
-      // Auto-detect platform if omitted or unknown
-      let finalPlatform: Platform = platform ?? 'unknown';
-      if (finalPlatform === 'unknown') {
-        try {
-          const probe = await guardedFetch(normalizedRoot);
-          const detected = detectPlatform({
-            html: probe.text(),
-            headers: probe.headers,
-          });
-          finalPlatform = detected.platform;
-        } catch {
-          // Keep as unknown
-        }
-      }
-
-      const org = await repos.organizations.findById(req.orgId!);
-      const site = await repos.sites.create(req.orgId!, {
-        name,
-        rootUrl: normalizedRoot,
-        platform: finalPlatform,
-        clientName: clientName ?? null,
-        timeZone: org?.timeZone ?? 'UTC',
+  router.post('/', requireOrgRole('member'), async (req: Request, res: Response): Promise<void> => {
+    const parse = createSiteSchema.safeParse(req.body);
+    if (!parse.success) {
+      res.status(400).json({
+        error: {
+          code: ErrorCode.VALIDATION_ERROR,
+          message: 'Invalid site payload.',
+          details: { issues: parse.error.issues },
+        },
       });
+      return;
+    }
 
-      if (parse.data.freeCheckId) {
-        await repos.freeChecks.markConverted(parse.data.freeCheckId, req.orgId!);
-      }
+    const { name, rootUrl, platform, clientName } = parse.data;
 
-      // Audit log
-      await repos.auditLog.write(req.orgId!, {
-        actorId: req.auth!.user.id,
-        actorType: 'user',
-        action: 'site.created',
-        targetId: site.id,
-        targetType: 'site',
-        data: { name: site.name, rootUrl: site.rootUrl, platform: site.platform },
-        ip: req.ip ?? null,
-        userAgent: req.get('user-agent') ?? null,
+    // Normalization requirement: `https://www.example.com/shop?x=1` stores `https://www.example.com`
+    const normalizedRoot = rootUrlOf(rootUrl);
+    if (!normalizedRoot) {
+      res.status(400).json({
+        error: {
+          code: ErrorCode.VALIDATION_ERROR,
+          message: 'Invalid site URL. Please enter a valid http(s) address.',
+          details: {},
+        },
       });
+      return;
+    }
 
-      res.status(201).json({ data: { site } });
-    },
-  );
+    // Duplicate detection within org
+    const duplicate = await repos.sites.findByRootUrl(req.orgId!, normalizedRoot);
+    if (duplicate) {
+      res.status(409).json({
+        error: {
+          code: ErrorCode.DUPLICATE_SITE,
+          message: `A site with root URL "${normalizedRoot}" already exists in this organisation.`,
+          details: { existingSiteId: duplicate.id },
+        },
+      });
+      return;
+    }
+
+    // Plan limit check stub
+    const currentCount = await repos.sites.count(req.orgId!);
+    if (currentCount >= DEFAULT_SITE_LIMIT) {
+      res.status(422).json({
+        error: {
+          code: ErrorCode.PLAN_LIMIT,
+          message: `You have reached your plan limit of ${DEFAULT_SITE_LIMIT} monitored sites.`,
+          details: {
+            limit: DEFAULT_SITE_LIMIT,
+            current: currentCount,
+            upgradeTo: 'agency_plus',
+          },
+        },
+      });
+      return;
+    }
+
+    // Auto-detect platform if omitted or unknown
+    let finalPlatform: Platform = platform ?? 'unknown';
+    if (finalPlatform === 'unknown') {
+      try {
+        const probe = await guardedFetch(normalizedRoot);
+        const detected = detectPlatform({
+          html: probe.text(),
+          headers: probe.headers,
+        });
+        finalPlatform = detected.platform;
+      } catch {
+        // Keep as unknown
+      }
+    }
+
+    const org = await repos.organizations.findById(req.orgId!);
+    const site = await repos.sites.create(req.orgId!, {
+      name,
+      rootUrl: normalizedRoot,
+      platform: finalPlatform,
+      clientName: clientName ?? null,
+      timeZone: org?.timeZone ?? 'UTC',
+    });
+
+    if (parse.data.freeCheckId) {
+      await repos.freeChecks.markConverted(parse.data.freeCheckId, req.orgId!);
+    }
+
+    // Audit log
+    await repos.auditLog.write(req.orgId!, {
+      actorId: req.auth!.user.id,
+      actorType: 'user',
+      action: 'site.created',
+      targetId: site.id,
+      targetType: 'site',
+      data: { name: site.name, rootUrl: site.rootUrl, platform: site.platform },
+      ip: req.ip ?? null,
+      userAgent: req.get('user-agent') ?? null,
+    });
+
+    res.status(201).json({ data: { site } });
+  });
 
   // GET /v1/orgs/:orgId/sites/:siteId - Site detail + trend (O A M)
   router.get(
@@ -296,37 +306,19 @@ export function orgSitesRouter(repos: Repositories): Router {
       // Fetch last 12 completed or partial scans
       const trendScans = await repos.scans.listTrendScans(req.orgId!, siteId, 12);
 
-      let trend: TrendPoint[];
-      if (trendScans.length > 0) {
-        trend = trendScans.map((s) => {
-          const dateLabel = formatScanDate(s.finishedAt ?? s.queuedAt);
-          const score = s.score ?? 0;
-          const openProblems =
-            (s.counts as Record<string, unknown> | undefined)?.total as number ??
-            (s.counts as Record<string, unknown> | undefined)?.open as number ??
-            0;
-          const isPartial = s.status === 'partial';
-          return [dateLabel, score, openProblems, isPartial];
-        });
-      } else {
-        // Fallback for demo/unscanned sites
-        trend = [
-          ['5 Aug', 61, 24],
-          ['12 Aug', 63, 22],
-          ['19 Aug', 62, 23],
-          ['26 Aug', 66, 20],
-          ['2 Sep', 64, 21, true],
-          ['9 Sep', 68, 18],
-          ['16 Sep', 70, 17],
-          ['23 Sep', 69, 17],
-          ['30 Sep', 72, 15],
-          ['7 Oct', 74, 13],
-          ['12 Oct', 72, 14],
-          ['14 Oct', site.score ?? 78, 11],
-        ];
-      }
+      const trend: TrendPoint[] = trendScans.map((s) => {
+        const dateLabel = formatScanDate(s.finishedAt ?? s.queuedAt);
+        const score = s.score ?? 0;
+        const openProblems =
+          ((s.counts as Record<string, unknown> | undefined)?.total as number) ??
+          ((s.counts as Record<string, unknown> | undefined)?.open as number) ??
+          0;
+        const isPartial = s.status === 'partial';
+        return [dateLabel, score, openProblems, isPartial];
+      });
 
-      const trendSummary = computeTrendSummary(trend);
+      const trendSummary =
+        trend.length > 0 ? computeTrendSummary(trend) : 'No completed scans yet.';
 
       // Top 5 issues ordered by (impact × occurrences) DESC
       const topIssues = await repos.issues.listTopIssues(req.orgId!, siteId, 5);
@@ -402,6 +394,7 @@ export function orgSitesRouter(repos: Repositories): Router {
                 scanId: latestScan.id,
                 score: latestScan.score,
                 status: latestScan.status,
+                finishedAt: latestScan.finishedAt,
               }
             : null,
         },
@@ -677,14 +670,16 @@ export function orgSitesRouter(repos: Repositories): Router {
               host: '@ (or _plainsight)',
               value: txtRecord,
               token: site.verifyToken,
-              instructions: 'Add a TXT record on your apex domain or _plainsight subdomain with this value.',
+              instructions:
+                'Add a TXT record on your apex domain or _plainsight subdomain with this value.',
             },
             file: {
               name: 'File Upload',
               path: filePath,
               url: fileUrl,
               content: site.verifyToken,
-              instructions: 'Create a plain text file at /.well-known/plainsight-verify.txt containing only your token.',
+              instructions:
+                'Create a plain text file at /.well-known/plainsight-verify.txt containing only your token.',
             },
           },
         },
@@ -931,11 +926,7 @@ export function orgSitesRouter(repos: Repositories): Router {
         return;
       }
 
-      const preview = await repos.pages.previewExclusions(
-        req.orgId!,
-        siteId,
-        parse.data.patterns,
-      );
+      const preview = await repos.pages.previewExclusions(req.orgId!, siteId, parse.data.patterns);
 
       res.status(200).json({
         data: preview,

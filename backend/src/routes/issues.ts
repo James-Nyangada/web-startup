@@ -12,8 +12,16 @@ import { computeCacheKey, scrubHtmlSnippet } from '../ai/scrubber.js';
 
 const parseMulti = (val: unknown): string[] => {
   if (!val) return [];
-  if (Array.isArray(val)) return val.flatMap((v) => String(v).split(',')).map((s) => s.trim()).filter(Boolean);
-  if (typeof val === 'string') return val.split(',').map((s) => s.trim()).filter(Boolean);
+  if (Array.isArray(val))
+    return val
+      .flatMap((v) => String(v).split(','))
+      .map((s) => s.trim())
+      .filter(Boolean);
+  if (typeof val === 'string')
+    return val
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean);
   return [];
 };
 
@@ -21,6 +29,16 @@ export interface IssuesRouterOptions {
   boss?: PgBoss;
   enqueueRecheck?: (issueId: string) => Promise<void>;
   aiService?: AiService;
+}
+
+const aiRequestBodySchema = z
+  .object({ platform: z.string().optional(), cacheKey: z.string().optional() })
+  .catch({});
+
+function requestedPlatform(req: Request): string {
+  const body = aiRequestBodySchema.parse(req.body);
+  const query = typeof req.query.platform === 'string' ? req.query.platform : '';
+  return (body.platform || query).toLowerCase();
 }
 
 const issuesQuerySchema = z.object({
@@ -46,10 +64,7 @@ const issuesQuerySchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
 });
 
-export function orgIssuesRouter(
-  repos: Repositories,
-  options?: IssuesRouterOptions,
-): Router {
+export function orgIssuesRouter(repos: Repositories, options?: IssuesRouterOptions): Router {
   const router = Router();
 
   // GET /v1/orgs/:orgId/sites/:siteId/issues (S-25 Issues list, Section 7.5)
@@ -314,7 +329,7 @@ export function orgIssuesRouter(
       'Last Seen At',
     ];
 
-    const escapeCsv = (val: unknown): string => {
+    const escapeCsv = (val: string | number | null | undefined): string => {
       if (val === null || val === undefined) return '';
       const str = String(val);
       if (/[",\r\n]/.test(str)) {
@@ -332,7 +347,7 @@ export function orgIssuesRouter(
           row.ruleId,
           row.title,
           row.impact,
-          row.wcagCriteria ?? '',
+          row.wcagCriteria?.join(', ') ?? '',
           row.wcagLevel ?? '',
           row.templateKey,
           row.status,
@@ -355,7 +370,7 @@ export function orgIssuesRouter(
     }
 
     const csvContent = '\uFEFF' + csvLines.join('\r\n');
-    const safeSiteSlug = ((site as any).slug || site.name || 'site').toLowerCase().replace(/[^a-z0-9_-]+/g, '-');
+    const safeSiteSlug = (site.name || 'site').toLowerCase().replace(/[^a-z0-9_-]+/g, '-');
     const dateStamp = new Date().toISOString().split('T')[0];
     const filename = `issues-${safeSiteSlug}-${dateStamp}.csv`;
 
@@ -367,14 +382,14 @@ export function orgIssuesRouter(
   router.get('/sites/:siteId/issues/export.csv', requireOrgRole('member'), exportCsvHandler);
   router.get('/sites/:siteId/issues/export', requireOrgRole('member'), exportCsvHandler);
 
-
   // GET /v1/orgs/:orgId/issues - Cross-site issues (agency / my-tasks)
   router.get(
     '/issues',
     requireOrgRole('member'),
     async (req: Request, res: Response): Promise<void> => {
       const assigneeParam = req.query.assignee;
-      const assignee = assigneeParam === 'me' ? req.auth!.user.id : (assigneeParam as string | undefined);
+      const assignee =
+        assigneeParam === 'me' ? req.auth!.user.id : (assigneeParam as string | undefined);
       const siteId = req.query.siteId as string | undefined;
       const limit = Math.min(200, Math.max(1, Number(req.query.limit || 50)));
       const page = Math.max(1, Number(req.query.page || 1));
@@ -497,7 +512,11 @@ export function orgIssuesRouter(
   };
 
   router.get('/issues/:issueId/occurrences', requireOrgRole('member'), getOccurrencesHandler);
-  router.get('/sites/:siteId/issues/:issueId/occurrences', requireOrgRole('member'), getOccurrencesHandler);
+  router.get(
+    '/sites/:siteId/issues/:issueId/occurrences',
+    requireOrgRole('member'),
+    getOccurrencesHandler,
+  );
 
   // GET /v1/orgs/:orgId/issues/:issueId/events - Timeline from issue_events
   const getEventsHandler = async (req: Request, res: Response): Promise<void> => {
@@ -819,12 +838,7 @@ export function orgIssuesRouter(
       }
     }
 
-    const updated = await repos.issues.assign(
-      req.orgId!,
-      issueId,
-      req.auth!.user.id,
-      assigneeId,
-    );
+    const updated = await repos.issues.assign(req.orgId!, issueId, req.auth!.user.id, assigneeId);
 
     res.status(200).json({
       data: { issue: updated },
@@ -836,7 +850,10 @@ export function orgIssuesRouter(
 
   // PATCH /v1/orgs/:orgId/issues/:issueId/due-date - Set or clear due date
   const dueDateSchema = z.object({
-    dueDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Date must be formatted as YYYY-MM-DD').nullable(),
+    dueDate: z
+      .string()
+      .regex(/^\d{4}-\d{2}-\d{2}$/, 'Date must be formatted as YYYY-MM-DD')
+      .nullable(),
   });
 
   const dueDateHandler = async (req: Request, res: Response): Promise<void> => {
@@ -1014,21 +1031,38 @@ export function orgIssuesRouter(
   };
 
   router.patch('/issues/:issueId/notes/:noteId', requireOrgRole('member'), updateNoteHandler);
-  router.patch('/sites/:siteId/issues/:issueId/notes/:noteId', requireOrgRole('member'), updateNoteHandler);
+  router.patch(
+    '/sites/:siteId/issues/:issueId/notes/:noteId',
+    requireOrgRole('member'),
+    updateNoteHandler,
+  );
   router.delete('/issues/:issueId/notes/:noteId', requireOrgRole('member'), deleteNoteHandler);
-  router.delete('/sites/:siteId/issues/:issueId/notes/:noteId', requireOrgRole('member'), deleteNoteHandler);
+  router.delete(
+    '/sites/:siteId/issues/:issueId/notes/:noteId',
+    requireOrgRole('member'),
+    deleteNoteHandler,
+  );
 
   // POST /v1/orgs/:orgId/issues/bulk - Bulk actions (≤ 200)
   const bulkActionSchema = z
     .object({
-      issueIds: z.array(z.string().uuid()).min(1).max(200, 'Bulk action is limited to 200 issues at a time.'),
+      issueIds: z
+        .array(z.string().uuid())
+        .min(1)
+        .max(200, 'Bulk action is limited to 200 issues at a time.'),
       action: z.enum(['ignore', 'unignore', 'assign', 'set_due_date']),
       data: z
         .object({
-          reason: z.enum(['false_positive', 'not_applicable', 'wont_fix', 'accepted_risk']).optional(),
+          reason: z
+            .enum(['false_positive', 'not_applicable', 'wont_fix', 'accepted_risk'])
+            .optional(),
           note: z.string().trim().optional(),
           assigneeId: z.string().uuid().nullable().optional(),
-          dueDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(),
+          dueDate: z
+            .string()
+            .regex(/^\d{4}-\d{2}-\d{2}$/)
+            .nullable()
+            .optional(),
         })
         .optional(),
     })
@@ -1036,7 +1070,10 @@ export function orgIssuesRouter(
       (val) => {
         if (val.action === 'ignore') {
           if (!val.data?.reason) return false;
-          if ((val.data.reason === 'accepted_risk' || val.data.reason === 'wont_fix') && !val.data.note) {
+          if (
+            (val.data.reason === 'accepted_risk' || val.data.reason === 'wont_fix') &&
+            !val.data.note
+          ) {
             return false;
           }
         }
@@ -1142,8 +1179,14 @@ export function orgIssuesRouter(
     } else if (options?.boss) {
       jobId = await enqueueIssueRecheck(options.boss, issueId);
     } else {
-      await repos.issues.markFixed(req.orgId!, issueId, req.auth!.user.id);
-      jobId = `mock-recheck-${issueId}`;
+      res.status(503).json({
+        error: {
+          code: ErrorCode.INTERNAL_ERROR,
+          message: 'Recheck is unavailable because the job queue is not running.',
+          details: {},
+        },
+      });
+      return;
     }
 
     res.status(200).json({
@@ -1189,7 +1232,7 @@ export function orgIssuesRouter(
     }
 
     // Determine platform
-    let platform = (req.body?.platform || req.query.platform || '').toString().toLowerCase();
+    let platform = requestedPlatform(req);
     if (!platform && issue.siteId) {
       const site = await repos.sites.findById(req.orgId!, issue.siteId);
       if (site?.platform) {
@@ -1216,10 +1259,9 @@ export function orgIssuesRouter(
       res.status(200).json({
         data: result,
       });
-    } catch (err: any) {
-      if (err instanceof AiServiceError || err.code === 'PLAN_LIMIT' || err.code === 'FEATURE_DISABLED') {
-        const statusCode = err.statusCode || (err.code === 'PLAN_LIMIT' ? 422 : 403);
-        res.status(statusCode).json({
+    } catch (err) {
+      if (err instanceof AiServiceError) {
+        res.status(err.statusCode).json({
           error: {
             code: err.code,
             message: err.message,
@@ -1231,7 +1273,7 @@ export function orgIssuesRouter(
       res.status(500).json({
         error: {
           code: ErrorCode.INTERNAL_ERROR,
-          message: err.message || 'Failed to generate AI suggestion.',
+          message: err instanceof Error ? err.message : 'Failed to generate AI suggestion.',
           details: {},
         },
       });
@@ -1265,9 +1307,9 @@ export function orgIssuesRouter(
       return;
     }
 
-    let cacheKey = req.body?.cacheKey;
+    let cacheKey = aiRequestBodySchema.parse(req.body).cacheKey;
     if (!cacheKey) {
-      let platform = (req.body?.platform || req.query.platform || '').toString().toLowerCase();
+      let platform = requestedPlatform(req);
       if (!platform && issue.siteId) {
         const site = await repos.sites.findById(req.orgId!, issue.siteId);
         if (site?.platform) platform = site.platform;
@@ -1289,9 +1331,21 @@ export function orgIssuesRouter(
   };
 
   router.post('/issues/:issueId/ai-suggestion', requireOrgRole('member'), aiSuggestionHandler);
-  router.post('/sites/:siteId/issues/:issueId/ai-suggestion', requireOrgRole('member'), aiSuggestionHandler);
-  router.post('/issues/:issueId/ai-suggestion/report', requireOrgRole('member'), reportAiSuggestionHandler);
-  router.post('/sites/:siteId/issues/:issueId/ai-suggestion/report', requireOrgRole('member'), reportAiSuggestionHandler);
+  router.post(
+    '/sites/:siteId/issues/:issueId/ai-suggestion',
+    requireOrgRole('member'),
+    aiSuggestionHandler,
+  );
+  router.post(
+    '/issues/:issueId/ai-suggestion/report',
+    requireOrgRole('member'),
+    reportAiSuggestionHandler,
+  );
+  router.post(
+    '/sites/:siteId/issues/:issueId/ai-suggestion/report',
+    requireOrgRole('member'),
+    reportAiSuggestionHandler,
+  );
 
   return router;
 }

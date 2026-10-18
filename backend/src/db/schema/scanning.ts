@@ -66,6 +66,7 @@ export const ISSUE_EVENT_TYPES = [
   'assigned',
   'due_date_set',
   'note_added',
+  'rechecked',
 ] as const;
 export type IssueEventType = (typeof ISSUE_EVENT_TYPES)[number];
 
