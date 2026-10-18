@@ -1,12 +1,14 @@
 import { PgBoss, type ConstructorOptions } from 'pg-boss';
-import type { ScanJobPayload, WorkerContext } from './types.js';
+import type { IssueRecheckJobPayload, ScanJobPayload, WorkerContext } from './types.js';
 import { handleScanRun } from './jobs/scan-run.js';
 import { handleScanProcess } from './jobs/scan-process.js';
 import { handleScanSchedule } from './jobs/scan-schedule.js';
+import { handleIssueRecheck } from './jobs/issue-recheck.js';
 
 export const QUEUE_SCAN_RUN = 'scan.run';
 export const QUEUE_SCAN_PROCESS = 'scan.process';
 export const QUEUE_SCAN_SCHEDULE = 'scan.schedule';
+export const QUEUE_ISSUE_RECHECK = 'issue.recheck';
 
 export interface CreateBossOptions {
   connectionString?: string;
@@ -68,6 +70,24 @@ export async function enqueueScanProcess(
 }
 
 /**
+ * Enqueue an issue.recheck job with Section 9 parameters:
+ * Concurrency: 1, Timeout: 5 min, Retries: 1.
+ */
+export async function enqueueIssueRecheck(
+  boss: PgBoss,
+  issueId: string,
+): Promise<string | null> {
+  return boss.send(
+    QUEUE_ISSUE_RECHECK,
+    { issueId },
+    {
+      expireInSeconds: 5 * 60,
+      retryLimit: 1,
+    },
+  );
+}
+
+/**
  * Registers workers for scan.run and scan.process.
  */
 export async function registerWorkers(boss: PgBoss, ctx: WorkerContext): Promise<void> {
@@ -101,6 +121,18 @@ export async function registerWorkers(boss: PgBoss, ctx: WorkerContext): Promise
     { localConcurrency: 1, batchSize: 1 },
     async () => {
       await handleScanSchedule(ctx);
+    },
+  );
+
+  // Concurrency 1 for issue.recheck
+  await boss.work<IssueRecheckJobPayload>(
+    QUEUE_ISSUE_RECHECK,
+    { localConcurrency: 1, batchSize: 1 },
+    async (jobs) => {
+      const job = jobs[0];
+      if (job?.data?.issueId) {
+        await handleIssueRecheck(job.data, ctx);
+      }
     },
   );
 }

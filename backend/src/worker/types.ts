@@ -20,3 +20,7 @@ export interface WorkerContext {
 export interface ScanJobPayload {
   scanId: string;
 }
+
+export interface IssueRecheckJobPayload {
+  issueId: string;
+}

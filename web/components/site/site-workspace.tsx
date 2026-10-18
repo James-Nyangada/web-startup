@@ -315,6 +315,18 @@ export function SiteWorkspace({
               showToast(`Rechecking ${n} ${n === 1 ? "issue" : "issues"}. We’ll update the list when it’s done.`);
               setSelected([]);
             }}
+            onIgnoreSelected={() => {
+              const n = selected.length;
+              setIssues((prev) =>
+                prev.map((i) =>
+                  selected.includes(i.id)
+                    ? { ...i, status: "ignored" as const, ignoreReason: "Accepted risk" }
+                    : i,
+                ),
+              );
+              setSelected([]);
+              showToast(`Ignored ${n} ${n === 1 ? "issue" : "issues"}. They remain in your evidence log.`);
+            }}
           />
         )}
         {tab > 1 && (

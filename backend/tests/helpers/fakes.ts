@@ -126,6 +126,65 @@ export function fakeRepos() {
           updatedAt: new Date(),
         }),
       ),
+      findRawById: vi.fn().mockResolvedValue(null),
+      ignore: vi.fn().mockImplementation((_orgId, issueId, actorId, reason, note) =>
+        Promise.resolve({
+          id: issueId,
+          status: 'ignored',
+          ignoredReason: reason,
+          ignoredNote: note ?? null,
+          ignoredBy: actorId,
+          ignoredAt: new Date(),
+        }),
+      ),
+      unignore: vi.fn().mockImplementation((_orgId, issueId) =>
+        Promise.resolve({
+          id: issueId,
+          status: 'open',
+          ignoredReason: null,
+          ignoredNote: null,
+          ignoredBy: null,
+          ignoredAt: null,
+        }),
+      ),
+      assign: vi.fn().mockImplementation((_orgId, issueId, _actorId, assigneeId) =>
+        Promise.resolve({
+          id: issueId,
+          assigneeId,
+        }),
+      ),
+      setDueDate: vi.fn().mockImplementation((_orgId, issueId, _actorId, dueDate) =>
+        Promise.resolve({
+          id: issueId,
+          dueDate,
+        }),
+      ),
+      markFixed: vi.fn().mockImplementation((_orgId, issueId, actorId, scanId) =>
+        Promise.resolve({
+          id: issueId,
+          status: 'fixed',
+          fixedAt: new Date(),
+          fixedScanId: scanId ?? null,
+        }),
+      ),
+      findNoteById: vi.fn().mockResolvedValue(null),
+      updateNote: vi.fn().mockImplementation((_orgId, issueId, noteId, body, visibleToClient) =>
+        Promise.resolve({
+          id: noteId,
+          issueId,
+          body,
+          visibleToClient: Boolean(visibleToClient),
+          updatedAt: new Date(),
+        }),
+      ),
+      deleteNote: vi.fn().mockImplementation((_orgId, issueId, noteId) =>
+        Promise.resolve({
+          id: noteId,
+          issueId,
+          deletedAt: new Date(),
+        }),
+      ),
+      bulkAction: vi.fn().mockResolvedValue({ updatedCount: 1 }),
     },
   } as unknown as Repositories;
   return { repos, join };

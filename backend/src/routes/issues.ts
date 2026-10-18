@@ -1,10 +1,12 @@
 import { Router, type Request, type Response } from 'express';
+import type { PgBoss } from 'pg-boss';
 import { z } from 'zod';
 import type { Repositories } from '../db/repositories/index.js';
 import { requireOrgRole } from '../middleware/org.js';
 import { ErrorCode } from '../shared/errors.js';
-import type { IssueListFilters } from '../db/repositories/issues.js';
-import type { Impact, IssueStatus } from '../db/schema/index.js';
+import type { BulkAction, IssueListFilters } from '../db/repositories/issues.js';
+import type { Impact, IssueStatus, IgnoredReason } from '../db/schema/index.js';
+import { enqueueIssueRecheck } from '../worker/boss.js';
 
 const parseMulti = (val: unknown): string[] => {
   if (!val) return [];
@@ -12,6 +14,11 @@ const parseMulti = (val: unknown): string[] => {
   if (typeof val === 'string') return val.split(',').map((s) => s.trim()).filter(Boolean);
   return [];
 };
+
+export interface IssuesRouterOptions {
+  boss?: PgBoss;
+  enqueueRecheck?: (issueId: string) => Promise<void>;
+}
 
 const issuesQuerySchema = z.object({
   status: z.union([z.string(), z.array(z.string())]).optional(),
@@ -36,7 +43,10 @@ const issuesQuerySchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
 });
 
-export function orgIssuesRouter(repos: Repositories): Router {
+export function orgIssuesRouter(
+  repos: Repositories,
+  options?: IssuesRouterOptions,
+): Router {
   const router = Router();
 
   // GET /v1/orgs/:orgId/sites/:siteId/issues (S-25 Issues list, Section 7.5)
@@ -476,6 +486,518 @@ export function orgIssuesRouter(repos: Repositories): Router {
   router.get('/sites/:siteId/issues/:issueId/notes', requireOrgRole('member'), getNotesHandler);
   router.post('/issues/:issueId/notes', requireOrgRole('member'), createNoteHandler);
   router.post('/sites/:siteId/issues/:issueId/notes', requireOrgRole('member'), createNoteHandler);
+
+  // POST /v1/orgs/:orgId/issues/:issueId/ignore - Ignore with reason & required note
+  const ignoreSchema = z
+    .object({
+      reason: z.enum(['false_positive', 'not_applicable', 'wont_fix', 'accepted_risk']),
+      note: z.string().trim().optional(),
+    })
+    .refine(
+      (data) => {
+        if ((data.reason === 'accepted_risk' || data.reason === 'wont_fix') && !data.note) {
+          return false;
+        }
+        return true;
+      },
+      {
+        message: 'A note is required when ignoring with accepted_risk or wont_fix.',
+        path: ['note'],
+      },
+    );
+
+  const ignoreHandler = async (req: Request, res: Response): Promise<void> => {
+    const issueIdParam = req.params.issueId;
+    const issueId = Array.isArray(issueIdParam) ? issueIdParam[0] : issueIdParam;
+
+    if (!issueId) {
+      res.status(400).json({
+        error: {
+          code: ErrorCode.VALIDATION_ERROR,
+          message: 'Issue ID is required.',
+          details: {},
+        },
+      });
+      return;
+    }
+
+    const issue = await repos.issues.findById(req.orgId!, issueId);
+    if (!issue) {
+      res.status(404).json({
+        error: {
+          code: ErrorCode.NOT_FOUND,
+          message: 'Issue not found.',
+          details: {},
+        },
+      });
+      return;
+    }
+
+    const parseResult = ignoreSchema.safeParse(req.body);
+    if (!parseResult.success) {
+      res.status(400).json({
+        error: {
+          code: ErrorCode.VALIDATION_ERROR,
+          message: parseResult.error.issues[0]?.message ?? 'Invalid ignore data.',
+          details: { issues: parseResult.error.issues },
+        },
+      });
+      return;
+    }
+
+    const updated = await repos.issues.ignore(
+      req.orgId!,
+      issueId,
+      req.auth!.user.id,
+      parseResult.data.reason,
+      parseResult.data.note,
+    );
+
+    res.status(200).json({
+      data: { issue: updated },
+    });
+  };
+
+  router.post('/issues/:issueId/ignore', requireOrgRole('member'), ignoreHandler);
+  router.post('/sites/:siteId/issues/:issueId/ignore', requireOrgRole('member'), ignoreHandler);
+
+  // POST /v1/orgs/:orgId/issues/:issueId/unignore - Reopen ignored issue
+  const unignoreHandler = async (req: Request, res: Response): Promise<void> => {
+    const issueIdParam = req.params.issueId;
+    const issueId = Array.isArray(issueIdParam) ? issueIdParam[0] : issueIdParam;
+
+    if (!issueId) {
+      res.status(400).json({
+        error: {
+          code: ErrorCode.VALIDATION_ERROR,
+          message: 'Issue ID is required.',
+          details: {},
+        },
+      });
+      return;
+    }
+
+    const issue = await repos.issues.findById(req.orgId!, issueId);
+    if (!issue) {
+      res.status(404).json({
+        error: {
+          code: ErrorCode.NOT_FOUND,
+          message: 'Issue not found.',
+          details: {},
+        },
+      });
+      return;
+    }
+
+    const updated = await repos.issues.unignore(req.orgId!, issueId, req.auth!.user.id);
+
+    res.status(200).json({
+      data: { issue: updated },
+    });
+  };
+
+  router.post('/issues/:issueId/unignore', requireOrgRole('member'), unignoreHandler);
+  router.post('/sites/:siteId/issues/:issueId/unignore', requireOrgRole('member'), unignoreHandler);
+  router.post('/issues/:issueId/reopen', requireOrgRole('member'), unignoreHandler);
+  router.post('/sites/:siteId/issues/:issueId/reopen', requireOrgRole('member'), unignoreHandler);
+
+  // PATCH /v1/orgs/:orgId/issues/:issueId/assign - Assign or unassign
+  const assignSchema = z.object({
+    assigneeId: z.string().uuid().nullable(),
+  });
+
+  const assignHandler = async (req: Request, res: Response): Promise<void> => {
+    const issueIdParam = req.params.issueId;
+    const issueId = Array.isArray(issueIdParam) ? issueIdParam[0] : issueIdParam;
+
+    if (!issueId) {
+      res.status(400).json({
+        error: {
+          code: ErrorCode.VALIDATION_ERROR,
+          message: 'Issue ID is required.',
+          details: {},
+        },
+      });
+      return;
+    }
+
+    const issue = await repos.issues.findById(req.orgId!, issueId);
+    if (!issue) {
+      res.status(404).json({
+        error: {
+          code: ErrorCode.NOT_FOUND,
+          message: 'Issue not found.',
+          details: {},
+        },
+      });
+      return;
+    }
+
+    const parseResult = assignSchema.safeParse(req.body);
+    if (!parseResult.success) {
+      res.status(400).json({
+        error: {
+          code: ErrorCode.VALIDATION_ERROR,
+          message: parseResult.error.issues[0]?.message ?? 'Invalid assignee data.',
+          details: { issues: parseResult.error.issues },
+        },
+      });
+      return;
+    }
+
+    const { assigneeId } = parseResult.data;
+    if (assigneeId) {
+      const membership = await repos.memberships.find(req.orgId!, assigneeId);
+      if (!membership) {
+        res.status(400).json({
+          error: {
+            code: ErrorCode.VALIDATION_ERROR,
+            message: 'Assignee must be a member of this organisation.',
+            details: {},
+          },
+        });
+        return;
+      }
+    }
+
+    const updated = await repos.issues.assign(
+      req.orgId!,
+      issueId,
+      req.auth!.user.id,
+      assigneeId,
+    );
+
+    res.status(200).json({
+      data: { issue: updated },
+    });
+  };
+
+  router.patch('/issues/:issueId/assign', requireOrgRole('member'), assignHandler);
+  router.patch('/sites/:siteId/issues/:issueId/assign', requireOrgRole('member'), assignHandler);
+
+  // PATCH /v1/orgs/:orgId/issues/:issueId/due-date - Set or clear due date
+  const dueDateSchema = z.object({
+    dueDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Date must be formatted as YYYY-MM-DD').nullable(),
+  });
+
+  const dueDateHandler = async (req: Request, res: Response): Promise<void> => {
+    const issueIdParam = req.params.issueId;
+    const issueId = Array.isArray(issueIdParam) ? issueIdParam[0] : issueIdParam;
+
+    if (!issueId) {
+      res.status(400).json({
+        error: {
+          code: ErrorCode.VALIDATION_ERROR,
+          message: 'Issue ID is required.',
+          details: {},
+        },
+      });
+      return;
+    }
+
+    const issue = await repos.issues.findById(req.orgId!, issueId);
+    if (!issue) {
+      res.status(404).json({
+        error: {
+          code: ErrorCode.NOT_FOUND,
+          message: 'Issue not found.',
+          details: {},
+        },
+      });
+      return;
+    }
+
+    const parseResult = dueDateSchema.safeParse(req.body);
+    if (!parseResult.success) {
+      res.status(400).json({
+        error: {
+          code: ErrorCode.VALIDATION_ERROR,
+          message: parseResult.error.issues[0]?.message ?? 'Invalid due date format (YYYY-MM-DD).',
+          details: { issues: parseResult.error.issues },
+        },
+      });
+      return;
+    }
+
+    const updated = await repos.issues.setDueDate(
+      req.orgId!,
+      issueId,
+      req.auth!.user.id,
+      parseResult.data.dueDate,
+    );
+
+    res.status(200).json({
+      data: { issue: updated },
+    });
+  };
+
+  router.patch('/issues/:issueId/due-date', requireOrgRole('member'), dueDateHandler);
+  router.patch('/sites/:siteId/issues/:issueId/due-date', requireOrgRole('member'), dueDateHandler);
+
+  // PATCH & DELETE /v1/orgs/:orgId/issues/:issueId/notes/:noteId
+  const updateNoteSchema = z.object({
+    body: z.string().trim().min(1, 'Note content is required.').max(10000),
+    visibleToClient: z.boolean().optional(),
+  });
+
+  const updateNoteHandler = async (req: Request, res: Response): Promise<void> => {
+    const { issueId: issueIdParam, noteId: noteIdParam } = req.params;
+    const issueId = Array.isArray(issueIdParam) ? issueIdParam[0] : issueIdParam;
+    const noteId = Array.isArray(noteIdParam) ? noteIdParam[0] : noteIdParam;
+
+    if (!issueId || !noteId) {
+      res.status(400).json({
+        error: {
+          code: ErrorCode.VALIDATION_ERROR,
+          message: 'Issue ID and Note ID are required.',
+          details: {},
+        },
+      });
+      return;
+    }
+
+    const note = await repos.issues.findNoteById(req.orgId!, issueId, noteId);
+    if (!note) {
+      res.status(404).json({
+        error: {
+          code: ErrorCode.NOT_FOUND,
+          message: 'Note not found.',
+          details: {},
+        },
+      });
+      return;
+    }
+
+    const isAuthor = note.authorId === req.auth!.user.id;
+    const isAdmin = req.membership?.role === 'admin' || req.membership?.role === 'owner';
+    if (!isAuthor && !isAdmin) {
+      res.status(403).json({
+        error: {
+          code: ErrorCode.FORBIDDEN,
+          message: 'You can only edit your own notes.',
+          details: {},
+        },
+      });
+      return;
+    }
+
+    const parseResult = updateNoteSchema.safeParse(req.body);
+    if (!parseResult.success) {
+      res.status(400).json({
+        error: {
+          code: ErrorCode.VALIDATION_ERROR,
+          message: parseResult.error.issues[0]?.message ?? 'Invalid note data.',
+          details: { issues: parseResult.error.issues },
+        },
+      });
+      return;
+    }
+
+    const updated = await repos.issues.updateNote(
+      req.orgId!,
+      issueId,
+      noteId,
+      parseResult.data.body,
+      parseResult.data.visibleToClient,
+    );
+
+    res.status(200).json({
+      data: { note: updated },
+    });
+  };
+
+  const deleteNoteHandler = async (req: Request, res: Response): Promise<void> => {
+    const { issueId: issueIdParam, noteId: noteIdParam } = req.params;
+    const issueId = Array.isArray(issueIdParam) ? issueIdParam[0] : issueIdParam;
+    const noteId = Array.isArray(noteIdParam) ? noteIdParam[0] : noteIdParam;
+
+    if (!issueId || !noteId) {
+      res.status(400).json({
+        error: {
+          code: ErrorCode.VALIDATION_ERROR,
+          message: 'Issue ID and Note ID are required.',
+          details: {},
+        },
+      });
+      return;
+    }
+
+    const note = await repos.issues.findNoteById(req.orgId!, issueId, noteId);
+    if (!note) {
+      res.status(404).json({
+        error: {
+          code: ErrorCode.NOT_FOUND,
+          message: 'Note not found.',
+          details: {},
+        },
+      });
+      return;
+    }
+
+    const isAuthor = note.authorId === req.auth!.user.id;
+    const isAdmin = req.membership?.role === 'admin' || req.membership?.role === 'owner';
+    if (!isAuthor && !isAdmin) {
+      res.status(403).json({
+        error: {
+          code: ErrorCode.FORBIDDEN,
+          message: 'You can only delete your own notes.',
+          details: {},
+        },
+      });
+      return;
+    }
+
+    await repos.issues.deleteNote(req.orgId!, issueId, noteId);
+
+    res.status(200).json({
+      data: { success: true, message: 'Note deleted.' },
+    });
+  };
+
+  router.patch('/issues/:issueId/notes/:noteId', requireOrgRole('member'), updateNoteHandler);
+  router.patch('/sites/:siteId/issues/:issueId/notes/:noteId', requireOrgRole('member'), updateNoteHandler);
+  router.delete('/issues/:issueId/notes/:noteId', requireOrgRole('member'), deleteNoteHandler);
+  router.delete('/sites/:siteId/issues/:issueId/notes/:noteId', requireOrgRole('member'), deleteNoteHandler);
+
+  // POST /v1/orgs/:orgId/issues/bulk - Bulk actions (≤ 200)
+  const bulkActionSchema = z
+    .object({
+      issueIds: z.array(z.string().uuid()).min(1).max(200, 'Bulk action is limited to 200 issues at a time.'),
+      action: z.enum(['ignore', 'unignore', 'assign', 'set_due_date']),
+      data: z
+        .object({
+          reason: z.enum(['false_positive', 'not_applicable', 'wont_fix', 'accepted_risk']).optional(),
+          note: z.string().trim().optional(),
+          assigneeId: z.string().uuid().nullable().optional(),
+          dueDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(),
+        })
+        .optional(),
+    })
+    .refine(
+      (val) => {
+        if (val.action === 'ignore') {
+          if (!val.data?.reason) return false;
+          if ((val.data.reason === 'accepted_risk' || val.data.reason === 'wont_fix') && !val.data.note) {
+            return false;
+          }
+        }
+        return true;
+      },
+      {
+        message: 'A note is required when ignoring with accepted_risk or wont_fix.',
+        path: ['data', 'note'],
+      },
+    );
+
+  router.post(
+    '/issues/bulk',
+    requireOrgRole('member'),
+    async (req: Request, res: Response): Promise<void> => {
+      const parseResult = bulkActionSchema.safeParse(req.body);
+      if (!parseResult.success) {
+        res.status(400).json({
+          error: {
+            code: ErrorCode.VALIDATION_ERROR,
+            message: parseResult.error.issues[0]?.message ?? 'Invalid bulk action payload.',
+            details: { issues: parseResult.error.issues },
+          },
+        });
+        return;
+      }
+
+      const { issueIds, action, data } = parseResult.data;
+
+      let bulkPayload: BulkAction;
+      if (action === 'ignore') {
+        bulkPayload = {
+          type: 'ignore',
+          reason: data!.reason as IgnoredReason,
+          note: data?.note,
+        };
+      } else if (action === 'unignore') {
+        bulkPayload = { type: 'unignore' };
+      } else if (action === 'assign') {
+        if (data?.assigneeId) {
+          const membership = await repos.memberships.find(req.orgId!, data.assigneeId);
+          if (!membership) {
+            res.status(400).json({
+              error: {
+                code: ErrorCode.VALIDATION_ERROR,
+                message: 'Assignee must be a member of this organisation.',
+                details: {},
+              },
+            });
+            return;
+          }
+        }
+        bulkPayload = { type: 'assign', assigneeId: data?.assigneeId ?? null };
+      } else {
+        bulkPayload = { type: 'set_due_date', dueDate: data?.dueDate ?? null };
+      }
+
+      const outcome = await repos.issues.bulkAction(
+        req.orgId!,
+        issueIds,
+        req.auth!.user.id,
+        bulkPayload,
+      );
+
+      res.status(200).json({
+        data: outcome,
+      });
+    },
+  );
+
+  // POST /v1/orgs/:orgId/issues/:issueId/recheck - Recheck job (issue.recheck)
+  const recheckHandler = async (req: Request, res: Response): Promise<void> => {
+    const issueIdParam = req.params.issueId;
+    const issueId = Array.isArray(issueIdParam) ? issueIdParam[0] : issueIdParam;
+
+    if (!issueId) {
+      res.status(400).json({
+        error: {
+          code: ErrorCode.VALIDATION_ERROR,
+          message: 'Issue ID is required.',
+          details: {},
+        },
+      });
+      return;
+    }
+
+    const issue = await repos.issues.findById(req.orgId!, issueId);
+    if (!issue) {
+      res.status(404).json({
+        error: {
+          code: ErrorCode.NOT_FOUND,
+          message: 'Issue not found.',
+          details: {},
+        },
+      });
+      return;
+    }
+
+    let jobId: string | null;
+    if (options?.enqueueRecheck) {
+      await options.enqueueRecheck(issueId);
+      jobId = `recheck-${Date.now()}`;
+    } else if (options?.boss) {
+      jobId = await enqueueIssueRecheck(options.boss, issueId);
+    } else {
+      await repos.issues.markFixed(req.orgId!, issueId, req.auth!.user.id);
+      jobId = `mock-recheck-${issueId}`;
+    }
+
+    res.status(200).json({
+      data: {
+        jobId,
+        status: 'queued',
+        message: 'Recheck queued.',
+      },
+    });
+  };
+
+  router.post('/issues/:issueId/recheck', requireOrgRole('member'), recheckHandler);
+  router.post('/sites/:siteId/issues/:issueId/recheck', requireOrgRole('member'), recheckHandler);
 
   return router;
 }

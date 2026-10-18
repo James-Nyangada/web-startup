@@ -463,7 +463,7 @@ export function orgsRouter(
   orgScoped.use(orgScansRouter(repos, scansOptions));
 
   // Mount Section 7.5 Issues router under orgScoped
-  orgScoped.use(orgIssuesRouter(repos));
+  orgScoped.use(orgIssuesRouter(repos, scansOptions));
 
   router.use('/:orgId', orgScoped);
 

@@ -13,9 +13,16 @@ import {
   users,
   type Impact,
   type IssueStatus,
+  type IgnoredReason,
 } from '../schema/index.js';
 import { AUDIENCE_LABELS, RULE_CONTENT } from '../../scanner/rules/content.js';
 import type { OrgId } from './org-scope.js';
+
+export type BulkAction =
+  | { type: 'ignore'; reason: IgnoredReason; note?: string | null }
+  | { type: 'unignore' }
+  | { type: 'assign'; assigneeId: string | null }
+  | { type: 'set_due_date'; dueDate: string | null };
 
 export interface IssueListFilters {
   status?: IssueStatus | IssueStatus[];
@@ -725,6 +732,17 @@ export function issuesRepository(db: Database) {
     },
 
     /**
+     * Finds an issue by ID without tenant scope (used by background workers).
+     */
+    async findRawById(issueId: string) {
+      const [row] = await db
+        .select()
+        .from(issues)
+        .where(eq(issues.id, issueId));
+      return row ?? null;
+    },
+
+    /**
      * Top issues to fix first ordered by (impact × occurrences) descending (Spec S-24, P2-11).
      * Impact weight: critical=4, serious=3, moderate=2, minor=1.
      */
@@ -1039,7 +1057,376 @@ export function issuesRepository(db: Database) {
         })
         .returning();
 
+      if (!note) {
+        throw new Error('Failed to create issue note');
+      }
+
+      // Write note_added event to issue_events
+      await db.insert(issueEvents).values({
+        orgId,
+        issueId,
+        type: 'note_added',
+        actorId: authorId,
+        data: { noteId: note.id, visibleToClient },
+      });
+
       return note;
+    },
+
+    /**
+     * Finds a single note by ID.
+     */
+    async findNoteById(orgId: OrgId, issueId: string, noteId: string) {
+      const [note] = await db
+        .select({
+          id: issueNotes.id,
+          issueId: issueNotes.issueId,
+          authorId: issueNotes.authorId,
+          authorName: users.name,
+          body: issueNotes.body,
+          visibleToClient: issueNotes.visibleToClient,
+          createdAt: issueNotes.createdAt,
+          updatedAt: issueNotes.updatedAt,
+        })
+        .from(issueNotes)
+        .leftJoin(users, eq(issueNotes.authorId, users.id))
+        .where(
+          and(
+            eq(issueNotes.orgId, orgId),
+            eq(issueNotes.issueId, issueId),
+            eq(issueNotes.id, noteId),
+            isNull(issueNotes.deletedAt),
+          ),
+        );
+
+      return note ?? null;
+    },
+
+    /**
+     * Updates an existing note.
+     */
+    async updateNote(
+      orgId: OrgId,
+      issueId: string,
+      noteId: string,
+      body: string,
+      visibleToClient?: boolean,
+    ) {
+      const updateData: Partial<typeof issueNotes.$inferInsert> = {
+        body,
+        updatedAt: new Date(),
+      };
+      if (visibleToClient !== undefined) {
+        updateData.visibleToClient = visibleToClient;
+      }
+
+      const [updated] = await db
+        .update(issueNotes)
+        .set(updateData)
+        .where(
+          and(
+            eq(issueNotes.orgId, orgId),
+            eq(issueNotes.issueId, issueId),
+            eq(issueNotes.id, noteId),
+            isNull(issueNotes.deletedAt),
+          ),
+        )
+        .returning();
+
+      return updated ?? null;
+    },
+
+    /**
+     * Soft deletes a note.
+     */
+    async deleteNote(orgId: OrgId, issueId: string, noteId: string) {
+      const [deleted] = await db
+        .update(issueNotes)
+        .set({
+          deletedAt: new Date(),
+          updatedAt: new Date(),
+        })
+        .where(
+          and(
+            eq(issueNotes.orgId, orgId),
+            eq(issueNotes.issueId, issueId),
+            eq(issueNotes.id, noteId),
+            isNull(issueNotes.deletedAt),
+          ),
+        )
+        .returning();
+
+      return deleted ?? null;
+    },
+
+    /**
+     * Ignores an issue with reason and optional/required note (Spec S-26, P2-14).
+     */
+    async ignore(
+      orgId: OrgId,
+      issueId: string,
+      actorId: string,
+      reason: IgnoredReason,
+      note?: string | null,
+    ) {
+      const trimmedNote = note?.trim() || null;
+      const [updated] = await db
+        .update(issues)
+        .set({
+          status: 'ignored',
+          ignoredReason: reason,
+          ignoredNote: trimmedNote,
+          ignoredBy: actorId,
+          ignoredAt: new Date(),
+          updatedAt: new Date(),
+        })
+        .where(and(eq(issues.orgId, orgId), eq(issues.id, issueId)))
+        .returning();
+
+      if (!updated) return null;
+
+      await db.insert(issueEvents).values({
+        orgId,
+        issueId,
+        type: 'ignored',
+        actorId,
+        data: { reason, note: trimmedNote },
+      });
+
+      return updated;
+    },
+
+    /**
+     * Unignores / reopens an ignored issue.
+     */
+    async unignore(orgId: OrgId, issueId: string, actorId: string) {
+      const [updated] = await db
+        .update(issues)
+        .set({
+          status: 'open',
+          ignoredReason: null,
+          ignoredNote: null,
+          ignoredBy: null,
+          ignoredAt: null,
+          updatedAt: new Date(),
+        })
+        .where(and(eq(issues.orgId, orgId), eq(issues.id, issueId)))
+        .returning();
+
+      if (!updated) return null;
+
+      await db.insert(issueEvents).values({
+        orgId,
+        issueId,
+        type: 'unignored',
+        actorId,
+        data: {},
+      });
+
+      return updated;
+    },
+
+    /**
+     * Assigns or unassigns an issue.
+     */
+    async assign(
+      orgId: OrgId,
+      issueId: string,
+      actorId: string,
+      assigneeId: string | null,
+    ) {
+      const [updated] = await db
+        .update(issues)
+        .set({
+          assigneeId,
+          updatedAt: new Date(),
+        })
+        .where(and(eq(issues.orgId, orgId), eq(issues.id, issueId)))
+        .returning();
+
+      if (!updated) return null;
+
+      await db.insert(issueEvents).values({
+        orgId,
+        issueId,
+        type: 'assigned',
+        actorId,
+        data: { assigneeId },
+      });
+
+      return updated;
+    },
+
+    /**
+     * Sets or clears an issue's due date.
+     */
+    async setDueDate(
+      orgId: OrgId,
+      issueId: string,
+      actorId: string,
+      dueDate: string | null,
+    ) {
+      const [updated] = await db
+        .update(issues)
+        .set({
+          dueDate,
+          updatedAt: new Date(),
+        })
+        .where(and(eq(issues.orgId, orgId), eq(issues.id, issueId)))
+        .returning();
+
+      if (!updated) return null;
+
+      await db.insert(issueEvents).values({
+        orgId,
+        issueId,
+        type: 'due_date_set',
+        actorId,
+        data: { dueDate },
+      });
+
+      return updated;
+    },
+
+    /**
+     * Marks an issue fixed (used by recheck / scan).
+     */
+    async markFixed(
+      orgId: OrgId,
+      issueId: string,
+      actorId?: string | null,
+      scanId?: string | null,
+    ) {
+      const [updated] = await db
+        .update(issues)
+        .set({
+          status: 'fixed',
+          fixedAt: new Date(),
+          fixedScanId: scanId ?? null,
+          updatedAt: new Date(),
+        })
+        .where(and(eq(issues.orgId, orgId), eq(issues.id, issueId)))
+        .returning();
+
+      if (!updated) return null;
+
+      await db.insert(issueEvents).values({
+        orgId,
+        issueId,
+        type: 'fixed',
+        actorId: actorId ?? null,
+        scanId: scanId ?? null,
+        data: {},
+      });
+
+      return updated;
+    },
+
+    /**
+     * Bulk actions across up to 200 issues (Spec P2-14).
+     */
+    async bulkAction(
+      orgId: OrgId,
+      issueIds: string[],
+      actorId: string,
+      action: BulkAction,
+    ): Promise<{ updatedCount: number }> {
+      if (issueIds.length === 0) return { updatedCount: 0 };
+      if (issueIds.length > 200) {
+        throw new Error('Bulk actions are limited to 200 issues at a time.');
+      }
+
+      return await db.transaction(async (tx) => {
+        const matchingIssues = await tx
+          .select({ id: issues.id, status: issues.status })
+          .from(issues)
+          .where(and(eq(issues.orgId, orgId), inArray(issues.id, issueIds)));
+
+        if (matchingIssues.length === 0) return { updatedCount: 0 };
+
+        const matchedIds = matchingIssues.map((i) => i.id);
+
+        if (action.type === 'ignore') {
+          const trimmedNote = action.note?.trim() || null;
+          await tx
+            .update(issues)
+            .set({
+              status: 'ignored',
+              ignoredReason: action.reason,
+              ignoredNote: trimmedNote,
+              ignoredBy: actorId,
+              ignoredAt: new Date(),
+              updatedAt: new Date(),
+            })
+            .where(and(eq(issues.orgId, orgId), inArray(issues.id, matchedIds)));
+
+          const eventRows = matchedIds.map((id) => ({
+            orgId,
+            issueId: id,
+            type: 'ignored' as const,
+            actorId,
+            data: { reason: action.reason, note: trimmedNote },
+          }));
+          await tx.insert(issueEvents).values(eventRows);
+        } else if (action.type === 'unignore') {
+          await tx
+            .update(issues)
+            .set({
+              status: 'open',
+              ignoredReason: null,
+              ignoredNote: null,
+              ignoredBy: null,
+              ignoredAt: null,
+              updatedAt: new Date(),
+            })
+            .where(and(eq(issues.orgId, orgId), inArray(issues.id, matchedIds)));
+
+          const eventRows = matchedIds.map((id) => ({
+            orgId,
+            issueId: id,
+            type: 'unignored' as const,
+            actorId,
+            data: {},
+          }));
+          await tx.insert(issueEvents).values(eventRows);
+        } else if (action.type === 'assign') {
+          await tx
+            .update(issues)
+            .set({
+              assigneeId: action.assigneeId,
+              updatedAt: new Date(),
+            })
+            .where(and(eq(issues.orgId, orgId), inArray(issues.id, matchedIds)));
+
+          const eventRows = matchedIds.map((id) => ({
+            orgId,
+            issueId: id,
+            type: 'assigned' as const,
+            actorId,
+            data: { assigneeId: action.assigneeId },
+          }));
+          await tx.insert(issueEvents).values(eventRows);
+        } else if (action.type === 'set_due_date') {
+          await tx
+            .update(issues)
+            .set({
+              dueDate: action.dueDate,
+              updatedAt: new Date(),
+            })
+            .where(and(eq(issues.orgId, orgId), inArray(issues.id, matchedIds)));
+
+          const eventRows = matchedIds.map((id) => ({
+            orgId,
+            issueId: id,
+            type: 'due_date_set' as const,
+            actorId,
+            data: { dueDate: action.dueDate },
+          }));
+          await tx.insert(issueEvents).values(eventRows);
+        }
+
+        return { updatedCount: matchedIds.length };
+      });
     },
   };
 }

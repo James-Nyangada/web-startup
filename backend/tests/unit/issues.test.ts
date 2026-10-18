@@ -612,5 +612,294 @@ describe('Issues API (Chunk P2-12, Screen S-25, Section 7.5)', () => {
       });
     });
   });
+
+  describe('Issue Actions (Chunk P2-14)', () => {
+    beforeEach(() => {
+      vi.mocked(repos.issues.findById).mockResolvedValue(sampleIssue);
+      vi.mocked(repos.memberships.find).mockResolvedValue({
+        id: 'mem-1',
+        orgId,
+        userId: 'user-colleague',
+        role: 'member',
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      });
+    });
+
+    describe('POST /v1/orgs/:orgId/issues/:issueId/ignore & /unignore', () => {
+      it('successfully ignores with accepted_risk when note is provided', async () => {
+        const res = await request(app)
+          .post(`/v1/orgs/${orgId}/issues/issue-1/ignore`)
+          .set('Cookie', memberCookie)
+          .send({
+            reason: 'accepted_risk',
+            note: 'Design approved brand colors for secondary buttons.',
+          })
+          .expect(200);
+
+        expect(res.body.data.issue).toBeDefined();
+        expect(repos.issues.ignore).toHaveBeenCalledWith(
+          orgId,
+          'issue-1',
+          userId,
+          'accepted_risk',
+          'Design approved brand colors for secondary buttons.',
+        );
+      });
+
+      it('GATE 1: rejects accepted_risk without note with 400 validation error', async () => {
+        const res = await request(app)
+          .post(`/v1/orgs/${orgId}/issues/issue-1/ignore`)
+          .set('Cookie', memberCookie)
+          .send({
+            reason: 'accepted_risk',
+          })
+          .expect(400);
+
+        expect(res.body.error.code).toBe(ErrorCode.VALIDATION_ERROR);
+        expect(res.body.error.message).toContain('note is required');
+      });
+
+      it('GATE 1: rejects wont_fix without note with 400 validation error', async () => {
+        const res = await request(app)
+          .post(`/v1/orgs/${orgId}/issues/issue-1/ignore`)
+          .set('Cookie', memberCookie)
+          .send({
+            reason: 'wont_fix',
+            note: '   ',
+          })
+          .expect(400);
+
+        expect(res.body.error.code).toBe(ErrorCode.VALIDATION_ERROR);
+      });
+
+      it('allows false_positive without a note', async () => {
+        const res = await request(app)
+          .post(`/v1/orgs/${orgId}/issues/issue-1/ignore`)
+          .set('Cookie', memberCookie)
+          .send({
+            reason: 'false_positive',
+          })
+          .expect(200);
+
+        expect(res.body.data.issue.status).toBe('ignored');
+      });
+
+      it('unignores/reopens an issue', async () => {
+        const res = await request(app)
+          .post(`/v1/orgs/${orgId}/issues/issue-1/unignore`)
+          .set('Cookie', memberCookie)
+          .expect(200);
+
+        expect(res.body.data.issue.status).toBe('open');
+        expect(repos.issues.unignore).toHaveBeenCalledWith(orgId, 'issue-1', userId);
+      });
+    });
+
+    describe('PATCH /v1/orgs/:orgId/issues/:issueId/assign', () => {
+      it('assigns issue to an organisation member', async () => {
+        const res = await request(app)
+          .patch(`/v1/orgs/${orgId}/issues/issue-1/assign`)
+          .set('Cookie', memberCookie)
+          .send({ assigneeId: '33333333-3333-4333-a333-333333333333' })
+          .expect(200);
+
+        expect(res.body.data.issue).toBeDefined();
+        expect(repos.issues.assign).toHaveBeenCalledWith(
+          orgId,
+          'issue-1',
+          userId,
+          '33333333-3333-4333-a333-333333333333',
+        );
+      });
+
+      it('rejects assigning to non-member with 400', async () => {
+        vi.mocked(repos.memberships.find).mockImplementation((_orgId, uId) =>
+          uId === userId
+            ? Promise.resolve({
+                id: 'mem-1',
+                orgId,
+                userId,
+                role: 'member' as const,
+                createdAt: new Date(),
+                updatedAt: new Date(),
+              })
+            : Promise.resolve(null),
+        );
+
+        const res = await request(app)
+          .patch(`/v1/orgs/${orgId}/issues/issue-1/assign`)
+          .set('Cookie', memberCookie)
+          .send({ assigneeId: '99999999-9999-4999-a999-999999999999' })
+          .expect(400);
+
+        expect(res.body.error.code).toBe(ErrorCode.VALIDATION_ERROR);
+        expect(res.body.error.message).toContain('member');
+      });
+
+      it('unassigns when assigneeId is null', async () => {
+        await request(app)
+          .patch(`/v1/orgs/${orgId}/issues/issue-1/assign`)
+          .set('Cookie', memberCookie)
+          .send({ assigneeId: null })
+          .expect(200);
+
+        expect(repos.issues.assign).toHaveBeenCalledWith(orgId, 'issue-1', userId, null);
+      });
+    });
+
+    describe('PATCH /v1/orgs/:orgId/issues/:issueId/due-date', () => {
+      it('sets a valid due date (YYYY-MM-DD)', async () => {
+        await request(app)
+          .patch(`/v1/orgs/${orgId}/issues/issue-1/due-date`)
+          .set('Cookie', memberCookie)
+          .send({ dueDate: '2026-11-15' })
+          .expect(200);
+
+        expect(repos.issues.setDueDate).toHaveBeenCalledWith(
+          orgId,
+          'issue-1',
+          userId,
+          '2026-11-15',
+        );
+      });
+
+      it('clears due date when null', async () => {
+        await request(app)
+          .patch(`/v1/orgs/${orgId}/issues/issue-1/due-date`)
+          .set('Cookie', memberCookie)
+          .send({ dueDate: null })
+          .expect(200);
+
+        expect(repos.issues.setDueDate).toHaveBeenCalledWith(orgId, 'issue-1', userId, null);
+      });
+
+      it('rejects invalid date format with 400', async () => {
+        const res = await request(app)
+          .patch(`/v1/orgs/${orgId}/issues/issue-1/due-date`)
+          .set('Cookie', memberCookie)
+          .send({ dueDate: 'next-friday' })
+          .expect(400);
+
+        expect(res.body.error.code).toBe(ErrorCode.VALIDATION_ERROR);
+      });
+    });
+
+    describe('PATCH & DELETE notes', () => {
+      it('updates note when user is the author', async () => {
+        vi.mocked(repos.issues.findNoteById).mockResolvedValue({
+          id: 'note-1',
+          issueId: 'issue-1',
+          authorId: userId,
+          authorName: 'User Member',
+          body: 'Original text',
+          visibleToClient: false,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        });
+
+        const res = await request(app)
+          .patch(`/v1/orgs/${orgId}/issues/issue-1/notes/note-1`)
+          .set('Cookie', memberCookie)
+          .send({ body: 'Updated text', visibleToClient: true })
+          .expect(200);
+
+        expect(res.body.data.note.body).toBe('Updated text');
+      });
+
+      it('returns 403 when user is neither author nor admin', async () => {
+        vi.mocked(repos.issues.findNoteById).mockResolvedValue({
+          id: 'note-1',
+          issueId: 'issue-1',
+          authorId: 'other-user',
+          authorName: 'Other Person',
+          body: 'Original text',
+          visibleToClient: false,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        });
+
+        const res = await request(app)
+          .patch(`/v1/orgs/${orgId}/issues/issue-1/notes/note-1`)
+          .set('Cookie', memberCookie)
+          .send({ body: 'Hacked note' })
+          .expect(403);
+
+        expect(res.body.error.code).toBe(ErrorCode.FORBIDDEN);
+      });
+
+      it('deletes note when author', async () => {
+        vi.mocked(repos.issues.findNoteById).mockResolvedValue({
+          id: 'note-1',
+          issueId: 'issue-1',
+          authorId: userId,
+          authorName: 'User Member',
+          body: 'Original text',
+          visibleToClient: false,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        });
+
+        const res = await request(app)
+          .delete(`/v1/orgs/${orgId}/issues/issue-1/notes/note-1`)
+          .set('Cookie', memberCookie)
+          .expect(200);
+
+        expect(res.body.data.success).toBe(true);
+        expect(repos.issues.deleteNote).toHaveBeenCalledWith(orgId, 'issue-1', 'note-1');
+      });
+    });
+
+    describe('POST /v1/orgs/:orgId/issues/bulk', () => {
+      it('executes bulk ignore on multiple issues', async () => {
+        const res = await request(app)
+          .post(`/v1/orgs/${orgId}/issues/bulk`)
+          .set('Cookie', memberCookie)
+          .send({
+            issueIds: [
+              '11111111-1111-4111-a111-111111111111',
+              '22222222-2222-4222-a222-222222222222',
+            ],
+            action: 'ignore',
+            data: {
+              reason: 'accepted_risk',
+              note: 'Bulk accepted risk for marketing banner font.',
+            },
+          })
+          .expect(200);
+
+        expect(res.body.data.updatedCount).toBe(1);
+        expect(repos.issues.bulkAction).toHaveBeenCalled();
+      });
+
+      it('rejects more than 200 issues in bulk action', async () => {
+        const tooManyIds = Array.from({ length: 201 }, (_, i) =>
+          `00000000-0000-4000-a000-${String(i).padStart(12, '0')}`,
+        );
+
+        const res = await request(app)
+          .post(`/v1/orgs/${orgId}/issues/bulk`)
+          .set('Cookie', memberCookie)
+          .send({
+            issueIds: tooManyIds,
+            action: 'unignore',
+          })
+          .expect(400);
+
+        expect(res.body.error.code).toBe(ErrorCode.VALIDATION_ERROR);
+      });
+    });
+
+    describe('POST /v1/orgs/:orgId/issues/:issueId/recheck', () => {
+      it('queues a recheck job', async () => {
+        const res = await request(app)
+          .post(`/v1/orgs/${orgId}/issues/issue-1/recheck`)
+          .set('Cookie', memberCookie)
+          .expect(200);
+
+        expect(res.body.data.status).toBe('queued');
+      });
+    });
+  });
 });
 

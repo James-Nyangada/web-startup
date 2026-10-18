@@ -22,6 +22,7 @@ export interface IssuesTabProps {
   setSelected: (fn: (s: string[]) => string[]) => void;
   onOpen: (id: string) => void;
   onRecheckSelected: () => void;
+  onIgnoreSelected?: () => void;
   serverTotal?: number;
 }
 
@@ -40,6 +41,7 @@ export function IssuesTab({
   setSelected,
   onOpen,
   onRecheckSelected,
+  onIgnoreSelected,
 }: IssuesTabProps) {
   // Filter states
   const [search, setSearch] = useState("");
@@ -622,6 +624,11 @@ export function IssuesTab({
           <button type="button" className={SECONDARY_SM}>
             Set due date
           </button>
+          {onIgnoreSelected && (
+            <button type="button" onClick={onIgnoreSelected} className={SECONDARY_SM}>
+              Ignore
+            </button>
+          )}
           <button type="button" onClick={onRecheckSelected} className={SECONDARY_SM}>
             Recheck selected
           </button>

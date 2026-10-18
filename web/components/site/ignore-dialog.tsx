@@ -7,7 +7,7 @@ import { IGNORE_REASONS } from "@/lib/site-data";
 import { gsap, useGSAP, MOTION, prefersReducedMotion } from "@/lib/gsap";
 
 /** Ignore dialog (S-26). Focus starts on the first radio; note is required for the last two reasons. */
-export function IgnoreDialog({ onCancel, onConfirm }: { onCancel: () => void; onConfirm: (reason: string) => void }) {
+export function IgnoreDialog({ onCancel, onConfirm }: { onCancel: () => void; onConfirm: (reason: string, note?: string) => void }) {
   const [reason, setReason] = useState(0);
   const [note, setNote] = useState("");
   const [noteError, setNoteError] = useState(false);
@@ -31,7 +31,7 @@ export function IgnoreDialog({ onCancel, onConfirm }: { onCancel: () => void; on
       setNoteError(true);
       return;
     }
-    onConfirm(IGNORE_REASONS[reason].toLowerCase());
+    onConfirm(IGNORE_REASONS[reason].toLowerCase(), note.trim() || undefined);
   };
 
   return (
