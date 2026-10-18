@@ -1,26 +1,47 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { useEffect, useMemo, useState } from "react";
 import { AppShell } from "@/components/app-shell";
 import { BandBadge } from "@/components/badges";
+import { Icon, I } from "@/components/icons";
 import { useEntrance } from "@/components/reveal";
-import { band } from "@/lib/severity";
 import { COMMON_PROBLEMS, SITES, type SiteRow } from "@/lib/site-data";
 
 const LAYOUTS = [
-  { id: "1a", label: "Worst-first table", hint: "Dense, scannable; closest to the spec." },
+  { id: "1a", label: "Worst-first table", hint: "Dense, scannable table with client grouping and persistent filters." },
   { id: "1b", label: "Triage lanes", hint: "Sites sorted into what to do this week." },
   { id: "1c", label: "Grouped by client", hint: "Mirrors how agencies bill." },
 ] as const;
 type LayoutId = (typeof LAYOUTS)[number]["id"];
+
+export type SortKey = "score" | "crit_ser" | "regressions" | "name" | "lastScan";
+
+interface OverviewUserPrefs {
+  sortKey: SortKey;
+  sortDir: "asc" | "desc";
+  clientFilter: string;
+  groupByClient: boolean;
+  layout: LayoutId;
+}
+
+const STORAGE_KEY = "plainsight_overview_prefs";
+
+const DEFAULT_PREFS: OverviewUserPrefs = {
+  sortKey: "score",
+  sortDir: "asc", // worst-first (lowest score first)
+  clientFilter: "all",
+  groupByClient: false,
+  layout: "1a",
+};
 
 const CARD = "rounded-2xl border border-line bg-surface shadow-card";
 const H1 = "m-0 font-serif text-[36px] leading-10 font-normal sm:text-[42px] sm:leading-[46px]";
 const PRIMARY = "ease-ui inline-flex h-10 items-center rounded-full border-0 bg-primary px-4 text-sm font-semibold text-on-primary no-underline hover:bg-primary-hover hover:text-on-primary";
 
 const deltaCls = (r: SiteRow) => (r.dir > 0 ? "text-ok" : r.dir < 0 ? "text-crit" : "text-muted");
-const siteHref = (r: SiteRow) => (r.url === "oakhaus.com" ? "/sites/oakhaus" : "#");
+const siteHref = (r: SiteRow) => (r.url === "oakhaus.com" ? "/sites/oakhaus" : `/sites/${r.name.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`);
 
 function Score({ r, size = "text-base" }: { r: SiteRow; size?: string }) {
   return (
@@ -31,116 +52,415 @@ function Score({ r, size = "text-base" }: { r: SiteRow; size?: string }) {
   );
 }
 
-/* ---------- 1a — Worst-first table ---------- */
-function TableLayout() {
-  const sorted = SITES.slice().sort((a, b) => (a.score ?? -1) - (b.score ?? -1));
+/* ---------- 1a — Worst-first table with Client Grouping and Persistent Filters ---------- */
+function TableLayout({
+  prefs,
+  onUpdatePrefs,
+}: {
+  prefs: OverviewUserPrefs;
+  onUpdatePrefs: (updater: Partial<OverviewUserPrefs>) => void;
+}) {
+  const [search, setSearch] = useState("");
+
+  const clientsList = useMemo(() => {
+    return Array.from(new Set(SITES.map((s) => s.client))).sort();
+  }, []);
+
   const stats = [
-    { label: "Sites monitored", value: "18", sub: "of 25 on Agency", c: "text-muted" },
+    { label: "Sites monitored", value: "18", sub: "of 25 on Agency plan", c: "text-muted" },
     { label: "Average score", value: "81", sub: "Up 3 since last week", c: "text-ok" },
     { label: "Open critical + serious", value: "64", sub: "Down 12 since last week", c: "text-ok" },
     { label: "Regressions this week", value: "2", sub: "Oakhaus, Kito Coffee", c: "text-muted" },
   ];
+
   const attention = [
-    { name: "Mwanga Solar", why: "scan failed (503)" },
-    { name: "Sora Skincare", why: "down 9" },
-    { name: "Oakhaus Furniture", why: "1 regression" },
+    { name: "Mwanga Solar", why: "scan failed (503)", href: siteHref(SITES[3]!) },
+    { name: "Sora Skincare", why: "down 9 after theme update", href: siteHref(SITES[1]!) },
+    { name: "Oakhaus Furniture", why: "1 regression detected", href: siteHref(SITES[0]!) },
   ];
+
+  // Filter sites by search and clientFilter
+  const filtered = useMemo(() => {
+    return SITES.filter((s) => {
+      if (prefs.clientFilter !== "all" && s.client !== prefs.clientFilter) {
+        return false;
+      }
+      if (search.trim()) {
+        const q = search.toLowerCase();
+        return (
+          s.name.toLowerCase().includes(q) ||
+          s.url.toLowerCase().includes(q) ||
+          s.client.toLowerCase().includes(q)
+        );
+      }
+      return true;
+    });
+  }, [prefs.clientFilter, search]);
+
+  // Sort sites
+  const sorted = useMemo(() => {
+    return filtered.slice().sort((a, b) => {
+      let cmp = 0;
+      switch (prefs.sortKey) {
+        case "score": {
+          // Worst-first: lowest score first. Unscored (null) placed at the top as needing attention.
+          const aScore = a.score ?? -1;
+          const bScore = b.score ?? -1;
+          cmp = aScore - bScore;
+          break;
+        }
+        case "crit_ser": {
+          const aCount = a.crit + a.ser;
+          const bCount = b.crit + b.ser;
+          cmp = bCount - aCount; // most problems first
+          break;
+        }
+        case "regressions": {
+          cmp = (b.regressions ?? 0) - (a.regressions ?? 0); // most regressions first
+          break;
+        }
+        case "name": {
+          cmp = a.name.localeCompare(b.name);
+          break;
+        }
+        case "lastScan": {
+          cmp = b.last.localeCompare(a.last);
+          break;
+        }
+      }
+      return prefs.sortDir === "desc" ? -cmp : cmp;
+    });
+  }, [filtered, prefs.sortKey, prefs.sortDir]);
+
+  // Grouped sites by client
+  const clientGroups = useMemo(() => {
+    if (!prefs.groupByClient) return null;
+    const map = new Map<string, SiteRow[]>();
+    for (const site of sorted) {
+      const list = map.get(site.client) ?? [];
+      list.push(site);
+      map.set(site.client, list);
+    }
+    return Array.from(map.entries()).map(([client, sites]) => ({
+      client,
+      sites,
+    }));
+  }, [prefs.groupByClient, sorted]);
+
+  const handleHeaderSort = (key: SortKey) => {
+    if (prefs.sortKey === key) {
+      onUpdatePrefs({ sortDir: prefs.sortDir === "asc" ? "desc" : "asc" });
+    } else {
+      onUpdatePrefs({ sortKey: key, sortDir: key === "score" ? "asc" : "desc" });
+    }
+  };
+
+  const renderSortIndicator = (key: SortKey) => {
+    if (prefs.sortKey !== key) return null;
+    return <span aria-hidden="true" className="ml-1 text-primary">{prefs.sortDir === "asc" ? "↑" : "↓"}</span>;
+  };
+
   return (
     <div data-layout className="flex flex-col gap-6">
+      {/* Overview Header & Metrics */}
       <div className="flex flex-wrap items-center justify-between gap-4">
-        <h1 className={H1}>Overview</h1>
+        <div>
+          <h1 className={H1}>Organisation Overview</h1>
+          <p className="mt-1 text-sm text-muted">
+            Monitored storefronts sorted worst-first. Track scores, open violations, regressions, and scheduled scans.
+          </p>
+        </div>
         <div className="flex items-center gap-3">
-          <span className="text-sm text-muted">18 of 25 sites</span>
-          <button type="button" className={PRIMARY}>
-            Add site
-          </button>
+          <span className="text-sm font-medium text-muted">18 of 25 sites active</span>
+          <Link href="/onboarding" className={PRIMARY}>
+            <Icon d={I.plus} size={16} className="mr-1.5" />
+            <span>Add site</span>
+          </Link>
         </div>
       </div>
+
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         {stats.map((s) => (
           <div key={s.label} className={`${CARD} flex flex-col gap-1 px-5 py-4`}>
             <span className="text-sm font-medium text-muted">{s.label}</span>
-            <span className="tnum font-serif text-[42px] leading-[46px] font-normal">{s.value}</span>
+            <span className="tnum font-serif text-[42px] leading-[46px] font-normal text-ink">{s.value}</span>
             <span className={`text-sm ${s.c}`}>{s.sub}</span>
           </div>
         ))}
       </div>
-      <div className="flex flex-wrap items-center gap-4 rounded-lg border border-ser bg-ser-soft px-4 py-3">
-        <strong className="text-sm">Needs attention</strong>
-        {attention.map((a) => (
-          <a key={a.name} href="#" className="text-sm text-ink">
-            <strong>{a.name}</strong> — {a.why}
-          </a>
-        ))}
+
+      {/* Needs Attention Alert Banner */}
+      <div className="flex flex-wrap items-center gap-4 rounded-xl border border-ser bg-ser-soft px-4 py-3 text-ink">
+        <div className="flex items-center gap-2 text-sm font-semibold text-ink">
+          <Icon d={I.serious} size={18} className="text-amber-600 dark:text-amber-400" />
+          <span>Needs attention:</span>
+        </div>
+        <div className="flex flex-wrap items-center gap-4 text-sm">
+          {attention.map((a) => (
+            <Link key={a.name} href={a.href} className="text-ink font-medium hover:text-primary hover:underline">
+              <strong>{a.name}</strong> — <span className="text-muted">{a.why}</span>
+            </Link>
+          ))}
+        </div>
       </div>
 
-      {/* Desktop: real table. Mobile: stacked SiteCards. */}
-      <div className="hidden md:block">
-        <table className="w-full border-collapse text-sm leading-5">
-          <thead>
-            <tr className="bg-subtle text-left text-muted">
-              <th scope="col" className="px-3 py-2.5 font-semibold">Site</th>
-              <th scope="col" className="px-3 py-2.5 font-semibold">Client</th>
-              <th scope="col" className="px-3 py-2.5 font-semibold" aria-sort="ascending">
-                Score <span aria-hidden="true">↑</span>
-                <span className="sr-only">, sorted lowest first</span>
-              </th>
-              <th scope="col" className="px-3 py-2.5 font-semibold">Critical · Serious</th>
-              <th scope="col" className="px-3 py-2.5 font-semibold">Change</th>
-              <th scope="col" className="px-3 py-2.5 font-semibold">Last scan</th>
-              <th scope="col" className="px-3 py-2.5 font-semibold">Status</th>
-            </tr>
-          </thead>
-          <tbody data-rows>
-            {sorted.map((r) => (
-              <tr key={r.url} className="ease-ui border-b border-line hover:bg-surface">
-                <td className="p-3">
-                  <Link href={siteHref(r)} className="block font-semibold text-ink no-underline hover:text-ptext">
-                    {r.name}
-                  </Link>
-                  <span className="text-muted">
-                    {r.url} · {r.platform}
-                  </span>
-                </td>
-                <td className="p-3">{r.client}</td>
-                <td className="p-3">
-                  <Score r={r} />
-                </td>
-                <td className="tnum p-3">
-                  <span className="font-semibold text-crit">{r.crit} critical</span> · <span className="font-semibold text-ser">{r.ser} serious</span>
-                </td>
-                <td className={`p-3 ${deltaCls(r)}`}>{r.delta}</td>
-                <td className="p-3 text-muted">{r.last}</td>
-                <td className="p-3">
-                  <span className="rounded border border-line-strong px-2 py-px text-[13px] font-medium">{r.status}</span>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      {/* Filtering and Grouping Controls Bar */}
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-line bg-surface p-3 shadow-xs">
+        <div className="flex flex-wrap items-center gap-3 flex-1 min-w-[280px]">
+          {/* Search Input */}
+          <div className="relative flex-1 min-w-[180px] max-w-sm">
+            <Icon d={I.search} size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted" />
+            <input
+              type="text"
+              placeholder="Search sites or URLs..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="w-full rounded-full border border-line bg-subtle/50 py-1.5 pl-9 pr-3 text-xs text-ink placeholder:text-muted focus:border-primary focus:bg-surface focus:outline-none"
+            />
+          </div>
+
+          {/* Client Filter Dropdown */}
+          <div className="flex items-center gap-2">
+            <label htmlFor="client-filter-select" className="text-xs font-semibold text-muted">
+              Client:
+            </label>
+            <select
+              id="client-filter-select"
+              value={prefs.clientFilter}
+              onChange={(e) => onUpdatePrefs({ clientFilter: e.target.value })}
+              className="rounded-full border border-line bg-surface px-3 py-1.5 text-xs text-ink focus:border-primary focus:outline-none"
+            >
+              <option value="all">All clients ({SITES.length} sites)</option>
+              {clientsList.map((c) => (
+                <option key={c} value={c}>
+                  {c}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Group by Client Toggle */}
+          <button
+            type="button"
+            onClick={() => onUpdatePrefs({ groupByClient: !prefs.groupByClient })}
+            className={`ease-ui flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold ${
+              prefs.groupByClient
+                ? "border-primary bg-primary-soft text-ptext"
+                : "border-line bg-surface text-ink hover:bg-subtle"
+            }`}
+          >
+            <Icon d={I.building} size={14} />
+            <span>Group by client</span>
+          </button>
+        </div>
+
+        {/* Sort selector dropdown */}
+        <div className="flex items-center gap-2">
+          <label htmlFor="sort-key-select" className="text-xs font-semibold text-muted">
+            Sort by:
+          </label>
+          <select
+            id="sort-key-select"
+            value={prefs.sortKey}
+            onChange={(e) => onUpdatePrefs({ sortKey: e.target.value as SortKey })}
+            className="rounded-full border border-line bg-surface px-3 py-1.5 text-xs font-semibold text-ink focus:border-primary focus:outline-none"
+          >
+            <option value="score">Score (worst-first)</option>
+            <option value="crit_ser">Critical & Serious issues</option>
+            <option value="regressions">Regressions count</option>
+            <option value="name">Site name (A–Z)</option>
+            <option value="lastScan">Last scan date</option>
+          </select>
+        </div>
       </div>
-      <ul className="m-0 flex list-none flex-col gap-3 p-0 md:hidden">
-        {sorted.map((r) => (
-          <li key={r.url}>
-            <Link href={siteHref(r)} className={`${CARD} flex flex-col gap-2 p-4 text-ink no-underline hover:text-ink`}>
-              <span className="flex items-start justify-between gap-3">
-                <span>
-                  <strong className="block">{r.name}</strong>
-                  <span className="text-sm text-muted">{r.client}</span>
-                </span>
-                <Score r={r} size="text-lg" />
-              </span>
-              <span className="tnum text-sm">
-                <span className="font-semibold text-crit">{r.crit} critical</span> · <span className="font-semibold text-ser">{r.ser} serious</span>
-              </span>
-              <span className="flex justify-between text-sm">
-                <span className={deltaCls(r)}>{r.delta}</span>
-                <span className="rounded border border-line-strong px-2 py-px text-[13px] font-medium">{r.status}</span>
-              </span>
-            </Link>
-          </li>
-        ))}
-      </ul>
+
+      {/* Main S-20 Sites Table */}
+      <div className="overflow-hidden rounded-2xl border border-line bg-surface shadow-card">
+        {clientGroups ? (
+          // Grouped by client view
+          <div className="divide-y divide-line">
+            {clientGroups.map((g) => (
+              <div key={g.client} className="p-0">
+                <div className="flex items-center justify-between bg-subtle px-4 py-2.5 border-b border-line">
+                  <div className="flex items-center gap-2 font-semibold text-ink text-sm">
+                    <Icon d={I.building} size={15} className="text-muted" />
+                    <span>{g.client}</span>
+                  </div>
+                  <span className="text-xs font-medium text-muted">
+                    {g.sites.length} {g.sites.length === 1 ? "site" : "sites"}
+                  </span>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full border-collapse text-left text-sm leading-5">
+                    <thead>
+                      <tr className="border-b border-line bg-surface text-xs font-semibold text-muted">
+                        <th scope="col" className="px-4 py-2.5">Site</th>
+                        <th scope="col" className="px-4 py-2.5">Score</th>
+                        <th scope="col" className="px-4 py-2.5">Critical · Serious</th>
+                        <th scope="col" className="px-4 py-2.5">Regressions</th>
+                        <th scope="col" className="px-4 py-2.5">Last Scan</th>
+                        <th scope="col" className="px-4 py-2.5">Next Scan</th>
+                        <th scope="col" className="px-4 py-2.5">Verification</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-line">
+                      {g.sites.map((r) => (
+                        <tr key={r.url} className="hover:bg-subtle/50 transition-colors">
+                          <td className="px-4 py-3">
+                            <Link href={siteHref(r)} className="font-semibold text-ink hover:text-primary no-underline block">
+                              {r.name}
+                            </Link>
+                            <span className="text-xs text-muted">
+                              {r.url} · {r.platform}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3">
+                            <Score r={r} />
+                          </td>
+                          <td className="px-4 py-3 tnum text-xs">
+                            <span className="font-semibold text-crit">{r.crit} critical</span> ·{" "}
+                            <span className="font-semibold text-ser">{r.ser} serious</span>
+                          </td>
+                          <td className="px-4 py-3 text-xs">
+                            {(r.regressions ?? 0) > 0 ? (
+                              <span className="inline-flex items-center gap-1 font-semibold text-crit">
+                                <Icon d={I.regressed} size={12} />
+                                <span>{r.regressions} regression{r.regressions === 1 ? "" : "s"}</span>
+                              </span>
+                            ) : (
+                              <span className="text-muted">—</span>
+                            )}
+                          </td>
+                          <td className="px-4 py-3 text-xs text-muted">{r.last}</td>
+                          <td className="px-4 py-3 text-xs text-muted">{r.nextScan}</td>
+                          <td className="px-4 py-3">
+                            {r.verified ? (
+                              <span className="inline-flex items-center gap-1 text-xs font-medium text-emerald-800 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 rounded-full px-2 py-0.5">
+                                <Icon d={I.check} size={12} />
+                                <span>Verified</span>
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 text-xs font-medium text-amber-800 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40 rounded-full px-2 py-0.5">
+                                <Icon d={I.alert} size={12} />
+                                <span>Pending</span>
+                              </span>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          // Flat worst-first table view
+          <div className="overflow-x-auto">
+            <table className="w-full border-collapse text-left text-sm leading-5">
+              <thead>
+                <tr className="border-b border-line bg-subtle text-xs font-semibold text-muted">
+                  <th
+                    scope="col"
+                    onClick={() => handleHeaderSort("name")}
+                    className="px-4 py-3 cursor-pointer select-none hover:text-ink"
+                    aria-sort={prefs.sortKey === "name" ? (prefs.sortDir === "asc" ? "ascending" : "descending") : "none"}
+                  >
+                    <span>Site</span>
+                    {renderSortIndicator("name")}
+                  </th>
+                  <th scope="col" className="px-4 py-3">Client</th>
+                  <th
+                    scope="col"
+                    onClick={() => handleHeaderSort("score")}
+                    className="px-4 py-3 cursor-pointer select-none hover:text-ink"
+                    aria-sort={prefs.sortKey === "score" ? (prefs.sortDir === "asc" ? "ascending" : "descending") : "none"}
+                  >
+                    <span>Score (Worst-first)</span>
+                    {renderSortIndicator("score")}
+                  </th>
+                  <th
+                    scope="col"
+                    onClick={() => handleHeaderSort("crit_ser")}
+                    className="px-4 py-3 cursor-pointer select-none hover:text-ink"
+                    aria-sort={prefs.sortKey === "crit_ser" ? (prefs.sortDir === "asc" ? "ascending" : "descending") : "none"}
+                  >
+                    <span>Critical · Serious</span>
+                    {renderSortIndicator("crit_ser")}
+                  </th>
+                  <th
+                    scope="col"
+                    onClick={() => handleHeaderSort("regressions")}
+                    className="px-4 py-3 cursor-pointer select-none hover:text-ink"
+                    aria-sort={prefs.sortKey === "regressions" ? (prefs.sortDir === "asc" ? "ascending" : "descending") : "none"}
+                  >
+                    <span>Regressions</span>
+                    {renderSortIndicator("regressions")}
+                  </th>
+                  <th
+                    scope="col"
+                    onClick={() => handleHeaderSort("lastScan")}
+                    className="px-4 py-3 cursor-pointer select-none hover:text-ink"
+                    aria-sort={prefs.sortKey === "lastScan" ? (prefs.sortDir === "asc" ? "ascending" : "descending") : "none"}
+                  >
+                    <span>Last Scan</span>
+                    {renderSortIndicator("lastScan")}
+                  </th>
+                  <th scope="col" className="px-4 py-3">Next Scan</th>
+                  <th scope="col" className="px-4 py-3">Verification</th>
+                </tr>
+              </thead>
+              <tbody data-rows className="divide-y divide-line">
+                {sorted.map((r) => (
+                  <tr key={r.url} className="hover:bg-subtle/50 transition-colors">
+                    <td className="px-4 py-3">
+                      <Link href={siteHref(r)} className="font-semibold text-ink hover:text-primary no-underline block">
+                        {r.name}
+                      </Link>
+                      <span className="text-xs text-muted">
+                        {r.url} · {r.platform}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-xs text-muted font-medium">{r.client}</td>
+                    <td className="px-4 py-3">
+                      <Score r={r} />
+                    </td>
+                    <td className="px-4 py-3 tnum text-xs">
+                      <span className="font-semibold text-crit">{r.crit} critical</span> ·{" "}
+                      <span className="font-semibold text-ser">{r.ser} serious</span>
+                    </td>
+                    <td className="px-4 py-3 text-xs">
+                      {(r.regressions ?? 0) > 0 ? (
+                        <span className="inline-flex items-center gap-1 font-semibold text-crit">
+                          <Icon d={I.regressed} size={12} />
+                          <span>{r.regressions} regression{r.regressions === 1 ? "" : "s"}</span>
+                        </span>
+                      ) : (
+                        <span className="text-muted">—</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 text-xs text-muted">{r.last}</td>
+                    <td className="px-4 py-3 text-xs text-muted">{r.nextScan}</td>
+                    <td className="px-4 py-3">
+                      {r.verified ? (
+                        <span className="inline-flex items-center gap-1 text-xs font-medium text-emerald-800 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 rounded-full px-2 py-0.5">
+                          <Icon d={I.check} size={12} />
+                          <span>Verified</span>
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 text-xs font-medium text-amber-800 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40 rounded-full px-2 py-0.5">
+                          <Icon d={I.alert} size={12} />
+                          <span>Pending</span>
+                        </span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -148,61 +468,46 @@ function TableLayout() {
 /* ---------- 1b — Triage lanes ---------- */
 function LanesLayout() {
   const lanes = [
-    { title: "Needs attention", hint: "Regressions, failed scans, sharp drops.", items: SITES.filter((r) => r.reason).map((r) => ({ r, reason: r.reason })) },
-    {
-      title: "Improving",
-      hint: "Score rising; keep going.",
-      items: SITES.filter((r) => !r.reason && r.dir > 0).map((r) => ({ r, reason: `${r.delta} since last scan · ${r.crit} critical open` })),
-    },
-    {
-      title: "Stable",
-      hint: "Nothing changed. Check monthly.",
-      items: SITES.filter((r) => !r.reason && r.dir === 0).map((r) => ({ r, reason: r.status === "Paused" ? "Paused" : `No change · last scan ${r.last}` })),
-    },
+    { id: "regressed", title: "Regressions", filter: (s: SiteRow) => (s.regressions ?? 0) > 0 },
+    { id: "critical", title: "High priority (< 70)", filter: (s: SiteRow) => (s.score ?? 0) < 70 },
+    { id: "good", title: "Stable (≥ 70)", filter: (s: SiteRow) => (s.score ?? 0) >= 70 },
   ];
+
   return (
     <div data-layout className="flex flex-col gap-6">
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <h1 className={H1}>Good morning, Daniel</h1>
-          <p className="mt-1 mb-0 text-muted">3 sites need you this week. Average score 81, up 3 since last week.</p>
-        </div>
-        <button type="button" className={PRIMARY}>
-          Add site
-        </button>
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <h1 className={H1}>Overview · Triage Lanes</h1>
       </div>
-      <div className="grid items-start gap-5 md:grid-cols-3">
-        {lanes.map((l) => (
-          <section key={l.title} aria-labelledby={`lane-${l.title}`} className="flex flex-col gap-3 rounded-xl bg-subtle p-4">
-            <h2 id={`lane-${l.title}`} className="m-0 flex justify-between text-base font-semibold">
-              <span>{l.title}</span>
-              <span className="font-medium text-muted">{l.items.length}</span>
-            </h2>
-            <p className="m-0 text-sm leading-5 text-muted">{l.hint}</p>
-            {l.items.map(({ r, reason }) => {
-              const b = band(r.score);
-              return (
-                <Link
-                  key={r.url}
-                  href={siteHref(r)}
-                  className="ease-ui flex flex-col gap-2 rounded-lg border border-line bg-surface px-4 py-3.5 text-ink no-underline hover:-translate-y-0.5 hover:text-ink hover:shadow-pop"
-                >
-                  <span className="flex justify-between gap-2">
-                    <span>
-                      <strong className="block">{r.name}</strong>
-                      <span className="text-[13px] text-muted">{r.client}</span>
-                    </span>
-                    <span className="text-right">
-                      <strong className="tnum text-xl">{r.score ?? "—"}</strong>
-                      <span className={`block text-xs font-semibold ${b.text}`}>{b.label}</span>
-                    </span>
-                  </span>
-                  <span className="text-[13px] text-muted">{reason}</span>
-                </Link>
-              );
-            })}
-          </section>
-        ))}
+      <div className="grid gap-6 md:grid-cols-3">
+        {lanes.map((l) => {
+          const sitesInLane = SITES.filter(l.filter);
+          return (
+            <div key={l.id} className={`${CARD} flex flex-col p-4`}>
+              <div className="flex items-center justify-between pb-3 border-b border-line mb-3">
+                <h2 className="text-sm font-semibold text-ink m-0">{l.title}</h2>
+                <span className="text-xs text-muted bg-subtle px-2 py-0.5 rounded-full">{sitesInLane.length}</span>
+              </div>
+              <div className="flex flex-col gap-2.5">
+                {sitesInLane.map((s) => (
+                  <Link
+                    key={s.url}
+                    href={siteHref(s)}
+                    className="p-3 rounded-xl border border-line bg-surface hover:bg-subtle/50 no-underline text-ink transition-colors block"
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="font-semibold text-sm">{s.name}</span>
+                      <Score r={s} size="text-sm" />
+                    </div>
+                    <div className="mt-1 text-xs text-muted flex items-center justify-between">
+                      <span>{s.client}</span>
+                      <span>{s.crit} crit · {s.ser} ser</span>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            </div>
+          );
+        })}
       </div>
     </div>
   );
@@ -210,34 +515,16 @@ function LanesLayout() {
 
 /* ---------- 1c — Grouped by client + common problems ---------- */
 function ClientsLayout() {
-  const [byClient, setByClient] = useState(true);
-  const groups = byClient
-    ? [...new Set(SITES.map((s) => s.client))].map((c) => ({ name: c, items: SITES.filter((s) => s.client === c) }))
-    : [{ name: "All sites", items: SITES }];
+  const groups = [...new Set(SITES.map((s) => s.client))].map((c) => ({
+    name: c,
+    items: SITES.filter((s) => s.client === c),
+  }));
+
   return (
     <div data-layout className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_340px]">
       <div className="flex flex-col gap-5">
-        <div className="flex flex-wrap items-center justify-between gap-4">
-          <h1 className={H1}>Overview</h1>
-          <div role="radiogroup" aria-label="Group by" className="inline-flex overflow-hidden rounded-full border border-line-strong text-sm font-semibold">
-            {[
-              ["By client", true],
-              ["All sites", false],
-            ].map(([l, v]) => (
-              <button
-                key={String(l)}
-                type="button"
-                role="radio"
-                aria-checked={byClient === v}
-                onClick={() => setByClient(v as boolean)}
-                className={`ease-ui border-0 px-3 py-1.5 ${byClient === v ? "bg-primary text-on-primary" : "bg-surface text-ink hover:bg-subtle"}`}
-              >
-                {l}
-              </button>
-            ))}
-          </div>
-        </div>
-        {groups.slice(0, 6).map((g) => (
+        <h1 className={H1}>Overview · By Client</h1>
+        {groups.map((g) => (
           <section key={g.name} aria-labelledby={`cl-${g.name}`} className={`${CARD} overflow-hidden`}>
             <h2 id={`cl-${g.name}`} className="m-0 flex justify-between bg-subtle px-4 py-3 text-base font-semibold">
               <span>{g.name}</span>
@@ -251,16 +538,16 @@ function ClientsLayout() {
                 className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-1 border-t border-line px-4 py-3 text-sm md:grid-cols-[minmax(0,1fr)_120px_180px_110px]"
               >
                 <span>
-                  <Link href={siteHref(r)} className="font-semibold text-ink no-underline hover:text-ptext">
+                  <Link href={siteHref(r)} className="font-semibold text-ink no-underline hover:text-primary">
                     {r.name}
                   </Link>
-                  <span className="block text-muted">{r.url}</span>
+                  <span className="block text-muted text-xs">{r.url} · {r.platform}</span>
                 </span>
                 <Score r={r} />
-                <span className="tnum">
+                <span className="tnum text-xs">
                   {r.crit} critical · {r.ser} serious
                 </span>
-                <span className={deltaCls(r)}>{r.delta}</span>
+                <span className={`text-xs ${deltaCls(r)}`}>{r.delta}</span>
               </div>
             ))}
           </section>
@@ -271,55 +558,113 @@ function ClientsLayout() {
           <h2 className="m-0 text-xl leading-7 font-semibold">Most common problems</h2>
           <p className="m-0 text-sm leading-5 text-muted">Fix once in a shared theme, help many clients.</p>
           {COMMON_PROBLEMS.map((p) => (
-            <a key={p.t} href="#" className="flex justify-between gap-3 border-t border-line py-2 text-sm text-ink no-underline hover:text-ptext">
+            <div key={p.t} className="flex justify-between gap-3 border-t border-line py-2 text-sm text-ink">
               <span>{p.t}</span>
-              <span className="whitespace-nowrap text-muted">{p.n} sites</span>
-            </a>
+              <span className="whitespace-nowrap text-muted text-xs font-semibold">{p.n} sites</span>
+            </div>
           ))}
         </section>
         <section className={`${CARD} flex flex-col gap-2 p-5`}>
           <h2 className="m-0 text-base font-semibold">This week</h2>
           <span className="text-sm">2 regressions · 31 problems fixed · 1 failed scan</span>
-          <a href="#" className="text-sm font-semibold">
-            Send monthly reports (5 due)
-          </a>
+          <Link href="/reports" className="text-sm font-semibold text-primary hover:underline">
+            View on-demand reports →
+          </Link>
         </section>
       </aside>
     </div>
   );
 }
 
-/** S-20 Agency overview — three layout options from the design pass, switchable for review. */
-export function AgencyOverview() {
-  const [layout, setLayout] = useState<LayoutId>("1a");
-  const scope = useEntrance<HTMLDivElement>([layout], "[data-layout] > *, [data-rows] > tr");
-  const current = LAYOUTS.find((l) => l.id === layout)!;
+export interface AgencyOverviewProps {
+  isStoreSingleSite?: boolean;
+  storeSiteSlug?: string;
+}
+
+/** S-20 Agency overview — with persistent sorting and filtering per user (P2-20). */
+export function AgencyOverview({ isStoreSingleSite = false, storeSiteSlug = "oakhaus" }: AgencyOverviewProps) {
+  const router = useRouter();
+
+  // Redirect single-site stores directly to their site overview
+  useEffect(() => {
+    if (isStoreSingleSite && storeSiteSlug) {
+      router.replace(`/sites/${storeSiteSlug}`);
+    }
+  }, [isStoreSingleSite, storeSiteSlug, router]);
+
+  // Load persistent user preferences
+  const [prefs, setPrefs] = useState<OverviewUserPrefs>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const saved = localStorage.getItem(STORAGE_KEY);
+        if (saved) {
+          return { ...DEFAULT_PREFS, ...JSON.parse(saved) };
+        }
+      } catch {
+        // Fall back to defaults
+      }
+    }
+    return DEFAULT_PREFS;
+  });
+
+  const updatePrefs = (updater: Partial<OverviewUserPrefs>) => {
+    setPrefs((prev) => {
+      const next = { ...prev, ...updater };
+      if (typeof window !== "undefined") {
+        try {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+        } catch {
+          // ignore storage errors
+        }
+      }
+      return next;
+    });
+  };
+
+  const scope = useEntrance<HTMLDivElement>([prefs.layout], "[data-layout] > *, [data-rows] > tr");
+  const currentLayout = LAYOUTS.find((l) => l.id === prefs.layout) ?? LAYOUTS[0];
+
+  if (isStoreSingleSite) {
+    return (
+      <AppShell active="overview" crumbs={[{ label: "Overview" }]}>
+        <div className="p-12 text-center text-sm text-muted">
+          Redirecting to site overview...
+        </div>
+      </AppShell>
+    );
+  }
 
   return (
     <AppShell active="overview" crumbs={[{ label: "Overview" }]}>
-      <div className="mb-8 flex flex-wrap items-center gap-3 rounded-full border border-dashed border-line-strong py-2 pr-4 pl-2 text-sm">
-        <div role="radiogroup" aria-label="Design option" className="inline-flex gap-1">
+      {/* Design layout switch bar */}
+      <div className="mb-6 flex flex-wrap items-center gap-3 rounded-full border border-dashed border-line-strong py-2 pr-4 pl-2 text-sm">
+        <div role="radiogroup" aria-label="Design layout option" className="inline-flex gap-1">
           {LAYOUTS.map((l) => (
             <button
               key={l.id}
               type="button"
               role="radio"
-              aria-checked={layout === l.id}
-              onClick={() => setLayout(l.id)}
-              className={`ease-ui rounded-full border-0 px-3 py-1 font-bold ${layout === l.id ? "bg-primary text-on-primary" : "bg-transparent text-ink hover:bg-subtle"}`}
+              aria-checked={prefs.layout === l.id}
+              onClick={() => updatePrefs({ layout: l.id })}
+              className={`ease-ui rounded-full border-0 px-3 py-1 font-bold ${
+                prefs.layout === l.id ? "bg-primary text-on-primary" : "bg-transparent text-ink hover:bg-subtle"
+              }`}
             >
               {l.id}
               <span className="sr-only">: {l.label}</span>
             </button>
           ))}
         </div>
-        <span className="font-semibold">{current.label}</span>
-        <span className="text-muted">{current.hint}</span>
+        <span className="font-semibold text-ink">{currentLayout.label}</span>
+        <span className="text-muted text-xs sm:text-sm">{currentLayout.hint}</span>
       </div>
+
       <div ref={scope}>
-        {layout === "1a" && <TableLayout />}
-        {layout === "1b" && <LanesLayout />}
-        {layout === "1c" && <ClientsLayout />}
+        {prefs.layout === "1a" && (
+          <TableLayout prefs={prefs} onUpdatePrefs={updatePrefs} />
+        )}
+        {prefs.layout === "1b" && <LanesLayout />}
+        {prefs.layout === "1c" && <ClientsLayout />}
       </div>
     </AppShell>
   );

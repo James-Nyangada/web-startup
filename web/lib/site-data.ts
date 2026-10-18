@@ -195,6 +195,7 @@ export const IGNORE_REASONS = ["False positive", "Not applicable", "Won’t fix"
 /* ---------- Agency overview (S-20) ---------- */
 
 export type SiteRow = {
+  id?: string;
   name: string;
   url: string;
   client: string;
@@ -202,22 +203,25 @@ export type SiteRow = {
   score: number | null;
   crit: number;
   ser: number;
+  regressions?: number;
   delta: string;
   dir: 1 | 0 | -1;
   last: string;
+  nextScan?: string;
   status: "Active" | "Error" | "Paused";
+  verified?: boolean;
   reason: string;
 };
 
 export const SITES: SiteRow[] = [
-  { name: "Oakhaus Furniture", url: "oakhaus.com", client: "Mark Otieno", platform: "Shopify", score: 78, crit: 3, ser: 4, delta: "Up 6", dir: 1, last: "14 Oct", status: "Active", reason: "Regressed: product images" },
-  { name: "Sora Skincare", url: "soraskin.co", client: "Grace Wanjiru", platform: "Shopify", score: 58, crit: 7, ser: 11, delta: "Down 9", dir: -1, last: "14 Oct", status: "Active", reason: "Score dropped 9 after a new app" },
-  { name: "Kito Coffee", url: "kitocoffee.com", client: "Kito Ltd", platform: "WordPress", score: 64, crit: 4, ser: 8, delta: "Up 2", dir: 1, last: "13 Oct", status: "Active", reason: "" },
-  { name: "Mwanga Solar", url: "mwangasolar.co.ke", client: "Mwanga Energy", platform: "WordPress", score: null, crit: 0, ser: 0, delta: "—", dir: 0, last: "Failed 13 Oct", status: "Error", reason: "Scan failed: site returned 503" },
-  { name: "Lumen Opticians", url: "lumenoptics.co.uk", client: "Lumen Group", platform: "WordPress", score: 83, crit: 1, ser: 3, delta: "No change", dir: 0, last: "14 Oct", status: "Active", reason: "" },
-  { name: "Lumen Careers", url: "careers.lumenoptics.co.uk", client: "Lumen Group", platform: "Other", score: 88, crit: 0, ser: 2, delta: "Up 4", dir: 1, last: "12 Oct", status: "Active", reason: "" },
-  { name: "Baraka Bikes", url: "barakabikes.com", client: "Baraka Cycles", platform: "Shopify", score: 91, crit: 0, ser: 1, delta: "Up 1", dir: 1, last: "14 Oct", status: "Active", reason: "" },
-  { name: "Tamu Bakery", url: "tamubakery.com", client: "Tamu Foods", platform: "Shopify", score: 95, crit: 0, ser: 0, delta: "No change", dir: 0, last: "11 Oct", status: "Paused", reason: "" },
+  { name: "Oakhaus Furniture", url: "oakhaus.com", client: "Mark Otieno", platform: "Shopify", score: 78, crit: 3, ser: 4, regressions: 1, delta: "Up 6", dir: 1, last: "14 Oct", nextScan: "Tomorrow 02:00", status: "Active", verified: true, reason: "Regressed: product images" },
+  { name: "Sora Skincare", url: "soraskin.co", client: "Grace Wanjiru", platform: "Shopify", score: 58, crit: 7, ser: 11, regressions: 2, delta: "Down 9", dir: -1, last: "14 Oct", nextScan: "Wed 03:00", status: "Active", verified: true, reason: "Score dropped 9 after a new app" },
+  { name: "Kito Coffee", url: "kitocoffee.com", client: "Kito Ltd", platform: "WordPress", score: 64, crit: 4, ser: 8, regressions: 1, delta: "Up 2", dir: 1, last: "13 Oct", nextScan: "Thu 02:00", status: "Active", verified: true, reason: "" },
+  { name: "Mwanga Solar", url: "mwangasolar.co.ke", client: "Mwanga Energy", platform: "WordPress", score: null, crit: 0, ser: 0, regressions: 0, delta: "—", dir: 0, last: "Failed 13 Oct", nextScan: "Retrying today", status: "Error", verified: false, reason: "Scan failed: site returned 503" },
+  { name: "Lumen Opticians", url: "lumenoptics.co.uk", client: "Lumen Group", platform: "WordPress", score: 83, crit: 1, ser: 3, regressions: 0, delta: "No change", dir: 0, last: "14 Oct", nextScan: "Friday 02:00", status: "Active", verified: true, reason: "" },
+  { name: "Lumen Careers", url: "careers.lumenoptics.co.uk", client: "Lumen Group", platform: "Other", score: 88, crit: 0, ser: 2, regressions: 0, delta: "Up 4", dir: 1, last: "12 Oct", nextScan: "Friday 02:30", status: "Active", verified: true, reason: "" },
+  { name: "Baraka Bikes", url: "barakabikes.com", client: "Baraka Cycles", platform: "Shopify", score: 91, crit: 0, ser: 1, regressions: 0, delta: "Up 1", dir: 1, last: "14 Oct", nextScan: "Sat 04:00", status: "Active", verified: true, reason: "" },
+  { name: "Tamu Bakery", url: "tamubakery.com", client: "Tamu Foods", platform: "Shopify", score: 95, crit: 0, ser: 0, regressions: 0, delta: "No change", dir: 0, last: "11 Oct", nextScan: "Paused", status: "Paused", verified: true, reason: "" },
 ];
 
 export const COMMON_PROBLEMS = [

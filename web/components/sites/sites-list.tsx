@@ -35,7 +35,10 @@ export function SitesList() {
       delta: "—",
       dir: 0,
       last: "Queued",
+      nextScan: "Scheduled",
       status: "Active",
+      verified: false,
+      regressions: 0,
       reason: "Initial onboarding scan queued",
     };
     setSiteRows((prev) => [row, ...prev]);
