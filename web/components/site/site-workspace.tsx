@@ -333,6 +333,7 @@ export function SiteWorkspace({
         onRecheck={recheck}
         onIgnore={() => setIgnoreOpen(true)}
         onReopen={() => current && setIssue(current.id, { status: "open" })}
+        siteHref={siteHref}
       />
       {ignoreOpen && <IgnoreDialog onCancel={closeIgnore} onConfirm={confirmIgnore} />}
       <Toast

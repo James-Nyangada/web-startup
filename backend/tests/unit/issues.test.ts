@@ -383,4 +383,234 @@ describe('Issues API (Chunk P2-12, Screen S-25, Section 7.5)', () => {
       );
     });
   });
+
+  describe('Issue Detail Sub-resources (Chunk P2-13, Screen S-26)', () => {
+    const mockIssueDetail = {
+      id: 'issue-1',
+      orgId,
+      siteId,
+      fingerprint: 'fp-1',
+      ruleId: 'color-contrast',
+      title: 'Elements must have sufficient color contrast',
+      description: 'Ensures the contrast between foreground and background colors meets WCAG 2 AA minimum contrast thresholds',
+      whoIsAffected: 'People with low vision',
+      helpUrl: 'https://dequeuniversity.com/rules/axe/4.14/color-contrast',
+      impact: 'serious' as const,
+      wcagCriteria: ['1.4.3'],
+      wcagLevel: 'AA' as const,
+      templateKey: 'product',
+      selector: '.product-card button',
+      htmlSnippet: '<button class="bg-gray text-white">Buy</button>',
+      failureSummary: 'Fix any of the following: Element has insufficient color contrast of 2.8:1 (foreground color: #ffffff, background color: #aaaaaa, font size: 12.0pt (16px), font weight: normal). Expected contrast ratio of 4.5:1',
+      status: 'open' as const,
+      ignoredReason: null,
+      ignoredNote: null,
+      ignoredBy: null,
+      ignoredAt: null,
+      isRegression: false,
+      regressionCount: 0,
+      occurrenceCount: 2,
+      assigneeId: null,
+      assigneeName: null,
+      dueDate: null,
+      needsReview: false,
+      firstSeenScanId: 'scan-1',
+      lastSeenScanId: 'scan-2',
+      fixedScanId: null,
+      fixedAt: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+
+    beforeEach(() => {
+      vi.mocked(repos.issues.findById).mockResolvedValue(mockIssueDetail);
+    });
+
+    describe('GET /v1/orgs/:orgId/sites/:siteId/issues/:issueId', () => {
+      it('returns issue detail under site-scoped route', async () => {
+        const res = await request(app)
+          .get(`/v1/orgs/${orgId}/sites/${siteId}/issues/issue-1`)
+          .set('Cookie', memberCookie)
+          .expect(200);
+
+        expect(res.body.data.issue.id).toBe('issue-1');
+        expect(res.body.data.issue.title).toBe('Elements must have sufficient color contrast');
+      });
+
+      it('returns 404 when siteId does not match issue siteId', async () => {
+        const res = await request(app)
+          .get(`/v1/orgs/${orgId}/sites/site-mismatched/issues/issue-1`)
+          .set('Cookie', memberCookie)
+          .expect(404);
+
+        expect(res.body.error.code).toBe(ErrorCode.NOT_FOUND);
+      });
+    });
+
+    describe('GET /v1/orgs/:orgId/issues/:issueId/occurrences', () => {
+      it('returns paginated occurrences for the issue', async () => {
+        vi.mocked(repos.issues.listOccurrences).mockResolvedValue([
+          {
+            id: 'occ-1',
+            issueId: 'issue-1',
+            pageId: 'page-1',
+            url: 'https://example.com/products/item-1',
+            pageTitle: 'Item 1',
+            templateKey: 'product',
+            target: '.product-card button',
+            scanId: 'scan-2',
+            createdAt: new Date(),
+          },
+          {
+            id: 'occ-2',
+            issueId: 'issue-1',
+            pageId: 'page-2',
+            url: 'https://example.com/products/item-2',
+            pageTitle: 'Item 2',
+            templateKey: 'product',
+            target: '.product-card button',
+            scanId: 'scan-2',
+            createdAt: new Date(),
+          },
+        ]);
+        vi.mocked(repos.issues.countOccurrences).mockResolvedValue(2);
+
+        const res = await request(app)
+          .get(`/v1/orgs/${orgId}/issues/issue-1/occurrences?limit=10&page=1`)
+          .set('Cookie', memberCookie)
+          .expect(200);
+
+        expect(res.body.data.items).toHaveLength(2);
+        expect(res.body.data.total).toBe(2);
+        expect(res.body.data.page).toBe(1);
+        expect(res.body.data.totalPages).toBe(1);
+        expect(repos.issues.listOccurrences).toHaveBeenCalledWith(
+          orgId,
+          'issue-1',
+          { limit: 10, offset: 0 },
+        );
+      });
+
+      it('returns 404 when issue not found', async () => {
+        vi.mocked(repos.issues.findById).mockResolvedValue(null);
+
+        const res = await request(app)
+          .get(`/v1/orgs/${orgId}/issues/missing-issue/occurrences`)
+          .set('Cookie', memberCookie)
+          .expect(404);
+
+        expect(res.body.error.code).toBe(ErrorCode.NOT_FOUND);
+      });
+
+      it('returns 404 on cross-org occurrences request', async () => {
+        await assertCrossOrg404(app, {
+          method: 'get',
+          path: `/v1/orgs/${otherOrgId}/issues/issue-1/occurrences`,
+          sessionCookie: memberCookie,
+        });
+      });
+    });
+
+    describe('GET /v1/orgs/:orgId/issues/:issueId/events', () => {
+      it('returns timeline events for the issue', async () => {
+        vi.mocked(repos.issues.listEvents).mockResolvedValue([
+          {
+            id: 'event-1',
+            issueId: 'issue-1',
+            type: 'created',
+            actorId: null,
+            actorName: null,
+            scanId: 'scan-1',
+            data: {},
+            createdAt: new Date(),
+          },
+          {
+            id: 'event-2',
+            issueId: 'issue-1',
+            type: 'assigned',
+            actorId: userId,
+            actorName: 'User Member',
+            scanId: null,
+            data: { assigneeId: userId },
+            createdAt: new Date(),
+          },
+        ]);
+
+        const res = await request(app)
+          .get(`/v1/orgs/${orgId}/issues/issue-1/events`)
+          .set('Cookie', memberCookie)
+          .expect(200);
+
+        expect(res.body.data.items).toHaveLength(2);
+        expect(res.body.data.items[0].type).toBe('created');
+      });
+
+      it('returns 404 when issue not found', async () => {
+        vi.mocked(repos.issues.findById).mockResolvedValue(null);
+
+        const res = await request(app)
+          .get(`/v1/orgs/${orgId}/issues/missing-issue/events`)
+          .set('Cookie', memberCookie)
+          .expect(404);
+
+        expect(res.body.error.code).toBe(ErrorCode.NOT_FOUND);
+      });
+    });
+
+    describe('GET & POST /v1/orgs/:orgId/issues/:issueId/notes', () => {
+      it('lists notes for the issue', async () => {
+        vi.mocked(repos.issues.listNotes).mockResolvedValue([
+          {
+            id: 'note-1',
+            issueId: 'issue-1',
+            authorId: userId,
+            authorName: 'User Member',
+            body: 'We will fix this in sprint 4.',
+            visibleToClient: false,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          },
+        ]);
+
+        const res = await request(app)
+          .get(`/v1/orgs/${orgId}/issues/issue-1/notes`)
+          .set('Cookie', memberCookie)
+          .expect(200);
+
+        expect(res.body.data.items).toHaveLength(1);
+        expect(res.body.data.items[0].body).toBe('We will fix this in sprint 4.');
+      });
+
+      it('creates a note for the issue', async () => {
+        const res = await request(app)
+          .post(`/v1/orgs/${orgId}/issues/issue-1/notes`)
+          .set('Cookie', memberCookie)
+          .send({
+            body: 'Theme update scheduled for tomorrow.',
+            visibleToClient: true,
+          })
+          .expect(201);
+
+        expect(res.body.data.note).toBeDefined();
+        expect(repos.issues.addNote).toHaveBeenCalledWith(
+          orgId,
+          'issue-1',
+          userId,
+          'Theme update scheduled for tomorrow.',
+          true,
+        );
+      });
+
+      it('validates empty body and returns 400', async () => {
+        const res = await request(app)
+          .post(`/v1/orgs/${orgId}/issues/issue-1/notes`)
+          .set('Cookie', memberCookie)
+          .send({ body: '   ' })
+          .expect(400);
+
+        expect(res.body.error.code).toBe(ErrorCode.VALIDATION_ERROR);
+      });
+    });
+  });
 });
+

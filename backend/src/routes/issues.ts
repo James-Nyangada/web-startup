@@ -228,41 +228,254 @@ export function orgIssuesRouter(repos: Repositories): Router {
   );
 
   // GET /v1/orgs/:orgId/issues/:issueId - Issue detail (S-26)
-  router.get(
-    '/issues/:issueId',
-    requireOrgRole('member'),
-    async (req: Request, res: Response): Promise<void> => {
-      const issueIdParam = req.params.issueId;
-      const issueId = Array.isArray(issueIdParam) ? issueIdParam[0] : issueIdParam;
+  const getIssueDetailHandler = async (req: Request, res: Response): Promise<void> => {
+    const issueIdParam = req.params.issueId;
+    const issueId = Array.isArray(issueIdParam) ? issueIdParam[0] : issueIdParam;
 
-      if (!issueId) {
-        res.status(400).json({
-          error: {
-            code: ErrorCode.VALIDATION_ERROR,
-            message: 'Issue ID is required.',
-            details: {},
-          },
-        });
-        return;
-      }
-
-      const issue = await repos.issues.findById(req.orgId!, issueId);
-      if (!issue) {
-        res.status(404).json({
-          error: {
-            code: ErrorCode.NOT_FOUND,
-            message: 'Issue not found.',
-            details: {},
-          },
-        });
-        return;
-      }
-
-      res.status(200).json({
-        data: { issue },
+    if (!issueId) {
+      res.status(400).json({
+        error: {
+          code: ErrorCode.VALIDATION_ERROR,
+          message: 'Issue ID is required.',
+          details: {},
+        },
       });
-    },
-  );
+      return;
+    }
+
+    const issue = await repos.issues.findById(req.orgId!, issueId);
+    if (!issue) {
+      res.status(404).json({
+        error: {
+          code: ErrorCode.NOT_FOUND,
+          message: 'Issue not found.',
+          details: {},
+        },
+      });
+      return;
+    }
+
+    // Check siteId matches if provided in route
+    const siteIdParam = req.params.siteId;
+    const siteId = Array.isArray(siteIdParam) ? siteIdParam[0] : siteIdParam;
+    if (siteId && issue.siteId !== siteId) {
+      res.status(404).json({
+        error: {
+          code: ErrorCode.NOT_FOUND,
+          message: 'Issue not found for this site.',
+          details: {},
+        },
+      });
+      return;
+    }
+
+    res.status(200).json({
+      data: { issue },
+    });
+  };
+
+  router.get('/issues/:issueId', requireOrgRole('member'), getIssueDetailHandler);
+  router.get('/sites/:siteId/issues/:issueId', requireOrgRole('member'), getIssueDetailHandler);
+
+  // GET /v1/orgs/:orgId/issues/:issueId/occurrences - Paginated occurrences
+  const getOccurrencesHandler = async (req: Request, res: Response): Promise<void> => {
+    const issueIdParam = req.params.issueId;
+    const issueId = Array.isArray(issueIdParam) ? issueIdParam[0] : issueIdParam;
+
+    if (!issueId) {
+      res.status(400).json({
+        error: {
+          code: ErrorCode.VALIDATION_ERROR,
+          message: 'Issue ID is required.',
+          details: {},
+        },
+      });
+      return;
+    }
+
+    const issue = await repos.issues.findById(req.orgId!, issueId);
+    if (!issue) {
+      res.status(404).json({
+        error: {
+          code: ErrorCode.NOT_FOUND,
+          message: 'Issue not found.',
+          details: {},
+        },
+      });
+      return;
+    }
+
+    const limit = Math.min(100, Math.max(1, Number(req.query.limit || 20)));
+    const page = Math.max(1, Number(req.query.page || 1));
+    const offset = (page - 1) * limit;
+
+    const [items, total] = await Promise.all([
+      repos.issues.listOccurrences(req.orgId!, issueId, { limit, offset }),
+      repos.issues.countOccurrences(req.orgId!, issueId),
+    ]);
+
+    const totalPages = Math.ceil(total / limit) || 1;
+
+    res.status(200).json({
+      data: {
+        items,
+        total,
+        page,
+        limit,
+        totalPages,
+      },
+    });
+  };
+
+  router.get('/issues/:issueId/occurrences', requireOrgRole('member'), getOccurrencesHandler);
+  router.get('/sites/:siteId/issues/:issueId/occurrences', requireOrgRole('member'), getOccurrencesHandler);
+
+  // GET /v1/orgs/:orgId/issues/:issueId/events - Timeline from issue_events
+  const getEventsHandler = async (req: Request, res: Response): Promise<void> => {
+    const issueIdParam = req.params.issueId;
+    const issueId = Array.isArray(issueIdParam) ? issueIdParam[0] : issueIdParam;
+
+    if (!issueId) {
+      res.status(400).json({
+        error: {
+          code: ErrorCode.VALIDATION_ERROR,
+          message: 'Issue ID is required.',
+          details: {},
+        },
+      });
+      return;
+    }
+
+    const issue = await repos.issues.findById(req.orgId!, issueId);
+    if (!issue) {
+      res.status(404).json({
+        error: {
+          code: ErrorCode.NOT_FOUND,
+          message: 'Issue not found.',
+          details: {},
+        },
+      });
+      return;
+    }
+
+    const items = await repos.issues.listEvents(req.orgId!, issueId);
+
+    res.status(200).json({
+      data: { items },
+    });
+  };
+
+  router.get('/issues/:issueId/events', requireOrgRole('member'), getEventsHandler);
+  router.get('/sites/:siteId/issues/:issueId/events', requireOrgRole('member'), getEventsHandler);
+
+  // GET & POST /v1/orgs/:orgId/issues/:issueId/notes - Notes
+  const getNotesHandler = async (req: Request, res: Response): Promise<void> => {
+    const issueIdParam = req.params.issueId;
+    const issueId = Array.isArray(issueIdParam) ? issueIdParam[0] : issueIdParam;
+
+    if (!issueId) {
+      res.status(400).json({
+        error: {
+          code: ErrorCode.VALIDATION_ERROR,
+          message: 'Issue ID is required.',
+          details: {},
+        },
+      });
+      return;
+    }
+
+    const issue = await repos.issues.findById(req.orgId!, issueId);
+    if (!issue) {
+      res.status(404).json({
+        error: {
+          code: ErrorCode.NOT_FOUND,
+          message: 'Issue not found.',
+          details: {},
+        },
+      });
+      return;
+    }
+
+    const items = await repos.issues.listNotes(req.orgId!, issueId);
+
+    res.status(200).json({
+      data: { items },
+    });
+  };
+
+  const createNoteSchema = z.object({
+    body: z.string().trim().min(1, 'Note content is required.').max(10000),
+    visibleToClient: z.boolean().optional().default(false),
+  });
+
+  const createNoteHandler = async (req: Request, res: Response): Promise<void> => {
+    const issueIdParam = req.params.issueId;
+    const issueId = Array.isArray(issueIdParam) ? issueIdParam[0] : issueIdParam;
+
+    if (!issueId) {
+      res.status(400).json({
+        error: {
+          code: ErrorCode.VALIDATION_ERROR,
+          message: 'Issue ID is required.',
+          details: {},
+        },
+      });
+      return;
+    }
+
+    const issue = await repos.issues.findById(req.orgId!, issueId);
+    if (!issue) {
+      res.status(404).json({
+        error: {
+          code: ErrorCode.NOT_FOUND,
+          message: 'Issue not found.',
+          details: {},
+        },
+      });
+      return;
+    }
+
+    const parseResult = createNoteSchema.safeParse(req.body);
+    if (!parseResult.success) {
+      res.status(400).json({
+        error: {
+          code: ErrorCode.VALIDATION_ERROR,
+          message: parseResult.error.issues[0]?.message ?? 'Invalid note data.',
+          details: { issues: parseResult.error.issues },
+        },
+      });
+      return;
+    }
+
+    const authorId = req.auth?.user?.id;
+    if (!authorId) {
+      res.status(401).json({
+        error: {
+          code: ErrorCode.UNAUTHENTICATED,
+          message: 'User authentication required.',
+          details: {},
+        },
+      });
+      return;
+    }
+
+    const note = await repos.issues.addNote(
+      req.orgId!,
+      issueId,
+      authorId,
+      parseResult.data.body,
+      parseResult.data.visibleToClient,
+    );
+
+    res.status(201).json({
+      data: { note },
+    });
+  };
+
+  router.get('/issues/:issueId/notes', requireOrgRole('member'), getNotesHandler);
+  router.get('/sites/:siteId/issues/:issueId/notes', requireOrgRole('member'), getNotesHandler);
+  router.post('/issues/:issueId/notes', requireOrgRole('member'), createNoteHandler);
+  router.post('/sites/:siteId/issues/:issueId/notes', requireOrgRole('member'), createNoteHandler);
 
   return router;
 }

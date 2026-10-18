@@ -110,6 +110,22 @@ export function fakeRepos() {
       listRecentlyFixed: vi.fn().mockResolvedValue([]),
       listTemplatesBySite: vi.fn().mockResolvedValue([]),
       listCrossSite: vi.fn().mockResolvedValue([]),
+      listOccurrences: vi.fn().mockResolvedValue([]),
+      countOccurrences: vi.fn().mockResolvedValue(0),
+      listEvents: vi.fn().mockResolvedValue([]),
+      listNotes: vi.fn().mockResolvedValue([]),
+      addNote: vi.fn().mockImplementation((_orgId, issueId, authorId, body, visibleToClient) =>
+        Promise.resolve({
+          id: 'note-1',
+          orgId: 'org-1',
+          issueId,
+          authorId,
+          body,
+          visibleToClient: Boolean(visibleToClient),
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        }),
+      ),
     },
   } as unknown as Repositories;
   return { repos, join };

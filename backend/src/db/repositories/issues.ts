@@ -4,6 +4,7 @@ import type { PreviousIssue, ScanDiff } from '../../scanner/results/diff.js';
 import type { FoundIssue } from '../../scanner/results/issues.js';
 import {
   issueEvents,
+  issueNotes,
   issueOccurrences,
   issues,
   pages,
@@ -13,6 +14,7 @@ import {
   type Impact,
   type IssueStatus,
 } from '../schema/index.js';
+import { AUDIENCE_LABELS, RULE_CONTENT } from '../../scanner/rules/content.js';
 import type { OrgId } from './org-scope.js';
 
 export interface IssueListFilters {
@@ -704,7 +706,22 @@ export function issuesRepository(db: Database) {
         .leftJoin(rules, eq(issues.ruleId, rules.ruleId))
         .leftJoin(users, eq(issues.assigneeId, users.id))
         .where(and(eq(issues.orgId, orgId), eq(issues.id, issueId)));
-      return row ? { ...row, title: row.title ?? row.ruleId } : null;
+
+      if (!row) return null;
+
+      const fallbackContent = RULE_CONTENT[row.ruleId];
+      const title = row.title ?? fallbackContent?.title ?? row.ruleId;
+      const description = row.description ?? fallbackContent?.description ?? null;
+      const whoIsAffected =
+        row.whoIsAffected ??
+        (fallbackContent?.affects?.map((a) => AUDIENCE_LABELS[a]).join('. ') || null);
+
+      return {
+        ...row,
+        title,
+        description,
+        whoIsAffected,
+      };
     },
 
     /**
@@ -896,6 +913,133 @@ export function issuesRepository(db: Database) {
         templateKey: r.templateKey,
         fixedAt: r.fixedAt ? r.fixedAt.toISOString() : null,
       }));
+    },
+
+    /**
+     * Lists occurrences for an issue, joined with page data (Spec S-26, P2-13).
+     */
+    async listOccurrences(
+      orgId: OrgId,
+      issueId: string,
+      options: { limit?: number; offset?: number } = {},
+    ) {
+      const limit = options.limit ?? 50;
+      const offset = options.offset ?? 0;
+
+      const rows = await db
+        .select({
+          id: issueOccurrences.id,
+          issueId: issueOccurrences.issueId,
+          pageId: issueOccurrences.pageId,
+          url: pages.url,
+          pageTitle: pages.title,
+          templateKey: pages.templateKey,
+          target: issueOccurrences.target,
+          scanId: issueOccurrences.scanId,
+          createdAt: issueOccurrences.createdAt,
+        })
+        .from(issueOccurrences)
+        .innerJoin(pages, eq(pages.id, issueOccurrences.pageId))
+        .where(and(eq(issueOccurrences.orgId, orgId), eq(issueOccurrences.issueId, issueId)))
+        .orderBy(pages.url, issueOccurrences.id)
+        .limit(limit)
+        .offset(offset);
+
+      return rows;
+    },
+
+    /**
+     * Count occurrences for an issue.
+     */
+    async countOccurrences(orgId: OrgId, issueId: string): Promise<number> {
+      const [row] = await db
+        .select({ count: sql<number>`count(*)::int` })
+        .from(issueOccurrences)
+        .where(and(eq(issueOccurrences.orgId, orgId), eq(issueOccurrences.issueId, issueId)));
+      return row?.count ?? 0;
+    },
+
+    /**
+     * Lists events for an issue timeline (Spec S-26, P2-13).
+     */
+    async listEvents(orgId: OrgId, issueId: string) {
+      const rows = await db
+        .select({
+          id: issueEvents.id,
+          issueId: issueEvents.issueId,
+          type: issueEvents.type,
+          actorId: issueEvents.actorId,
+          actorName: users.name,
+          scanId: issueEvents.scanId,
+          data: issueEvents.data,
+          createdAt: issueEvents.createdAt,
+        })
+        .from(issueEvents)
+        .leftJoin(users, eq(issueEvents.actorId, users.id))
+        .where(and(eq(issueEvents.orgId, orgId), eq(issueEvents.issueId, issueId)))
+        .orderBy(desc(issueEvents.createdAt));
+
+      return rows;
+    },
+
+    /**
+     * Lists notes for an issue (Spec S-26, P2-13).
+     */
+    async listNotes(
+      orgId: OrgId,
+      issueId: string,
+      options: { clientVisibleOnly?: boolean } = {},
+    ) {
+      const conditions = [
+        eq(issueNotes.orgId, orgId),
+        eq(issueNotes.issueId, issueId),
+        isNull(issueNotes.deletedAt),
+      ];
+      if (options.clientVisibleOnly) {
+        conditions.push(eq(issueNotes.visibleToClient, true));
+      }
+
+      const rows = await db
+        .select({
+          id: issueNotes.id,
+          issueId: issueNotes.issueId,
+          authorId: issueNotes.authorId,
+          authorName: users.name,
+          body: issueNotes.body,
+          visibleToClient: issueNotes.visibleToClient,
+          createdAt: issueNotes.createdAt,
+          updatedAt: issueNotes.updatedAt,
+        })
+        .from(issueNotes)
+        .leftJoin(users, eq(issueNotes.authorId, users.id))
+        .where(and(...conditions))
+        .orderBy(asc(issueNotes.createdAt));
+
+      return rows;
+    },
+
+    /**
+     * Adds a note to an issue (Spec S-26, P2-13/P2-14).
+     */
+    async addNote(
+      orgId: OrgId,
+      issueId: string,
+      authorId: string,
+      body: string,
+      visibleToClient = false,
+    ) {
+      const [note] = await db
+        .insert(issueNotes)
+        .values({
+          orgId,
+          issueId,
+          authorId,
+          body,
+          visibleToClient,
+        })
+        .returning();
+
+      return note;
     },
   };
 }

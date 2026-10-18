@@ -43,6 +43,7 @@ export const I = {
   audit: "M9 11l3 3L22 4 M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11",
   loader: "M12 2v4 M12 18v4 M4.93 4.93l2.83 2.83 M16.24 16.24l2.83 2.83 M2 12h4 M18 12h4 M4.93 19.07l2.83-2.83 M16.24 7.76l2.83-2.83",
   stop: "M9 9h6v6H9z",
+  arrowLeft: "M19 12H5 M12 19l-7-7 7-7",
 };
 
 export function Icon({
