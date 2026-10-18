@@ -315,6 +315,7 @@ describe('Scans API & Onboarding Scans (Section 7.4 & Chunk P2-05)', () => {
         .expect(200)
         .expect('Content-Type', /text\/event-stream/);
 
+      expect(res.headers['x-accel-buffering']).toBe('no');
       expect(res.text).toContain('"scanId"');
       expect(res.text).toContain('event: complete');
     });

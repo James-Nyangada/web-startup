@@ -19,27 +19,23 @@ const createScanSchema = z.object({
  * In-memory event broadcaster for live SSE scan progress.
  * Subscribes clients to scan updates.
  */
-type ProgressListener = (event: {
+export interface ScanProgressEvent {
   phase: string;
   pagesScanned: number;
   pagesPlanned: number;
   currentUrl?: string;
   score?: number | null;
   status?: string;
-}) => void;
+  message?: string;
+}
+
+export type ProgressListener = (event: ScanProgressEvent) => void;
 
 const scanListeners = new Map<string, Set<ProgressListener>>();
 
 export function broadcastScanProgress(
   scanId: string,
-  event: {
-    phase: string;
-    pagesScanned: number;
-    pagesPlanned: number;
-    currentUrl?: string;
-    score?: number | null;
-    status?: string;
-  },
+  event: ScanProgressEvent,
 ) {
   const set = scanListeners.get(scanId);
   if (set) {
@@ -365,21 +361,32 @@ export function orgScansRouter(repos: Repositories, options?: ScansRouterOptions
         'Content-Type': 'text/event-stream',
         'Cache-Control': 'no-cache, no-transform',
         Connection: 'keep-alive',
+        'X-Accel-Buffering': 'no',
       });
+
+      // Keep-alive heartbeat ping every 15s to prevent proxy timeouts
+      const pingInterval = setInterval(() => {
+        try {
+          res.write(': ping\n\n');
+        } catch {
+          clearInterval(pingInterval);
+        }
+      }, 15000);
 
       // Send initial state immediately
       res.write(
         `data: ${JSON.stringify({
           scanId: scan.id,
           status: scan.status,
-          phase: scan.status === 'completed' ? 'processing' : 'scanning',
+          phase: scan.status,
           pagesScanned: scan.pagesScanned,
           pagesPlanned: scan.pagesPlanned,
           score: scan.score,
         })}\n\n`,
       );
 
-      if (scan.status === 'completed' || scan.status === 'failed') {
+      if (['completed', 'failed', 'canceled'].includes(scan.status)) {
+        clearInterval(pingInterval);
         res.write(`event: complete\ndata: ${JSON.stringify(scan)}\n\n`);
         res.end();
         return;
@@ -387,7 +394,8 @@ export function orgScansRouter(repos: Repositories, options?: ScansRouterOptions
 
       const listener: ProgressListener = (event) => {
         res.write(`data: ${JSON.stringify(event)}\n\n`);
-        if (event.status === 'completed' || event.status === 'failed') {
+        if (event.status && ['completed', 'failed', 'canceled'].includes(event.status)) {
+          clearInterval(pingInterval);
           res.write(`event: complete\ndata: ${JSON.stringify(event)}\n\n`);
           res.end();
         }
@@ -399,6 +407,7 @@ export function orgScansRouter(repos: Repositories, options?: ScansRouterOptions
       scanListeners.get(scanId)!.add(listener);
 
       req.on('close', () => {
+        clearInterval(pingInterval);
         const set = scanListeners.get(scanId);
         if (set) {
           set.delete(listener);

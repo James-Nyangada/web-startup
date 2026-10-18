@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { AppShell } from "@/components/app-shell";
 import { Icon, I } from "@/components/icons";
 import { OverviewTab } from "./overview-tab";
@@ -132,13 +133,13 @@ export function SiteWorkspace({ startTab = 0 }: { startTab?: number }) {
           <button type="button" className="ease-ui h-10 rounded-full border border-line-strong bg-surface px-4 text-sm font-semibold text-ink hover:bg-subtle">
             Download report
           </button>
-          <button
-            type="button"
-            className="ease-ui flex h-10 items-center gap-2 rounded-full border-0 bg-primary px-4 text-sm font-semibold text-on-primary hover:bg-primary-hover"
+          <Link
+            href="/sites/oakhaus/scans/scan-demo"
+            className="ease-ui flex h-10 items-center gap-2 rounded-full border-0 bg-primary px-4 text-sm font-semibold text-on-primary no-underline hover:bg-primary-hover"
           >
             <Icon d={I.refresh} strokeWidth={2} />
             Scan now
-          </button>
+          </Link>
         </div>
       </div>
 

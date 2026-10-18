@@ -5,9 +5,13 @@ import { closeDb, getDb } from './db/index.js';
 import { createRepositories } from './db/repositories/index.js';
 import { logger } from './lib/logger.js';
 import { createTurnstileVerifier } from './lib/turnstile.js';
+import { startNotifyBridge, stopNotifyBridge } from './lib/notify-bridge.js';
 
 const config = env();
 const { pool, db } = getDb();
+
+// Start Postgres NOTIFY bridge for cross-process SSE events
+void startNotifyBridge(pool);
 
 const app = createApp({
   config,
@@ -34,7 +38,11 @@ pool
 function shutdown(signal: string) {
   logger.info(`${signal} received, shutting down`);
   server.close(() => {
-    void closeDb().finally(() => process.exit(0));
+    void stopNotifyBridge()
+      .catch((err) => logger.warn({ err }, 'Error stopping notify bridge'))
+      .finally(() => {
+        void closeDb().finally(() => process.exit(0));
+      });
   });
   setTimeout(() => process.exit(1), 10_000).unref();
 }
