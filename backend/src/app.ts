@@ -16,6 +16,7 @@ import { meRouter } from './routes/me.js';
 import { orgsRouter } from './routes/orgs.js';
 import { detectPlatformRouter } from './routes/sites.js';
 import { waitlistRouter } from './routes/public/waitlist.js';
+import { publicPlansRouter } from './routes/public/plans.js';
 import type { ScansRouterOptions } from './routes/scans.js';
 import { EmailSender } from './emails/sender.js';
 import { createEmailPreviewRouter } from './emails/preview-router.js';
@@ -95,9 +96,11 @@ export function createApp({
   v1.use('/invitations', invitationsRouter(repos, auth));
   v1.use('/sites', detectPlatformRouter(auth));
   v1.use('/public', waitlistRouter(repos, verifyTurnstile));
+  v1.use('/public', publicPlansRouter());
   v1.use('/emails', createEmailPreviewRouter());
   v1.use('/reports', reportsPublicRouter(repos, storage));
   app.use('/v1', v1);
+  app.use('/public', publicPlansRouter());
 
   app.use(notFoundHandler);
   if (config.SENTRY_DSN_API) Sentry.setupExpressErrorHandler(app);
