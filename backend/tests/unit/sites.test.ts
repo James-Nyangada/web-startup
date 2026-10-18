@@ -602,4 +602,111 @@ describe('Sites API (Chunk P2-06 & Section 7.3)', () => {
       expect(res.body.error.code).toBe(ErrorCode.UNAUTHENTICATED);
     });
   });
+
+  describe('Pages & Templates endpoints (Screen S-29, S-34)', () => {
+    beforeEach(() => {
+      vi.mocked(repos.sites.findById).mockResolvedValue(mockSite);
+    });
+
+    it('GET /v1/orgs/:orgId/sites/:siteId/pages returns grouped templates', async () => {
+      vi.mocked(repos.pages.listGroupedByTemplate).mockResolvedValueOnce([
+        {
+          templateKey: 'product',
+          templateName: 'Product pages',
+          pagesDiscovered: 4,
+          pagesCheckedLastScan: 4,
+          openIssuesCount: 3,
+          pages: [
+            {
+              id: 'p-1',
+              url: 'https://oakhaus.com/products/chair',
+              templateKey: 'product',
+              title: 'Ergonomic Chair',
+              isPinned: true,
+              lastStatusCode: 200,
+              lastScannedScanId: 'scan-1',
+              createdAt: new Date(),
+              updatedAt: new Date(),
+              lastResultStatus: 'completed',
+              violations: 2,
+              passes: 45,
+              score: 82,
+            },
+          ],
+        },
+      ]);
+
+      const res = await request(app)
+        .get(`/v1/orgs/${orgId}/sites/${siteId}/pages`)
+        .set('Cookie', adminCookie)
+        .expect(200);
+
+      expect(res.body.data.templates).toHaveLength(1);
+      expect(res.body.data.templates[0].templateName).toBe('Product pages');
+      expect(res.body.data.templates[0].openIssuesCount).toBe(3);
+    });
+
+    it('returns 404 for cross-org GET /pages', async () => {
+      await assertCrossOrg404(app, {
+        method: 'get',
+        path: `/v1/orgs/${otherOrgId}/sites/${siteId}/pages`,
+        sessionCookie: adminCookie,
+      });
+    });
+
+    it('POST /v1/orgs/:orgId/sites/:siteId/pages/pin toggles pin status', async () => {
+      const res = await request(app)
+        .post(`/v1/orgs/${orgId}/sites/${siteId}/pages/pin`)
+        .set('Cookie', adminCookie)
+        .send({ url: 'https://oakhaus.com/custom-page', isPinned: true })
+        .expect(200);
+
+      expect(res.body.data.isPinned).toBe(true);
+      expect(repos.pages.setPin).toHaveBeenCalledWith(
+        orgId,
+        siteId,
+        'https://oakhaus.com/custom-page',
+        true,
+      );
+    });
+
+    it('POST /v1/orgs/:orgId/sites/:siteId/pages/pin rejects missing pageId and url', async () => {
+      const res = await request(app)
+        .post(`/v1/orgs/${orgId}/sites/${siteId}/pages/pin`)
+        .set('Cookie', adminCookie)
+        .send({ isPinned: true })
+        .expect(400);
+
+      expect(res.body.error.code).toBe(ErrorCode.VALIDATION_ERROR);
+    });
+
+    it('POST /v1/orgs/:orgId/sites/:siteId/preview-exclusions returns match count', async () => {
+      vi.mocked(repos.pages.previewExclusions).mockResolvedValueOnce({
+        matchCount: 3,
+        matchedUrls: [
+          'https://oakhaus.com/cart',
+          'https://oakhaus.com/checkout',
+          'https://oakhaus.com/account/login',
+        ],
+      });
+
+      const res = await request(app)
+        .post(`/v1/orgs/${orgId}/sites/${siteId}/preview-exclusions`)
+        .set('Cookie', adminCookie)
+        .send({ patterns: ['/cart*', '/account/*'] })
+        .expect(200);
+
+      expect(res.body.data.matchCount).toBe(3);
+      expect(res.body.data.matchedUrls).toHaveLength(3);
+    });
+
+    it('returns 404 for cross-org POST /preview-exclusions', async () => {
+      await assertCrossOrg404(app, {
+        method: 'post',
+        path: `/v1/orgs/${otherOrgId}/sites/${siteId}/preview-exclusions`,
+        sessionCookie: adminCookie,
+        body: { patterns: ['/cart*'] },
+      });
+    });
+  });
 });

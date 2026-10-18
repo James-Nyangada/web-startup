@@ -46,6 +46,12 @@ export const I = {
   arrowLeft: "M19 12H5 M12 19l-7-7 7-7",
   arrowRight: "M5 12h14 M12 5l7 7-7 7",
   alert: "M21.73 18l-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3z M12 9v4 M12 17h.01",
+  pin: "M12 17v5 M9 2h6 M9 2v6l-2 3v2h10v-2l-2-3V2",
+  trash: "M3 6h18 M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6 M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2",
+  play: "M5 3l14 9-14 9V3z",
+  pause: "M6 4h4v16H6z M14 4h4v16h-4z",
+  chevronDown: "M6 9l6 6 6-6",
+  chevronUp: "M18 15l-6-6-6 6",
 };
 
 export function Icon({

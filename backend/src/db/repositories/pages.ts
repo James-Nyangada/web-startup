@@ -1,11 +1,14 @@
-import { and, desc, eq, sql } from 'drizzle-orm';
+import { and, desc, eq, inArray, isNull, sql } from 'drizzle-orm';
 import { createHash } from 'node:crypto';
 import type { Database } from '../client.js';
 import {
+  issues,
   pages,
   pageResults,
+  sites,
   type PageResultStatus,
 } from '../schema/index.js';
+import { createExcludedPathMatcher } from '../../scanner/url/skip-patterns.js';
 import type { OrgId } from './org-scope.js';
 
 export function hashUrl(url: string): string {
@@ -194,6 +197,257 @@ export function pagesRepository(db: Database) {
         .leftJoin(pages, eq(pageResults.pageId, pages.id))
         .where(and(eq(pageResults.orgId, orgId), eq(pageResults.scanId, scanId)))
         .orderBy(desc(pageResults.violations));
+    },
+
+    /**
+     * Lists discovered pages grouped by template (Screen S-29).
+     * Includes pages count, pages checked in last scan, open issues count,
+     * and page details with pin status and last results.
+     */
+    async listGroupedByTemplate(orgId: OrgId, siteId: string) {
+      const allPages = await db
+        .select({
+          id: pages.id,
+          url: pages.url,
+          templateKey: pages.templateKey,
+          title: pages.title,
+          isPinned: pages.isPinned,
+          lastStatusCode: pages.lastStatusCode,
+          lastScannedScanId: pages.lastScannedScanId,
+          createdAt: pages.createdAt,
+          updatedAt: pages.updatedAt,
+        })
+        .from(pages)
+        .where(and(eq(pages.orgId, orgId), eq(pages.siteId, siteId)))
+        .orderBy(pages.templateKey, pages.url);
+
+      if (allPages.length === 0) {
+        return [];
+      }
+
+      const issueCounts = await db
+        .select({
+          templateKey: issues.templateKey,
+          openCount: sql<number>`count(*)::int`,
+        })
+        .from(issues)
+        .where(
+          and(
+            eq(issues.orgId, orgId),
+            eq(issues.siteId, siteId),
+            eq(issues.status, 'open'),
+          ),
+        )
+        .groupBy(issues.templateKey);
+
+      const templateIssueCountMap = new Map<string, number>(
+        issueCounts.map((r) => [r.templateKey, r.openCount]),
+      );
+
+      const pageIds = allPages.map((p) => p.id);
+      const results = await db
+        .select({
+          pageId: pageResults.pageId,
+          status: pageResults.status,
+          httpStatus: pageResults.httpStatus,
+          loadMs: pageResults.loadMs,
+          violations: pageResults.violations,
+          passes: pageResults.passes,
+          incomplete: pageResults.incomplete,
+          score: pageResults.score,
+        })
+        .from(pageResults)
+        .where(and(eq(pageResults.orgId, orgId), inArray(pageResults.pageId, pageIds)))
+        .orderBy(desc(pageResults.createdAt));
+
+      const pageLatestResultMap = new Map<string, (typeof results)[0]>();
+      for (const res of results) {
+        if (!pageLatestResultMap.has(res.pageId)) {
+          pageLatestResultMap.set(res.pageId, res);
+        }
+      }
+
+      const formatTemplateName = (key: string): string => {
+        if (key === 'home') return 'Home page';
+        if (key === 'product') return 'Product pages';
+        if (key === 'collection') return 'Collections';
+        if (key === 'cart') return 'Cart';
+        if (key === 'account') return 'Account & Login';
+        if (key === 'article') return 'Articles & Blog posts';
+        if (key === 'blog-index') return 'Blog index';
+        if (key === 'search') return 'Search';
+        if (key.startsWith('page:')) {
+          const slug = key.slice(5);
+          return `Page: ${slug.charAt(0).toUpperCase() + slug.slice(1)}`;
+        }
+        return key.charAt(0).toUpperCase() + key.slice(1);
+      };
+
+      type PageItem = (typeof allPages)[0] & {
+        lastResultStatus: string | null;
+        violations: number | null;
+        passes: number | null;
+        score: number | null;
+      };
+
+      const groupsMap = new Map<
+        string,
+        {
+          templateKey: string;
+          templateName: string;
+          pagesDiscovered: number;
+          pagesCheckedLastScan: number;
+          openIssuesCount: number;
+          pages: PageItem[];
+        }
+      >();
+
+      for (const page of allPages) {
+        let group = groupsMap.get(page.templateKey);
+        if (!group) {
+          group = {
+            templateKey: page.templateKey,
+            templateName: formatTemplateName(page.templateKey),
+            pagesDiscovered: 0,
+            pagesCheckedLastScan: 0,
+            openIssuesCount: templateIssueCountMap.get(page.templateKey) ?? 0,
+            pages: [],
+          };
+          groupsMap.set(page.templateKey, group);
+        }
+
+        group.pagesDiscovered++;
+        if (page.lastScannedScanId) {
+          group.pagesCheckedLastScan++;
+        }
+
+        const latestResult = pageLatestResultMap.get(page.id);
+        group.pages.push({
+          ...page,
+          lastResultStatus: latestResult?.status ?? null,
+          violations: latestResult?.violations ?? null,
+          passes: latestResult?.passes ?? null,
+          score: latestResult?.score ?? null,
+        });
+      }
+
+      return Array.from(groupsMap.values());
+    },
+
+    /**
+     * Toggles pin status for a page and synchronizes sites.pinnedUrls (Spec S-29, S-34).
+     */
+    async setPin(
+      orgId: OrgId,
+      siteId: string,
+      pageIdOrUrl: string,
+      isPinned: boolean,
+    ) {
+      let [page] = await db
+        .select()
+        .from(pages)
+        .where(
+          and(
+            eq(pages.orgId, orgId),
+            eq(pages.siteId, siteId),
+            sql`(${pages.id} = ${pageIdOrUrl} or ${pages.url} = ${pageIdOrUrl})`,
+          ),
+        )
+        .limit(1);
+
+      if (!page && isPinned) {
+        const urlHash = hashUrl(pageIdOrUrl);
+        const [inserted] = await db
+          .insert(pages)
+          .values({
+            orgId,
+            siteId,
+            url: pageIdOrUrl,
+            urlHash,
+            templateKey: 'custom',
+            title: pageIdOrUrl,
+            isPinned: true,
+          })
+          .onConflictDoUpdate({
+            target: [pages.siteId, pages.urlHash],
+            set: { isPinned: true, updatedAt: new Date() },
+          })
+          .returning();
+        page = inserted;
+      }
+
+      if (!page) {
+        return null;
+      }
+
+      const [updatedPage] = await db
+        .update(pages)
+        .set({ isPinned, updatedAt: new Date() })
+        .where(and(eq(pages.orgId, orgId), eq(pages.id, page.id)))
+        .returning();
+
+      const [site] = await db
+        .select({ pinnedUrls: sites.pinnedUrls })
+        .from(sites)
+        .where(and(eq(sites.orgId, orgId), eq(sites.id, siteId), isNull(sites.deletedAt)))
+        .limit(1);
+
+      if (site) {
+        const currentPins = new Set(site.pinnedUrls || []);
+        if (isPinned) {
+          currentPins.add(page.url);
+        } else {
+          currentPins.delete(page.url);
+        }
+
+        await db
+          .update(sites)
+          .set({
+            pinnedUrls: Array.from(currentPins),
+            updatedAt: new Date(),
+          })
+          .where(and(eq(sites.orgId, orgId), eq(sites.id, siteId)));
+      }
+
+      return updatedPage ?? null;
+    },
+
+    /**
+     * Previews how many discovered URLs match the provided excluded path globs.
+     * Satisfies Spec S-34 & Chunk P2-16 acceptance criteria:
+     * "[ ] Excluded-path preview shows how many discovered URLs match."
+     */
+    async previewExclusions(orgId: OrgId, siteId: string, patterns: string[]) {
+      const allPages = await db
+        .select({ url: pages.url })
+        .from(pages)
+        .where(and(eq(pages.orgId, orgId), eq(pages.siteId, siteId)));
+
+      if (allPages.length === 0 || patterns.length === 0) {
+        return {
+          matchCount: 0,
+          matchedUrls: [],
+        };
+      }
+
+      const isExcluded = createExcludedPathMatcher(patterns);
+      const matchedUrls: string[] = [];
+
+      for (const page of allPages) {
+        try {
+          const pathname = new URL(page.url).pathname;
+          if (isExcluded(pathname)) {
+            matchedUrls.push(page.url);
+          }
+        } catch {
+          // ignore invalid URLs
+        }
+      }
+
+      return {
+        matchCount: matchedUrls.length,
+        matchedUrls: matchedUrls.slice(0, 50),
+      };
     },
   };
 }

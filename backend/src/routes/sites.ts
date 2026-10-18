@@ -49,6 +49,20 @@ const verifySiteSchema = z.object({
   method: z.enum(['meta', 'dns', 'file'] as const),
 });
 
+const pinPageSchema = z
+  .object({
+    pageId: z.string().trim().optional(),
+    url: z.string().trim().optional(),
+    isPinned: z.boolean(),
+  })
+  .refine((data) => Boolean(data.pageId || data.url), {
+    message: 'Either pageId or url is required.',
+  });
+
+const previewExclusionsSchema = z.object({
+  patterns: z.array(z.string()).default([]),
+});
+
 // Default stub limit for sites per org (real limits in Phase 4)
 const DEFAULT_SITE_LIMIT = 25;
 
@@ -755,6 +769,171 @@ export function orgSitesRouter(repos: Repositories): Router {
           site: updated,
           method,
         },
+      });
+    },
+  );
+
+  // GET /v1/orgs/:orgId/sites/:siteId/pages - Discovered pages grouped by template (O A M)
+  router.get(
+    '/:siteId/pages',
+    requireOrgRole('member'),
+    async (req: Request, res: Response): Promise<void> => {
+      const siteIdParam = req.params.siteId;
+      const siteId = Array.isArray(siteIdParam) ? siteIdParam[0] : siteIdParam;
+
+      if (!siteId) {
+        res.status(400).json({
+          error: {
+            code: ErrorCode.VALIDATION_ERROR,
+            message: 'Site ID is required.',
+            details: {},
+          },
+        });
+        return;
+      }
+
+      const site = await repos.sites.findById(req.orgId!, siteId);
+      if (!site) {
+        res.status(404).json({
+          error: {
+            code: ErrorCode.NOT_FOUND,
+            message: 'Site not found.',
+            details: {},
+          },
+        });
+        return;
+      }
+
+      const templates = await repos.pages.listGroupedByTemplate(req.orgId!, siteId);
+
+      res.status(200).json({
+        data: {
+          siteId: site.id,
+          pinnedUrls: site.pinnedUrls || [],
+          templates,
+        },
+      });
+    },
+  );
+
+  // POST /v1/orgs/:orgId/sites/:siteId/pages/pin - Pin or unpin a page (O A M)
+  router.post(
+    '/:siteId/pages/pin',
+    requireOrgRole('member'),
+    async (req: Request, res: Response): Promise<void> => {
+      const siteIdParam = req.params.siteId;
+      const siteId = Array.isArray(siteIdParam) ? siteIdParam[0] : siteIdParam;
+
+      if (!siteId) {
+        res.status(400).json({
+          error: {
+            code: ErrorCode.VALIDATION_ERROR,
+            message: 'Site ID is required.',
+            details: {},
+          },
+        });
+        return;
+      }
+
+      const parse = pinPageSchema.safeParse(req.body);
+      if (!parse.success) {
+        res.status(400).json({
+          error: {
+            code: ErrorCode.VALIDATION_ERROR,
+            message: 'Invalid pin payload.',
+            details: parse.error.flatten(),
+          },
+        });
+        return;
+      }
+
+      const site = await repos.sites.findById(req.orgId!, siteId);
+      if (!site) {
+        res.status(404).json({
+          error: {
+            code: ErrorCode.NOT_FOUND,
+            message: 'Site not found.',
+            details: {},
+          },
+        });
+        return;
+      }
+
+      const { pageId, url, isPinned } = parse.data;
+      const target = (pageId ?? url)!;
+      const updatedPage = await repos.pages.setPin(req.orgId!, siteId, target, isPinned);
+
+      if (!updatedPage) {
+        res.status(404).json({
+          error: {
+            code: ErrorCode.NOT_FOUND,
+            message: 'Page not found.',
+            details: {},
+          },
+        });
+        return;
+      }
+
+      res.status(200).json({
+        data: {
+          page: updatedPage,
+          isPinned,
+        },
+      });
+    },
+  );
+
+  // POST /v1/orgs/:orgId/sites/:siteId/preview-exclusions - Preview excluded path globs match count (O A M)
+  router.post(
+    '/:siteId/preview-exclusions',
+    requireOrgRole('member'),
+    async (req: Request, res: Response): Promise<void> => {
+      const siteIdParam = req.params.siteId;
+      const siteId = Array.isArray(siteIdParam) ? siteIdParam[0] : siteIdParam;
+
+      if (!siteId) {
+        res.status(400).json({
+          error: {
+            code: ErrorCode.VALIDATION_ERROR,
+            message: 'Site ID is required.',
+            details: {},
+          },
+        });
+        return;
+      }
+
+      const parse = previewExclusionsSchema.safeParse(req.body);
+      if (!parse.success) {
+        res.status(400).json({
+          error: {
+            code: ErrorCode.VALIDATION_ERROR,
+            message: 'Invalid preview exclusions payload.',
+            details: parse.error.flatten(),
+          },
+        });
+        return;
+      }
+
+      const site = await repos.sites.findById(req.orgId!, siteId);
+      if (!site) {
+        res.status(404).json({
+          error: {
+            code: ErrorCode.NOT_FOUND,
+            message: 'Site not found.',
+            details: {},
+          },
+        });
+        return;
+      }
+
+      const preview = await repos.pages.previewExclusions(
+        req.orgId!,
+        siteId,
+        parse.data.patterns,
+      );
+
+      res.status(200).json({
+        data: preview,
       });
     },
   );

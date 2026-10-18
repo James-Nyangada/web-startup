@@ -97,6 +97,16 @@ export function fakeRepos() {
       findById: vi.fn().mockResolvedValue(null),
       insertPageResults: vi.fn().mockResolvedValue(undefined),
       listResultsByScan: vi.fn().mockResolvedValue([]),
+      listGroupedByTemplate: vi.fn().mockResolvedValue([]),
+      setPin: vi.fn().mockImplementation((_orgId, _siteId, pageIdOrUrl, isPinned) =>
+        Promise.resolve({ id: 'p-1', url: pageIdOrUrl, isPinned }),
+      ),
+      previewExclusions: vi.fn().mockImplementation((_orgId, _siteId, patterns) =>
+        Promise.resolve({
+          matchCount: patterns.length > 0 ? 1 : 0,
+          matchedUrls: patterns.length > 0 ? ['https://example.com/cart'] : [],
+        }),
+      ),
     },
     issues: {
       listForDiff: vi.fn().mockResolvedValue([]),

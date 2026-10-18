@@ -7,6 +7,8 @@ import { Icon, I } from "@/components/icons";
 import { OverviewTab } from "./overview-tab";
 import { IssuesTab } from "./issues-tab";
 import { ScansTab, type ScanHistoryItem } from "./scans-tab";
+import { PagesTab } from "./pages-tab";
+import { SettingsTab } from "./settings-tab";
 import { IssueDrawer } from "./issue-drawer";
 import { IgnoreDialog } from "./ignore-dialog";
 import { Toast } from "./toast";
@@ -345,9 +347,27 @@ export function SiteWorkspace({
             }}
           />
         )}
-        {tab > 2 && (
+        {tab === 3 && (
+          <PagesTab
+            orgSlug={orgSlug}
+            siteSlug={siteSlug}
+            siteId={initialSite?.id}
+            onNavigateToSettings={() => setTab(8)}
+            onToast={showToast}
+          />
+        )}
+        {tab === 8 && (
+          <SettingsTab
+            orgSlug={orgSlug}
+            siteSlug={siteSlug}
+            siteId={initialSite?.id}
+            initialSite={initialSite}
+            onToast={showToast}
+          />
+        )}
+        {tab > 2 && tab !== 3 && tab !== 8 && (
           <div className="rounded-lg border border-dashed border-line-strong px-6 py-12 text-center text-sm text-muted">
-            {SITE_TABS[tab]} is not part of this design pass. Overview, Issues, and Scans are interactive.
+            {SITE_TABS[tab]} is not part of this design pass. Overview, Issues, Scans, Pages, and Settings are interactive.
           </div>
         )}
       </div>
