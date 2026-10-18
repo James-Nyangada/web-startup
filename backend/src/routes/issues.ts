@@ -7,6 +7,8 @@ import { ErrorCode } from '../shared/errors.js';
 import type { BulkAction, IssueListFilters } from '../db/repositories/issues.js';
 import type { Impact, IssueStatus, IgnoredReason } from '../db/schema/index.js';
 import { enqueueIssueRecheck } from '../worker/boss.js';
+import { AiService, AiServiceError } from '../ai/service.js';
+import { computeCacheKey, scrubHtmlSnippet } from '../ai/scrubber.js';
 
 const parseMulti = (val: unknown): string[] => {
   if (!val) return [];
@@ -18,6 +20,7 @@ const parseMulti = (val: unknown): string[] => {
 export interface IssuesRouterOptions {
   boss?: PgBoss;
   enqueueRecheck?: (issueId: string) => Promise<void>;
+  aiService?: AiService;
 }
 
 const issuesQuerySchema = z.object({
@@ -1154,6 +1157,141 @@ export function orgIssuesRouter(
 
   router.post('/issues/:issueId/recheck', requireOrgRole('member'), recheckHandler);
   router.post('/sites/:siteId/issues/:issueId/recheck', requireOrgRole('member'), recheckHandler);
+
+  // POST /v1/orgs/:orgId/issues/:issueId/ai-suggestion (Phase 3 Chunk P3-07, Section 6.10 & 7.5)
+  const aiService = options?.aiService ?? new AiService(repos);
+
+  const aiSuggestionHandler = async (req: Request, res: Response): Promise<void> => {
+    const issueIdParam = req.params.issueId;
+    const issueId = Array.isArray(issueIdParam) ? issueIdParam[0] : issueIdParam;
+
+    if (!issueId) {
+      res.status(400).json({
+        error: {
+          code: ErrorCode.VALIDATION_ERROR,
+          message: 'Issue ID is required.',
+          details: {},
+        },
+      });
+      return;
+    }
+
+    const issue = await repos.issues.findById(req.orgId!, issueId);
+    if (!issue) {
+      res.status(404).json({
+        error: {
+          code: ErrorCode.NOT_FOUND,
+          message: 'Issue not found.',
+          details: {},
+        },
+      });
+      return;
+    }
+
+    // Determine platform
+    let platform = (req.body?.platform || req.query.platform || '').toString().toLowerCase();
+    if (!platform && issue.siteId) {
+      const site = await repos.sites.findById(req.orgId!, issue.siteId);
+      if (site?.platform) {
+        platform = site.platform;
+      }
+    }
+    if (!platform) {
+      platform = 'generic';
+    }
+
+    try {
+      const result = await aiService.getOrGenerateSuggestion({
+        orgId: req.orgId!,
+        issueId: issue.id,
+        ruleId: issue.ruleId,
+        ruleTitle: issue.title,
+        ruleDescription: issue.description,
+        wcagCriteria: issue.wcagCriteria,
+        platform,
+        htmlSnippet: issue.htmlSnippet ?? '',
+        failureSummary: issue.failureSummary,
+      });
+
+      res.status(200).json({
+        data: result,
+      });
+    } catch (err: any) {
+      if (err instanceof AiServiceError || err.code === 'PLAN_LIMIT' || err.code === 'FEATURE_DISABLED') {
+        const statusCode = err.statusCode || (err.code === 'PLAN_LIMIT' ? 422 : 403);
+        res.status(statusCode).json({
+          error: {
+            code: err.code,
+            message: err.message,
+            details: {},
+          },
+        });
+        return;
+      }
+      res.status(500).json({
+        error: {
+          code: ErrorCode.INTERNAL_ERROR,
+          message: err.message || 'Failed to generate AI suggestion.',
+          details: {},
+        },
+      });
+    }
+  };
+
+  const reportAiSuggestionHandler = async (req: Request, res: Response): Promise<void> => {
+    const issueIdParam = req.params.issueId;
+    const issueId = Array.isArray(issueIdParam) ? issueIdParam[0] : issueIdParam;
+
+    if (!issueId) {
+      res.status(400).json({
+        error: {
+          code: ErrorCode.VALIDATION_ERROR,
+          message: 'Issue ID is required.',
+          details: {},
+        },
+      });
+      return;
+    }
+
+    const issue = await repos.issues.findById(req.orgId!, issueId);
+    if (!issue) {
+      res.status(404).json({
+        error: {
+          code: ErrorCode.NOT_FOUND,
+          message: 'Issue not found.',
+          details: {},
+        },
+      });
+      return;
+    }
+
+    let cacheKey = req.body?.cacheKey;
+    if (!cacheKey) {
+      let platform = (req.body?.platform || req.query.platform || '').toString().toLowerCase();
+      if (!platform && issue.siteId) {
+        const site = await repos.sites.findById(req.orgId!, issue.siteId);
+        if (site?.platform) platform = site.platform;
+      }
+      platform = platform || 'generic';
+      const scrubbed = scrubHtmlSnippet(issue.htmlSnippet || '');
+      cacheKey = computeCacheKey(issue.ruleId, platform, scrubbed);
+    }
+
+    const reportResult = await aiService.reportBadSuggestion(cacheKey);
+
+    res.status(200).json({
+      data: {
+        success: true,
+        flagged: reportResult.flagged,
+        cacheKey: reportResult.cacheKey,
+      },
+    });
+  };
+
+  router.post('/issues/:issueId/ai-suggestion', requireOrgRole('member'), aiSuggestionHandler);
+  router.post('/sites/:siteId/issues/:issueId/ai-suggestion', requireOrgRole('member'), aiSuggestionHandler);
+  router.post('/issues/:issueId/ai-suggestion/report', requireOrgRole('member'), reportAiSuggestionHandler);
+  router.post('/sites/:siteId/issues/:issueId/ai-suggestion/report', requireOrgRole('member'), reportAiSuggestionHandler);
 
   return router;
 }

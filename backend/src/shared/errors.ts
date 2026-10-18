@@ -30,6 +30,7 @@ export const ErrorCode = {
   INVITATION_REVOKED: 'INVITATION_REVOKED',
   REPORT_NOT_READY: 'REPORT_NOT_READY',
   REPORT_FAILED: 'REPORT_FAILED',
+  FEATURE_DISABLED: 'FEATURE_DISABLED',
 } as const;
 
 export type ErrorCode = (typeof ErrorCode)[keyof typeof ErrorCode];

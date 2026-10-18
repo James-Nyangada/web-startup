@@ -21,6 +21,7 @@ export function IssueDrawer({
   onIgnore,
   onReopen,
   siteHref,
+  orgSlug,
 }: {
   issue: Issue | null;
   rechecking: boolean;
@@ -31,6 +32,7 @@ export function IssueDrawer({
   onIgnore: () => void;
   onReopen: () => void;
   siteHref?: string;
+  orgSlug?: string;
 }) {
   const [shown, setShown] = useState<Issue | null>(issue);
   const panel = useRef<HTMLElement>(null);
@@ -104,6 +106,7 @@ export function IssueDrawer({
       >
         <IssueDetailContent
           issue={shown}
+          orgSlug={orgSlug}
           rechecking={rechecking}
           onRecheck={onRecheck}
           onIgnore={onIgnore}

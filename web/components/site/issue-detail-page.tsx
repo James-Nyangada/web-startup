@@ -129,6 +129,7 @@ export function IssueDetailPage({
       <div className="overflow-hidden rounded-2xl border border-line bg-surface shadow-card">
         <IssueDetailContent
           issue={issue}
+          orgSlug={orgSlug}
           rechecking={rechecking}
           onRecheck={onRecheck}
           onIgnore={() => setIgnoreOpen(true)}

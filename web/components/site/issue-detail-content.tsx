@@ -8,6 +8,7 @@ import { CodeSnippet } from "./code-snippet";
 import { getWcagUnderstandingUrl } from "@/lib/wcag";
 import { GuideRenderer } from "@/components/marketing/guide-renderer";
 import { getFixGuideByRuleAndPlatform } from "@/lib/fix-guides-data";
+import { apiClient, ApiException } from "@/lib/api";
 import {
   DRAWER_TABS,
   NAMES,
@@ -33,7 +34,24 @@ const HISTORY_ICON: Record<HistoryKind, string> = {
 
 const PLATFORMS = ["Shopify", "WordPress", "Generic"] as const;
 type Platform = (typeof PLATFORMS)[number];
-type AiState = "none" | "gen" | "ready";
+type AiState = "none" | "gen" | "ready" | "reported" | "cap_reached" | "error";
+
+function parseAiSuggestion(markdown: string) {
+  const codeBlockRegex = /```([a-zA-Z0-9_-]*)\n([\s\S]+?)\n```/;
+  const match = codeBlockRegex.exec(markdown);
+  if (!match) {
+    return { prose: markdown, code: null, lang: "HTML" };
+  }
+  const [fullMatch, detectedLang, extractedCode] = match;
+  const parts = markdown.split(fullMatch);
+  const before = parts[0]?.trim() || "";
+  const after = parts[1]?.trim() || "";
+  const prose = [before, after].filter(Boolean).join("\n\n");
+  const normalizedLang = detectedLang
+    ? detectedLang.charAt(0).toUpperCase() + detectedLang.slice(1).toLowerCase()
+    : "HTML";
+  return { prose, code: extractedCode.trim(), lang: normalizedLang };
+}
 
 const SECONDARY_SM =
   "ease-ui h-8 rounded-full border border-line-strong bg-surface px-3 text-sm font-semibold text-ink hover:bg-subtle focus-visible:ring-2 focus-visible:ring-primary";
@@ -57,6 +75,7 @@ export interface IssueNoteItem {
 export interface IssueDetailContentProps {
   issue: Issue;
   sitePlatform?: string;
+  orgSlug?: string;
   rechecking: boolean;
   onRecheck: () => void;
   onIgnore: () => void;
@@ -70,6 +89,7 @@ export interface IssueDetailContentProps {
 export function IssueDetailContent({
   issue,
   sitePlatform,
+  orgSlug,
   rechecking,
   onRecheck,
   onIgnore,
@@ -86,6 +106,11 @@ export function IssueDetailContent({
   const [pf, setPf] = useState<Platform>(initialPlatform);
   const [copiedLink, setCopiedLink] = useState(false);
   const [aiState, setAiState] = useState<AiState>("none");
+  const [aiSuggestion, setAiSuggestion] = useState<string | null>(issue.ai ?? null);
+  const [aiCacheKey, setAiCacheKey] = useState<string | null>(null);
+  const [aiError, setAiError] = useState<string | null>(null);
+  const [copiedSuggestion, setCopiedSuggestion] = useState(false);
+  const [reportingAi, setReportingAi] = useState(false);
 
   // Occurrences pagination
   const [occPage, setOccPage] = useState(1);
@@ -147,9 +172,59 @@ export function IssueDetailContent({
       : []),
   ];
 
-  const genAi = () => {
+  const resolvedOrgSlug =
+    orgSlug || (siteHref ? siteHref.split("/").filter(Boolean)[0] : undefined);
+
+  const genAi = async () => {
     setAiState("gen");
-    setTimeout(() => setAiState("ready"), 1200);
+    setAiError(null);
+    try {
+      if (resolvedOrgSlug) {
+        const res = await apiClient<{ suggestion: string; cached: boolean; cacheKey: string }>(
+          `/v1/orgs/${resolvedOrgSlug}/issues/${issue.id}/ai-suggestion`,
+          {
+            method: "POST",
+            body: JSON.stringify({ platform: pf }),
+          },
+        );
+        setAiSuggestion(res.suggestion);
+        setAiCacheKey(res.cacheKey);
+        setAiState("ready");
+        return;
+      }
+
+      // Demo/offline fallback
+      await new Promise((r) => setTimeout(r, 600));
+      const demoFix =
+        issue.ai ??
+        `Ensure this element meets WCAG 2.2 AA accessibility requirements by providing an accessible label and semantic structure.\n\n\`\`\`${lang.toLowerCase()}\n${code}\n\`\`\``;
+      setAiSuggestion(demoFix);
+      setAiState("ready");
+    } catch (err: any) {
+      if (err instanceof ApiException && (err.status === 422 || err.code === "PLAN_LIMIT")) {
+        setAiState("cap_reached");
+      } else {
+        setAiError(err.message || "Failed to generate AI suggestion");
+        setAiState("error");
+      }
+    }
+  };
+
+  const reportAi = async () => {
+    setReportingAi(true);
+    try {
+      if (resolvedOrgSlug && aiCacheKey) {
+        await apiClient(`/v1/orgs/${resolvedOrgSlug}/issues/${issue.id}/ai-suggestion/report`, {
+          method: "POST",
+          body: JSON.stringify({ cacheKey: aiCacheKey, platform: pf }),
+        });
+      }
+      setAiState("reported");
+    } catch {
+      setAiState("reported");
+    } finally {
+      setReportingAi(false);
+    }
   };
 
   const onCopyLink = () => {
@@ -549,16 +624,25 @@ export function IssueDetailContent({
               );
             })()}
 
-            {/* AI Suggestion Slot (Spec P3-07 placeholder) */}
-            <section className="flex flex-col gap-2.5 rounded-2xl border border-line bg-surface p-4 shadow-card">
-              <div className="flex items-center gap-2">
-                <span className="rounded bg-primary-soft px-2 py-0.5 text-[13px] leading-5 font-semibold text-ptext">
-                  AI suggestion
-                </span>
-                <span className="text-xs text-muted">Check before applying</span>
+            {/* AI Suggestion Slot (Spec Section 6.10 & Chunk P3-07) */}
+            <section
+              aria-labelledby="ai-suggestion-heading"
+              className="flex flex-col gap-3 rounded-2xl border border-line bg-surface p-4 shadow-card"
+            >
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span
+                    id="ai-suggestion-heading"
+                    className="rounded bg-primary-soft px-2 py-0.5 text-[13px] leading-5 font-semibold text-ptext"
+                  >
+                    AI suggestion
+                  </span>
+                  <span className="text-xs text-muted">Check before applying</span>
+                </div>
               </div>
+
               {aiState === "none" && (
-                <>
+                <div className="flex flex-col gap-2.5">
                   <p className="m-0 text-sm leading-5 text-muted">
                     Get an AI suggestion tailored for this exact element and template.
                   </p>
@@ -569,38 +653,144 @@ export function IssueDetailContent({
                   >
                     Generate suggestion
                   </button>
-                </>
+                </div>
               )}
+
               {aiState === "gen" && (
-                <div role="status" className="flex items-center gap-2 text-sm text-muted">
-                  <span className="size-4 animate-spin rounded-full border-2 border-primary border-r-transparent" />
+                <div
+                  role="status"
+                  aria-live="polite"
+                  className="flex items-center gap-2.5 py-2 text-sm text-muted"
+                >
+                  <span
+                    className="size-4 animate-spin rounded-full border-2 border-primary border-r-transparent"
+                    aria-hidden="true"
+                  />
                   <span>Writing a tailored suggestion…</span>
                 </div>
               )}
-              {aiState === "ready" && (
-                <>
-                  <p role="status" className="m-0 text-sm leading-5 text-pretty">
-                    {issue.ai ??
-                      "Apply the recommended fix to this element; ensure any screen reader text clearly conveys the element’s purpose in context."}
-                  </p>
-                  <div className="flex items-center gap-4 text-sm">
+
+              {aiState === "ready" && aiSuggestion && (
+                <div className="flex flex-col gap-3">
+                  {(() => {
+                    const parsed = parseAiSuggestion(aiSuggestion);
+                    return (
+                      <>
+                        {parsed.prose && (
+                          <p role="status" className="m-0 text-sm leading-5 text-pretty text-ink">
+                            {parsed.prose}
+                          </p>
+                        )}
+                        {parsed.code ? (
+                          <CodeSnippet
+                            code={parsed.code}
+                            language={parsed.lang}
+                            label={`AI Recommended Fix (${parsed.lang})`}
+                          />
+                        ) : (
+                          <pre className="m-0 overflow-x-auto rounded-lg bg-sunk p-3 font-mono text-[13px] whitespace-pre-wrap text-ink">
+                            {aiSuggestion}
+                          </pre>
+                        )}
+                      </>
+                    );
+                  })()}
+
+                  <div className="flex flex-wrap items-center gap-4 pt-1 text-sm">
                     <button
                       type="button"
                       onClick={() => {
-                        navigator.clipboard?.writeText(issue.ai ?? code).catch(() => {});
+                        const parsed = parseAiSuggestion(aiSuggestion);
+                        navigator.clipboard
+                          ?.writeText(parsed.code ?? aiSuggestion)
+                          .then(() => {
+                            setCopiedSuggestion(true);
+                            setTimeout(() => setCopiedSuggestion(false), 2000);
+                          })
+                          .catch(() => {});
                       }}
-                      className="border-0 bg-transparent p-0 font-semibold text-ptext hover:underline"
+                      className="ease-ui flex items-center gap-1.5 border-0 bg-transparent p-0 font-semibold text-ptext hover:underline focus-visible:ring-2 focus-visible:ring-primary rounded"
                     >
-                      Copy suggestion
+                      <Icon
+                        d={copiedSuggestion ? I.fixed : I.copy}
+                        size={14}
+                        className={copiedSuggestion ? "text-ok" : "text-ptext"}
+                      />
+                      <span>{copiedSuggestion ? "Copied suggestion" : "Copy suggestion"}</span>
                     </button>
                     <button
                       type="button"
-                      className="border-0 bg-transparent p-0 text-muted underline underline-offset-2 hover:text-ink"
+                      onClick={reportAi}
+                      disabled={reportingAi}
+                      className="ease-ui border-0 bg-transparent p-0 text-muted underline underline-offset-2 hover:text-ink disabled:opacity-50 focus-visible:ring-2 focus-visible:ring-primary rounded"
                     >
-                      Report a bad suggestion
+                      {reportingAi ? "Flagging…" : "Report a bad suggestion"}
                     </button>
                   </div>
-                </>
+                </div>
+              )}
+
+              {aiState === "reported" && (
+                <div
+                  role="status"
+                  aria-live="polite"
+                  className="flex flex-col gap-2 rounded-xl bg-subtle p-3 text-sm text-ink"
+                >
+                  <div className="flex items-center gap-2 font-medium text-ok">
+                    <Icon d={I.fixed} size={16} />
+                    <span>Suggestion flagged for review</span>
+                  </div>
+                  <p className="m-0 text-xs text-muted">
+                    Thank you for your feedback. Our team has flagged this suggestion to improve quality.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={genAi}
+                    className="self-start text-xs font-semibold text-ptext hover:underline"
+                  >
+                    Regenerate suggestion
+                  </button>
+                </div>
+              )}
+
+              {aiState === "cap_reached" && (
+                <div
+                  role="alert"
+                  className="flex flex-col gap-2 rounded-xl border border-warn/30 bg-warn-soft p-3.5 text-sm"
+                >
+                  <div className="flex items-center gap-2 font-semibold text-warn">
+                    <Icon d={I.alert} size={16} />
+                    <span>Monthly AI suggestion limit reached</span>
+                  </div>
+                  <p className="m-0 text-xs text-ink/80">
+                    You have used all 50 AI fix suggestions included in your plan this month.
+                    Upgrade your plan for higher monthly allowances or wait until the next billing cycle.
+                  </p>
+                  <Link
+                    href="/pricing"
+                    className="self-start text-xs font-semibold text-ptext underline hover:text-primary"
+                  >
+                    View upgrade options →
+                  </Link>
+                </div>
+              )}
+
+              {aiState === "error" && (
+                <div
+                  role="alert"
+                  className="flex flex-col gap-2 rounded-xl border border-line bg-subtle p-3 text-sm"
+                >
+                  <p className="m-0 text-xs text-muted">
+                    {aiError || "Suggestion unavailable. Please try again or refer to the fix guide above."}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={genAi}
+                    className="self-start text-xs font-semibold text-ptext hover:underline"
+                  >
+                    Try again
+                  </button>
+                </div>
               )}
             </section>
           </>

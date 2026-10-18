@@ -348,6 +348,35 @@ export function fakeRepos() {
       countRecentByDomain: vi.fn().mockResolvedValue(0),
       countGlobalToday: vi.fn().mockResolvedValue(0),
     },
+    aiSuggestions: {
+      findByCacheKey: vi.fn().mockResolvedValue(null),
+      create: vi.fn().mockImplementation((data) =>
+        Promise.resolve({
+          id: 'ai-sug-1',
+          cacheKey: data.cacheKey,
+          ruleId: data.ruleId,
+          platform: data.platform,
+          suggestionMd: data.suggestionMd,
+          model: data.model,
+          tokensIn: data.tokensIn ?? 10,
+          tokensOut: data.tokensOut ?? 50,
+          flagged: false,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        }),
+      ),
+      flag: vi.fn().mockImplementation((cacheKey) =>
+        Promise.resolve({
+          id: 'ai-sug-1',
+          cacheKey,
+          flagged: true,
+          updatedAt: new Date(),
+        }),
+      ),
+      getMonthlyUsage: vi.fn().mockResolvedValue(0),
+      incrementMonthlyUsage: vi.fn().mockResolvedValue(1),
+      isFeatureEnabled: vi.fn().mockResolvedValue(true),
+    },
   } as unknown as Repositories;
   return { repos, join };
 }

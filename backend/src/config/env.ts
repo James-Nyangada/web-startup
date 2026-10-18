@@ -27,6 +27,10 @@ const envSchema = z.object({
     .default('dev_secret_must_be_at_least_32_characters_long_for_auth'),
   GOOGLE_CLIENT_ID: z.string().optional(),
   GOOGLE_CLIENT_SECRET: z.string().optional(),
+  GEMINI_API_KEY: z.string().optional(),
+  GEMINI_MODEL: z.string().default('gemini-2.5-flash'),
+  AI_SUGGESTIONS_MONTHLY_CAP: z.coerce.number().int().positive().default(50),
+  FEATURE_AI_SUGGESTIONS: booleanString.default(true),
 });
 
 export type Env = z.infer<typeof envSchema>;
