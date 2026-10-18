@@ -352,7 +352,7 @@ export function orgIssuesRouter(
     }
 
     const csvContent = '\uFEFF' + csvLines.join('\r\n');
-    const safeSiteSlug = (site.slug || site.name || 'site').toLowerCase().replace(/[^a-z0-9_-]+/g, '-');
+    const safeSiteSlug = ((site as any).slug || site.name || 'site').toLowerCase().replace(/[^a-z0-9_-]+/g, '-');
     const dateStamp = new Date().toISOString().split('T')[0];
     const filename = `issues-${safeSiteSlug}-${dateStamp}.csv`;
 

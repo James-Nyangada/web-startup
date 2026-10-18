@@ -902,7 +902,7 @@ describe('Issues API (Chunk P2-12, Screen S-25, Section 7.5)', () => {
             title: 'Text has insufficient contrast, ratio is 2.5:1',
             description: 'Ensure contrast ratio meets 4.5:1',
             impact: 'critical',
-            wcagCriteria: '1.4.3 Contrast (Minimum)',
+            wcagCriteria: ['1.4.3 Contrast (Minimum)'],
             wcagLevel: 'AA',
             templateKey: 'product',
             selector: 'div.product-card > h2',
