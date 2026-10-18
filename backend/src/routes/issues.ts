@@ -209,6 +209,162 @@ export function orgIssuesRouter(
     },
   );
 
+  // GET /v1/orgs/:orgId/sites/:siteId/issues/export.csv (P2-22 CSV export)
+  const exportCsvHandler = async (req: Request, res: Response): Promise<void> => {
+    const siteIdParam = req.params.siteId;
+    const siteId = Array.isArray(siteIdParam) ? siteIdParam[0] : siteIdParam;
+
+    if (!siteId) {
+      res.status(400).json({
+        error: {
+          code: ErrorCode.VALIDATION_ERROR,
+          message: 'Site ID is required.',
+          details: {},
+        },
+      });
+      return;
+    }
+
+    const site = await repos.sites.findById(req.orgId!, siteId);
+    if (!site) {
+      res.status(404).json({
+        error: {
+          code: ErrorCode.NOT_FOUND,
+          message: 'Site not found.',
+          details: {},
+        },
+      });
+      return;
+    }
+
+    const queryParse = issuesQuerySchema.safeParse(req.query);
+    if (!queryParse.success) {
+      res.status(400).json({
+        error: {
+          code: ErrorCode.VALIDATION_ERROR,
+          message: 'Invalid query parameters.',
+          details: { issues: queryParse.error.issues },
+        },
+      });
+      return;
+    }
+
+    const {
+      status: statusRaw,
+      impact: impactRaw,
+      wcag,
+      template,
+      rule,
+      assignee: assigneeParam,
+      isRegression,
+      needsReview,
+      q: search,
+    } = queryParse.data;
+
+    const parsedStatus = parseMulti(statusRaw) as IssueStatus[];
+    const parsedImpact = parseMulti(impactRaw) as Impact[];
+
+    const filters: IssueListFilters = {
+      status: parsedStatus.length > 0 ? parsedStatus : undefined,
+      impact: parsedImpact.length > 0 ? parsedImpact : undefined,
+      wcag: wcag || undefined,
+      templateKey: template || undefined,
+      ruleId: rule || undefined,
+      isRegression,
+      needsReview,
+      search: search || undefined,
+    };
+
+    if (assigneeParam) {
+      filters.assigneeId = assigneeParam === 'me' ? req.auth!.user.id : assigneeParam;
+    }
+
+    const rows = await repos.issues.listBySite(req.orgId!, siteId, filters, {
+      limit: 10000,
+      offset: 0,
+      maxLimit: 10000,
+      sort: 'impact',
+      order: 'desc',
+    });
+
+    // RFC 4180 escaping and UTF-8 BOM
+    const headers = [
+      'Issue ID',
+      'Rule ID',
+      'Rule Title',
+      'Impact',
+      'WCAG Criteria',
+      'WCAG Level',
+      'Template',
+      'Status',
+      'Occurrences',
+      'Is Regression',
+      'Needs Review',
+      'Assigned To',
+      'Due Date',
+      'Ignored Reason',
+      'Ignored Note',
+      'CSS Selector',
+      'HTML Snippet',
+      'Failure Summary',
+      'First Seen At',
+      'Last Seen At',
+    ];
+
+    const escapeCsv = (val: unknown): string => {
+      if (val === null || val === undefined) return '';
+      const str = String(val);
+      if (/[",\r\n]/.test(str)) {
+        return `"${str.replace(/"/g, '""')}"`;
+      }
+      return str;
+    };
+
+    const csvLines = [headers.map(escapeCsv).join(',')];
+
+    for (const row of rows) {
+      csvLines.push(
+        [
+          row.id,
+          row.ruleId,
+          row.title,
+          row.impact,
+          row.wcagCriteria ?? '',
+          row.wcagLevel ?? '',
+          row.templateKey,
+          row.status,
+          row.occurrenceCount,
+          row.isRegression ? 'Yes' : 'No',
+          row.needsReview ? 'Yes' : 'No',
+          row.assigneeName ?? (row.assigneeId ? 'Assigned' : 'Unassigned'),
+          row.dueDate ? new Date(row.dueDate).toISOString().split('T')[0] : '',
+          row.ignoredReason ?? '',
+          row.ignoredNote ?? '',
+          row.selector ?? '',
+          row.htmlSnippet ?? '',
+          row.failureSummary ?? '',
+          row.createdAt ? new Date(row.createdAt).toISOString() : '',
+          row.updatedAt ? new Date(row.updatedAt).toISOString() : '',
+        ]
+          .map(escapeCsv)
+          .join(','),
+      );
+    }
+
+    const csvContent = '\uFEFF' + csvLines.join('\r\n');
+    const safeSiteSlug = (site.slug || site.name || 'site').toLowerCase().replace(/[^a-z0-9_-]+/g, '-');
+    const dateStamp = new Date().toISOString().split('T')[0];
+    const filename = `issues-${safeSiteSlug}-${dateStamp}.csv`;
+
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.status(200).send(Buffer.from(csvContent, 'utf-8'));
+  };
+
+  router.get('/sites/:siteId/issues/export.csv', requireOrgRole('member'), exportCsvHandler);
+  router.get('/sites/:siteId/issues/export', requireOrgRole('member'), exportCsvHandler);
+
+
   // GET /v1/orgs/:orgId/issues - Cross-site issues (agency / my-tasks)
   router.get(
     '/issues',

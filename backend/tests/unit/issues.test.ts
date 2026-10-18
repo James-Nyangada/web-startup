@@ -890,14 +890,101 @@ describe('Issues API (Chunk P2-12, Screen S-25, Section 7.5)', () => {
       });
     });
 
-    describe('POST /v1/orgs/:orgId/issues/:issueId/recheck', () => {
-      it('queues a recheck job', async () => {
+    describe('GET /v1/orgs/:orgId/sites/:siteId/issues/export.csv (P2-22)', () => {
+      it('exports issues as CSV with UTF-8 BOM, RFC 4180 escaping, and correct headers', async () => {
+        vi.mocked(repos.issues.listBySite).mockResolvedValueOnce([
+          {
+            id: '11111111-1111-4111-a111-111111111111',
+            orgId,
+            siteId,
+            fingerprint: 'fp-1',
+            ruleId: 'color-contrast',
+            title: 'Text has insufficient contrast, ratio is 2.5:1',
+            description: 'Ensure contrast ratio meets 4.5:1',
+            impact: 'critical',
+            wcagCriteria: '1.4.3 Contrast (Minimum)',
+            wcagLevel: 'AA',
+            templateKey: 'product',
+            selector: 'div.product-card > h2',
+            htmlSnippet: '<h2 class="title">"Discount" item</h2>',
+            failureSummary: 'Fix any of the following:\n  Element has insufficient color contrast of 2.5:1',
+            status: 'open',
+            ignoredReason: null,
+            ignoredNote: null,
+            isRegression: true,
+            regressionCount: 1,
+            occurrenceCount: 5,
+            assigneeId: userId,
+            assigneeName: 'Daniel Mwangi',
+            dueDate: '2026-11-01',
+            needsReview: false,
+            firstSeenScanId: 'scan-1',
+            lastSeenScanId: 'scan-2',
+            fixedScanId: null,
+            fixedAt: null,
+            createdAt: new Date('2026-10-01T10:00:00Z'),
+            updatedAt: new Date('2026-10-14T10:00:00Z'),
+          },
+        ]);
+
         const res = await request(app)
-          .post(`/v1/orgs/${orgId}/issues/issue-1/recheck`)
+          .get(`/v1/orgs/${orgId}/sites/${siteId}/issues/export.csv?status=open&impact=critical`)
           .set('Cookie', memberCookie)
           .expect(200);
 
-        expect(res.body.data.status).toBe('queued');
+        expect(res.headers['content-type']).toContain('text/csv');
+        expect(res.headers['content-disposition']).toMatch(/attachment; filename="issues-.*\.csv"/);
+
+        const text = res.text;
+        // Verify UTF-8 BOM is present at the beginning
+        expect(text.charCodeAt(0)).toBe(0xfeff);
+
+        // Verify CSV header line
+        expect(text).toContain('Issue ID,Rule ID,Rule Title,Impact,WCAG Criteria');
+
+        // Verify issue fields and RFC 4180 escaping of commas, quotes, and newlines
+        expect(text).toContain('11111111-1111-4111-a111-111111111111');
+        expect(text).toContain('color-contrast');
+        // Comma in title must be escaped in quotes
+        expect(text).toContain('"Text has insufficient contrast, ratio is 2.5:1"');
+        // Quotes inside htmlSnippet must be doubled
+        expect(text).toContain('""Discount"" item');
+        // Regression flag
+        expect(text).toContain('Yes');
+        // Assignee name
+        expect(text).toContain('Daniel Mwangi');
+
+        expect(repos.issues.listBySite).toHaveBeenCalledWith(
+          orgId,
+          siteId,
+          expect.objectContaining({
+            status: ['open'],
+            impact: ['critical'],
+          }),
+          expect.objectContaining({
+            limit: 10000,
+            maxLimit: 10000,
+          }),
+        );
+      });
+
+      it('returns 404 when site does not exist', async () => {
+        vi.mocked(repos.sites.findById).mockResolvedValueOnce(null);
+
+        const res = await request(app)
+          .get(`/v1/orgs/${orgId}/sites/missing-site/issues/export.csv`)
+          .set('Cookie', memberCookie)
+          .expect(404);
+
+        expect(res.body.error.code).toBe(ErrorCode.NOT_FOUND);
+      });
+
+      it('returns 404 on cross-org CSV export attempt', async () => {
+        await assertCrossOrg404(app, {
+          method: 'get',
+          path: `/v1/orgs/${otherOrgId}/sites/${siteId}/issues/export.csv`,
+          sessionCookie: memberCookie,
+        });
       });
     });
   });

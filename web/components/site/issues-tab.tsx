@@ -352,6 +352,83 @@ export function IssuesTab({
     [selected, setSelected],
   );
 
+  const handleExportCsv = () => {
+    const headers = [
+      "Issue ID",
+      "Rule ID",
+      "Rule Title",
+      "Severity",
+      "WCAG Criteria",
+      "Template",
+      "Status",
+      "Occurrences",
+      "Pages Affected",
+      "Is Regression",
+      "Needs Review",
+      "Assigned To",
+      "Due Date",
+      "Ignored Reason",
+      "Sample Location / Selector",
+      "HTML Snippet",
+      "First Seen",
+      "Last Seen",
+    ];
+
+    const escapeCsv = (val: unknown): string => {
+      if (val === null || val === undefined) return "";
+      const str = String(val);
+      if (/[",\r\n]/.test(str)) {
+        return `"${str.replace(/"/g, '""')}"`;
+      }
+      return str;
+    };
+
+    const lines = [headers.map(escapeCsv).join(",")];
+
+    for (const issue of sorted) {
+      const assigneeName = issue.assignee ? NAMES[issue.assignee] ?? issue.assignee : "Unassigned";
+      const sampleLoc = issue.occs && issue.occs.length > 0 ? `${issue.occs[0][0]} (${issue.occs[0][1]})` : "";
+
+      lines.push(
+        [
+          issue.id,
+          issue.rule,
+          issue.title,
+          issue.sev,
+          issue.wcag,
+          issue.template,
+          issue.status,
+          issue.occ,
+          issue.pages,
+          issue.status === "regressed" ? "Yes" : "No",
+          issue.status === "needsReview" ? "Yes" : "No",
+          assigneeName,
+          issue.due ?? "",
+          issue.ignoreReason ?? "",
+          sampleLoc,
+          issue.snippet ?? "",
+          issue.first,
+          issue.last,
+        ]
+          .map(escapeCsv)
+          .join(",")
+      );
+    }
+
+    // Prepend UTF-8 BOM so Excel and Google Sheets correctly parse encoding
+    const csvContent = "\uFEFF" + lines.join("\r\n");
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    const dateStamp = new Date().toISOString().split("T")[0];
+    link.download = `issues-export-${dateStamp}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <div ref={scope} className="flex flex-col gap-4">
       {/* Header bar */}
@@ -373,6 +450,7 @@ export function IssuesTab({
           </button>
           <button
             type="button"
+            onClick={handleExportCsv}
             className="ease-ui h-9 rounded-full border border-line-strong bg-surface px-4 text-sm font-semibold text-ink hover:bg-subtle"
           >
             Export CSV

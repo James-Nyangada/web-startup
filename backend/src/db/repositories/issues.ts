@@ -386,6 +386,7 @@ export function issuesRepository(db: Database) {
             offset?: number;
             sort?: IssueSortField;
             order?: IssueSortOrder;
+            maxLimit?: number;
           }
         | number = 50,
       legacyOffset = 0,
@@ -405,7 +406,11 @@ export function issuesRepository(db: Database) {
         sortOrder = optionsOrLimit.order ?? 'desc';
       }
 
-      limit = Math.min(200, Math.max(1, limit));
+      const maxLimit =
+        typeof optionsOrLimit === 'object' && optionsOrLimit.maxLimit
+          ? optionsOrLimit.maxLimit
+          : 200;
+      limit = Math.min(maxLimit, Math.max(1, limit));
       offset = Math.max(0, offset);
 
       const conditions = [eq(issues.orgId, orgId), eq(issues.siteId, siteId)];
