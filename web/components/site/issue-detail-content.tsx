@@ -6,6 +6,8 @@ import { Icon, I } from "@/components/icons";
 import { SeverityBadge } from "@/components/badges";
 import { CodeSnippet } from "./code-snippet";
 import { getWcagUnderstandingUrl } from "@/lib/wcag";
+import { GuideRenderer } from "@/components/marketing/guide-renderer";
+import { getFixGuideByRuleAndPlatform } from "@/lib/fix-guides-data";
 import {
   DRAWER_TABS,
   NAMES,
@@ -54,6 +56,7 @@ export interface IssueNoteItem {
 
 export interface IssueDetailContentProps {
   issue: Issue;
+  sitePlatform?: string;
   rechecking: boolean;
   onRecheck: () => void;
   onIgnore: () => void;
@@ -66,6 +69,7 @@ export interface IssueDetailContentProps {
 
 export function IssueDetailContent({
   issue,
+  sitePlatform,
   rechecking,
   onRecheck,
   onIgnore,
@@ -76,7 +80,10 @@ export function IssueDetailContent({
   titleRef,
 }: IssueDetailContentProps) {
   const [dTab, setDTab] = useState(0);
-  const [pf, setPf] = useState<Platform>("Shopify");
+  const initialPlatform: Platform = sitePlatform?.toLowerCase().includes("wordpress")
+    ? "WordPress"
+    : "Shopify";
+  const [pf, setPf] = useState<Platform>(initialPlatform);
   const [copiedLink, setCopiedLink] = useState(false);
   const [aiState, setAiState] = useState<AiState>("none");
 
@@ -503,30 +510,44 @@ export function IssueDetailContent({
               </div>
             </div>
 
-            {steps.length > 0 ? (
-              <ol className="m-0 flex flex-col gap-2 pl-6 text-pretty">
-                {steps.map((s, idx) => (
-                  <li key={idx} className="text-sm leading-6">
-                    {s}
-                  </li>
-                ))}
-              </ol>
-            ) : (
-              <p className="m-0 text-pretty text-sm text-muted">
-                We don&apos;t have a written WordPress guide for this problem yet. The generic fix
-                applies to any theme, or generate an AI suggestion below.
-              </p>
-            )}
+            {(() => {
+              const matchedGuide = pf !== "Generic" ? getFixGuideByRuleAndPlatform(issue.rule, pf) : undefined;
+              if (matchedGuide) {
+                return (
+                  <div className="flex flex-col gap-6 pt-2">
+                    <GuideRenderer guide={matchedGuide} isCompact={true} />
+                  </div>
+                );
+              }
+              return (
+                <>
+                  {steps.length > 0 ? (
+                    <ol className="m-0 flex flex-col gap-2 pl-6 text-pretty">
+                      {steps.map((s, idx) => (
+                        <li key={idx} className="text-sm leading-6">
+                          {s}
+                        </li>
+                      ))}
+                    </ol>
+                  ) : (
+                    <p className="m-0 text-pretty text-sm text-muted">
+                      We don&apos;t have a specific written guide for this rule on {pf} yet. The generic fix
+                      applies to any theme, or generate an AI suggestion below.
+                    </p>
+                  )}
 
-            <div className="flex flex-col gap-2">
-              <h4 className="m-0 text-sm font-semibold">Code change</h4>
-              <CodeSnippet code={code} language={lang} label={`${pf} (${lang})`} />
-            </div>
+                  <div className="flex flex-col gap-2">
+                    <h4 className="m-0 text-sm font-semibold">Code change</h4>
+                    <CodeSnippet code={code} language={lang} label={`${pf} (${lang})`} />
+                  </div>
 
-            <section className="flex flex-col gap-1.5">
-              <h3 className="m-0 text-base leading-6 font-semibold">How to check your fix</h3>
-              <p className="m-0 text-pretty text-sm text-muted">{issue.check}</p>
-            </section>
+                  <section className="flex flex-col gap-1.5">
+                    <h3 className="m-0 text-base leading-6 font-semibold">How to check your fix</h3>
+                    <p className="m-0 text-pretty text-sm text-muted">{issue.check}</p>
+                  </section>
+                </>
+              );
+            })()}
 
             {/* AI Suggestion Slot (Spec P3-07 placeholder) */}
             <section className="flex flex-col gap-2.5 rounded-2xl border border-line bg-surface p-4 shadow-card">
