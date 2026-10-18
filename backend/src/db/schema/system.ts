@@ -48,3 +48,51 @@ export const waitlist = pgTable('waitlist', {
   consent: boolean('consent').notNull().default(false),
   ...timestamps(),
 });
+
+export interface FreeCheckIssue {
+  ruleId: string;
+  title: string;
+  impact: 'critical' | 'serious' | 'moderate' | 'minor';
+  wcagCriteria: string[];
+  occurrences: number;
+  whoIsAffected: string;
+  selector?: string;
+  htmlSnippet?: string;
+}
+
+export interface FreeCheckResultPayload {
+  score: number;
+  scoreBand: 'Good' | 'Needs work' | 'Poor';
+  counts: {
+    critical: number;
+    serious: number;
+    moderate: number;
+    minor: number;
+  };
+  topIssues: FreeCheckIssue[];
+  pageTitle?: string | null;
+  checkedAt: string;
+  loadMs?: number | null;
+}
+
+export const freeChecks = pgTable(
+  'free_checks',
+  {
+    id: id(),
+    url: text('url').notNull(),
+    domain: text('domain').notNull(),
+    email: citext('email'),
+    ipHash: text('ip_hash').notNull(),
+    status: text('status').$type<'pending' | 'running' | 'completed' | 'failed'>().notNull().default('pending'),
+    result: jsonb('result').$type<FreeCheckResultPayload>(),
+    reportKey: text('report_key'),
+    marketingConsent: boolean('marketing_consent').notNull().default(false),
+    convertedOrgId: uuid('converted_org_id').references(() => organizations.id, { onDelete: 'set null' }),
+    errorMessage: text('error_message'),
+    ...timestamps(),
+  },
+  (t) => [
+    index('free_checks_ip_hash_created_idx').on(t.ipHash, t.createdAt.desc()),
+    index('free_checks_domain_created_idx').on(t.domain, t.createdAt.desc()),
+  ],
+);

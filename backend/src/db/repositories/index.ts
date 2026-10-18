@@ -10,6 +10,7 @@ import { usersRepository } from './users.js';
 import { waitlistRepository } from './waitlist.js';
 import { invitationsRepository } from './invitations.js';
 import { reportsRepository } from './reports.js';
+import { freeChecksRepository } from './free-checks.js';
 
 export function createRepositories(db: Database) {
   return {
@@ -24,6 +25,7 @@ export function createRepositories(db: Database) {
     waitlist: waitlistRepository(db),
     invitations: invitationsRepository(db),
     reports: reportsRepository(db),
+    freeChecks: freeChecksRepository(db),
   };
 }
 

@@ -4,6 +4,9 @@ import { createApp } from '../../src/app.js';
 import type { Auth } from '../../src/lib/auth.js';
 import type { Repositories } from '../../src/db/repositories/index.js';
 import type { TurnstileVerifier } from '../../src/lib/turnstile.js';
+import type { GuardPolicy } from '../../src/scanner/net/guard.js';
+import { isPublicAddress } from '../../src/scanner/net/ip-ranges.js';
+import type { FreeChecksRouterOptions } from '../../src/routes/public/free-checks.js';
 
 export const testConfig = {
   APP_URL: 'http://localhost:3000',
@@ -317,9 +320,48 @@ export function fakeRepos() {
       ),
       delete: vi.fn().mockResolvedValue(true),
     },
+    freeChecks: {
+      create: vi.fn().mockImplementation((data) =>
+        Promise.resolve({
+          id: 'fc-123',
+          url: data.url,
+          domain: data.domain,
+          ipHash: data.ipHash,
+          status: 'pending',
+          email: null,
+          result: null,
+          reportKey: null,
+          marketingConsent: false,
+          convertedOrgId: null,
+          errorMessage: null,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        }),
+      ),
+      findById: vi.fn().mockResolvedValue(null),
+      updateStatus: vi.fn().mockResolvedValue(null),
+      updateResult: vi.fn().mockResolvedValue(null),
+      attachEmail: vi.fn().mockResolvedValue(null),
+      setReportKey: vi.fn().mockResolvedValue(null),
+      markConverted: vi.fn().mockResolvedValue(null),
+      countRecentByIpHash: vi.fn().mockResolvedValue(0),
+      countRecentByDomain: vi.fn().mockResolvedValue(0),
+      countGlobalToday: vi.fn().mockResolvedValue(0),
+    },
   } as unknown as Repositories;
   return { repos, join };
 }
+
+export const testGuardPolicy: GuardPolicy = {
+  allowedPorts: [80, 443],
+  isAllowedAddress: isPublicAddress,
+  resolve: async (hostname) => {
+    if (hostname.includes('internal') || hostname.includes('private')) {
+      return ['10.0.0.1'];
+    }
+    return ['93.184.216.34'];
+  },
+};
 
 export function buildTestApp(
   options: {
@@ -327,16 +369,23 @@ export function buildTestApp(
     turnstile?: TurnstileVerifier;
     auth?: Auth;
     repos?: Repositories;
+    freeChecksOptions?: FreeChecksRouterOptions;
   } = {},
 ) {
   const defaultRepos = fakeRepos();
   const repos = options.repos ?? defaultRepos.repos;
+  const freeChecksOptions: FreeChecksRouterOptions = {
+    guardPolicy: testGuardPolicy,
+    customRunner: () => Promise.resolve(),
+    ...options.freeChecksOptions,
+  };
   const app = createApp({
     config: testConfig,
     pool: fakePool(options.healthy ?? true),
     repos,
     verifyTurnstile: options.turnstile ?? (() => Promise.resolve(true)),
     auth: options.auth,
+    freeChecksOptions,
   });
   return { app, join: defaultRepos.join, repos };
 }

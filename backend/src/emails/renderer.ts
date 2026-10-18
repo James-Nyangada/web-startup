@@ -7,6 +7,7 @@ import {
   renderScanSummary,
   renderVerifyEmail,
   renderWelcomeEmail,
+  renderFreeCheckReport,
 } from './templates/index.js';
 import type {
   EmailBranding,
@@ -21,6 +22,7 @@ import type {
   TemplateDataMap,
   VerifyEmailData,
   WelcomeEmailData,
+  FreeCheckReportData,
 } from './types.js';
 
 export function renderEmail<T extends EmailTemplateId>(
@@ -45,6 +47,8 @@ export function renderEmail<T extends EmailTemplateId>(
       return renderScanSummary(data as ScanSummaryData, branding);
     case 'E-11':
       return renderReportShared(data as ReportSharedData, branding);
+    case 'E-13':
+      return renderFreeCheckReport(data as FreeCheckReportData, branding);
     default:
       throw new Error(`Unsupported email template: ${templateId}`);
   }
@@ -113,6 +117,16 @@ export function getSampleTemplateData(templateId: EmailTemplateId): unknown {
         message: 'Here is the latest scan report for our staging deployment ahead of tomorrow’s product release.',
         downloadUrl: 'http://localhost:3000/v1/reports/download/sample_token_123',
         expiresInHours: 24,
+      };
+    case 'E-13':
+      return {
+        url: 'https://soraskin.co',
+        score: 64,
+        scoreBand: 'Poor',
+        criticalCount: 2,
+        seriousCount: 3,
+        reportUrl: 'http://localhost:3000/check/sample_check_123',
+        checkId: 'sample_check_123',
       };
   }
 }

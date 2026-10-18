@@ -6,7 +6,8 @@ export type EmailTemplateId =
   | 'E-05' // Welcome + next steps
   | 'E-06' // First scan ready
   | 'E-07' // Scan completed summary
-  | 'E-11'; // Report ready / report shared
+  | 'E-11' // Report ready / report shared
+  | 'E-13'; // Free check report
 
 export interface EmailRenderOutput {
   subject: string;
@@ -82,6 +83,16 @@ export interface ReportSharedData {
   expiresInHours?: number;
 }
 
+export interface FreeCheckReportData {
+  url: string;
+  score: number;
+  scoreBand: string;
+  criticalCount: number;
+  seriousCount: number;
+  reportUrl: string;
+  checkId: string;
+}
+
 export type TemplateDataMap = {
   'E-01': VerifyEmailData;
   'E-02': MagicLinkData;
@@ -91,4 +102,5 @@ export type TemplateDataMap = {
   'E-06': FirstScanReadyData;
   'E-07': ScanSummaryData;
   'E-11': ReportSharedData;
+  'E-13': FreeCheckReportData;
 };

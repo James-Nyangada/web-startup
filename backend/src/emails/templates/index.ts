@@ -10,6 +10,7 @@ import type {
   ScanSummaryData,
   VerifyEmailData,
   WelcomeEmailData,
+  FreeCheckReportData,
 } from '../types.js';
 
 // E-01: Verify your email
@@ -447,6 +448,65 @@ Download the report:
 ${data.downloadUrl}
 
 ${expiryText}
+
+— The ${brandName} Team`;
+
+  return { subject, html, text };
+}
+
+// E-13: Free check report
+export function renderFreeCheckReport(
+  data: FreeCheckReportData,
+  branding?: EmailBranding,
+): EmailRenderOutput {
+  const brandName = branding?.displayName || 'Plainsight';
+  const subject = `Your accessibility audit report for ${data.url}`;
+
+  const contentHtml = `
+    <p style="margin: 0 0 16px 0;">
+      Here is the free accessibility check report you requested for <strong>${data.url}</strong>:
+    </p>
+    <div style="background-color: #F8F7F4; border: 1px solid #E4E0D8; border-radius: 8px; padding: 16px; margin-bottom: 20px;">
+      <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%">
+        <tr>
+          <td align="left" style="font-size: 14px; color: #635F59;">Audit Score:</td>
+          <td align="right" style="font-size: 20px; font-weight: 700; color: #1A1816;">${data.score}/100 (${data.scoreBand})</td>
+        </tr>
+        <tr>
+          <td align="left" style="font-size: 14px; color: #DC2626; padding-top: 8px;">Critical barriers:</td>
+          <td align="right" style="font-size: 14px; font-weight: 600; color: #DC2626; padding-top: 8px;">${data.criticalCount}</td>
+        </tr>
+        <tr>
+          <td align="left" style="font-size: 14px; color: #D97706; padding-top: 4px;">Serious issues:</td>
+          <td align="right" style="font-size: 14px; font-weight: 600; color: #D97706; padding-top: 4px;">${data.seriousCount}</td>
+        </tr>
+      </table>
+    </div>
+    <p style="margin: 0 0 16px 0;">
+      Our automated audit evaluated 92 WCAG criteria. You can review your full interactive results, inspect code snippets, and download your tagged PDF report below.
+    </p>
+  `;
+
+  const html = renderEmailLayout({
+    preheader: `Audit report for ${data.url}: Score ${data.score}/100 with ${data.criticalCount} critical issues.`,
+    title: `Accessibility report for ${data.url}`,
+    contentHtml,
+    buttonLabel: 'View full audit & download PDF',
+    buttonUrl: data.reportUrl,
+    secondaryLinkText: 'Direct report link',
+    secondaryLinkUrl: data.reportUrl,
+    branding,
+  });
+
+  const text = `Your accessibility audit report for ${data.url}
+
+Summary:
+- Score: ${data.score}/100 (${data.scoreBand})
+- Critical barriers: ${data.criticalCount}
+- Serious issues: ${data.seriousCount}
+
+View the full report and download PDF:
+${data.reportUrl}
 
 — The ${brandName} Team`;
 

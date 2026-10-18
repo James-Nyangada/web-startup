@@ -2,9 +2,9 @@ import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { chromium } from 'playwright';
 import type { ScanResult } from '../scanner/scan.js';
-import { FullReport, ScanSummaryReport } from './templates.js';
+import { FullReport, ScanSummaryReport, FreeCheckReport, type FreeCheckReportInput } from './templates.js';
 
-export type ReportType = 'summary' | 'full';
+export type ReportType = 'summary' | 'full' | 'free_check';
 export type Paper = 'a4' | 'letter';
 
 export interface ReportOptions {
@@ -45,6 +45,37 @@ export async function renderReportPdf(scan: ScanResult, options: ReportOptions):
       displayHeaderFooter: true,
       headerTemplate: '<span></span>',
       footerTemplate: footerTemplate(scan.rootUrl),
+      margin: { top: '16mm', bottom: '18mm', left: '15mm', right: '15mm' },
+    });
+    return pdf;
+  } finally {
+    await browser.close();
+  }
+}
+
+export function renderFreeCheckReportHtml(check: FreeCheckReportInput): string {
+  return `<!doctype html>${renderToStaticMarkup(createElement(FreeCheckReport, { check }))}`;
+}
+
+export async function renderFreeCheckReportPdf(
+  check: FreeCheckReportInput,
+  paper: Paper = 'a4',
+): Promise<Buffer> {
+  const html = renderFreeCheckReportHtml(check);
+  const browser = await chromium.launch();
+  try {
+    const context = await browser.newContext({ javaScriptEnabled: false });
+    await context.route('**/*', (route) => route.abort());
+    const page = await context.newPage();
+    await page.setContent(html, { waitUntil: 'load' });
+    const pdf = await page.pdf({
+      format: paper === 'letter' ? 'Letter' : 'A4',
+      printBackground: true,
+      tagged: true,
+      outline: true,
+      displayHeaderFooter: true,
+      headerTemplate: '<span></span>',
+      footerTemplate: footerTemplate(check.url),
       margin: { top: '16mm', bottom: '18mm', left: '15mm', right: '15mm' },
     });
     return pdf;

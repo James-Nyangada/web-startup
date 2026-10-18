@@ -84,3 +84,105 @@ export function FullReport({ scan }: { scan: ScanResult }) {
     </Document>
   );
 }
+
+export interface FreeCheckReportInput {
+  url: string;
+  checkedAt: string;
+  score: number;
+  scoreBand: string;
+  counts: {
+    critical: number;
+    serious: number;
+    moderate: number;
+    minor: number;
+  };
+  topIssues: Array<{
+    ruleId: string;
+    title: string;
+    impact: string;
+    wcagCriteria: string[];
+    occurrences: number;
+    whoIsAffected: string;
+    selector?: string;
+    htmlSnippet?: string;
+  }>;
+}
+
+/** R-06: Free check one-page report. */
+export function FreeCheckReport({ check }: { check: FreeCheckReportInput }) {
+  const title = 'Free Accessibility Audit Report';
+  return (
+    <Document title={`${title} – ${check.url}`}>
+      <header className="cover">
+        <h1>{title}</h1>
+        <p className="site">{check.url}</p>
+        <dl className="meta">
+          <dt>Checked</dt>
+          <dd>{new Date(check.checkedAt).toUTCString()}</dd>
+          <dt>Standard checked</dt>
+          <dd>WCAG 2.2 level A and AA (automated checks)</dd>
+          <dt>Pages tested</dt>
+          <dd>1 page (home page audit)</dd>
+        </dl>
+      </header>
+      <section className="score-block">
+        <div className="score-dial">
+          <span className="score-number">{check.score}</span>
+          <span className="score-max">/ 100</span>
+          <span className={`band band-${check.scoreBand.toLowerCase().replace(/\s+/g, '-')}`}>
+            {check.scoreBand}
+          </span>
+        </div>
+      </section>
+      <section className="counts-block">
+        <div className="counts-grid">
+          <div className="count-card">
+            <span className="count-num">{check.counts.critical}</span>
+            <span className="count-label">Critical</span>
+          </div>
+          <div className="count-card">
+            <span className="count-num">{check.counts.serious}</span>
+            <span className="count-label">Serious</span>
+          </div>
+          <div className="count-card">
+            <span className="count-num">{check.counts.moderate}</span>
+            <span className="count-label">Moderate</span>
+          </div>
+          <div className="count-card">
+            <span className="count-num">{check.counts.minor}</span>
+            <span className="count-label">Minor</span>
+          </div>
+        </div>
+      </section>
+      <section aria-labelledby="top-heading">
+        <h2 id="top-heading">Top issues identified on this page</h2>
+        <table className="data-table">
+          <thead>
+            <tr>
+              <th scope="col">Severity</th>
+              <th scope="col">Problem</th>
+              <th scope="col">Who is affected</th>
+              <th scope="col">Occurrences</th>
+            </tr>
+          </thead>
+          <tbody>
+            {check.topIssues.map((issue, idx) => (
+              <tr key={idx}>
+                <td>
+                  <span className={`badge sev-${issue.impact}`}>{issue.impact}</span>
+                </td>
+                <td>
+                  <strong>{issue.title}</strong>
+                  <div className="muted">{issue.ruleId}</div>
+                </td>
+                <td>{issue.whoIsAffected}</td>
+                <td>{issue.occurrences}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </section>
+      <Limitations />
+    </Document>
+  );
+}

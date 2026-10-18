@@ -157,4 +157,12 @@ export class EmailSender implements AuthMailer {
       },
     });
   }
+
+  async sendFreeCheckReport(to: string, data: import('./types.js').FreeCheckReportData): Promise<void> {
+    await this.send({
+      to,
+      templateId: 'E-13',
+      data,
+    });
+  }
 }
