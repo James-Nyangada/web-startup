@@ -5,7 +5,8 @@ export type EmailTemplateId =
   | 'E-04' // Invitation to organisation
   | 'E-05' // Welcome + next steps
   | 'E-06' // First scan ready
-  | 'E-07'; // Scan completed summary
+  | 'E-07' // Scan completed summary
+  | 'E-11'; // Report ready / report shared
 
 export interface EmailRenderOutput {
   subject: string;
@@ -72,6 +73,15 @@ export interface ScanSummaryData {
   unsubscribeUrl?: string;
 }
 
+export interface ReportSharedData {
+  reportTitle: string;
+  siteName: string;
+  senderName?: string | null;
+  message?: string | null;
+  downloadUrl: string;
+  expiresInHours?: number;
+}
+
 export type TemplateDataMap = {
   'E-01': VerifyEmailData;
   'E-02': MagicLinkData;
@@ -80,4 +90,5 @@ export type TemplateDataMap = {
   'E-05': WelcomeEmailData;
   'E-06': FirstScanReadyData;
   'E-07': ScanSummaryData;
+  'E-11': ReportSharedData;
 };

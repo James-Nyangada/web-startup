@@ -5,6 +5,7 @@ import type {
   FirstScanReadyData,
   InvitationEmailData,
   MagicLinkData,
+  ReportSharedData,
   ResetPasswordData,
   ScanSummaryData,
   VerifyEmailData,
@@ -370,6 +371,82 @@ Review scan diff:
 ${data.scanUrl}
 
 ${data.unsubscribeUrl ? `Unsubscribe: ${data.unsubscribeUrl}` : ''}
+
+— The ${brandName} Team`;
+
+  return { subject, html, text };
+}
+
+// E-11: Report ready / report shared
+export function renderReportShared(
+  data: ReportSharedData,
+  branding?: EmailBranding,
+): EmailRenderOutput {
+  const brandName = branding?.displayName || 'Plainsight';
+  const senderText = data.senderName
+    ? `${data.senderName} shared an accessibility report`
+    : 'Your accessibility report is ready';
+  const subject = `${data.reportTitle} – ${data.siteName}`;
+
+  const messageBlock = data.message
+    ? `<div style="background-color: #F6F5F2; border-left: 3px solid #0F3D3E; border-radius: 4px; padding: 12px 16px; margin: 0 0 20px 0; font-size: 14px; line-height: 1.6; color: #1A1816; font-style: italic;">
+        "${data.message.replace(/[<>&"]/g, '')}"
+      </div>`
+    : '';
+
+  const expiryText = data.expiresInHours
+    ? `This secure download link is valid for ${data.expiresInHours} hours.`
+    : 'This secure download link is valid for 7 days.';
+
+  const contentHtml = `
+    <p style="margin: 0 0 16px 0;">
+      ${senderText} for <strong>${data.siteName}</strong>:
+    </p>
+    ${messageBlock}
+    <div style="background-color: #FAFAF8; border: 1px solid #E6E4DF; border-radius: 6px; padding: 16px; margin: 0 0 20px 0;">
+      <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%">
+        <tr>
+          <td align="left" style="font-size: 14px; font-weight: 600; color: #1A1816;">Report:</td>
+          <td align="right" style="font-size: 14px; color: #476788;">${data.reportTitle}</td>
+        </tr>
+        <tr>
+          <td align="left" style="font-size: 14px; font-weight: 600; color: #1A1816; padding-top: 6px;">Site:</td>
+          <td align="right" style="font-size: 14px; color: #476788; padding-top: 6px;">${data.siteName}</td>
+        </tr>
+        <tr>
+          <td align="left" style="font-size: 14px; font-weight: 600; color: #1A1816; padding-top: 6px;">Format:</td>
+          <td align="right" style="font-size: 14px; color: #476788; padding-top: 6px;">Tagged PDF (A4)</td>
+        </tr>
+      </table>
+    </div>
+    <p style="margin: 0 0 8px 0; font-size: 13px; color: #706E6B;">
+      ${expiryText}
+    </p>
+  `;
+
+  const html = renderEmailLayout({
+    preheader: `${data.reportTitle} for ${data.siteName} is ready to download.`,
+    title: data.reportTitle,
+    contentHtml,
+    buttonLabel: 'Download report (PDF)',
+    buttonUrl: data.downloadUrl,
+    secondaryLinkText: 'Download report link',
+    secondaryLinkUrl: data.downloadUrl,
+    branding,
+  });
+
+  const text = `${data.reportTitle} – ${data.siteName}
+
+${senderText} for ${data.siteName}.
+
+${data.message ? `Message: "${data.message}"\n\n` : ''}Report: ${data.reportTitle}
+Site: ${data.siteName}
+Format: Tagged PDF (A4)
+
+Download the report:
+${data.downloadUrl}
+
+${expiryText}
 
 — The ${brandName} Team`;
 

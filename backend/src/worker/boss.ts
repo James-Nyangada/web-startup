@@ -5,12 +5,15 @@ import { handleScanProcess } from './jobs/scan-process.js';
 import { handleScanSchedule } from './jobs/scan-schedule.js';
 import { handleIssueRecheck } from './jobs/issue-recheck.js';
 import { handleEmailSend } from './jobs/email-send.js';
+import { handleReportRender } from './jobs/report-render.js';
+import type { ReportRenderJobPayload } from './types.js';
 
 export const QUEUE_SCAN_RUN = 'scan.run';
 export const QUEUE_SCAN_PROCESS = 'scan.process';
 export const QUEUE_SCAN_SCHEDULE = 'scan.schedule';
 export const QUEUE_ISSUE_RECHECK = 'issue.recheck';
 export const QUEUE_EMAIL_SEND = 'email.send';
+export const QUEUE_REPORT_RENDER = 'report.render';
 
 export interface CreateBossOptions {
   connectionString?: string;
@@ -108,6 +111,24 @@ export async function enqueueEmailSend(
 }
 
 /**
+ * Enqueue a report.render job with Section 9 parameters:
+ * Concurrency: 1, Timeout: 5 min, Retries: 2.
+ */
+export async function enqueueReportRender(
+  boss: PgBoss,
+  reportId: string,
+): Promise<string | null> {
+  return boss.send(
+    QUEUE_REPORT_RENDER,
+    { reportId },
+    {
+      expireInSeconds: 5 * 60,
+      retryLimit: 2,
+    },
+  );
+}
+
+/**
  * Registers workers for scan.run and scan.process.
  */
 export async function registerWorkers(boss: PgBoss, ctx: WorkerContext): Promise<void> {
@@ -164,6 +185,18 @@ export async function registerWorkers(boss: PgBoss, ctx: WorkerContext): Promise
       const job = jobs[0];
       if (job?.data) {
         await handleEmailSend(job.data, ctx);
+      }
+    },
+  );
+
+  // Concurrency 1 for report.render
+  await boss.work<ReportRenderJobPayload>(
+    QUEUE_REPORT_RENDER,
+    { localConcurrency: 1, batchSize: 1 },
+    async (jobs) => {
+      const job = jobs[0];
+      if (job?.data?.reportId) {
+        await handleReportRender(job.data, ctx);
       }
     },
   );

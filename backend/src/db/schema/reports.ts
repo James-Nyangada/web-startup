@@ -50,3 +50,6 @@ export const reports = pgTable(
     check('reports_status_check', sql`${t.status} in (${inList(REPORT_STATUSES)})`),
   ],
 );
+
+export type ReportRow = typeof reports.$inferSelect;
+export type NewReportRow = typeof reports.$inferInsert;

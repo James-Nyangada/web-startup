@@ -35,3 +35,7 @@ export interface EmailSendJobPayload {
   data: Record<string, unknown>;
   branding?: EmailBranding;
 }
+
+export interface ReportRenderJobPayload {
+  reportId: string;
+}

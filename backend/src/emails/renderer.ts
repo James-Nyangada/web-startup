@@ -2,6 +2,7 @@ import {
   renderFirstScanReady,
   renderInvitationEmail,
   renderMagicLink,
+  renderReportShared,
   renderResetPassword,
   renderScanSummary,
   renderVerifyEmail,
@@ -14,6 +15,7 @@ import type {
   FirstScanReadyData,
   InvitationEmailData,
   MagicLinkData,
+  ReportSharedData,
   ResetPasswordData,
   ScanSummaryData,
   TemplateDataMap,
@@ -41,6 +43,8 @@ export function renderEmail<T extends EmailTemplateId>(
       return renderFirstScanReady(data as FirstScanReadyData, branding);
     case 'E-07':
       return renderScanSummary(data as ScanSummaryData, branding);
+    case 'E-11':
+      return renderReportShared(data as ReportSharedData, branding);
     default:
       throw new Error(`Unsupported email template: ${templateId}`);
   }
@@ -100,6 +104,15 @@ export function getSampleTemplateData(templateId: EmailTemplateId): unknown {
         regressedCount: 0,
         scanUrl: 'http://localhost:3000/sites/oakhaus/scans/scan-demo',
         unsubscribeUrl: 'http://localhost:3000/settings/notifications',
+      };
+    case 'E-11':
+      return {
+        reportTitle: 'Accessibility Scan Summary',
+        siteName: 'Oakhaus Furniture',
+        senderName: 'Daniel Mwangi',
+        message: 'Here is the latest scan report for our staging deployment ahead of tomorrow’s product release.',
+        downloadUrl: 'http://localhost:3000/v1/reports/download/sample_token_123',
+        expiresInHours: 24,
       };
   }
 }

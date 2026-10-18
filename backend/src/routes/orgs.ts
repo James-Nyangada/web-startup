@@ -9,6 +9,8 @@ import { requireOrgRole, resolveOrgContext } from '../middleware/org.js';
 import { orgSitesRouter } from './sites.js';
 import { orgScansRouter, type ScansRouterOptions } from './scans.js';
 import { orgIssuesRouter } from './issues.js';
+import { orgReportsRouter } from './reports.js';
+import type { StorageService } from '../storage/index.js';
 import { ErrorCode } from '../shared/errors.js';
 
 const createOrgSchema = z.object({
@@ -44,6 +46,7 @@ export function orgsRouter(
   repos: Repositories,
   scansOptions?: ScansRouterOptions,
   emailSender?: EmailSender,
+  storage?: StorageService,
 ): Router {
   const router = Router();
   router.use(requireAuth(auth));
@@ -682,6 +685,16 @@ export function orgsRouter(
 
   // Mount Section 7.5 Issues router under orgScoped
   orgScoped.use(orgIssuesRouter(repos, scansOptions));
+
+  // Mount Section 8.1 Reports router under orgScoped
+  orgScoped.use(
+    '/reports',
+    orgReportsRouter(repos, {
+      emailSender,
+      storage,
+      boss: scansOptions?.boss,
+    }),
+  );
 
   router.use('/:orgId', orgScoped);
 

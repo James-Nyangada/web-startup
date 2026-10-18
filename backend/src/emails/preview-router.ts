@@ -10,6 +10,7 @@ const VALID_TEMPLATES: EmailTemplateId[] = [
   'E-05',
   'E-06',
   'E-07',
+  'E-11',
 ];
 
 export function createEmailPreviewRouter(): Router {

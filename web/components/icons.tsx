@@ -52,6 +52,9 @@ export const I = {
   pause: "M6 4h4v16H6z M14 4h4v16h-4z",
   chevronDown: "M6 9l6 6 6-6",
   chevronUp: "M18 15l-6-6-6 6",
+  download: "M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4 M7 10l5 5 5-5 M12 15V3",
+  mail: "M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z M22 6l-10 7L2 6",
+  share: "M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8 M16 6l-4-4-4 4 M12 2v13",
 };
 
 export function Icon({

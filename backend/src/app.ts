@@ -20,6 +20,8 @@ import type { ScansRouterOptions } from './routes/scans.js';
 import { EmailSender } from './emails/sender.js';
 import { createEmailPreviewRouter } from './emails/preview-router.js';
 import { invitationsRouter } from './routes/invitations.js';
+import { reportsPublicRouter } from './routes/reports.js';
+import { getStorage, type StorageService } from './storage/index.js';
 
 export interface AppDeps {
   config: Pick<
@@ -38,6 +40,7 @@ export interface AppDeps {
   auth?: Auth;
   scansOptions?: ScansRouterOptions;
   emailSender?: EmailSender;
+  storage?: StorageService;
 }
 
 export function createApp({
@@ -48,9 +51,11 @@ export function createApp({
   auth: injectedAuth,
   scansOptions,
   emailSender: injectedEmailSender,
+  storage: injectedStorage,
 }: AppDeps): express.Express {
   const app = express();
   const emailSender = injectedEmailSender ?? new EmailSender();
+  const storage = injectedStorage ?? getStorage();
 
   // Behind Caddy / Cloudflare in production; needed for a correct req.ip.
   app.set('trust proxy', 1);
@@ -86,11 +91,12 @@ export function createApp({
   const v1 = Router();
   v1.use('/auth', authRouter(auth, verifyTurnstile, config));
   v1.use('/me', meRouter(auth, repos));
-  v1.use('/orgs', orgsRouter(auth, repos, scansOptions, emailSender));
+  v1.use('/orgs', orgsRouter(auth, repos, scansOptions, emailSender, storage));
   v1.use('/invitations', invitationsRouter(repos, auth));
   v1.use('/sites', detectPlatformRouter(auth));
   v1.use('/public', waitlistRouter(repos, verifyTurnstile));
   v1.use('/emails', createEmailPreviewRouter());
+  v1.use('/reports', reportsPublicRouter(repos, storage));
   app.use('/v1', v1);
 
   app.use(notFoundHandler);
