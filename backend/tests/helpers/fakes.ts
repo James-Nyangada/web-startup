@@ -197,6 +197,55 @@ export function fakeRepos() {
       ),
       bulkAction: vi.fn().mockResolvedValue({ updatedCount: 1 }),
     },
+    invitations: {
+      create: vi.fn().mockImplementation((orgId, input) =>
+        Promise.resolve({
+          invitation: {
+            id: 'inv-123',
+            orgId,
+            email: input.email,
+            role: input.role,
+            siteIds: input.siteIds ?? [],
+            tokenHash: 'hash-123',
+            invitedBy: input.invitedBy ?? null,
+            expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+            acceptedAt: null,
+            revokedAt: null,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          },
+          rawToken: 'mock-raw-token-123',
+        }),
+      ),
+      listPending: vi.fn().mockResolvedValue([]),
+      findById: vi.fn().mockResolvedValue(null),
+      findByToken: vi.fn().mockResolvedValue(null),
+      revoke: vi.fn().mockImplementation((orgId, id) =>
+        Promise.resolve({
+          id,
+          orgId,
+          revokedAt: new Date(),
+        }),
+      ),
+      renew: vi.fn().mockImplementation((orgId, id) =>
+        Promise.resolve({
+          invitation: {
+            id,
+            orgId,
+            email: 'test@example.com',
+            role: 'member',
+            expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+          },
+          rawToken: 'renewed-token-456',
+        }),
+      ),
+      markAccepted: vi.fn().mockImplementation((id) =>
+        Promise.resolve({
+          id,
+          acceptedAt: new Date(),
+        }),
+      ),
+    },
   } as unknown as Repositories;
   return { repos, join };
 }

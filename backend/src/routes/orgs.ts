@@ -27,14 +27,23 @@ const transferOwnershipSchema = z.object({
   newOwnerId: z.string().uuid(),
 });
 
+import type { EmailSender } from '../emails/sender.js';
+
 const changeMemberRoleSchema = z.object({
   role: z.enum(['admin', 'member']),
+});
+
+const createInvitationSchema = z.object({
+  email: z.string().trim().email('Valid email is required'),
+  role: z.enum(['admin', 'member', 'client_viewer']).default('member'),
+  siteIds: z.array(z.string().uuid()).optional(),
 });
 
 export function orgsRouter(
   auth: Auth,
   repos: Repositories,
   scansOptions?: ScansRouterOptions,
+  emailSender?: EmailSender,
 ): Router {
   const router = Router();
   router.use(requireAuth(auth));
@@ -283,7 +292,216 @@ export function orgsRouter(
     requireOrgRole('member'),
     async (req: Request, res: Response): Promise<void> => {
       const members = await repos.memberships.list(req.orgId!);
-      res.status(200).json({ data: { members } });
+      const invitations = await repos.invitations.listPending(req.orgId!);
+      res.status(200).json({ data: { members, invitations } });
+    },
+  );
+
+  // POST /v1/orgs/:orgId/invitations - Invite member or client viewer (O A)
+  orgScoped.post(
+    '/invitations',
+    requireOrgRole('admin'),
+    async (req: Request, res: Response): Promise<void> => {
+      const parse = createInvitationSchema.safeParse(req.body);
+      if (!parse.success) {
+        res.status(400).json({
+          error: {
+            code: ErrorCode.VALIDATION_ERROR,
+            message: 'Invalid invitation payload.',
+            details: { issues: parse.error.issues },
+          },
+        });
+        return;
+      }
+
+      const { email, role, siteIds } = parse.data;
+
+      // Check if user is already a member
+      const existingUser = await repos.users.findByEmail(email);
+      if (existingUser) {
+        const existingMembership = await repos.memberships.find(req.orgId!, existingUser.id);
+        if (existingMembership) {
+          res.status(409).json({
+            error: {
+              code: ErrorCode.ALREADY_MEMBER,
+              message: `User ${email} is already a member of this organisation.`,
+              details: {},
+            },
+          });
+          return;
+        }
+      }
+
+      const { invitation, rawToken } = await repos.invitations.create(req.orgId!, {
+        email,
+        role,
+        siteIds,
+        invitedBy: req.auth!.user.id,
+      });
+
+      if (!invitation) {
+        res.status(500).json({
+          error: {
+            code: ErrorCode.INTERNAL_ERROR,
+            message: 'Failed to create invitation.',
+            details: {},
+          },
+        });
+        return;
+      }
+
+      const appUrl = process.env.APP_URL || 'http://localhost:3000';
+      const inviteUrl = `${appUrl}/invitations/${rawToken}`;
+
+      if (emailSender) {
+        await emailSender.send({
+          to: invitation.email,
+          templateId: 'E-04',
+          data: {
+            inviterName: req.auth!.user.name || req.auth!.user.email,
+            orgName: req.org!.name,
+            role: invitation.role,
+            inviteUrl,
+            expiresInDays: 7,
+          },
+        });
+      }
+
+      await repos.auditLog.write(req.orgId!, {
+        actorId: req.auth!.user.id,
+        actorType: 'user',
+        action: 'member.invited',
+        targetId: invitation.id,
+        targetType: 'invitation',
+        data: { email: invitation.email, role: invitation.role },
+        ip: req.ip ?? null,
+        userAgent: req.get('user-agent') ?? null,
+      });
+
+      res.status(201).json({
+        data: {
+          invitation,
+          inviteUrl,
+        },
+      });
+    },
+  );
+
+  // DELETE /v1/orgs/:orgId/invitations/:id - Revoke invitation (O A)
+  orgScoped.delete(
+    '/invitations/:id',
+    requireOrgRole('admin'),
+    async (req: Request, res: Response): Promise<void> => {
+      const paramVal = req.params.id;
+      const invitationId = Array.isArray(paramVal) ? paramVal[0] : paramVal;
+
+      if (!invitationId) {
+        res.status(400).json({
+          error: {
+            code: ErrorCode.VALIDATION_ERROR,
+            message: 'Invitation ID is required.',
+            details: {},
+          },
+        });
+        return;
+      }
+
+      const existing = await repos.invitations.findById(req.orgId!, invitationId);
+      if (!existing) {
+        res.status(404).json({
+          error: {
+            code: ErrorCode.NOT_FOUND,
+            message: 'Invitation not found.',
+            details: {},
+          },
+        });
+        return;
+      }
+
+      await repos.invitations.revoke(req.orgId!, invitationId);
+
+      await repos.auditLog.write(req.orgId!, {
+        actorId: req.auth!.user.id,
+        actorType: 'user',
+        action: 'invitation.revoked',
+        targetId: invitationId,
+        targetType: 'invitation',
+        data: { email: existing.email },
+        ip: req.ip ?? null,
+        userAgent: req.get('user-agent') ?? null,
+      });
+
+      res.status(200).json({ data: { ok: true } });
+    },
+  );
+
+  // POST /v1/orgs/:orgId/invitations/:id/resend - Resend invitation (O A)
+  orgScoped.post(
+    '/invitations/:id/resend',
+    requireOrgRole('admin'),
+    async (req: Request, res: Response): Promise<void> => {
+      const paramVal = req.params.id;
+      const invitationId = Array.isArray(paramVal) ? paramVal[0] : paramVal;
+
+      if (!invitationId) {
+        res.status(400).json({
+          error: {
+            code: ErrorCode.VALIDATION_ERROR,
+            message: 'Invitation ID is required.',
+            details: {},
+          },
+        });
+        return;
+      }
+
+      const existing = await repos.invitations.findById(req.orgId!, invitationId);
+      if (!existing) {
+        res.status(404).json({
+          error: {
+            code: ErrorCode.NOT_FOUND,
+            message: 'Invitation not found.',
+            details: {},
+          },
+        });
+        return;
+      }
+
+      const renewed = await repos.invitations.renew(req.orgId!, invitationId);
+      if (!renewed) {
+        res.status(500).json({
+          error: {
+            code: ErrorCode.INTERNAL_ERROR,
+            message: 'Failed to renew invitation.',
+            details: {},
+          },
+        });
+        return;
+      }
+
+      const appUrl = process.env.APP_URL || 'http://localhost:3000';
+      const inviteUrl = `${appUrl}/invitations/${renewed.rawToken}`;
+
+      if (emailSender) {
+        await emailSender.send({
+          to: renewed.invitation.email,
+          templateId: 'E-04',
+          data: {
+            inviterName: req.auth!.user.name || req.auth!.user.email,
+            orgName: req.org!.name,
+            role: renewed.invitation.role,
+            inviteUrl,
+            expiresInDays: 7,
+          },
+        });
+      }
+
+      res.status(200).json({
+        data: {
+          ok: true,
+          invitation: renewed.invitation,
+          inviteUrl,
+        },
+      });
     },
   );
 

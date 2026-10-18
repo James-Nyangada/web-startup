@@ -8,6 +8,7 @@ import { pagesRepository } from './pages.js';
 import { issuesRepository } from './issues.js';
 import { usersRepository } from './users.js';
 import { waitlistRepository } from './waitlist.js';
+import { invitationsRepository } from './invitations.js';
 
 export function createRepositories(db: Database) {
   return {
@@ -20,6 +21,7 @@ export function createRepositories(db: Database) {
     issues: issuesRepository(db),
     users: usersRepository(db),
     waitlist: waitlistRepository(db),
+    invitations: invitationsRepository(db),
   };
 }
 

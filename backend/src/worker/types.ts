@@ -4,6 +4,9 @@ import type { Repositories } from '../db/repositories/index.js';
 import type { StorageService } from '../storage/index.js';
 import type { ScanLogger } from '../scanner/types.js';
 
+import type { EmailSender } from '../emails/sender.js';
+import type { EmailBranding, EmailTemplateId } from '../emails/types.js';
+
 export interface WorkerContext {
   repos: Repositories;
   storage: StorageService;
@@ -15,6 +18,7 @@ export interface WorkerContext {
   /** In testing or monolithic execution, run scan.process immediately after scan.run. */
   autoProcess?: boolean;
   logger?: ScanLogger;
+  emailSender?: EmailSender;
 }
 
 export interface ScanJobPayload {
@@ -23,4 +27,11 @@ export interface ScanJobPayload {
 
 export interface IssueRecheckJobPayload {
   issueId: string;
+}
+
+export interface EmailSendJobPayload {
+  to: string;
+  templateId: EmailTemplateId;
+  data: Record<string, unknown>;
+  branding?: EmailBranding;
 }
