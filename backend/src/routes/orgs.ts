@@ -17,6 +17,7 @@ const createOrgSchema = z.object({
   name: z.string().min(1, 'Organisation name is required').max(100),
   type: z.enum(['agency', 'store']).default('store'),
   timeZone: z.string().min(1).max(50).default('UTC'),
+  freeCheckId: z.string().uuid().optional(),
 });
 
 const patchOrgSchema = z.object({
@@ -99,6 +100,10 @@ export function orgsRouter(
         userAgent: req.headers['user-agent'],
         data: { name: org.name, slug: org.slug, type, timeZone },
       });
+
+      if (parse.data.freeCheckId) {
+        await repos.freeChecks.markConverted(parse.data.freeCheckId, org.id);
+      }
 
       res.status(201).json({
         data: {

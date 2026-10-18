@@ -282,4 +282,14 @@ describe('Free Checker Backend API (Chunk P3-03, Screen S-03, Sections 7.10 & 11
 
     expect(res.body.data.id).toBe('fc-v1-test');
   });
+
+  it('marks free check as converted to an organization (Chunk P3-08)', async () => {
+    const { repos } = buildTestApp();
+    const orgId = '11111111-1111-4111-a111-111111111111';
+    const checkId = 'fc-convert-test';
+
+    await repos.freeChecks.markConverted(checkId, orgId);
+
+    expect(repos.freeChecks.markConverted).toHaveBeenCalledWith(checkId, orgId);
+  });
 });

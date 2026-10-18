@@ -1,14 +1,19 @@
 'use client';
 
-import React, { useRef, useState } from 'react';
+import React, { Suspense, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { AuthCard } from '@/components/auth/auth-card';
 import { authClient, ApiException } from '@/lib/auth-client';
+import { Icon, I } from '@/components/icons';
 
-export default function SignUpPage() {
+function SignUpContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const errorRef = useRef<HTMLDivElement | null>(null);
+
+  const urlParam = searchParams.get('url') || '';
+  const checkIdParam = searchParams.get('checkId') || '';
 
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -17,6 +22,34 @@ export default function SignUpPage() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [isSuccess, setIsSuccess] = useState(false);
+  const [pendingUrl, setPendingUrl] = useState<string>(urlParam);
+  const [pendingCheckId, setPendingCheckId] = useState<string>(checkIdParam);
+
+  useEffect(() => {
+    if (urlParam) {
+      setPendingUrl(urlParam);
+      try {
+        localStorage.setItem('plainsight_pending_url', urlParam);
+      } catch {}
+    } else {
+      try {
+        const savedUrl = localStorage.getItem('plainsight_pending_url');
+        if (savedUrl) setPendingUrl(savedUrl);
+      } catch {}
+    }
+
+    if (checkIdParam) {
+      setPendingCheckId(checkIdParam);
+      try {
+        localStorage.setItem('plainsight_pending_check_id', checkIdParam);
+      } catch {}
+    } else {
+      try {
+        const savedCheck = localStorage.getItem('plainsight_pending_check_id');
+        if (savedCheck) setPendingCheckId(savedCheck);
+      } catch {}
+    }
+  }, [urlParam, checkIdParam]);
 
   const passwordTooShort = password.length > 0 && password.length < 10;
   const isPasswordValid = password.length >= 10;
@@ -74,6 +107,13 @@ export default function SignUpPage() {
     }
   }
 
+  const continueQuery = new URLSearchParams();
+  if (pendingUrl) continueQuery.set('url', pendingUrl);
+  if (pendingCheckId) continueQuery.set('checkId', pendingCheckId);
+  const continueUrl = pendingUrl
+    ? `/sign-in?continue=${encodeURIComponent(`/onboarding?${continueQuery.toString()}`)}`
+    : '/sign-in';
+
   if (isSuccess) {
     return (
       <AuthCard
@@ -87,7 +127,7 @@ export default function SignUpPage() {
           </p>
           <div className="pt-2">
             <Link
-              href="/sign-in"
+              href={continueUrl}
               className="w-full flex items-center justify-center py-2.5 px-4 rounded-lg bg-primary hover:bg-primary-hover text-on-primary font-medium text-sm transition"
             >
               Continue to sign in
@@ -113,6 +153,15 @@ export default function SignUpPage() {
         </p>
       }
     >
+      {pendingUrl && (
+        <div className="mb-4 flex items-center gap-2 rounded-lg bg-primary-soft p-3 text-xs text-ink">
+          <Icon d={I.globe} size={16} className="text-ptext flex-none" />
+          <span className="font-medium">
+            Monitoring <strong className="font-semibold text-ptext">{pendingUrl}</strong> — 14-day free trial included
+          </span>
+        </div>
+      )}
+
       <form onSubmit={handleSubmit} noValidate className="space-y-4">
         <div>
           <label htmlFor="name" className="block text-sm font-medium text-ink mb-1.5">
@@ -138,65 +187,47 @@ export default function SignUpPage() {
             id="email"
             name="email"
             type="email"
-            required
             autoComplete="email"
-            aria-required="true"
-            aria-invalid={Boolean(fieldErrors.email)}
-            aria-describedby={fieldErrors.email ? 'email-error' : undefined}
+            required
             value={email}
-            onChange={(e) => {
-              setEmail(e.target.value);
-              if (fieldErrors.email) {
-                setFieldErrors((prev) => ({ ...prev, email: '' }));
-              }
-            }}
-            className={`w-full px-3.5 py-2.5 text-sm rounded-lg border bg-surface text-ink placeholder:text-muted focus:outline-none focus:ring-2 transition ${
-              fieldErrors.email
-                ? 'border-crit focus:ring-crit'
-                : 'border-line focus:ring-primary focus:border-transparent'
-            }`}
-            placeholder="jane@company.com"
+            onChange={(e) => setEmail(e.target.value)}
+            className={`w-full px-3.5 py-2.5 text-sm rounded-lg border ${
+              fieldErrors.email ? 'border-crit' : 'border-line'
+            } bg-surface text-ink placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition`}
+            placeholder="you@company.com"
           />
           {fieldErrors.email && (
-            <p id="email-error" role="alert" className="mt-1 text-xs text-crit font-medium">
-              {fieldErrors.email}
-            </p>
+            <p className="mt-1 text-xs text-crit">{fieldErrors.email}</p>
           )}
         </div>
 
         <div>
           <label htmlFor="password" className="block text-sm font-medium text-ink mb-1.5">
-            Password
+            Password <span className="text-muted font-normal">(10+ characters)</span>
           </label>
           <input
             id="password"
             name="password"
             type="password"
-            required
             autoComplete="new-password"
-            aria-required="true"
-            aria-invalid={Boolean(fieldErrors.password)}
-            aria-describedby="password-hint password-error"
+            required
             value={password}
-            onChange={(e) => {
-              setPassword(e.target.value);
-              if (fieldErrors.password) {
-                setFieldErrors((prev) => ({ ...prev, password: '' }));
-              }
-            }}
-            className={`w-full px-3.5 py-2.5 text-sm rounded-lg border bg-surface text-ink placeholder:text-muted focus:outline-none focus:ring-2 transition ${
-              fieldErrors.password
-                ? 'border-crit focus:ring-crit'
-                : 'border-line focus:ring-primary focus:border-transparent'
-            }`}
+            onChange={(e) => setPassword(e.target.value)}
+            className={`w-full px-3.5 py-2.5 text-sm rounded-lg border ${
+              fieldErrors.password || passwordTooShort ? 'border-crit' : 'border-line'
+            } bg-surface text-ink placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition`}
+            placeholder="••••••••••••"
           />
-          <p id="password-hint" className="mt-1 text-xs text-muted">
-            Must be at least 10 characters long and not easily guessable.
-          </p>
-          {fieldErrors.password && (
-            <p id="password-error" role="alert" className="mt-1 text-xs text-crit font-medium">
-              {fieldErrors.password}
+          {passwordTooShort && (
+            <p className="mt-1 text-xs text-crit">
+              Password must be at least 10 characters long ({password.length}/10).
             </p>
+          )}
+          {fieldErrors.password && !passwordTooShort && (
+            <p className="mt-1 text-xs text-crit">{fieldErrors.password}</p>
+          )}
+          {isPasswordValid && (
+            <p className="mt-1 text-xs text-ok">Password meets length requirement.</p>
           )}
         </div>
 
@@ -204,31 +235,38 @@ export default function SignUpPage() {
           <button
             type="submit"
             disabled={isSubmitting}
-            aria-busy={isSubmitting}
-            className="w-full flex items-center justify-center py-2.5 px-4 rounded-lg bg-primary hover:bg-primary-hover text-on-primary font-medium text-sm transition disabled:opacity-50 disabled:cursor-not-allowed shadow-xs"
+            className="w-full flex items-center justify-center py-2.5 px-4 rounded-lg bg-primary hover:bg-primary-hover text-on-primary font-medium text-sm transition disabled:opacity-50"
           >
-            {isSubmitting ? 'Creating account...' : 'Create account'}
+            {isSubmitting ? 'Creating account…' : 'Start 14-day free trial'}
           </button>
         </div>
 
-        <div className="relative my-4">
-          <div className="absolute inset-0 flex items-center">
-            <div className="w-full border-t border-line" />
-          </div>
-          <div className="relative flex justify-center text-xs uppercase">
-            <span className="bg-surface px-2 text-muted">or</span>
-          </div>
-        </div>
-
-        <div>
-          <Link
-            href="/magic"
-            className="w-full flex items-center justify-center py-2.5 px-4 rounded-lg border border-line hover:bg-subtle text-ink font-medium text-sm transition"
-          >
-            Sign in with a magic link
+        <p className="text-xs text-muted text-center pt-2">
+          By signing up, you agree to our{' '}
+          <Link href="/terms" className="underline hover:text-ink">
+            Terms of Service
+          </Link>{' '}
+          and{' '}
+          <Link href="/privacy" className="underline hover:text-ink">
+            Privacy Policy
           </Link>
-        </div>
+          .
+        </p>
       </form>
     </AuthCard>
+  );
+}
+
+export default function SignUpPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen grid place-items-center bg-surface">
+          <span className="size-6 animate-spin rounded-full border-2 border-primary border-r-transparent" />
+        </div>
+      }
+    >
+      <SignUpContent />
+    </Suspense>
   );
 }

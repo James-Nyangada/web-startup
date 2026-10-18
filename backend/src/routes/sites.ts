@@ -27,6 +27,7 @@ const createSiteSchema = z.object({
   rootUrl: z.string().trim().min(1, 'URL is required'),
   platform: z.enum(PLATFORMS as unknown as [Platform, ...Platform[]]).optional(),
   clientName: z.string().trim().max(255).optional().nullable(),
+  freeCheckId: z.string().uuid().optional(),
 });
 
 const updateSiteSchema = z.object({
@@ -235,6 +236,10 @@ export function orgSitesRouter(repos: Repositories): Router {
         clientName: clientName ?? null,
         timeZone: org?.timeZone ?? 'UTC',
       });
+
+      if (parse.data.freeCheckId) {
+        await repos.freeChecks.markConverted(parse.data.freeCheckId, req.orgId!);
+      }
 
       // Audit log
       await repos.auditLog.write(req.orgId!, {

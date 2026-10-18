@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Icon, I } from "@/components/icons";
 import { VerifySiteDialog } from "@/components/sites/verify-site-dialog";
+import { apiClient } from "@/lib/api";
 
 interface OnboardingState {
   step: 1 | 2 | 3 | 4;
@@ -63,13 +64,43 @@ export default function OnboardingPage() {
   const [verifyDialogOpen, setVerifyDialogOpen] = useState(false);
   const [createdSiteId, setCreatedSiteId] = useState<string>("site-onboarding-1");
 
-  // Load resumable state from localStorage
+  // Load resumable state from localStorage or query params (P3-08 conversion)
   useEffect(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEY);
       if (saved) {
         const parsed = JSON.parse(saved);
         setState((prev) => ({ ...prev, ...parsed }));
+      }
+
+      if (typeof window !== "undefined") {
+        const params = new URLSearchParams(window.location.search);
+        const urlParam = params.get("url") || localStorage.getItem("plainsight_pending_url");
+        const checkIdParam = params.get("checkId") || localStorage.getItem("plainsight_pending_check_id");
+
+        if (urlParam) {
+          let clean = urlParam.trim();
+          if (!/^https?:\/\//i.test(clean)) {
+            clean = "https://" + clean;
+          }
+          let defaultName = "";
+          try {
+            const parsed = new URL(clean);
+            const host = parsed.hostname.replace(/^www\./i, "");
+            const baseName = host.split(".")[0];
+            defaultName = baseName.charAt(0).toUpperCase() + baseName.slice(1);
+          } catch {}
+
+          setState((prev) => ({
+            ...prev,
+            siteUrl: prev.siteUrl || clean,
+            siteName: prev.siteName || defaultName,
+          }));
+        }
+
+        if (checkIdParam) {
+          localStorage.setItem("plainsight_free_check_id", checkIdParam);
+        }
       }
     } catch {
       // Ignore localStorage read errors
@@ -161,13 +192,46 @@ export default function OnboardingPage() {
     }
   };
 
-  const handleFinishOnboarding = () => {
+  const handleFinishOnboarding = async () => {
+    const freeCheckId =
+      typeof window !== "undefined"
+        ? localStorage.getItem("plainsight_free_check_id") || undefined
+        : undefined;
+
     try {
-      localStorage.removeItem(STORAGE_KEY);
+      if (state.orgName) {
+        const orgRes = await apiClient<{ org: { id: string; slug: string } }>("/v1/orgs", {
+          method: "POST",
+          body: JSON.stringify({
+            name: state.orgName,
+            type: state.orgType,
+            freeCheckId,
+          }),
+        }).catch(() => null);
+
+        if (orgRes?.org?.id && state.siteUrl) {
+          await apiClient(`/v1/orgs/${orgRes.org.id}/sites`, {
+            method: "POST",
+            body: JSON.stringify({
+              name: state.siteName || "My Store",
+              rootUrl: state.siteUrl,
+              platform: state.platform !== "unknown" ? state.platform : undefined,
+              freeCheckId,
+            }),
+          }).catch(() => null);
+        }
+      }
     } catch {
-      // Ignore
+      // In offline / preview mode, proceed seamlessly
+    } finally {
+      try {
+        localStorage.removeItem(STORAGE_KEY);
+        localStorage.removeItem("plainsight_pending_url");
+        localStorage.removeItem("plainsight_pending_check_id");
+        localStorage.removeItem("plainsight_free_check_id");
+      } catch {}
+      router.push("/sites");
     }
-    router.push("/sites");
   };
 
   return (

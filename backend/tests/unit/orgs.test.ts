@@ -146,6 +146,34 @@ describe('organisations router and authorization core', () => {
       );
     });
 
+    it('marks free check as converted when freeCheckId is provided (Chunk P3-08)', async () => {
+      const { app, repos } = buildTestApp({ auth: ownerAuth });
+      const freeCheckId = '33333333-3333-4333-a333-333333333333';
+
+      vi.mocked(repos.organizations.createWithInitialOwner).mockResolvedValue({
+        org: orgA,
+        membership: {
+          id: 'mem-1',
+          orgId: orgA.id,
+          userId: 'user-owner',
+          role: 'owner',
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        },
+      });
+
+      await request(app)
+        .post('/v1/orgs')
+        .set('Cookie', 'better-auth.session_token=token-user-owner')
+        .send({
+          name: 'Org With Free Check',
+          freeCheckId,
+        })
+        .expect(201);
+
+      expect(repos.freeChecks.markConverted).toHaveBeenCalledWith(freeCheckId, orgA.id);
+    });
+
     it('increments candidate slug if base slug is already taken', async () => {
       const { app, repos } = buildTestApp({ auth: ownerAuth });
 

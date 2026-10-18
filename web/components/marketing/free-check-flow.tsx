@@ -402,6 +402,13 @@ export function FreeCheckFlow({
                   <Icon d={copiedLink ? I.fixed : I.share} size={14} />
                   {copiedLink ? "Link copied!" : "Share report"}
                 </button>
+                <Link
+                  href={`/sign-up?url=${encodeURIComponent(checkData.url)}&checkId=${encodeURIComponent(checkData.id)}`}
+                  className="inline-flex items-center gap-1.5 rounded-full bg-primary px-3 py-1 text-xs font-semibold text-on-primary shadow-sm hover:bg-primary-hover no-underline"
+                >
+                  <Icon d={I.globe} size={14} />
+                  <span>Monitor this site</span>
+                </Link>
               </div>
 
               <h1
@@ -675,10 +682,10 @@ export function FreeCheckFlow({
                 We&apos;ll scan up to 250 pages weekly, track your progress score, generate compliance evidence packs, and alert you before regressions reach production.
               </p>
               <Link
-                href={`/sign-up?url=${encodeURIComponent(checkData.url)}`}
+                href={`/sign-up?url=${encodeURIComponent(checkData.url)}&checkId=${encodeURIComponent(checkData.id)}`}
                 className="ease-ui flex h-11 items-center justify-center rounded-lg bg-primary text-sm font-semibold text-on-primary no-underline hover:bg-primary-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
               >
-                Start 14-day free trial
+                Monitor this site — Start 14-day free trial
               </Link>
             </section>
 
