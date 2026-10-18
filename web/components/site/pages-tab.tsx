@@ -27,185 +27,6 @@ export interface TemplateGroup {
   pages: PageItem[];
 }
 
-export const DEMO_PAGES_TEMPLATES: TemplateGroup[] = [
-  {
-    templateKey: "home",
-    templateName: "Home page",
-    pagesDiscovered: 1,
-    pagesCheckedLastScan: 1,
-    openIssuesCount: 1,
-    pages: [
-      {
-        id: "p-home",
-        url: "https://oakhaus.com/",
-        templateKey: "home",
-        title: "Oakhaus Furniture — Handcrafted Solid Timber Living",
-        isPinned: true,
-        lastStatusCode: 200,
-        lastResultStatus: "completed",
-        violations: 1,
-        passes: 54,
-        score: 85,
-      },
-    ],
-  },
-  {
-    templateKey: "product",
-    templateName: "Product pages",
-    pagesDiscovered: 18,
-    pagesCheckedLastScan: 4,
-    openIssuesCount: 4,
-    pages: [
-      {
-        id: "p-prod-1",
-        url: "https://oakhaus.com/products/arne-dining-chair",
-        templateKey: "product",
-        title: "Arne Dining Chair — Solid Oak & Aniline Leather",
-        isPinned: true,
-        lastStatusCode: 200,
-        lastResultStatus: "completed",
-        violations: 3,
-        passes: 46,
-        score: 76,
-      },
-      {
-        id: "p-prod-2",
-        url: "https://oakhaus.com/products/koto-sideboard-walnut",
-        templateKey: "product",
-        title: "Koto Credenza Sideboard — Walnut",
-        isPinned: false,
-        lastStatusCode: 200,
-        lastResultStatus: "completed",
-        violations: 3,
-        passes: 47,
-        score: 78,
-      },
-      {
-        id: "p-prod-3",
-        url: "https://oakhaus.com/products/nordic-lounge-chair",
-        templateKey: "product",
-        title: "Nordic Recline Lounge Chair",
-        isPinned: false,
-        lastStatusCode: 200,
-        lastResultStatus: "completed",
-        violations: 3,
-        passes: 46,
-        score: 78,
-      },
-      {
-        id: "p-prod-4",
-        url: "https://oakhaus.com/products/solid-oak-bench",
-        templateKey: "product",
-        title: "Solid Oak Trestle Bench",
-        isPinned: false,
-        lastStatusCode: 200,
-        lastResultStatus: "completed",
-        violations: 2,
-        passes: 48,
-        score: 80,
-      },
-    ],
-  },
-  {
-    templateKey: "collection",
-    templateName: "Collections",
-    pagesDiscovered: 6,
-    pagesCheckedLastScan: 3,
-    openIssuesCount: 3,
-    pages: [
-      {
-        id: "p-col-1",
-        url: "https://oakhaus.com/collections/chairs-and-seating",
-        templateKey: "collection",
-        title: "Dining Chairs & Seating Collection",
-        isPinned: false,
-        lastStatusCode: 200,
-        lastResultStatus: "completed",
-        violations: 4,
-        passes: 42,
-        score: 72,
-      },
-      {
-        id: "p-col-2",
-        url: "https://oakhaus.com/collections/tables-and-desks",
-        templateKey: "collection",
-        title: "Handcrafted Dining Tables & Desks",
-        isPinned: false,
-        lastStatusCode: 200,
-        lastResultStatus: "completed",
-        violations: 3,
-        passes: 44,
-        score: 74,
-      },
-      {
-        id: "p-col-3",
-        url: "https://oakhaus.com/collections/new-arrivals",
-        templateKey: "collection",
-        title: "New Season Handcrafted Releases",
-        isPinned: false,
-        lastStatusCode: 200,
-        lastResultStatus: "completed",
-        violations: 3,
-        passes: 45,
-        score: 75,
-      },
-    ],
-  },
-  {
-    templateKey: "cart",
-    templateName: "Cart",
-    pagesDiscovered: 1,
-    pagesCheckedLastScan: 1,
-    openIssuesCount: 1,
-    pages: [
-      {
-        id: "p-cart-1",
-        url: "https://oakhaus.com/cart",
-        templateKey: "cart",
-        title: "Your Shopping Cart",
-        isPinned: false,
-        lastStatusCode: 200,
-        lastResultStatus: "completed",
-        violations: 1,
-        passes: 52,
-        score: 88,
-      },
-    ],
-  },
-  {
-    templateKey: "article",
-    templateName: "Articles & Blog posts",
-    pagesDiscovered: 4,
-    pagesCheckedLastScan: 2,
-    openIssuesCount: 0,
-    pages: [
-      {
-        id: "p-art-1",
-        url: "https://oakhaus.com/blogs/journal/sustainable-timber-sourcing",
-        templateKey: "article",
-        title: "Our Commitment to Sustainable Forestry",
-        isPinned: false,
-        lastStatusCode: 200,
-        lastResultStatus: "completed",
-        violations: 0,
-        passes: 56,
-        score: 91,
-      },
-      {
-        id: "p-art-2",
-        url: "https://oakhaus.com/blogs/journal/caring-for-solid-oak",
-        templateKey: "article",
-        title: "Caring for Solid Timber Furniture",
-        isPinned: false,
-        lastStatusCode: 200,
-        lastResultStatus: "completed",
-        violations: 0,
-        passes: 55,
-        score: 90,
-      },
-    ],
-  },
-];
 
 export interface PagesTabProps {
   orgSlug?: string;
@@ -222,7 +43,7 @@ export function PagesTab({
   onNavigateToSettings,
   onToast,
 }: PagesTabProps) {
-  const [templates, setTemplates] = useState<TemplateGroup[]>(DEMO_PAGES_TEMPLATES);
+  const [templates, setTemplates] = useState<TemplateGroup[]>([]);
   const [expanded, setExpanded] = useState<Record<string, boolean>>({
     home: true,
     product: true,
@@ -241,7 +62,7 @@ export function PagesTab({
     let mounted = true;
     apiClient<{ templates: TemplateGroup[] }>(`/v1/orgs/${orgSlug}/sites/${siteId}/pages`)
       .then((res) => {
-        if (mounted && res?.templates && res.templates.length > 0) {
+        if (mounted && res?.templates) {
           setTemplates(res.templates);
           // Set initial expanded keys
           const exp: Record<string, boolean> = {};
@@ -252,7 +73,7 @@ export function PagesTab({
         }
       })
       .catch(() => {
-        // Fallback gracefully to demo templates
+        if (mounted) onToast?.("Could not load pages for this site.");
       });
 
     return () => {
@@ -298,8 +119,8 @@ export function PagesTab({
             isPinned: nextPinned,
           }),
         });
-      } catch (err) {
-        console.error("Failed to toggle pin:", err);
+      } catch {
+        onToast?.("Could not save the pin change. Please reload and try again.");
       }
     }
   };
@@ -367,8 +188,8 @@ export function PagesTab({
             isPinned: true,
           }),
         });
-      } catch (err) {
-        console.error("Failed to pin new page:", err);
+      } catch {
+        onToast?.("Could not pin that page. Please reload and try again.");
       }
     }
   };

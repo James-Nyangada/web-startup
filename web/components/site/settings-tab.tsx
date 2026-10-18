@@ -69,26 +69,18 @@ export function SettingsTab({
   // Baseline initial state
   const baseline: SiteSettingsData = useMemo(() => {
     return {
-      id: siteId || initialSite?.id || "site-oakhaus",
-      name: initialSite?.name || "Oakhaus Furniture",
-      rootUrl: initialSite?.rootUrl || "https://oakhaus.com",
-      clientName: initialSite?.clientName || "Mark Otieno",
-      platform: initialSite?.platform || "shopify",
+      id: siteId || initialSite?.id || "",
+      name: initialSite?.name || "",
+      rootUrl: initialSite?.rootUrl || "",
+      clientName: initialSite?.clientName || "",
+      platform: initialSite?.platform || "unknown",
       scanFrequency: initialSite?.scanFrequency || "weekly",
       scanDay: initialSite?.scanDay ?? 1,
       scanHour: initialSite?.scanHour ?? 2,
       pageLimit: initialSite?.pageLimit ?? 50,
       standard: initialSite?.standard || "wcag22aa",
-      pinnedUrls: initialSite?.pinnedUrls || [
-        "https://oakhaus.com/",
-        "https://oakhaus.com/products/arne-dining-chair",
-      ],
-      excludedPaths: initialSite?.excludedPaths || [
-        "/cart*",
-        "/checkout*",
-        "/account/*",
-        "/admin/*",
-      ],
+      pinnedUrls: initialSite?.pinnedUrls || [],
+      excludedPaths: initialSite?.excludedPaths || [],
       status: initialSite?.status || "active",
       timeZone: initialSite?.timeZone || "UTC",
     };
@@ -122,8 +114,8 @@ export function SettingsTab({
     matchedUrls: string[];
     loading: boolean;
   }>({
-    matchCount: 1,
-    matchedUrls: ["https://oakhaus.com/cart"],
+    matchCount: 0,
+    matchedUrls: [],
     loading: false,
   });
 
@@ -193,38 +185,11 @@ export function SettingsTab({
           });
           return;
         } catch {
-          // fallback to client-side demo check
+          // Preview is best-effort; show no matches if it fails.
         }
       }
 
-      // Demo fallback calculation for oakhaus
-      const sampleDiscovered = [
-        "https://oakhaus.com/",
-        "https://oakhaus.com/products/arne-dining-chair",
-        "https://oakhaus.com/products/koto-sideboard-walnut",
-        "https://oakhaus.com/collections/chairs-and-seating",
-        "https://oakhaus.com/cart",
-        "https://oakhaus.com/checkout",
-        "https://oakhaus.com/account/login",
-        "https://oakhaus.com/admin/login",
-      ];
-
-      const matched = sampleDiscovered.filter((url) => {
-        const path = new URL(url).pathname;
-        return patterns.some((p) => {
-          if (p.endsWith("*")) {
-            const prefix = p.slice(0, -1);
-            return path.startsWith(prefix);
-          }
-          return path === p;
-        });
-      });
-
-      setExclusionPreview({
-        matchCount: matched.length,
-        matchedUrls: matched,
-        loading: false,
-      });
+      setExclusionPreview({ matchCount: 0, matchedUrls: [], loading: false });
     }, 350);
 
     return () => clearTimeout(previewTimer.current);

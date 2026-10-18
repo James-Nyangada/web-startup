@@ -3,8 +3,8 @@
 import React, { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Icon, I } from "@/components/icons";
-import { SITES, ISSUES } from "@/lib/site-data";
-import { useToast } from "./toast-context";
+import { authClient } from "@/lib/auth-client";
+import { appApi, platformLabel, type ApiSite } from "@/lib/app-api";
 
 export interface CommandItem {
   id: string;
@@ -130,13 +130,29 @@ export function CommandPalette({
   onClose: () => void;
 }) {
   const router = useRouter();
-  const { showToast } = useToast();
   const [query, setQuery] = useState("");
   const [selectedIndex, setSelectedIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLUListElement>(null);
   const triggerRef = useRef<HTMLElement | null>(null);
   const liveRegionId = useId();
+  const [org, setOrg] = useState<string | null>(null);
+  const [sites, setSites] = useState<ApiSite[]>([]);
+
+  // Load the active organisation's sites the first time the palette opens.
+  useEffect(() => {
+    if (!open || org) return;
+    authClient
+      .getMe()
+      .then(async (me) => {
+        const active = me.activeOrg ?? me.memberships[0]?.org;
+        if (!active) return;
+        const slug = active.slug ?? active.id;
+        setOrg(slug);
+        setSites(await appApi.listSites(slug));
+      })
+      .catch(() => setSites([]));
+  }, [open, org]);
 
   // Remember previous active element to restore focus on close
   useEffect(() => {
@@ -154,33 +170,21 @@ export function CommandPalette({
     }
   }, [open]);
 
-  // Global Ctrl+K / Cmd+K listener
-  useEffect(() => {
-    const onKeyDown = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
-        e.preventDefault();
-        if (open) onClose();
-        else {
-          // Open handled by parent or toggle
-        }
-      }
-    };
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [open, onClose]);
-
   // Build the complete search pool
   const allCommands = useMemo<CommandItem[]>(() => {
     // 1. Sites
-    const siteCommands: CommandItem[] = SITES.map((s) => ({
-      id: `site-${s.url}`,
-      category: "Sites",
-      label: s.name,
-      subtext: `${s.url} · ${s.platform} · Score: ${s.score ?? "—"}`,
-      href: s.url === "oakhaus.com" ? "/sites/oakhaus" : `/sites/oakhaus?site=${encodeURIComponent(s.url)}`,
-      icon: I.globe,
-      keywords: [s.url, s.client, s.platform, "site", "store"],
-    }));
+    const siteCommands: CommandItem[] = sites.map((s) => {
+      const host = s.rootUrl.replace(/^https?:\/\//, "");
+      return {
+        id: `site-${s.id}`,
+        category: "Sites",
+        label: s.name,
+        subtext: `${host} · ${platformLabel(s.platform)} · Score: ${s.score ?? "—"}`,
+        href: `/${org}/sites/${s.id}`,
+        icon: I.globe,
+        keywords: [host, s.clientName ?? "", s.platform, "site", "store"],
+      };
+    });
 
     // 2. Actions
     const actionCommands: CommandItem[] = [
@@ -190,8 +194,7 @@ export function CommandPalette({
         label: "Add new site",
         subtext: "Begin monitoring a new Shopify or WordPress store",
         action: () => {
-          showToast("Opening site setup wizard...");
-          router.push("/overview?action=add-site");
+          router.push(org ? `/${org}/sites` : "/sites");
         },
         icon: I.plus,
         keywords: ["new", "create", "site", "add"],
@@ -207,33 +210,10 @@ export function CommandPalette({
         icon: I.users,
         keywords: ["invite", "member", "colleague", "team"],
       },
-      {
-        id: "action-scan-oakhaus",
-        category: "Actions",
-        label: "Scan now: Oakhaus Furniture",
-        subtext: "Trigger an immediate full crawl & accessibility scan",
-        action: () => {
-          showToast("Immediate scan scheduled for Oakhaus Furniture.");
-          router.push("/sites/oakhaus");
-        },
-        icon: I.refresh,
-        keywords: ["scan", "crawl", "now", "recheck", "oakhaus"],
-      },
     ];
 
-    // 3. Issues
-    const issueCommands: CommandItem[] = ISSUES.slice(0, 5).map((issue) => ({
-      id: `issue-${issue.id}`,
-      category: "Issues",
-      label: issue.title,
-      subtext: `${issue.sev.toUpperCase()} · ${issue.template} (${issue.occ} occurrences)`,
-      href: `/sites/oakhaus?tab=issues&issue=${issue.id}`,
-      icon: issue.sev === "critical" ? I.critical : issue.sev === "serious" ? I.serious : I.moderate,
-      keywords: [issue.rule, issue.template, issue.wcag, "issue", "problem", "bug"],
-    }));
-
-    return [...siteCommands, ...SETTINGS_PAGES, ...NAV_ITEMS, ...actionCommands, ...issueCommands];
-  }, [router, showToast]);
+    return [...siteCommands, ...SETTINGS_PAGES, ...NAV_ITEMS, ...actionCommands];
+  }, [router, sites, org]);
 
   // Filter commands by query
   const filteredCommands = useMemo(() => {
@@ -241,13 +221,11 @@ export function CommandPalette({
     if (!q) {
       // Default / recent items when empty
       return [
-        allCommands.find((c) => c.id === "site-oakhaus.com")!,
-        allCommands.find((c) => c.id === "nav-overview")!,
-        allCommands.find((c) => c.id === "settings-members")!,
-        allCommands.find((c) => c.id === "settings-billing")!,
-        allCommands.find((c) => c.id === "action-add-site")!,
-        allCommands.find((c) => c.id === "action-scan-oakhaus")!,
-      ].filter(Boolean);
+        ...allCommands.filter((c) => c.category === "Sites").slice(0, 3),
+        allCommands.find((c) => c.id === "nav-overview"),
+        allCommands.find((c) => c.id === "settings-members"),
+        allCommands.find((c) => c.id === "action-add-site"),
+      ].filter((c): c is CommandItem => Boolean(c));
     }
 
     return allCommands.filter((c) => {

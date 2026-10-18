@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Icon, I } from "@/components/icons";
 import { SeverityBadge } from "@/components/badges";
@@ -9,12 +9,8 @@ import { getWcagUnderstandingUrl } from "@/lib/wcag";
 import { GuideRenderer } from "@/components/marketing/guide-renderer";
 import { getFixGuideByRuleAndPlatform } from "@/lib/fix-guides-data";
 import { apiClient, ApiException } from "@/lib/api";
-import {
-  DRAWER_TABS,
-  NAMES,
-  type HistoryKind,
-  type Issue,
-} from "@/lib/site-data";
+import { appApi, formatDayTime, type ApiMember } from "@/lib/app-api";
+import { DRAWER_TABS, type HistoryKind, type Issue } from "@/lib/site-data";
 
 const STATUS_LABEL = {
   open: "Open",
@@ -84,6 +80,9 @@ export interface IssueDetailContentProps {
   isFullPage?: boolean;
   siteHref?: string;
   titleRef?: React.Ref<HTMLHeadingElement>;
+  members?: ApiMember[];
+  onAssign?: (assigneeId: string | null) => void;
+  onSetDue?: (dueDate: string | null) => void;
 }
 
 export function IssueDetailContent({
@@ -98,11 +97,17 @@ export function IssueDetailContent({
   isFullPage = false,
   siteHref,
   titleRef,
+  members = [],
+  onAssign,
+  onSetDue,
 }: IssueDetailContentProps) {
   const [dTab, setDTab] = useState(0);
-  const initialPlatform: Platform = sitePlatform?.toLowerCase().includes("wordpress")
+  const sitePf = sitePlatform?.toLowerCase() ?? "";
+  const initialPlatform: Platform = sitePf.includes("wordpress") || sitePf.includes("woocommerce")
     ? "WordPress"
-    : "Shopify";
+    : sitePf.includes("shopify")
+      ? "Shopify"
+      : "Generic";
   const [pf, setPf] = useState<Platform>(initialPlatform);
   const [copiedLink, setCopiedLink] = useState(false);
   const [aiState, setAiState] = useState<AiState>("none");
@@ -117,15 +122,7 @@ export function IssueDetailContent({
   const occPageSize = 5;
 
   // Notes state
-  const [notes, setNotes] = useState<IssueNoteItem[]>([
-    {
-      id: "note-demo",
-      authorName: "Daniel Mwangi",
-      body: "Investigating whether this was introduced in the latest theme update.",
-      visibleToClient: false,
-      createdAt: "14 Oct, 11:30",
-    },
-  ]);
+  const [notes, setNotes] = useState<IssueNoteItem[]>([]);
   const [noteBody, setNoteBody] = useState("");
   const [visibleToClient, setVisibleToClient] = useState(false);
   const [showMarkdownPreview, setShowMarkdownPreview] = useState(false);
@@ -151,29 +148,38 @@ export function IssueDetailContent({
     ];
   }
 
-  const history: [HistoryKind, string, string][] = [
-    ...(issue.history ?? [
-      ["found", "First found", issue.first] as [HistoryKind, string, string],
-      ...(issue.assignee
-        ? [
-            [
-              "user",
-              `Assigned to ${NAMES[issue.assignee]}, ${issue.due?.toLowerCase()}`,
-              "Daniel Mwangi",
-            ] as [HistoryKind, string, string],
-          ]
-        : []),
-    ]),
-    ...(issue.status === "fixed"
-      ? [["ok", "Fixed by recheck", "Daniel Mwangi · Today"] as [HistoryKind, string, string]]
-      : []),
-    ...(issue.status === "ignored"
-      ? [["eye", `Ignored: ${issue.ignoreReason ?? "Accepted risk"}`, "Daniel Mwangi · Today"] as [HistoryKind, string, string]]
-      : []),
+  // Timeline from issue_events, loaded by the parent; first sighting as a fallback.
+  const history: [HistoryKind, string, string][] = issue.history ?? [
+    ["found", "First found", issue.first],
   ];
 
   const resolvedOrgSlug =
     orgSlug || (siteHref ? siteHref.split("/").filter(Boolean)[0] : undefined);
+
+  useEffect(() => {
+    if (!resolvedOrgSlug) return;
+    let cancelled = false;
+    appApi
+      .listNotes(resolvedOrgSlug, issue.id)
+      .then((items) => {
+        if (cancelled) return;
+        setNotes(
+          items.map((n) => ({
+            id: n.id,
+            authorName: n.authorName ?? "Former member",
+            body: n.body,
+            visibleToClient: n.visibleToClient,
+            createdAt: formatDayTime(n.createdAt),
+          })),
+        );
+      })
+      .catch(() => {
+        if (!cancelled) setNotes([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [resolvedOrgSlug, issue.id]);
 
   const genAi = async () => {
     setAiState("gen");
@@ -190,16 +196,7 @@ export function IssueDetailContent({
         setAiSuggestion(res.suggestion);
         setAiCacheKey(res.cacheKey);
         setAiState("ready");
-        return;
       }
-
-      // Demo/offline fallback
-      await new Promise((r) => setTimeout(r, 600));
-      const demoFix =
-        issue.ai ??
-        `Ensure this element meets WCAG 2.2 AA accessibility requirements by providing an accessible label and semantic structure.\n\n\`\`\`${lang.toLowerCase()}\n${code}\n\`\`\``;
-      setAiSuggestion(demoFix);
-      setAiState("ready");
     } catch (err: any) {
       if (err instanceof ApiException && (err.status === 422 || err.code === "PLAN_LIMIT")) {
         setAiState("cap_reached");
@@ -236,23 +233,29 @@ export function IssueDetailContent({
     }
   };
 
-  const handleAddNote = (e: React.FormEvent) => {
+  const handleAddNote = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!noteBody.trim()) return;
+    if (!noteBody.trim() || !resolvedOrgSlug) return;
 
-    const newNote: IssueNoteItem = {
-      id: `note-${Date.now()}`,
-      authorName: "You",
-      body: noteBody.trim(),
-      visibleToClient,
-      createdAt: "Just now",
-    };
-
-    setNotes((prev) => [...prev, newNote]);
-    setNoteBody("");
-    setVisibleToClient(false);
-    setShowMarkdownPreview(false);
-    setNoteStatus("Note added successfully.");
+    try {
+      const saved = await appApi.addNote(resolvedOrgSlug, issue.id, noteBody.trim(), visibleToClient);
+      setNotes((prev) => [
+        ...prev,
+        {
+          id: saved.id,
+          authorName: saved.authorName ?? "You",
+          body: saved.body,
+          visibleToClient: saved.visibleToClient,
+          createdAt: formatDayTime(saved.createdAt),
+        },
+      ]);
+      setNoteBody("");
+      setVisibleToClient(false);
+      setShowMarkdownPreview(false);
+      setNoteStatus("Note added.");
+    } catch (err) {
+      setNoteStatus(err instanceof ApiException ? err.message : "Could not save the note.");
+    }
     setTimeout(() => setNoteStatus(null), 3000);
   };
 
@@ -266,7 +269,7 @@ export function IssueDetailContent({
   );
 
   const wcagUrl = getWcagUnderstandingUrl(issue.wcag);
-  const directFullPageUrl = siteHref ? `${siteHref}/issues/${issue.id}` : `/sites/oakhaus/issues/${issue.id}`;
+  const directFullPageUrl = siteHref ? `${siteHref}/issues/${issue.id}` : `/issues/${issue.id}`;
 
   return (
     <div className="flex flex-1 flex-col">
@@ -384,14 +387,32 @@ export function IssueDetailContent({
                   aria-hidden="true"
                 />
               )}
-              {rechecking ? "Rechecking 3 pages…" : "Recheck"}
+              {rechecking ? "Rechecking…" : "Recheck"}
             </button>
-            <button type="button" className={SECONDARY_SM}>
-              {issue.assignee ? `Assigned: ${NAMES[issue.assignee]}` : "Assign"}
-            </button>
-            <button type="button" className={SECONDARY_SM}>
-              {issue.due ?? "Set due date"}
-            </button>
+            <select
+              value={issue.assigneeId ?? ""}
+              onChange={(e) => onAssign?.(e.target.value || null)}
+              disabled={!onAssign}
+              aria-label="Assignee"
+              className="h-8 rounded-full border border-line-strong bg-surface px-3 text-sm font-semibold text-ink"
+            >
+              <option value="">Unassigned</option>
+              {members.map((m) => (
+                <option key={m.userId} value={m.userId}>
+                  {m.name || m.email}
+                </option>
+              ))}
+            </select>
+            <label className="flex items-center gap-1.5 text-sm font-semibold text-ink">
+              Due
+              <input
+                type="date"
+                value={issue.dueDate ?? ""}
+                onChange={(e) => onSetDue?.(e.target.value || null)}
+                disabled={!onSetDue}
+                className="h-8 rounded-full border border-line-strong bg-surface px-3 text-sm text-ink"
+              />
+            </label>
             <button
               type="button"
               onClick={onIgnore}
@@ -503,14 +524,14 @@ export function IssueDetailContent({
                   >
                     <span className="flex min-w-0 flex-1 flex-col gap-0.5">
                       <span className="text-sm font-medium leading-5 [overflow-wrap:anywhere]">
-                        oakhaus.com{url}
+                        {url.replace(/^https?:\/\//, "")}
                       </span>
                       <code className="font-mono text-[13px] leading-[18px] text-muted [overflow-wrap:anywhere]">
                         {sel}
                       </code>
                     </span>
                     <a
-                      href={`https://oakhaus.com${url}`}
+                      href={url}
                       target="_blank"
                       rel="noreferrer"
                       className="inline-flex items-center gap-1 text-sm font-semibold whitespace-nowrap text-ptext hover:underline"
@@ -611,15 +632,19 @@ export function IssueDetailContent({
                     </p>
                   )}
 
-                  <div className="flex flex-col gap-2">
-                    <h4 className="m-0 text-sm font-semibold">Code change</h4>
-                    <CodeSnippet code={code} language={lang} label={`${pf} (${lang})`} />
-                  </div>
+                  {code && (
+                    <div className="flex flex-col gap-2">
+                      <h4 className="m-0 text-sm font-semibold">Code change</h4>
+                      <CodeSnippet code={code} language={lang} label={`${pf} (${lang})`} />
+                    </div>
+                  )}
 
-                  <section className="flex flex-col gap-1.5">
-                    <h3 className="m-0 text-base leading-6 font-semibold">How to check your fix</h3>
-                    <p className="m-0 text-pretty text-sm text-muted">{issue.check}</p>
-                  </section>
+                  {issue.check && (
+                    <section className="flex flex-col gap-1.5">
+                      <h3 className="m-0 text-base leading-6 font-semibold">How to check your fix</h3>
+                      <p className="m-0 text-pretty text-sm text-muted">{issue.check}</p>
+                    </section>
+                  )}
                 </>
               );
             })()}

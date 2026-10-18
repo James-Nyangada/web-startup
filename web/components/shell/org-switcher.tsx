@@ -2,8 +2,11 @@
 
 import React, { useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { usePathname, useRouter } from "next/navigation";
 import { Icon, I } from "@/components/icons";
 import { useToast } from "./toast-context";
+import { authClient } from "@/lib/auth-client";
+import { initials } from "@/lib/app-api";
 
 export interface OrgItem {
   id: string;
@@ -15,33 +18,6 @@ export interface OrgItem {
   isCurrent?: boolean;
 }
 
-const DEFAULT_ORGS: OrgItem[] = [
-  {
-    id: "org-brightline",
-    name: "Brightline Studio",
-    slug: "brightline",
-    type: "agency",
-    sitesCount: 18,
-    initials: "BS",
-    isCurrent: true,
-  },
-  {
-    id: "org-oakhaus",
-    name: "Oakhaus Store",
-    slug: "oakhaus-store",
-    type: "store",
-    sitesCount: 1,
-    initials: "OS",
-  },
-  {
-    id: "org-meridian",
-    name: "Meridian Agency",
-    slug: "meridian",
-    type: "agency",
-    sitesCount: 6,
-    initials: "MA",
-  },
-];
 
 export function OrgSwitcher({
   variant = "topbar",
@@ -51,10 +27,37 @@ export function OrgSwitcher({
   onOrgSelected?: (org: OrgItem) => void;
 }) {
   const [open, setOpen] = useState(false);
-  const [orgs, setOrgs] = useState<OrgItem[]>(DEFAULT_ORGS);
+  const [orgs, setOrgs] = useState<OrgItem[]>([]);
   const { showToast } = useToast();
+  const router = useRouter();
+  const pathname = usePathname();
   const menuRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
+
+  // The org in the URL wins; otherwise the user's last active org.
+  useEffect(() => {
+    authClient
+      .getMe()
+      .then((me) => {
+        const fromPath = pathname.split("/")[1];
+        const active = me.activeOrg?.id;
+        const list = me.memberships.map((m) => ({
+          id: m.org.id,
+          name: m.org.name,
+          slug: m.org.slug,
+          type: m.org.type,
+          sitesCount: 0,
+          initials: initials(m.org.name) ?? "?",
+          isCurrent: false,
+        }));
+        const current =
+          list.find((o) => o.slug === fromPath || o.id === fromPath) ??
+          list.find((o) => o.id === active) ??
+          list[0];
+        setOrgs(list.map((o) => ({ ...o, isCurrent: o.id === current?.id })));
+      })
+      .catch(() => setOrgs([]));
+  }, [pathname]);
 
   const currentOrg = orgs.find((o) => o.isCurrent) ?? orgs[0];
 
@@ -87,10 +90,13 @@ export function OrgSwitcher({
       }))
     );
     setOpen(false);
+    void authClient.updateProfile({ lastActiveOrgId: targetOrg.id }).catch(() => {});
     showToast(`Switched to organisation: ${targetOrg.name}`);
     onOrgSelected?.(targetOrg);
-    buttonRef.current?.focus();
+    router.push(`/${targetOrg.slug}`);
   };
+
+  if (!currentOrg) return null;
 
   if (variant === "sidebar") {
     return (
@@ -101,18 +107,18 @@ export function OrgSwitcher({
           onClick={() => setOpen((prev) => !prev)}
           aria-expanded={open}
           aria-haspopup="true"
-          aria-label={`Switch organisation. Current: ${currentOrg.name}`}
           className="ease-ui flex w-full items-center gap-3 rounded-full border border-line bg-surface p-2 text-left text-ink hover:border-line-strong focus-visible:outline-2 focus-visible:outline-primary"
         >
-          <span className="grid size-8 place-items-center rounded-md bg-primary text-[13px] font-bold text-on-primary">
+          <span aria-hidden="true" className="grid size-8 place-items-center rounded-md bg-primary text-[13px] font-bold text-on-primary">
             {currentOrg.initials}
           </span>
           <span className="flex min-w-0 flex-1 flex-col">
             <span className="truncate text-sm leading-5 font-semibold">{currentOrg.name}</span>
             <span className="truncate text-xs leading-4 text-muted">
-              {currentOrg.type === "agency" ? "Agency" : "Store"} · {currentOrg.sitesCount} {currentOrg.sitesCount === 1 ? "site" : "sites"}
+              {currentOrg.type === "agency" ? "Agency" : "Store"}
             </span>
           </span>
+          <span className="sr-only">, switch organisation</span>
           <Icon d={I.chevronsUpDown} size={16} className="text-muted" />
         </button>
 
@@ -166,13 +172,13 @@ export function OrgSwitcher({
         onClick={() => setOpen((prev) => !prev)}
         aria-expanded={open}
         aria-haspopup="true"
-        aria-label={`Current organisation: ${currentOrg.name}. Switch organisation`}
         className="ease-ui flex h-9 items-center gap-2 rounded-full border border-line bg-surface px-2.5 text-left text-ink hover:border-line-strong focus-visible:outline-2 focus-visible:outline-primary max-w-[200px] sm:max-w-[240px]"
       >
-        <span className="grid size-5.5 place-items-center rounded bg-primary text-[11px] font-bold text-on-primary flex-none">
+        <span aria-hidden="true" className="grid size-5.5 place-items-center rounded bg-primary text-[11px] font-bold text-on-primary flex-none">
           {currentOrg.initials}
         </span>
         <span className="truncate text-xs font-semibold sm:text-sm">{currentOrg.name}</span>
+        <span className="sr-only">, switch organisation</span>
         <Icon d={I.chevronsUpDown} size={14} className="text-muted flex-none" />
       </button>
 
@@ -201,7 +207,7 @@ export function OrgSwitcher({
               <div className="flex min-w-0 flex-1 flex-col">
                 <span className="truncate">{o.name}</span>
                 <span className="text-[11px] text-muted">
-                  {o.type === "agency" ? "Agency" : "Store"} · {o.sitesCount} sites
+                  {o.type === "agency" ? "Agency" : "Store"}
                 </span>
               </div>
               {o.isCurrent && <Icon d={I.check} size={16} className="text-primary flex-none" />}

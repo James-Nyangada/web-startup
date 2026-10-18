@@ -4,6 +4,7 @@ export type IssueStatus = "open" | "regressed" | "needsReview" | "fixed" | "igno
 
 export type Issue = {
   id: string;
+  siteId?: string;
   rule: string;
   sev: Severity;
   title: string;
@@ -11,9 +12,14 @@ export type Issue = {
   occ: number;
   pages: number;
   status: IssueStatus;
-  assignee?: "DM" | "AK";
+  /** Initials shown in the avatar. */
+  assignee?: string;
+  assigneeName?: string;
+  assigneeId?: string | null;
   due?: string;
+  dueDate?: string | null;
   wcag: string;
+  wcagCriteria?: string[];
   first: string;
   last: string;
   who: string;
@@ -207,6 +213,8 @@ export type SiteRow = {
   delta: string;
   dir: 1 | 0 | -1;
   last: string;
+  /** Epoch ms of the latest scan, for sorting. */
+  lastScanAt?: number;
   nextScan?: string;
   status: "Active" | "Error" | "Paused";
   verified?: boolean;

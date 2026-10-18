@@ -33,111 +33,6 @@ export interface ScanHistoryItem {
   } | null;
 }
 
-export const OAKHAUS_SCANS: ScanHistoryItem[] = [
-  {
-    id: "scan-24-demo",
-    queuedAt: "2026-10-18T14:30:00Z",
-    startedAt: "2026-10-18T14:30:05Z",
-    finishedAt: "2026-10-18T14:32:19Z",
-    trigger: "manual",
-    pagesScanned: 50,
-    pagesPlanned: 50,
-    pagesFailed: 0,
-    score: 78,
-    counts: { critical: 3, serious: 4, moderate: 4, minor: 0, new: 1, fixed: 2, regressed: 1 },
-    status: "completed",
-  },
-  {
-    id: "scan-23-demo",
-    queuedAt: "2026-10-14T02:00:00Z",
-    startedAt: "2026-10-14T02:00:06Z",
-    finishedAt: "2026-10-14T02:02:14Z",
-    trigger: "scheduled",
-    pagesScanned: 50,
-    pagesPlanned: 50,
-    pagesFailed: 0,
-    score: 78,
-    counts: { critical: 3, serious: 4, moderate: 4, minor: 0, new: 0, fixed: 1, regressed: 1 },
-    status: "completed",
-  },
-  {
-    id: "scan-22-demo",
-    queuedAt: "2026-10-12T02:00:00Z",
-    startedAt: "2026-10-12T02:00:04Z",
-    finishedAt: "2026-10-12T02:02:14Z",
-    trigger: "scheduled",
-    pagesScanned: 48,
-    pagesPlanned: 50,
-    pagesFailed: 2,
-    score: 72,
-    counts: { critical: 3, serious: 5, moderate: 6, minor: 0, new: 2, fixed: 0, regressed: 0 },
-    status: "completed",
-  },
-  {
-    id: "scan-21-demo",
-    queuedAt: "2026-10-07T02:00:00Z",
-    startedAt: "2026-10-07T02:00:05Z",
-    finishedAt: "2026-10-07T02:02:20Z",
-    trigger: "scheduled",
-    pagesScanned: 50,
-    pagesPlanned: 50,
-    pagesFailed: 0,
-    score: 74,
-    counts: { critical: 3, serious: 6, moderate: 4, minor: 0, new: 0, fixed: 3, regressed: 0 },
-    status: "completed",
-  },
-  {
-    id: "scan-20-demo",
-    queuedAt: "2026-10-02T16:15:00Z",
-    startedAt: "2026-10-02T16:15:05Z",
-    finishedAt: "2026-10-02T16:16:07Z",
-    trigger: "manual",
-    pagesScanned: 22,
-    pagesPlanned: 50,
-    pagesFailed: 28,
-    score: 64,
-    counts: { critical: 4, serious: 7, moderate: 6, minor: 4, new: 1, fixed: 0, regressed: 0 },
-    status: "partial",
-    errorCode: "PAGE_TIMEOUTS",
-    errorMessage: "28 of 50 pages timed out after 45s.",
-    hint: {
-      reason: "Scan completed partially: 28 of 50 planned pages timed out after 45 seconds.",
-      whatToDo: "Partial scans never mark issues as fixed to avoid false positives. Check server response times during peak hours and re-run the scan once responsive.",
-    },
-  },
-  {
-    id: "scan-19-demo",
-    queuedAt: "2026-09-30T02:00:00Z",
-    startedAt: "2026-09-30T02:00:05Z",
-    finishedAt: "2026-09-30T02:02:10Z",
-    trigger: "scheduled",
-    pagesScanned: 50,
-    pagesPlanned: 50,
-    pagesFailed: 0,
-    score: 72,
-    counts: { critical: 3, serious: 7, moderate: 5, minor: 0, new: 1, fixed: 1, regressed: 0 },
-    status: "completed",
-  },
-  {
-    id: "scan-18-demo",
-    queuedAt: "2026-09-26T11:20:00Z",
-    startedAt: "2026-09-26T11:20:03Z",
-    finishedAt: "2026-09-26T11:20:48Z",
-    trigger: "manual",
-    pagesScanned: 0,
-    pagesPlanned: 50,
-    pagesFailed: 50,
-    score: null,
-    status: "failed",
-    errorCode: "RATE_LIMITED_429",
-    errorMessage: "Target server returned HTTP 429 Too Many Requests.",
-    hint: {
-      reason: "The server or web application firewall (WAF) rate-limited automated requests (HTTP 429).",
-      whatToDo: "Add PlainsightBot to your CDN or firewall allowlist (e.g. Cloudflare, AWS WAF), or lower the page limit in site settings.",
-    },
-  },
-];
-
 function formatDuration(startedAt?: string | null, finishedAt?: string | null): string {
   if (!startedAt) return "—";
   const start = new Date(startedAt).getTime();
@@ -185,15 +80,12 @@ interface ScansTabProps {
 export function ScansTab({
   orgSlug,
   siteSlug,
-  scans = OAKHAUS_SCANS,
+  scans = [],
   onTriggerScan,
   isTriggering = false,
 }: ScansTabProps) {
   const [filter, setFilter] = useState<string>("all");
-  const [expandedHints, setExpandedHints] = useState<Record<string, boolean>>({
-    "scan-20-demo": true,
-    "scan-18-demo": true,
-  });
+  const [expandedHints, setExpandedHints] = useState<Record<string, boolean>>({});
 
   const toggleHint = (id: string, e: React.MouseEvent) => {
     e.stopPropagation();

@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useFocusTrap } from "@/components/use-focus-trap";
 import { IssueDetailContent } from "./issue-detail-content";
 import type { Issue } from "@/lib/site-data";
+import type { ApiMember } from "@/lib/app-api";
 import { gsap, useGSAP, MOTION, prefersReducedMotion } from "@/lib/gsap";
 
 /**
@@ -22,6 +23,10 @@ export function IssueDrawer({
   onReopen,
   siteHref,
   orgSlug,
+  sitePlatform,
+  members,
+  onAssign,
+  onSetDue,
 }: {
   issue: Issue | null;
   rechecking: boolean;
@@ -33,6 +38,10 @@ export function IssueDrawer({
   onReopen: () => void;
   siteHref?: string;
   orgSlug?: string;
+  sitePlatform?: string;
+  members?: ApiMember[];
+  onAssign?: (assigneeId: string | null) => void;
+  onSetDue?: (dueDate: string | null) => void;
 }) {
   const [shown, setShown] = useState<Issue | null>(issue);
   const panel = useRef<HTMLElement>(null);
@@ -107,6 +116,10 @@ export function IssueDrawer({
         <IssueDetailContent
           issue={shown}
           orgSlug={orgSlug}
+          sitePlatform={sitePlatform}
+          members={members}
+          onAssign={onAssign}
+          onSetDue={onSetDue}
           rechecking={rechecking}
           onRecheck={onRecheck}
           onIgnore={onIgnore}

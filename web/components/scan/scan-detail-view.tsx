@@ -15,6 +15,7 @@ import {
   type ScanFailureHint,
 } from "@/lib/use-scan-progress";
 import { apiClient } from "@/lib/api";
+import { appApi } from "@/lib/app-api";
 
 const CARD = "rounded-2xl border border-line bg-surface p-6 shadow-card";
 
@@ -32,124 +33,13 @@ interface PageResultItem {
   score?: number | null;
 }
 
-const DEMO_PAGES: PageResultItem[] = [
-  {
-    url: "https://oakhaus.com/",
-    templateKey: "home",
-    title: "Home — Oakhaus",
-    status: "ok",
-    httpStatus: 200,
-    loadMs: 380,
-    violations: 2,
-    passes: 48,
-    score: 86,
-  },
-  {
-    url: "https://oakhaus.com/products/linden-oak-dining-table",
-    templateKey: "product",
-    title: "Linden Dining Table — Oakhaus",
-    status: "ok",
-    httpStatus: 200,
-    loadMs: 440,
-    violations: 3,
-    passes: 45,
-    score: 78,
-  },
-  {
-    url: "https://oakhaus.com/products/arlo-lounge-chair",
-    templateKey: "product",
-    title: "Arlo Lounge Chair — Oakhaus",
-    status: "ok",
-    httpStatus: 200,
-    loadMs: 410,
-    violations: 3,
-    passes: 45,
-    score: 78,
-  },
-  {
-    url: "https://oakhaus.com/collections/dining",
-    templateKey: "collection",
-    title: "Dining Collection — Oakhaus",
-    status: "ok",
-    httpStatus: 200,
-    loadMs: 390,
-    violations: 1,
-    passes: 47,
-    score: 91,
-  },
-  {
-    url: "https://oakhaus.com/cart",
-    templateKey: "cart",
-    title: "Shopping Cart — Oakhaus",
-    status: "ok",
-    httpStatus: 200,
-    loadMs: 310,
-    violations: 1,
-    passes: 46,
-    score: 88,
-  },
-];
 
-const DEMO_DIFF: ScanDiffState = {
-  regressed: [
-    {
-      id: "i1",
-      ruleId: "image-alt",
-      title: "Images are missing descriptions",
-      impact: "critical",
-      templateKey: "Product pages",
-      selector: ".product__media-item:nth-child(2) img",
-      occurrenceCount: 214,
-      isRegression: true,
-      regressionCount: 1,
-    },
-  ],
-  new: [
-    {
-      id: "i3",
-      ruleId: "color-contrast",
-      title: "Text doesn't have enough contrast",
-      impact: "serious",
-      templateKey: "Cart",
-      selector: ".cart__subtotal-text",
-      occurrenceCount: 1,
-      isRegression: false,
-      regressionCount: 0,
-    },
-  ],
-  fixed: [
-    {
-      id: "i-fixed-1",
-      ruleId: "document-title",
-      title: "Page has no title",
-      impact: "serious",
-      templateKey: "Account",
-      selector: "head > title",
-      occurrenceCount: 0,
-      isRegression: false,
-      regressionCount: 0,
-    },
-    {
-      id: "i-fixed-2",
-      ruleId: "aria-valid-attr",
-      title: "Form errors aren't announced",
-      impact: "serious",
-      templateKey: "Checkout",
-      selector: "form#checkout",
-      occurrenceCount: 0,
-      isRegression: false,
-      regressionCount: 0,
-    },
-  ],
-};
 
 interface ScanDetailViewProps {
   orgSlug: string;
   siteSlug: string;
   scanId: string;
   initialScan?: ScanRecord | null;
-  siteName?: string;
-  rootUrl?: string;
 }
 
 export function ScanDetailView({
@@ -157,9 +47,20 @@ export function ScanDetailView({
   siteSlug,
   scanId,
   initialScan,
-  siteName = "Site",
-  rootUrl,
 }: ScanDetailViewProps) {
+  const [siteName, setSiteName] = useState("Site");
+  const [rootUrl, setRootUrl] = useState<string | undefined>();
+
+  useEffect(() => {
+    appApi
+      .getSite(orgSlug, siteSlug)
+      .then((d) => {
+        setSiteName(d.site.name);
+        setRootUrl(d.site.rootUrl);
+      })
+      .catch(() => {});
+  }, [orgSlug, siteSlug]);
+
   const {
     scan,
     status,
@@ -186,9 +87,9 @@ export function ScanDetailView({
   const [loadingPages, setLoadingPages] = useState<boolean>(true);
 
   const shortId = scanId.slice(0, 8);
-  const overviewUrl = orgSlug ? `/${orgSlug}/sites/${siteSlug}` : `/sites/${siteSlug}`;
-  const scansUrl = `${overviewUrl}?tab=scans`;
-  const issuesUrl = `${overviewUrl}?tab=issues`;
+  const overviewUrl = `/${orgSlug}/sites/${siteSlug}`;
+  const scansUrl = `${overviewUrl}/scans`;
+  const issuesUrl = `${overviewUrl}/issues`;
 
   // Fetch per-page results (Spec S-28: pages table URL, template, status, issues, load time)
   useEffect(() => {
@@ -199,13 +100,9 @@ export function ScanDetailView({
         const res = await apiClient<{ pages: PageResultItem[] }>(
           `/v1/orgs/${orgSlug}/scans/${scanId}/pages`,
         );
-        if (active && res.pages && res.pages.length > 0) {
-          setPagesList(res.pages);
-        } else if (active) {
-          setPagesList(DEMO_PAGES);
-        }
+        if (active) setPagesList(res.pages ?? []);
       } catch {
-        if (active) setPagesList(DEMO_PAGES);
+        if (active) setPagesList([]);
       } finally {
         if (active) setLoadingPages(false);
       }
@@ -230,8 +127,7 @@ export function ScanDetailView({
     }
   };
 
-  // Resolve diff comparison lists (with fallback to demo for visual verification)
-  const diff: ScanDiffState = liveDiff || DEMO_DIFF;
+  const diff: ScanDiffState = liveDiff || { regressed: [], new: [], fixed: [] };
   const regressedList = diff.regressed || [];
   const newList = diff.new || [];
   const fixedList = diff.fixed || [];
@@ -538,10 +434,11 @@ export function ScanDetailView({
                 </div>
 
                 {/* Filter tabs: All, Regressed, New, Fixed */}
-                <div className="flex items-center gap-1.5" role="tablist">
+                <div className="flex items-center gap-1.5" role="group" aria-label="Filter changes">
                   <button
                     type="button"
                     onClick={() => setActiveDiffTab("all")}
+                    aria-pressed={activeDiffTab === "all"}
                     className={`ease-ui h-8 rounded-full border px-3 text-xs font-semibold ${
                       activeDiffTab === "all"
                         ? "border-ptext bg-ptext text-surface"
@@ -553,6 +450,7 @@ export function ScanDetailView({
                   <button
                     type="button"
                     onClick={() => setActiveDiffTab("regressed")}
+                    aria-pressed={activeDiffTab === "regressed"}
                     className={`ease-ui h-8 rounded-full border px-3 text-xs font-semibold ${
                       activeDiffTab === "regressed"
                         ? "border-crit bg-crit text-on-primary"
@@ -564,6 +462,7 @@ export function ScanDetailView({
                   <button
                     type="button"
                     onClick={() => setActiveDiffTab("new")}
+                    aria-pressed={activeDiffTab === "new"}
                     className={`ease-ui h-8 rounded-full border px-3 text-xs font-semibold ${
                       activeDiffTab === "new"
                         ? "border-mod bg-mod text-surface"
@@ -575,6 +474,7 @@ export function ScanDetailView({
                   <button
                     type="button"
                     onClick={() => setActiveDiffTab("fixed")}
+                    aria-pressed={activeDiffTab === "fixed"}
                     className={`ease-ui h-8 rounded-full border px-3 text-xs font-semibold ${
                       activeDiffTab === "fixed"
                         ? "border-ok bg-ok text-on-primary"

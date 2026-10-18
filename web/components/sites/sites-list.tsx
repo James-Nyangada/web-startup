@@ -1,71 +1,96 @@
 "use client";
 
-import React, { useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Icon, I } from "@/components/icons";
 import { BandBadge } from "@/components/badges";
-import { SITES, type SiteRow } from "@/lib/site-data";
-import { AddSiteDialog, type NewSiteData } from "./add-site-dialog";
+import type { SiteRow } from "@/lib/site-data";
+import { ApiException, apiClient } from "@/lib/api";
+import { appApi, toSiteRow, type ApiSite } from "@/lib/app-api";
+import { AddSiteDialog } from "./add-site-dialog";
 import { useToast } from "@/components/shell/toast-context";
 
-export function SitesList() {
+/** S-21 Sites list with S-22 Add site dialog. */
+export function SitesList({ orgSlug }: { orgSlug: string }) {
   const { showToast } = useToast();
-  const [siteRows, setSiteRows] = useState<SiteRow[]>(SITES);
+  const router = useRouter();
+  const [sites, setSites] = useState<ApiSite[] | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [platformFilter, setPlatformFilter] = useState<string>("all");
+  const [clientFilter, setClientFilter] = useState<string>("all");
   const [sortBy, setSortBy] = useState<"score" | "name" | "lastScan" | "openCritical">("score");
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [actionMenuOpen, setActionMenuOpen] = useState<string | null>(null);
+
+  const load = useCallback(() => {
+    appApi
+      .listSites(orgSlug)
+      .then((list) => {
+        setSites(list);
+        setLoadError(null);
+      })
+      .catch((err: unknown) =>
+        setLoadError(err instanceof ApiException ? err.message : "Could not load your sites."),
+      );
+  }, [orgSlug]);
+
+  useEffect(load, [load]);
+
+  const siteRows = useMemo(() => (sites ?? []).map(toSiteRow), [sites]);
+  const lastScanAt = useMemo(
+    () => new Map((sites ?? []).map((s) => [s.id, s.lastScanAt ? new Date(s.lastScanAt).getTime() : 0])),
+    [sites],
+  );
 
   // Extract unique platforms and clients for filter dropdowns
   const platforms = useMemo(() => {
     return Array.from(new Set(siteRows.map((s) => s.platform))).filter(Boolean);
   }, [siteRows]);
+  const clients = useMemo(() => {
+    return Array.from(new Set(siteRows.map((s) => s.client))).filter(Boolean).sort();
+  }, [siteRows]);
 
-  const handleAddSite = (newSite: NewSiteData) => {
-    const row: SiteRow = {
-      name: newSite.name,
-      url: newSite.url,
-      client: newSite.clientName || "Direct Store",
-      platform: newSite.platform,
-      score: null, // Initial scan pending
-      crit: 0,
-      ser: 0,
-      delta: "—",
-      dir: 0,
-      last: "Queued",
-      nextScan: "Scheduled",
-      status: "Active",
-      verified: false,
-      regressions: 0,
-      reason: "Initial onboarding scan queued",
-    };
-    setSiteRows((prev) => [row, ...prev]);
+  const errorText = (err: unknown, fallback: string) =>
+    err instanceof ApiException ? err.message : fallback;
+
+  const handlePauseResume = async (site: SiteRow) => {
+    setActionMenuOpen(null);
+    const resume = site.status === "Paused";
+    try {
+      await apiClient(`/v1/orgs/${orgSlug}/sites/${site.id}/${resume ? "resume" : "pause"}`, {
+        method: "POST",
+        body: "{}",
+      });
+      showToast(`${site.name} is now ${resume ? "active" : "paused"}.`);
+      load();
+    } catch (err) {
+      showToast(errorText(err, "Could not change the scan schedule."), { type: "error" });
+    }
   };
 
-  const handlePauseResume = (url: string) => {
-    setSiteRows((prev) =>
-      prev.map((s) => {
-        if (s.url !== url) return s;
-        const nextStatus = s.status === "Paused" ? "Active" : "Paused";
-        showToast(`${s.name} is now ${nextStatus.toLowerCase()}.`);
-        return { ...s, status: nextStatus };
-      })
-    );
+  const handleRemoveSite = async (site: SiteRow) => {
     setActionMenuOpen(null);
+    if (!window.confirm(`Remove ${site.name}? Its history is kept for 30 days.`)) return;
+    try {
+      await apiClient(`/v1/orgs/${orgSlug}/sites/${site.id}`, { method: "DELETE" });
+      showToast(`Removed ${site.name}.`, { type: "info" });
+      load();
+    } catch (err) {
+      showToast(errorText(err, "Could not remove the site."), { type: "error" });
+    }
   };
 
-  const handleRemoveSite = (url: string) => {
-    const target = siteRows.find((s) => s.url === url);
-    setSiteRows((prev) => prev.filter((s) => s.url !== url));
-    showToast(`Removed ${target?.name ?? "site"} from organisation.`, { type: "info" });
+  const handleScanNow = async (site: SiteRow) => {
     setActionMenuOpen(null);
-  };
-
-  const handleScanNow = (site: SiteRow) => {
-    showToast(`Scan started for ${site.name}. Discovering pages...`);
-    setActionMenuOpen(null);
+    try {
+      const scan = await appApi.startScan(orgSlug, site.id!);
+      router.push(`/${orgSlug}/sites/${site.id}/scans/${scan.id}`);
+    } catch (err) {
+      showToast(errorText(err, "Could not start a scan."), { type: "error" });
+    }
   };
 
   // Filter and sort sites
@@ -94,6 +119,8 @@ export function SitesList() {
           return false;
         }
 
+        if (clientFilter !== "all" && s.client !== clientFilter) return false;
+
         return true;
       })
       .sort((a, b) => {
@@ -106,15 +133,17 @@ export function SitesList() {
           case "openCritical":
             return b.crit - a.crit;
           case "lastScan":
-            return a.last.localeCompare(b.last);
+            return (lastScanAt.get(b.id!) ?? 0) - (lastScanAt.get(a.id!) ?? 0);
           default:
             return 0;
         }
       });
-  }, [siteRows, searchQuery, statusFilter, platformFilter, sortBy]);
+  }, [siteRows, searchQuery, statusFilter, platformFilter, clientFilter, sortBy, lastScanAt]);
 
   const activeCount = siteRows.length;
   const maxLimit = 25;
+  const filtersActive =
+    searchQuery || statusFilter !== "all" || platformFilter !== "all" || clientFilter !== "all";
 
   return (
     <div className="flex flex-col gap-6">
@@ -204,10 +233,26 @@ export function SitesList() {
             ))}
           </select>
 
+          {clients.length > 0 && (
+            <select
+              value={clientFilter}
+              onChange={(e) => setClientFilter(e.target.value)}
+              aria-label="Filter by client"
+              className="h-9 rounded-xl border border-line bg-surface px-3 text-xs font-medium text-ink outline-none focus:border-primary"
+            >
+              <option value="all">All clients</option>
+              {clients.map((c) => (
+                <option key={c} value={c}>
+                  {c}
+                </option>
+              ))}
+            </select>
+          )}
+
           {/* Sort order */}
           <select
             value={sortBy}
-            onChange={(e) => setSortBy(e.target.value as any)}
+            onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
             aria-label="Sort sites by"
             className="h-9 rounded-xl border border-line bg-surface px-3 text-xs font-medium text-ink outline-none focus:border-primary"
           >
@@ -221,7 +266,18 @@ export function SitesList() {
 
       {/* Sites Table */}
       <div className="overflow-hidden rounded-2xl border border-line bg-surface shadow-card">
-        {filteredSites.length === 0 ? (
+        {loadError ? (
+          <div role="alert" className="p-12 text-center text-sm text-crit">
+            {loadError}{" "}
+            <button type="button" onClick={load} className="font-semibold underline">
+              Try again
+            </button>
+          </div>
+        ) : sites === null ? (
+          <div role="status" className="p-12 text-center text-sm text-muted">
+            Loading sites…
+          </div>
+        ) : filteredSites.length === 0 ? (
           <div className="p-12 text-center flex flex-col items-center justify-center gap-3">
             <span className="grid size-12 place-items-center rounded-full bg-subtle text-muted">
               <Icon d={I.globe} size={24} />
@@ -229,18 +285,19 @@ export function SitesList() {
             <div className="flex flex-col gap-1 max-w-sm">
               <h3 className="text-base font-semibold text-ink m-0">No websites found</h3>
               <p className="text-xs text-muted m-0">
-                {searchQuery || statusFilter !== "all" || platformFilter !== "all"
+                {filtersActive
                   ? "Try resetting your search filters to view your websites."
                   : "Add your first online store to begin automated accessibility audits."}
               </p>
             </div>
-            {searchQuery || statusFilter !== "all" || platformFilter !== "all" ? (
+            {filtersActive ? (
               <button
                 type="button"
                 onClick={() => {
                   setSearchQuery("");
                   setStatusFilter("all");
                   setPlatformFilter("all");
+                  setClientFilter("all");
                 }}
                 className="mt-2 rounded-full border border-line px-4 py-1.5 text-xs font-semibold text-ink hover:bg-subtle"
               >
@@ -275,18 +332,18 @@ export function SitesList() {
                 {filteredSites.map((site) => {
                   const isPaused = site.status === "Paused";
                   const isError = site.status === "Error";
-                  const siteSlug = site.url === "oakhaus.com" ? "oakhaus" : encodeURIComponent(site.url);
+                  const siteHref = `/${orgSlug}/sites/${site.id}`;
 
                   return (
                     <tr
-                      key={site.url}
+                      key={site.id}
                       className={`transition-colors hover:bg-subtle/50 ${
                         isPaused ? "opacity-60 bg-subtle/20" : ""
                       }`}
                     >
                       <td className="px-4 py-3 sm:px-6">
                         <Link
-                          href={`/sites/${siteSlug}`}
+                          href={siteHref}
                           className="flex flex-col no-underline text-ink group"
                         >
                           <span className="font-semibold group-hover:text-primary transition-colors">
@@ -319,7 +376,9 @@ export function SitesList() {
                       </td>
 
                       <td className="px-4 py-3 text-xs">
-                        {site.crit > 0 ? (
+                        {site.score === null ? (
+                          <span className="text-muted">Not scanned yet</span>
+                        ) : site.crit > 0 ? (
                           <span className="font-semibold text-crit flex items-center gap-1">
                             <Icon d={I.critical} size={14} stroke="var(--crit)" />
                             {site.crit} critical
@@ -360,14 +419,14 @@ export function SitesList() {
                       <td className="px-4 py-3 text-right relative">
                         <button
                           type="button"
-                          onClick={() => setActionMenuOpen((curr) => (curr === site.url ? null : site.url))}
+                          onClick={() => setActionMenuOpen((curr) => (curr === site.id ? null : site.id!))}
                           aria-label={`Actions for ${site.name}`}
                           className="grid size-8 place-items-center rounded-lg border border-line bg-surface text-ink hover:bg-subtle ml-auto focus-visible:outline-2 focus-visible:outline-primary"
                         >
                           <Icon d={I.chevronsUpDown} size={14} />
                         </button>
 
-                        {actionMenuOpen === site.url && (
+                        {actionMenuOpen === site.id && (
                           <div
                             role="menu"
                             aria-label={`Actions for ${site.name}`}
@@ -383,7 +442,7 @@ export function SitesList() {
                               <span>Scan now</span>
                             </button>
                             <Link
-                              href={`/sites/${siteSlug}?tab=settings`}
+                              href={`${siteHref}/settings`}
                               role="menuitem"
                               onClick={() => setActionMenuOpen(null)}
                               className="ease-ui flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs text-ink hover:bg-subtle no-underline"
@@ -394,7 +453,7 @@ export function SitesList() {
                             <button
                               type="button"
                               role="menuitem"
-                              onClick={() => handlePauseResume(site.url)}
+                              onClick={() => handlePauseResume(site)}
                               className="ease-ui flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs text-ink hover:bg-subtle"
                             >
                               <Icon d={I.circle} size={14} className="text-muted" />
@@ -404,7 +463,7 @@ export function SitesList() {
                             <button
                               type="button"
                               role="menuitem"
-                              onClick={() => handleRemoveSite(site.url)}
+                              onClick={() => handleRemoveSite(site)}
                               className="ease-ui flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs text-crit hover:bg-rose-500/10"
                             >
                               <Icon d={I.close} size={14} />
@@ -425,8 +484,9 @@ export function SitesList() {
       {/* S-22 Add Site Dialog */}
       <AddSiteDialog
         open={addDialogOpen}
+        orgSlug={orgSlug}
         onClose={() => setAddDialogOpen(false)}
-        onSiteCreated={handleAddSite}
+        onSiteCreated={load}
         isAgency={true}
       />
     </div>

@@ -114,6 +114,7 @@ export function TurnstileWidget({ onVerify, onError, className = "" }: Turnstile
     <div
       ref={containerRef}
       className={`min-h-[65px] ${className}`}
+      role="group"
       aria-label="Security check"
     />
   );

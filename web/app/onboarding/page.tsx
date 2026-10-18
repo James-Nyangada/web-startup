@@ -5,7 +5,10 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Icon, I } from "@/components/icons";
 import { VerifySiteDialog } from "@/components/sites/verify-site-dialog";
-import { apiClient } from "@/lib/api";
+import { apiClient, ApiException } from "@/lib/api";
+import { appApi } from "@/lib/app-api";
+import { useScanProgress, type ScanCounts } from "@/lib/use-scan-progress";
+import { band } from "@/lib/severity";
 
 interface OnboardingState {
   step: 1 | 2 | 3 | 4;
@@ -15,8 +18,47 @@ interface OnboardingState {
   siteUrl: string;
   platform: string;
   clientName: string;
-  scanProgress: number; // 0 to 10
-  scanScore: number;
+  scanProgress: number; // pages scanned so far
+  scanPlanned: number;
+  scanScore: number | null;
+  scanCounts?: ScanCounts;
+  scanFailed?: string | null;
+  orgId?: string;
+  orgSlug?: string;
+  siteId?: string;
+  scanId?: string;
+}
+
+type ScanSnapshot = {
+  scanned: number;
+  planned: number;
+  status: string;
+  currentUrl?: string;
+  score?: number | null;
+  counts?: ScanCounts;
+  error?: string | null;
+};
+
+/** Follows the onboarding scan over SSE (polling fallback) and reports each change (P2-05, P2-10). */
+function ScanWatcher({ orgSlug, scanId, onChange }: { orgSlug: string; scanId: string; onChange: (s: ScanSnapshot) => void }) {
+  const p = useScanProgress(orgSlug, scanId);
+  useEffect(() => {
+    onChange({
+      scanned: p.pagesScanned,
+      planned: p.pagesPlanned,
+      status: p.status,
+      currentUrl: p.currentUrl,
+      score: p.score,
+      counts: p.counts,
+      error: p.errorMessage,
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [p.pagesScanned, p.pagesPlanned, p.status, p.currentUrl, p.score, p.counts, p.errorMessage]);
+  return (
+    <p role="status" className="sr-only">
+      {p.announcement}
+    </p>
+  );
 }
 
 const STORAGE_KEY = "plainsight_onboarding_v1";
@@ -56,13 +98,17 @@ export default function OnboardingPage() {
     platform: "unknown",
     clientName: "",
     scanProgress: 0,
-    scanScore: 78,
+    scanPlanned: 10,
+    scanScore: null,
   });
+  const [formError, setFormError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [scanStatus, setScanStatus] = useState<string>("queued");
+  const [scanUrl, setScanUrl] = useState<string | undefined>();
 
   const [detectingPlatform, setDetectingPlatform] = useState(false);
   const [activeSlide, setActiveSlide] = useState(0);
   const [verifyDialogOpen, setVerifyDialogOpen] = useState(false);
-  const [createdSiteId, setCreatedSiteId] = useState<string>("site-onboarding-1");
 
   // Load resumable state from localStorage or query params (P3-08 conversion)
   useEffect(() => {
@@ -129,23 +175,27 @@ export default function OnboardingPage() {
     return () => clearInterval(interval);
   }, [state.step]);
 
-  // Scan simulation progress timer
-  useEffect(() => {
-    if (state.step !== 3) return;
-
-    if (state.scanProgress >= 10) {
-      const timer = setTimeout(() => {
-        updateState({ step: 4 });
-      }, 800);
-      return () => clearTimeout(timer);
+  const onScanChange = (snap: ScanSnapshot) => {
+    setScanStatus(snap.status);
+    setScanUrl(snap.currentUrl);
+    const finished = ["completed", "partial", "failed", "canceled"].includes(snap.status);
+    if (finished && state.orgSlug && state.scanId) {
+      // The progress stream carries the score; the stored scan has the final severity counts.
+      apiClient<{ scan: { score: number | null; counts?: ScanCounts } }>(
+        `/v1/orgs/${state.orgSlug}/scans/${state.scanId}`,
+      )
+        .then(({ scan }) => updateState({ scanScore: scan.score, scanCounts: scan.counts }))
+        .catch(() => {});
     }
-
-    const timer = setTimeout(() => {
-      updateState({ scanProgress: state.scanProgress + 1 });
-    }, 1100);
-
-    return () => clearTimeout(timer);
-  }, [state.step, state.scanProgress]);
+    updateState({
+      scanProgress: snap.scanned,
+      scanPlanned: snap.planned || 10,
+      scanScore: snap.score ?? null,
+      scanCounts: snap.counts,
+      scanFailed: snap.status === "failed" || snap.status === "canceled" ? (snap.error ?? "The scan did not finish.") : null,
+      ...(finished ? { step: 4 as const } : {}),
+    });
+  };
 
   // Handle URL blur & platform detection
   const handleUrlBlur = async () => {
@@ -168,70 +218,89 @@ export default function OnboardingPage() {
       }
 
       setDetectingPlatform(true);
-      const res = await fetch("/api/sites/detect-platform", {
+      const detected = await apiClient<{ platform: string }>("/v1/sites/detect-platform", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ url: clean }),
       });
-
-      if (res.ok) {
-        const data = await res.json();
-        if (data.data?.platform) {
-          updateState({ platform: data.data.platform });
-        }
-      }
+      updateState({ platform: detected.platform });
     } catch {
-      // If endpoint isn't available, check heuristics
-      if (clean.includes("myshopify") || clean.includes("shopify")) {
-        updateState({ platform: "shopify" });
-      } else if (clean.includes("wp-") || clean.includes("wordpress")) {
-        updateState({ platform: "wordpress" });
-      }
+      // Detection is a convenience; the user can pick the platform below.
     } finally {
       setDetectingPlatform(false);
     }
   };
 
-  const handleFinishOnboarding = async () => {
-    const freeCheckId =
-      typeof window !== "undefined"
-        ? localStorage.getItem("plainsight_free_check_id") || undefined
-        : undefined;
-
+  const freeCheckId = () => {
     try {
-      if (state.orgName) {
-        const orgRes = await apiClient<{ org: { id: string; slug: string } }>("/v1/orgs", {
+      return localStorage.getItem("plainsight_free_check_id") || undefined;
+    } catch {
+      return undefined;
+    }
+  };
+
+  const errorText = (err: unknown, fallback: string) =>
+    err instanceof ApiException ? err.message : fallback;
+
+  // Step 1: create the organisation once (resumable: a stored org is reused).
+  const submitOrg = async () => {
+    if (!state.orgName.trim()) return;
+    if (state.orgId) {
+      updateState({ step: 2 });
+      return;
+    }
+    setSubmitting(true);
+    setFormError(null);
+    try {
+      const { org } = await apiClient<{ org: { id: string; slug: string } }>("/v1/orgs", {
+        method: "POST",
+        body: JSON.stringify({ name: state.orgName.trim(), type: state.orgType, freeCheckId: freeCheckId() }),
+      });
+      updateState({ orgId: org.id, orgSlug: org.slug, step: 2 });
+    } catch (err) {
+      setFormError(errorText(err, "Could not create your organisation. Please try again."));
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  // Step 2: add the site and start the 10-page onboarding scan.
+  const submitSite = async () => {
+    if (!state.siteUrl.trim() || !state.orgSlug) return;
+    setSubmitting(true);
+    setFormError(null);
+    try {
+      let siteId = state.siteId;
+      if (!siteId) {
+        const { site } = await apiClient<{ site: { id: string } }>(`/v1/orgs/${state.orgSlug}/sites`, {
           method: "POST",
           body: JSON.stringify({
-            name: state.orgName,
-            type: state.orgType,
-            freeCheckId,
+            name: state.siteName.trim() || "My site",
+            rootUrl: state.siteUrl.trim(),
+            platform: state.platform !== "unknown" ? state.platform : undefined,
+            clientName: state.orgType === "agency" && state.clientName.trim() ? state.clientName.trim() : undefined,
+            freeCheckId: freeCheckId(),
           }),
-        }).catch(() => null);
-
-        if (orgRes?.org?.id && state.siteUrl) {
-          await apiClient(`/v1/orgs/${orgRes.org.id}/sites`, {
-            method: "POST",
-            body: JSON.stringify({
-              name: state.siteName || "My Store",
-              rootUrl: state.siteUrl,
-              platform: state.platform !== "unknown" ? state.platform : undefined,
-              freeCheckId,
-            }),
-          }).catch(() => null);
-        }
+        });
+        siteId = site.id;
+        updateState({ siteId });
       }
-    } catch {
-      // In offline / preview mode, proceed seamlessly
+      const scan = await appApi.startScan(state.orgSlug, siteId, "onboarding");
+      updateState({ scanId: scan.id, scanProgress: 0, scanScore: null, step: 3 });
+    } catch (err) {
+      setFormError(errorText(err, "Could not add your site. Please check the address and try again."));
     } finally {
-      try {
-        localStorage.removeItem(STORAGE_KEY);
-        localStorage.removeItem("plainsight_pending_url");
-        localStorage.removeItem("plainsight_pending_check_id");
-        localStorage.removeItem("plainsight_free_check_id");
-      } catch {}
-      router.push("/sites");
+      setSubmitting(false);
     }
+  };
+
+  const handleFinishOnboarding = () => {
+    try {
+      localStorage.removeItem(STORAGE_KEY);
+      localStorage.removeItem("plainsight_pending_url");
+      localStorage.removeItem("plainsight_pending_check_id");
+      localStorage.removeItem("plainsight_free_check_id");
+    } catch {}
+    router.push(state.orgSlug && state.siteId ? `/${state.orgSlug}/sites/${state.siteId}` : "/overview");
   };
 
   return (
@@ -409,8 +478,7 @@ export default function OnboardingPage() {
               <form
                 onSubmit={(e) => {
                   e.preventDefault();
-                  if (!state.orgName.trim()) return;
-                  updateState({ step: 2 });
+                  void submitOrg();
                 }}
               >
                 <div style={{ marginBottom: "20px" }}>
@@ -554,7 +622,7 @@ export default function OnboardingPage() {
 
                 <button
                   type="submit"
-                  disabled={!state.orgName.trim()}
+                  disabled={submitting || !state.orgName.trim()}
                   style={{
                     width: "100%",
                     padding: "12px",
@@ -570,6 +638,11 @@ export default function OnboardingPage() {
                 >
                   Continue to Add Site →
                 </button>
+                {formError && (
+                  <p role="alert" style={{ color: "var(--crit, #B42318)", fontSize: "13px", marginTop: "12px" }}>
+                    {formError}
+                  </p>
+                )}
               </form>
             </div>
           )}
@@ -612,9 +685,7 @@ export default function OnboardingPage() {
               <form
                 onSubmit={(e) => {
                   e.preventDefault();
-                  if (!state.siteUrl.trim()) return;
-                  setCreatedSiteId("site-" + Math.random().toString(36).substring(2, 9));
-                  updateState({ step: 3, scanProgress: 0 });
+                  void submitSite();
                 }}
               >
                 <div style={{ marginBottom: "16px" }}>
@@ -789,7 +860,7 @@ export default function OnboardingPage() {
                   </button>
                   <button
                     type="submit"
-                    disabled={!state.siteUrl.trim()}
+                    disabled={submitting || !state.siteUrl.trim()}
                     style={{
                       flex: 1,
                       padding: "12px",
@@ -806,6 +877,11 @@ export default function OnboardingPage() {
                     Start 10-Page Scan →
                   </button>
                 </div>
+                {formError && (
+                  <p role="alert" style={{ color: "var(--crit, #B42318)", fontSize: "13px", marginTop: "12px" }}>
+                    {formError}
+                  </p>
+                )}
               </form>
             </div>
           )}
@@ -865,10 +941,18 @@ export default function OnboardingPage() {
                 >
                   <span>Pages Scanned</span>
                   <span style={{ fontVariantNumeric: "tabular-nums" }}>
-                    {state.scanProgress} of 10 pages
+                    {state.scanProgress} of {state.scanPlanned} pages
                   </span>
                 </div>
+                {state.orgSlug && state.scanId && (
+                  <ScanWatcher orgSlug={state.orgSlug} scanId={state.scanId} onChange={onScanChange} />
+                )}
                 <div
+                  role="progressbar"
+                  aria-label="Onboarding scan progress"
+                  aria-valuemin={0}
+                  aria-valuemax={state.scanPlanned}
+                  aria-valuenow={state.scanProgress}
                   style={{
                     width: "100%",
                     height: "8px",
@@ -880,7 +964,7 @@ export default function OnboardingPage() {
                   <div
                     style={{
                       height: "100%",
-                      width: `${(state.scanProgress / 10) * 100}%`,
+                      width: `${Math.min(100, (state.scanProgress / Math.max(1, state.scanPlanned)) * 100)}%`,
                       background: "var(--primary, #2545FF)",
                       transition: "width 0.4s ease",
                     }}
@@ -898,10 +982,10 @@ export default function OnboardingPage() {
                   }}
                 >
                   <span style={{ display: "inline-block", width: "8px", height: "8px", borderRadius: "50%", background: "var(--primary)" }} />
-                  {state.scanProgress < 3 && `Discovering sitemap & links on ${state.siteUrl}...`}
-                  {state.scanProgress >= 3 && state.scanProgress < 7 && `Testing template pages & contrast ratios...`}
-                  {state.scanProgress >= 7 && state.scanProgress < 10 && `Grouping occurrences into unique issue fingerprints...`}
-                  {state.scanProgress >= 10 && `Computing final score & report...`}
+                  {scanStatus === "queued" && "Waiting for a scanner to pick up your site…"}
+                  {scanStatus === "discovering" && `Discovering pages on ${state.siteUrl}…`}
+                  {scanStatus === "scanning" && (scanUrl ? `Checking ${scanUrl}` : "Checking pages…")}
+                  {scanStatus === "processing" && "Grouping issues and computing your score…"}
                 </div>
               </div>
 
@@ -960,7 +1044,7 @@ export default function OnboardingPage() {
                   color: "var(--ok, #067647)",
                 }}
               >
-                Scan Complete
+                {state.scanFailed ? "Scan did not finish" : "Scan complete"}
               </span>
               <h1
                 style={{
@@ -998,10 +1082,10 @@ export default function OnboardingPage() {
                         color: "var(--mod, #8A6100)",
                       }}
                     >
-                      {state.scanScore}
+                      {state.scanScore ?? "—"}
                     </span>
                     <span style={{ fontSize: "14px", fontWeight: 600, color: "var(--mod, #8A6100)" }}>
-                      / 100 · Needs work
+                      / 100 · {state.scanScore !== null ? band(state.scanScore).label : "No score"}
                     </span>
                   </div>
                 </div>
@@ -1009,7 +1093,7 @@ export default function OnboardingPage() {
                 <div style={{ display: "flex", gap: "12px", textAlign: "right" }}>
                   <div>
                     <span style={{ fontSize: "18px", fontWeight: 700, color: "var(--crit, #B42318)" }}>
-                      2
+                      {state.scanCounts?.critical ?? 0}
                     </span>
                     <span style={{ display: "block", fontSize: "11px", color: "var(--muted, #476788)" }}>
                       Critical
@@ -1017,7 +1101,7 @@ export default function OnboardingPage() {
                   </div>
                   <div>
                     <span style={{ fontSize: "18px", fontWeight: 700, color: "var(--ser, #B54708)" }}>
-                      5
+                      {state.scanCounts?.serious ?? 0}
                     </span>
                     <span style={{ display: "block", fontSize: "11px", color: "var(--muted, #476788)" }}>
                       Serious
@@ -1025,7 +1109,7 @@ export default function OnboardingPage() {
                   </div>
                   <div>
                     <span style={{ fontSize: "18px", fontWeight: 700, color: "var(--mod, #8A6100)" }}>
-                      7
+                      {state.scanCounts?.moderate ?? 0}
                     </span>
                     <span style={{ display: "block", fontSize: "11px", color: "var(--muted, #476788)" }}>
                       Moderate
@@ -1123,15 +1207,14 @@ export default function OnboardingPage() {
 
       {/* S-23 Verification Dialog */}
       <VerifySiteDialog
-        open={verifyDialogOpen}
+        open={verifyDialogOpen && Boolean(state.orgSlug && state.siteId)}
         onClose={() => setVerifyDialogOpen(false)}
+        orgSlug={state.orgSlug ?? ""}
         site={{
-          id: createdSiteId,
+          id: state.siteId ?? "",
           name: state.siteName || "My Site",
-          rootUrl: state.siteUrl || "https://example.com",
-          verifyToken: "ps_onboarding_token_" + createdSiteId,
+          rootUrl: state.siteUrl,
           platform: state.platform,
-          status: "pending_verification",
         }}
         onVerified={() => {
           setVerifyDialogOpen(false);

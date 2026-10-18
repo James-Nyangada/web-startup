@@ -1,20 +1,20 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Icon, I } from "@/components/icons";
 import { useToast } from "@/components/shell/toast-context";
 import { useFocusTrap } from "@/components/use-focus-trap";
+import { apiClient, ApiException } from "@/lib/api";
 
 export interface VerifySiteDialogProps {
   open: boolean;
+  orgSlug: string;
   onClose: () => void;
   site: {
     id: string;
     name: string;
     rootUrl: string;
-    verifyToken?: string;
     platform?: string;
-    status?: string;
   };
   onVerified?: () => void;
 }
@@ -23,6 +23,7 @@ type VerifyTab = "meta" | "dns" | "file";
 
 export function VerifySiteDialog({
   open,
+  orgSlug,
   onClose,
   site,
   onVerified,
@@ -33,16 +34,39 @@ export function VerifySiteDialog({
   const [error, setError] = useState<string | null>(null);
   const [verifiedSuccess, setVerifiedSuccess] = useState(false);
   const [copiedField, setCopiedField] = useState<string | null>(null);
+  const [token, setToken] = useState<string | null>(null);
+
+  // The token is per site and only the API knows it (spec 6.9).
+  useEffect(() => {
+    if (!open) return;
+    apiClient<{ verifyToken: string; status: string }>(
+      `/v1/orgs/${orgSlug}/sites/${site.id}/verification`,
+    )
+      .then((res) => {
+        setToken(res.verifyToken);
+        if (res.status !== "pending_verification") setVerifiedSuccess(true);
+      })
+      .catch((err: unknown) =>
+        setError(err instanceof ApiException ? err.message : "Could not load your verification token."),
+      );
+  }, [open, orgSlug, site.id]);
 
   const dialogRef = React.useRef<HTMLDivElement>(null);
   useFocusTrap(dialogRef, open);
 
   if (!open) return null;
 
-  const token = site.verifyToken || "ps_token_placeholder";
-  const metaSnippet = `<meta name="plainsight-verify" content="${token}">`;
+  if (!token && !error) {
+    return (
+      <div role="status" className="fixed inset-0 z-[1000] grid place-items-center bg-scrim text-sm text-on-primary">
+        Loading verification details…
+      </div>
+    );
+  }
+  const verifyToken = token ?? "";
+  const metaSnippet = `<meta name="plainsight-verify" content="${verifyToken}">`;
   const dnsHost = "_plainsight";
-  const dnsValue = `plainsight-verify=${token}`;
+  const dnsValue = `plainsight-verify=${verifyToken}`;
   const filePath = "/.well-known/plainsight-verify.txt";
   const fileUrl = `${site.rootUrl}${filePath}`;
 
@@ -60,35 +84,22 @@ export function VerifySiteDialog({
   const handleVerify = async () => {
     setVerifying(true);
     setError(null);
-
     try {
-      const res = await fetch(`/api/orgs/current/sites/${site.id}/verify`, {
+      await apiClient(`/v1/orgs/${orgSlug}/sites/${site.id}/verify`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ method: activeTab }),
       });
-
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({}));
-        const reason =
-          body.error?.message ||
-          `Verification check failed for ${activeTab}. Please ensure the change is saved and public.`;
-        setError(reason);
-        setVerifying(false);
-        return;
-      }
-
       setVerifiedSuccess(true);
       showToast("Site ownership verified!", { type: "success" });
       if (onVerified) onVerified();
-    } catch {
-      // Graceful fallback for mock simulation
-      setTimeout(() => {
-        setVerifiedSuccess(true);
-        showToast("Site ownership verified!", { type: "success" });
-        if (onVerified) onVerified();
-        setVerifying(false);
-      }, 1000);
+    } catch (err) {
+      setError(
+        err instanceof ApiException
+          ? err.message
+          : `Verification check failed for ${activeTab}. Please ensure the change is saved and public.`,
+      );
+    } finally {
+      setVerifying(false);
     }
   };
 
@@ -518,10 +529,10 @@ export function VerifySiteDialog({
                       alignItems: "center",
                     }}
                   >
-                    <code style={{ fontSize: "12px" }}>{token}</code>
+                    <code style={{ fontSize: "12px" }}>{verifyToken}</code>
                     <button
                       type="button"
-                      onClick={() => copyToClipboard(token, "token")}
+                      onClick={() => copyToClipboard(verifyToken, "token")}
                       style={{
                         background: "none",
                         border: "none",

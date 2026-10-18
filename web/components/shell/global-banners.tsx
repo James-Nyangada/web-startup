@@ -19,6 +19,8 @@ export interface GlobalBannerData {
   email?: string;
   siteName?: string;
   siteSlug?: string;
+  /** Where the banner's action goes (e.g. the site's verification page). */
+  href?: string;
   daysRemaining?: number;
   daysLeft?: number;
   onAction?: () => void;
@@ -158,7 +160,7 @@ export function GlobalBannersRegion({
             </span>
           </div>
           <Link
-            href={`/sites/${banner.siteSlug ?? "oakhaus"}?tab=settings`}
+            href={banner.href ?? (banner.siteSlug ? `/sites/${banner.siteSlug}/verify` : "/sites")}
             className="ease-ui inline-flex items-center rounded-full bg-surface border border-line px-3 py-1 text-xs font-semibold hover:bg-subtle text-ink no-underline"
           >
             Verify site

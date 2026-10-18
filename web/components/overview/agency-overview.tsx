@@ -2,12 +2,28 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { AppShell } from "@/components/app-shell";
 import { BandBadge } from "@/components/badges";
 import { Icon, I } from "@/components/icons";
 import { useEntrance } from "@/components/reveal";
-import { COMMON_PROBLEMS, SITES, type SiteRow } from "@/lib/site-data";
+import type { SiteRow } from "@/lib/site-data";
+import { apiClient, ApiException } from "@/lib/api";
+import { appApi, toSiteRow } from "@/lib/app-api";
+
+interface OverviewData {
+  orgSlug: string;
+  sites: SiteRow[];
+  common: { t: string; n: number }[];
+}
+
+const OverviewContext = createContext<OverviewData>({ orgSlug: "", sites: [], common: [] });
+
+function useOverview() {
+  const data = useContext(OverviewContext);
+  const siteHref = (r: SiteRow) => `/${data.orgSlug}/sites/${r.id}`;
+  return { ...data, siteHref };
+}
 
 const LAYOUTS = [
   { id: "1a", label: "Worst-first table", hint: "Dense, scannable table with client grouping and persistent filters." },
@@ -41,7 +57,6 @@ const H1 = "m-0 font-serif text-[36px] leading-10 font-normal sm:text-[42px] sm:
 const PRIMARY = "ease-ui inline-flex h-10 items-center rounded-full border-0 bg-primary px-4 text-sm font-semibold text-on-primary no-underline hover:bg-primary-hover hover:text-on-primary";
 
 const deltaCls = (r: SiteRow) => (r.dir > 0 ? "text-ok" : r.dir < 0 ? "text-crit" : "text-muted");
-const siteHref = (r: SiteRow) => (r.url === "oakhaus.com" ? "/sites/oakhaus" : `/sites/${r.name.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`);
 
 function Score({ r, size = "text-base" }: { r: SiteRow; size?: string }) {
   return (
@@ -61,23 +76,40 @@ function TableLayout({
   onUpdatePrefs: (updater: Partial<OverviewUserPrefs>) => void;
 }) {
   const [search, setSearch] = useState("");
+  const { orgSlug, sites: SITES, siteHref } = useOverview();
 
   const clientsList = useMemo(() => {
-    return Array.from(new Set(SITES.map((s) => s.client))).sort();
-  }, []);
+    return Array.from(new Set(SITES.map((s) => s.client).filter(Boolean))).sort();
+  }, [SITES]);
 
+  const scored = SITES.filter((s) => s.score !== null);
+  const withRegressions = SITES.filter((s) => (s.regressions ?? 0) > 0);
   const stats = [
-    { label: "Sites monitored", value: "18", sub: "of 25 on Agency plan", c: "text-muted" },
-    { label: "Average score", value: "81", sub: "Up 3 since last week", c: "text-ok" },
-    { label: "Open critical + serious", value: "64", sub: "Down 12 since last week", c: "text-ok" },
-    { label: "Regressions this week", value: "2", sub: "Oakhaus, Kito Coffee", c: "text-muted" },
+    { label: "Sites monitored", value: String(SITES.length), sub: `${SITES.filter((s) => s.status === "Active").length} active`, c: "text-muted" },
+    {
+      label: "Average score",
+      value: scored.length ? String(Math.round(scored.reduce((a, s) => a + s.score!, 0) / scored.length)) : "—",
+      sub: `across ${scored.length} scanned ${scored.length === 1 ? "site" : "sites"}`,
+      c: "text-muted",
+    },
+    { label: "Open critical + serious", value: String(SITES.reduce((a, s) => a + s.crit + s.ser, 0)), sub: "across all sites", c: "text-muted" },
+    {
+      label: "Sites with regressions",
+      value: String(withRegressions.length),
+      sub: withRegressions.slice(0, 2).map((s) => s.name).join(", ") || "None",
+      c: "text-muted",
+    },
   ];
 
+  // Failed scans first, then regressions, then the biggest score drops.
   const attention = [
-    { name: "Mwanga Solar", why: "scan failed (503)", href: siteHref(SITES[3]!) },
-    { name: "Sora Skincare", why: "down 9 after theme update", href: siteHref(SITES[1]!) },
-    { name: "Oakhaus Furniture", why: "1 regression detected", href: siteHref(SITES[0]!) },
-  ];
+    ...SITES.filter((s) => s.status === "Error").map((s) => ({ s, why: s.reason || "scan failed" })),
+    ...withRegressions.map((s) => ({ s, why: s.reason })),
+    ...SITES.filter((s) => s.dir < 0).map((s) => ({ s, why: s.delta.toLowerCase() })),
+  ]
+    .filter((a, i, all) => all.findIndex((b) => b.s.id === a.s.id) === i)
+    .slice(0, 3)
+    .map(({ s, why }) => ({ name: s.name, why, href: siteHref(s) }));
 
   // Filter sites by search and clientFilter
   const filtered = useMemo(() => {
@@ -95,7 +127,7 @@ function TableLayout({
       }
       return true;
     });
-  }, [prefs.clientFilter, search]);
+  }, [SITES, prefs.clientFilter, search]);
 
   // Sort sites
   const sorted = useMemo(() => {
@@ -124,7 +156,7 @@ function TableLayout({
           break;
         }
         case "lastScan": {
-          cmp = b.last.localeCompare(a.last);
+          cmp = (b.lastScanAt ?? 0) - (a.lastScanAt ?? 0);
           break;
         }
       }
@@ -171,8 +203,7 @@ function TableLayout({
           </p>
         </div>
         <div className="flex items-center gap-3">
-          <span className="text-sm font-medium text-muted">18 of 25 sites active</span>
-          <Link href="/onboarding" className={PRIMARY}>
+          <Link href={`/${orgSlug}/sites`} className={PRIMARY}>
             <Icon d={I.plus} size={16} className="mr-1.5" />
             <span>Add site</span>
           </Link>
@@ -190,6 +221,7 @@ function TableLayout({
       </div>
 
       {/* Needs Attention Alert Banner */}
+      {attention.length > 0 && (
       <div className="flex flex-wrap items-center gap-4 rounded-xl border border-ser bg-ser-soft px-4 py-3 text-ink">
         <div className="flex items-center gap-2 text-sm font-semibold text-ink">
           <Icon d={I.serious} size={18} className="text-amber-600 dark:text-amber-400" />
@@ -203,6 +235,7 @@ function TableLayout({
           ))}
         </div>
       </div>
+      )}
 
       {/* Filtering and Grouping Controls Bar */}
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-line bg-surface p-3 shadow-xs">
@@ -305,7 +338,7 @@ function TableLayout({
                     </thead>
                     <tbody className="divide-y divide-line">
                       {g.sites.map((r) => (
-                        <tr key={r.url} className="hover:bg-subtle/50 transition-colors">
+                        <tr key={r.id} className="hover:bg-subtle/50 transition-colors">
                           <td className="px-4 py-3">
                             <Link href={siteHref(r)} className="font-semibold text-ink hover:text-primary no-underline block">
                               {r.name}
@@ -412,7 +445,7 @@ function TableLayout({
               </thead>
               <tbody data-rows className="divide-y divide-line">
                 {sorted.map((r) => (
-                  <tr key={r.url} className="hover:bg-subtle/50 transition-colors">
+                  <tr key={r.id} className="hover:bg-subtle/50 transition-colors">
                     <td className="px-4 py-3">
                       <Link href={siteHref(r)} className="font-semibold text-ink hover:text-primary no-underline block">
                         {r.name}
@@ -467,9 +500,10 @@ function TableLayout({
 
 /* ---------- 1b — Triage lanes ---------- */
 function LanesLayout() {
+  const { sites: SITES, siteHref } = useOverview();
   const lanes = [
     { id: "regressed", title: "Regressions", filter: (s: SiteRow) => (s.regressions ?? 0) > 0 },
-    { id: "critical", title: "High priority (< 70)", filter: (s: SiteRow) => (s.score ?? 0) < 70 },
+    { id: "critical", title: "High priority (< 70)", filter: (s: SiteRow) => s.score !== null && s.score < 70 },
     { id: "good", title: "Stable (≥ 70)", filter: (s: SiteRow) => (s.score ?? 0) >= 70 },
   ];
 
@@ -490,7 +524,7 @@ function LanesLayout() {
               <div className="flex flex-col gap-2.5">
                 {sitesInLane.map((s) => (
                   <Link
-                    key={s.url}
+                    key={s.id}
                     href={siteHref(s)}
                     className="p-3 rounded-xl border border-line bg-surface hover:bg-subtle/50 no-underline text-ink transition-colors block"
                   >
@@ -515,6 +549,7 @@ function LanesLayout() {
 
 /* ---------- 1c — Grouped by client + common problems ---------- */
 function ClientsLayout() {
+  const { sites: SITES, siteHref, common: COMMON_PROBLEMS } = useOverview();
   const groups = [...new Set(SITES.map((s) => s.client))].map((c) => ({
     name: c,
     items: SITES.filter((s) => s.client === c),
@@ -534,7 +569,7 @@ function ClientsLayout() {
             </h2>
             {g.items.map((r) => (
               <div
-                key={r.url}
+                key={r.id}
                 className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-1 border-t border-line px-4 py-3 text-sm md:grid-cols-[minmax(0,1fr)_120px_180px_110px]"
               >
                 <span>
@@ -577,20 +612,56 @@ function ClientsLayout() {
 }
 
 export interface AgencyOverviewProps {
-  isStoreSingleSite?: boolean;
-  storeSiteSlug?: string;
+  orgSlug: string;
 }
 
 /** S-20 Agency overview — with persistent sorting and filtering per user (P2-20). */
-export function AgencyOverview({ isStoreSingleSite = false, storeSiteSlug = "oakhaus" }: AgencyOverviewProps) {
+export function AgencyOverview({ orgSlug }: AgencyOverviewProps) {
   const router = useRouter();
+  const [data, setData] = useState<OverviewData | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [isStoreSingleSite, setIsStoreSingleSite] = useState(false);
 
-  // Redirect single-site stores directly to their site overview
   useEffect(() => {
-    if (isStoreSingleSite && storeSiteSlug) {
-      router.replace(`/sites/${storeSiteSlug}`);
-    }
-  }, [isStoreSingleSite, storeSiteSlug, router]);
+    let cancelled = false;
+    Promise.all([
+      apiClient<{ org: { type: "agency" | "store" } }>(`/v1/orgs/${orgSlug}`),
+      appApi.listSites(orgSlug),
+      apiClient<{ items: { title: string; siteId: string }[] }>(
+        `/v1/orgs/${orgSlug}/issues?status=open&limit=200`,
+      ).catch(() => ({ items: [] })),
+    ])
+      .then(([orgRes, sites, issues]) => {
+        if (cancelled) return;
+        // Stores with one site go straight to that site's overview (S-20).
+        if (orgRes.org.type === "store" && sites.length === 1) {
+          setIsStoreSingleSite(true);
+          router.replace(`/${orgSlug}/sites/${sites[0]!.id}`);
+          return;
+        }
+        const sitesByProblem = new Map<string, Set<string>>();
+        for (const issue of issues.items) {
+          const set = sitesByProblem.get(issue.title) ?? new Set<string>();
+          set.add(issue.siteId);
+          sitesByProblem.set(issue.title, set);
+        }
+        const common = [...sitesByProblem.entries()]
+          .map(([t, set]) => ({ t, n: set.size }))
+          .sort((a, b) => b.n - a.n)
+          .slice(0, 5);
+        setData({ orgSlug, sites: sites.map(toSiteRow), common });
+      })
+      .catch((err: unknown) => {
+        if (cancelled) return;
+        if (err instanceof ApiException && err.status === 401) {
+          router.replace(`/sign-in?redirect=${encodeURIComponent(`/${orgSlug}`)}`);
+        }
+        else setLoadError(err instanceof ApiException ? err.message : "Could not load the overview.");
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [orgSlug, router]);
 
   // Load persistent user preferences
   const [prefs, setPrefs] = useState<OverviewUserPrefs>(() => {
@@ -624,11 +695,21 @@ export function AgencyOverview({ isStoreSingleSite = false, storeSiteSlug = "oak
   const scope = useEntrance<HTMLDivElement>([prefs.layout], "[data-layout] > *, [data-rows] > tr");
   const currentLayout = LAYOUTS.find((l) => l.id === prefs.layout) ?? LAYOUTS[0];
 
-  if (isStoreSingleSite) {
+  if (loadError) {
     return (
       <AppShell active="overview" crumbs={[{ label: "Overview" }]}>
-        <div className="p-12 text-center text-sm text-muted">
-          Redirecting to site overview...
+        <div role="alert" className="p-12 text-center text-sm text-crit">
+          {loadError}
+        </div>
+      </AppShell>
+    );
+  }
+
+  if (!data || isStoreSingleSite) {
+    return (
+      <AppShell active="overview" crumbs={[{ label: "Overview" }]}>
+        <div role="status" className="p-12 text-center text-sm text-muted">
+          {isStoreSingleSite ? "Opening your site…" : "Loading overview…"}
         </div>
       </AppShell>
     );
@@ -660,11 +741,13 @@ export function AgencyOverview({ isStoreSingleSite = false, storeSiteSlug = "oak
       </div>
 
       <div ref={scope}>
-        {prefs.layout === "1a" && (
-          <TableLayout prefs={prefs} onUpdatePrefs={updatePrefs} />
-        )}
-        {prefs.layout === "1b" && <LanesLayout />}
-        {prefs.layout === "1c" && <ClientsLayout />}
+        <OverviewContext.Provider value={data}>
+          {prefs.layout === "1a" && (
+            <TableLayout prefs={prefs} onUpdatePrefs={updatePrefs} />
+          )}
+          {prefs.layout === "1b" && <LanesLayout />}
+          {prefs.layout === "1c" && <ClientsLayout />}
+        </OverviewContext.Provider>
       </div>
     </AppShell>
   );

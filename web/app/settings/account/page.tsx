@@ -475,7 +475,7 @@ export default function AccountSettingsPage() {
                 type="button"
                 onClick={() => setShowCurrentPw((v) => !v)}
                 aria-label={showCurrentPw ? "Hide password" : "Show password"}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted hover:text-ink"
+                className="absolute right-2 top-1/2 grid size-7 -translate-y-1/2 place-items-center rounded text-muted hover:text-ink"
               >
                 <Icon d={showCurrentPw ? I.eyeOff : I.eye} size={16} />
               </button>
@@ -500,7 +500,7 @@ export default function AccountSettingsPage() {
                 type="button"
                 onClick={() => setShowNewPw((v) => !v)}
                 aria-label={showNewPw ? "Hide password" : "Show password"}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted hover:text-ink"
+                className="absolute right-2 top-1/2 grid size-7 -translate-y-1/2 place-items-center rounded text-muted hover:text-ink"
               >
                 <Icon d={showNewPw ? I.eyeOff : I.eye} size={16} />
               </button>
@@ -525,7 +525,7 @@ export default function AccountSettingsPage() {
                 type="button"
                 onClick={() => setShowConfirmPw((v) => !v)}
                 aria-label={showConfirmPw ? "Hide password" : "Show password"}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted hover:text-ink"
+                className="absolute right-2 top-1/2 grid size-7 -translate-y-1/2 place-items-center rounded text-muted hover:text-ink"
               >
                 <Icon d={showConfirmPw ? I.eyeOff : I.eye} size={16} />
               </button>
@@ -640,7 +640,7 @@ export default function AccountSettingsPage() {
                 setDeleteError(null);
                 setDeleteDialogOpen(true);
               }}
-              className="ease-ui flex items-center gap-2 rounded-full border border-crit bg-crit px-4 py-2 text-xs font-semibold text-on-crit hover:bg-crit/90"
+              className="ease-ui flex items-center gap-2 rounded-full border border-crit bg-crit px-4 py-2 text-xs font-semibold text-on-primary hover:bg-crit/90"
             >
               <Icon d={I.trash} size={14} />
               <span>Delete account</span>
@@ -714,7 +714,7 @@ export default function AccountSettingsPage() {
                 type="button"
                 onClick={handleDeleteAccount}
                 disabled={deleteConfirmationText !== "DELETE" || deletingAccount}
-                className="ease-ui rounded-full bg-crit px-4 py-2 text-xs font-semibold text-on-crit hover:bg-crit/90 disabled:opacity-50"
+                className="ease-ui rounded-full bg-crit px-4 py-2 text-xs font-semibold text-on-primary hover:bg-crit/90 disabled:opacity-50"
               >
                 {deletingAccount ? "Deleting account..." : "Delete my account"}
               </button>

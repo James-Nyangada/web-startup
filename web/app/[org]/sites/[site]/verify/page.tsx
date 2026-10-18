@@ -1,65 +1,58 @@
 "use client";
 
-import React, { use } from "react";
+import React, { use, useEffect, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { AppShell } from "@/components/app-shell";
 import { VerifySiteDialog } from "@/components/sites/verify-site-dialog";
+import { appApi, type ApiSite } from "@/lib/app-api";
 
+/** S-23 Verification as a page (linked from the site header and onboarding). */
 export default function SiteVerifyPage({
   params,
 }: {
   params: Promise<{ org: string; site: string }>;
 }) {
-  const resolvedParams = use(params);
-  const siteSlug = resolvedParams.site;
-  const orgSlug = resolvedParams.org;
+  const { org, site: siteId } = use(params);
+  const router = useRouter();
+  const [site, setSite] = useState<ApiSite | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const siteHref = `/${org}/sites/${siteId}`;
 
-  const mockSite = {
-    id: "site-" + siteSlug,
-    name: siteSlug.charAt(0).toUpperCase() + siteSlug.slice(1),
-    rootUrl: `https://${siteSlug}.com`,
-    verifyToken: `ps_token_${siteSlug}`,
-    platform: "shopify",
-    status: "pending_verification",
-  };
+  useEffect(() => {
+    appApi
+      .getSite(org, siteId)
+      .then((d) => setSite(d.site))
+      .catch(() => setError("This site doesn’t exist or you don’t have access to it."));
+  }, [org, siteId]);
 
   return (
     <AppShell
       active="sites"
       crumbs={[
-        { label: "Sites", href: "/sites" },
-        { label: mockSite.name, href: `/sites/${siteSlug}` },
-        { label: "Verify Ownership" },
+        { label: "Sites", href: `/${org}/sites` },
+        { label: site?.name ?? "Site", href: siteHref },
+        { label: "Verify ownership" },
       ]}
     >
-      <div style={{ maxWidth: "640px", margin: "40px auto", padding: "0 16px" }}>
-        <div style={{ marginBottom: "20px" }}>
-          <Link
-            href={`/sites/${siteSlug}`}
-            style={{
-              fontSize: "13px",
-              color: "var(--muted, #476788)",
-              textDecoration: "none",
-              display: "inline-flex",
-              alignItems: "center",
-              gap: "4px",
-            }}
-          >
-            ← Back to Site Overview
-          </Link>
-        </div>
-
-        {/* Embedded Card using the VerifySiteDialog component directly */}
-        <VerifySiteDialog
-          open={true}
-          onClose={() => {
-            window.location.href = `/sites/${siteSlug}`;
-          }}
-          site={mockSite}
-          onVerified={() => {
-            window.location.href = `/sites/${siteSlug}`;
-          }}
-        />
+      <div className="mx-auto my-10 max-w-[640px] px-4">
+        <Link href={siteHref} className="text-sm text-muted no-underline hover:text-ink">
+          ← Back to site overview
+        </Link>
+        {error && (
+          <p role="alert" className="mt-6 text-sm text-crit">
+            {error}
+          </p>
+        )}
+        {site && (
+          <VerifySiteDialog
+            open={true}
+            orgSlug={org}
+            onClose={() => router.push(siteHref)}
+            site={site}
+            onVerified={() => router.push(siteHref)}
+          />
+        )}
       </div>
     </AppShell>
   );

@@ -1,35 +1,6 @@
-import React from "react";
-import type { Metadata } from "next";
-import { ScanDetailView } from "@/components/scan/scan-detail-view";
+import { OrgRedirect } from "@/components/shell/org-redirect";
 
-export async function generateMetadata({
-  params,
-}: {
-  params: Promise<{ site: string; scan: string }>;
-}): Promise<Metadata> {
-  const { scan } = await params;
-  const shortId = scan.slice(0, 8);
-  return {
-    title: `Scan #${shortId} · Plainsight`,
-    description: "Live accessibility scan progress and details",
-  };
-}
-
-export default async function DirectScanDetailPage({
-  params,
-}: {
-  params: Promise<{ site: string; scan: string }>;
-}) {
+export default async function Page({ params }: { params: Promise<{ site: string; scan: string }> }) {
   const { site, scan } = await params;
-  const siteName = site === "oakhaus" ? "Oakhaus Furniture" : site.charAt(0).toUpperCase() + site.slice(1);
-
-  return (
-    <ScanDetailView
-      orgSlug="default"
-      siteSlug={site}
-      scanId={scan}
-      siteName={siteName}
-      rootUrl={`https://${site}.com`}
-    />
-  );
+  return <OrgRedirect path={`/sites/${site}/scans/${scan}`} />;
 }

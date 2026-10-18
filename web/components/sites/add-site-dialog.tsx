@@ -4,23 +4,20 @@ import React, { useEffect, useRef, useState } from "react";
 import { Icon, I } from "@/components/icons";
 import { useToast } from "@/components/shell/toast-context";
 import { useFocusTrap } from "@/components/use-focus-trap";
-
-export interface NewSiteData {
-  name: string;
-  url: string;
-  platform: string;
-  clientName?: string;
-}
+import { apiClient, ApiException } from "@/lib/api";
+import { appApi, type ApiSite } from "@/lib/app-api";
 
 export function AddSiteDialog({
   open,
+  orgSlug,
   onClose,
   onSiteCreated,
   isAgency = true,
 }: {
   open: boolean;
+  orgSlug: string;
   onClose: () => void;
-  onSiteCreated?: (site: NewSiteData) => void;
+  onSiteCreated?: (site: ApiSite) => void;
   isAgency?: boolean;
 }) {
   const { showToast } = useToast();
@@ -31,6 +28,7 @@ export function AddSiteDialog({
   const [detecting, setDetecting] = useState(false);
   const [detectedEvidence, setDetectedEvidence] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
 
   const dialogRef = useRef<HTMLDivElement>(null);
   useFocusTrap(dialogRef, open);
@@ -74,34 +72,18 @@ export function AddSiteDialog({
       setDetecting(true);
       setDetectedEvidence(null);
 
-      // In client or dev mode: simulate / call platform detection
       try {
-        const res = await fetch("/v1/sites/detect-platform", {
+        const detected = await apiClient<{ platform: string }>("/v1/sites/detect-platform", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ url: rootOrigin }),
         });
-        if (res.ok) {
-          const body = await res.json();
-          if (body.data?.platform && body.data.platform !== "unknown") {
-            setPlatform(body.data.platform);
-            setDetectedEvidence(`Detected: ${body.data.platform.toUpperCase()}`);
-            setDetecting(false);
-            return;
-          }
-        }
+        setPlatform(detected.platform);
+        setDetectedEvidence(
+          detected.platform !== "unknown"
+            ? `Detected: ${detected.platform}`
+            : "Platform could not be detected automatically. Please select below.",
+        );
       } catch {
-        // Fallback heuristics
-      }
-
-      // Local heuristic fallback
-      if (clean.includes("myshopify") || clean.includes("oakhaus") || clean.includes("sora") || clean.includes("baraka")) {
-        setPlatform("shopify");
-        setDetectedEvidence("Detected: Shopify (via headers & theme scripts)");
-      } else if (clean.includes("wp") || clean.includes("kito") || clean.includes("mwanga") || clean.includes("lumen")) {
-        setPlatform("wordpress");
-        setDetectedEvidence("Detected: WordPress (via wp-json & generator)");
-      } else {
         setPlatform("unknown");
         setDetectedEvidence("Platform could not be detected automatically. Please select below.");
       }
@@ -112,7 +94,7 @@ export function AddSiteDialog({
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!url) {
       setError("Website URL is required.");
@@ -124,26 +106,35 @@ export function AddSiteDialog({
       return;
     }
 
-    // Normalise to apex root
-    let root = url.trim();
+    setSubmitting(true);
+    setError(null);
     try {
-      if (!/^https?:\/\//i.test(root)) root = "https://" + root;
-      root = new URL(root).origin;
-    } catch {
-      setError("Invalid website URL.");
-      return;
+      const { site } = await apiClient<{ site: ApiSite }>(`/v1/orgs/${orgSlug}/sites`, {
+        method: "POST",
+        body: JSON.stringify({
+          name: name.trim(),
+          rootUrl: /^https?:\/\//i.test(url.trim()) ? url.trim() : `https://${url.trim()}`,
+          platform: platform !== "unknown" ? platform : undefined,
+          clientName: isAgency && clientName.trim() ? clientName.trim() : undefined,
+        }),
+      });
+      // Spec 7.3: a new site gets a 10-page onboarding scan straight away.
+      const scanStarted = await appApi
+        .startScan(orgSlug, site.id, "onboarding")
+        .then(() => true)
+        .catch(() => false);
+      showToast(
+        scanStarted
+          ? `Added ${site.name}. The first scan has started.`
+          : `Added ${site.name}. Start a scan from the site page.`,
+      );
+      onSiteCreated?.(site);
+      onClose();
+    } catch (err) {
+      setError(err instanceof ApiException ? err.message : "Could not add the site. Please try again.");
+    } finally {
+      setSubmitting(false);
     }
-
-    const newSite: NewSiteData = {
-      name: name.trim(),
-      url: root.replace(/^https?:\/\//, ""),
-      platform,
-      clientName: isAgency ? clientName.trim() : undefined,
-    };
-
-    onSiteCreated?.(newSite);
-    showToast(`Added ${newSite.name} (${root}). Initial scan queued!`);
-    onClose();
   };
 
   if (!open) return null;
@@ -277,9 +268,10 @@ export function AddSiteDialog({
             </button>
             <button
               type="submit"
-              className="ease-ui rounded-full bg-primary px-5 py-2 text-sm font-semibold text-on-primary hover:bg-primary-hover shadow-card"
+              disabled={submitting}
+              className="ease-ui rounded-full bg-primary px-5 py-2 text-sm font-semibold text-on-primary hover:bg-primary-hover shadow-card disabled:opacity-70"
             >
-              Add site &amp; run scan
+              {submitting ? "Adding…" : "Add site & run scan"}
             </button>
           </div>
         </form>

@@ -1,11 +1,11 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { AppShell } from "@/components/app-shell";
 import { Icon, I } from "@/components/icons";
 import { OverviewTab } from "./overview-tab";
-import { IssuesTab } from "./issues-tab";
+import { IssuesTab, type BulkRequest } from "./issues-tab";
 import { ScansTab, type ScanHistoryItem } from "./scans-tab";
 import { PagesTab } from "./pages-tab";
 import { ReportsTab } from "./reports-tab";
@@ -13,114 +13,122 @@ import { SettingsTab } from "./settings-tab";
 import { IssueDrawer } from "./issue-drawer";
 import { IgnoreDialog } from "./ignore-dialog";
 import { Toast } from "./toast";
-import { ISSUES, RECENTLY_FIXED, SITE_TABS, type Issue } from "@/lib/site-data";
-import type { TrendPoint } from "@/lib/trend";
-import type { Severity } from "@/lib/severity";
-
-const isActive = (i: Issue) => i.status === "open" || i.status === "regressed" || i.status === "needsReview";
+import { SITE_TABS, type Issue } from "@/lib/site-data";
+import { ApiException } from "@/lib/api";
+import {
+  appApi,
+  formatDay,
+  formatDayTime,
+  loadIssue,
+  platformLabel,
+  recheckAndWait,
+  recheckMessage,
+  toIssue,
+  type ApiMember,
+  type ApiSiteDetail,
+} from "@/lib/app-api";
 
 export interface SiteWorkspaceProps {
   startTab?: number;
-  orgSlug?: string;
-  siteSlug?: string;
-  siteName?: string;
-  initialScans?: ScanHistoryItem[];
-  initialSite?: {
-    id: string;
-    name: string;
-    rootUrl: string;
-    platform?: string;
-    clientName?: string | null;
-    score?: number | null;
-    status?: string;
-    lastScanId?: string | null;
-    scanFrequency?: string;
-    scanDay?: number;
-    scanHour?: number;
-    pageLimit?: number;
-    standard?: string;
-  };
-  initialOverview?: {
-    score?: number | null;
-    scoreBand?: string | null;
-    scoreExplanation?: string | null;
-    trend?: TrendPoint[];
-    trendSummary?: string;
-    topIssues?: Issue[];
-    severityCounts?: Record<Severity, number>;
-    diffSummary?: {
-      newCount: number;
-      fixedCount: number;
-      regressedCount: number;
-      sinceLabel?: string | null;
-    };
-    recentlyFixed?: Array<{ id: string; title: string; fixedAt: string | null; fixedDate?: string }>;
-    coverage?: {
-      pagesScanned?: number;
-      pagesPlanned?: number;
-      templatesFound?: number;
-      standard?: string;
-      nextScan?: string;
-      nextScanFormatted?: string | null;
-    };
-  };
+  orgSlug: string;
+  siteId: string;
 }
 
 /** S-24 Site overview · S-25 Issues · S-26 Issue drawer — interactive flow F-04 (triage and fix). */
-export function SiteWorkspace({
-  startTab = 0,
-  orgSlug,
-  siteSlug,
-  siteName,
-  initialSite,
-  initialOverview,
-  initialScans,
-}: SiteWorkspaceProps) {
+export function SiteWorkspace({ startTab = 0, orgSlug, siteId }: SiteWorkspaceProps) {
+  const router = useRouter();
   const [tab, setTab] = useState(startTab);
-  const [issues, setIssues] = useState<Issue[]>(() => {
-    if (initialOverview?.topIssues && initialOverview.topIssues.length > 0) {
-      // Merge initial top issues with standard issues set
-      return ISSUES;
-    }
-    return ISSUES;
-  });
-  const [fixed, setFixed] = useState<[string, string][]>(RECENTLY_FIXED);
+  const [detail, setDetail] = useState<ApiSiteDetail | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [members, setMembers] = useState<ApiMember[]>([]);
+  const [scans, setScans] = useState<ScanHistoryItem[]>([]);
+  const [refreshKey, setRefreshKey] = useState(0);
   const [selected, setSelected] = useState<string[]>([]);
   const [openId, setOpenId] = useState<string | null>(null);
-  const [ignoreOpen, setIgnoreOpen] = useState(false);
+  const [current, setCurrent] = useState<Issue | null>(null);
+  const [ignoreTargets, setIgnoreTargets] = useState<string[] | null>(null);
   const [rechecking, setRechecking] = useState(false);
+  const [startingScan, setStartingScan] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const returnTo = useRef<HTMLElement | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const tabRefs = useRef<(HTMLButtonElement | null)[]>([]);
+  const ignoreOpen = ignoreTargets !== null;
 
-  const active = issues.filter(isActive);
-  const current = issues.find((i) => i.id === openId) ?? null;
-
-  const displayName = siteName || initialSite?.name || "Oakhaus Furniture";
-  const rootUrl = initialSite?.rootUrl || "https://oakhaus.com";
-  const rootHost = rootUrl.replace(/^https?:\/\//, "").replace(/\/$/, "");
-  const platform = initialSite?.platform || "Shopify";
-  const clientName = initialSite?.clientName ? `Client: ${initialSite.clientName}` : "Client: Mark Otieno";
-  const isVerified = initialSite ? initialSite.status === "active" : true;
-
-  const siteHref = orgSlug && siteSlug ? `/${orgSlug}/sites/${siteSlug}` : (siteSlug ? `/sites/${siteSlug}` : "/sites/oakhaus");
-  const scanHref = orgSlug && siteSlug
-    ? `/${orgSlug}/sites/${siteSlug}/scans/scan-demo`
-    : (siteSlug ? `/sites/${siteSlug}/scans/scan-demo` : "/sites/oakhaus/scans/scan-demo");
+  const site = detail?.site;
+  const siteHref = `/${orgSlug}/sites/${siteId}`;
 
   const startToastTimer = useCallback(() => {
     clearTimeout(toastTimer.current);
     toastTimer.current = setTimeout(() => setToast(null), 6000);
   }, []);
-  const showToast = (t: string) => {
-    setToast(t);
-    startToastTimer();
-  };
+  const showToast = useCallback(
+    (t: string) => {
+      setToast(t);
+      startToastTimer();
+    },
+    [startToastTimer],
+  );
   useEffect(() => () => clearTimeout(toastTimer.current), []);
 
-  const setIssue = (id: string, patch: Partial<Issue>) =>
-    setIssues((all) => all.map((i) => (i.id === id ? { ...i, ...patch } : i)));
+  const errorText = (err: unknown, fallback: string) =>
+    err instanceof ApiException ? err.message : fallback;
+
+  // Site detail (score, trend, top issues, counts) — reloaded after every change.
+  useEffect(() => {
+    let cancelled = false;
+    appApi
+      .getSite(orgSlug, siteId)
+      .then((d) => {
+        if (!cancelled) {
+          setDetail(d);
+          setLoadError(null);
+        }
+      })
+      .catch((err: unknown) => {
+        if (cancelled) return;
+        setLoadError(
+          err instanceof ApiException && err.status === 404
+            ? "This site doesn’t exist or you don’t have access to it."
+            : errorText(err, "Could not load this site."),
+        );
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [orgSlug, siteId, refreshKey]);
+
+  useEffect(() => {
+    appApi.listMembers(orgSlug).then(setMembers).catch(() => setMembers([]));
+  }, [orgSlug]);
+
+  useEffect(() => {
+    if (tab !== 2) return;
+    appApi.listScans(orgSlug, siteId).then(setScans).catch(() => setScans([]));
+  }, [orgSlug, siteId, tab, refreshKey]);
+
+  // Drawer content
+  useEffect(() => {
+    if (!openId) {
+      setCurrent(null);
+      return;
+    }
+    let cancelled = false;
+    loadIssue(orgSlug, openId)
+      .then((issue) => {
+        if (!cancelled) setCurrent(issue);
+      })
+      .catch((err: unknown) => {
+        if (cancelled) return;
+        setOpenId(null);
+        showToast(errorText(err, "Could not open this issue."));
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [orgSlug, openId, refreshKey, showToast]);
+
+  const refresh = () => setRefreshKey((k) => k + 1);
 
   const openIssue = (id: string) => {
     returnTo.current = document.activeElement as HTMLElement;
@@ -145,31 +153,114 @@ export function SiteWorkspace({
     return () => document.removeEventListener("keydown", onKey);
   });
 
-  const recheck = () => {
+  /** Queues issue.recheck jobs and waits for the worker to record each outcome (P2-14). */
+  const recheckIssues = async (ids: string[]) => {
+    showToast(`Rechecking ${ids.length === 1 ? "this issue" : `${ids.length} issues`}…`);
+    try {
+      const outcomes = await recheckAndWait(orgSlug, ids);
+      showToast(recheckMessage(outcomes, ids.length));
+    } catch (err) {
+      showToast(errorText(err, "Could not start the recheck."));
+    }
+    refresh();
+  };
+
+  const recheck = async () => {
     if (!current) return;
-    const { id, title, template, pages } = current;
-    const n = Math.min(pages, 3);
     setRechecking(true);
-    setTimeout(() => {
-      setIssue(id, { status: "fixed" });
-      setRechecking(false);
-      setFixed((f) => [[`${title} — ${template}`, "Today"], ...f]);
-      setSelected((s) => s.filter((x) => x !== id));
-      showToast(`Fixed — the problem no longer appears on ${n} checked ${n === 1 ? "page" : "pages"}.`);
-    }, 1600);
+    await recheckIssues([current.id]);
+    setRechecking(false);
   };
 
   const focusInDrawer = (sel: string) =>
     requestAnimationFrame(() => (document.querySelector<HTMLElement>(sel) ?? document.getElementById("drawer-title"))?.focus());
   const closeIgnore = () => {
-    setIgnoreOpen(false);
-    focusInDrawer("[data-ignore-btn]");
+    setIgnoreTargets(null);
+    if (openId) focusInDrawer("[data-ignore-btn]");
   };
-  const confirmIgnore = (reason: string) => {
-    if (current) setIssue(current.id, { status: "ignored", ignoreReason: reason });
-    setIgnoreOpen(false);
-    focusInDrawer("#drawer-title");
-    showToast("Issue ignored. It stays in your evidence log with your reason.");
+  const confirmIgnore = async (reason: string, note?: string) => {
+    const targets = ignoreTargets ?? [];
+    setIgnoreTargets(null);
+    try {
+      if (targets.length === 1) await appApi.ignore(orgSlug, targets[0]!, reason, note);
+      else await appApi.bulk(orgSlug, { issueIds: targets, action: "ignore", data: { reason, note } });
+      setSelected((s) => s.filter((id) => !targets.includes(id)));
+      showToast(
+        targets.length === 1
+          ? "Issue ignored. It stays in your evidence log with your reason."
+          : `Ignored ${targets.length} issues. They remain in your evidence log.`,
+      );
+      refresh();
+    } catch (err) {
+      showToast(errorText(err, "Could not ignore the issue."));
+    }
+    if (openId) focusInDrawer("#drawer-title");
+  };
+
+  const reopen = async () => {
+    if (!current) return;
+    try {
+      await appApi.unignore(orgSlug, current.id);
+      showToast("Issue reopened.");
+      refresh();
+    } catch (err) {
+      showToast(errorText(err, "Could not reopen the issue."));
+    }
+  };
+
+  const assign = async (assigneeId: string | null) => {
+    if (!current) return;
+    try {
+      await appApi.assign(orgSlug, current.id, assigneeId);
+      refresh();
+    } catch (err) {
+      showToast(errorText(err, "Could not change the assignee."));
+    }
+  };
+
+  const setDue = async (dueDate: string | null) => {
+    if (!current) return;
+    try {
+      await appApi.setDueDate(orgSlug, current.id, dueDate);
+      refresh();
+    } catch (err) {
+      showToast(errorText(err, "Could not set the due date."));
+    }
+  };
+
+  const onBulk = async (request: BulkRequest) => {
+    const ids = [...selected];
+    if (ids.length === 0) return;
+    if (request.action === "ignore") {
+      setIgnoreTargets(ids);
+      return;
+    }
+    if (request.action === "recheck") {
+      setSelected([]);
+      await recheckIssues(ids);
+      return;
+    }
+    try {
+      const data =
+        request.action === "assign" ? { assigneeId: request.assigneeId } : { dueDate: request.dueDate };
+      await appApi.bulk(orgSlug, { issueIds: ids, action: request.action, data });
+      showToast(`Updated ${ids.length} ${ids.length === 1 ? "issue" : "issues"}.`);
+      setSelected([]);
+      refresh();
+    } catch (err) {
+      showToast(errorText(err, "Could not update the selected issues."));
+    }
+  };
+
+  const scanNow = async () => {
+    setStartingScan(true);
+    try {
+      const scan = await appApi.startScan(orgSlug, siteId);
+      router.push(`${siteHref}/scans/${scan.id}`);
+    } catch (err) {
+      showToast(errorText(err, "Could not start a scan."));
+      setStartingScan(false);
+    }
   };
 
   // Arrow-key navigation between site tabs (WAI-ARIA tabs pattern).
@@ -181,6 +272,43 @@ export function SiteWorkspace({
     setTab(next);
     tabRefs.current[next]?.focus();
   };
+
+  if (loadError && !detail) {
+    return (
+      <AppShell active="sites" crumbs={[{ label: "Sites", href: `/${orgSlug}/sites` }, { label: "Site" }]}>
+        <div role="alert" className="rounded-2xl border border-line bg-surface px-6 py-12 text-center">
+          <h1 className="m-0 text-xl font-semibold">{loadError}</h1>
+          <button
+            type="button"
+            onClick={refresh}
+            className="ease-ui mt-4 h-10 rounded-full border border-line-strong bg-surface px-5 text-sm font-semibold text-ink hover:bg-subtle"
+          >
+            Try again
+          </button>
+        </div>
+      </AppShell>
+    );
+  }
+
+  if (!detail || !site) {
+    return (
+      <AppShell active="sites" crumbs={[{ label: "Sites", href: `/${orgSlug}/sites` }, { label: "Loading…" }]}>
+        <div role="status" className="px-6 py-12 text-center text-sm text-muted">
+          Loading site…
+        </div>
+      </AppShell>
+    );
+  }
+
+  const displayName = site.name;
+  const rootUrl = site.rootUrl;
+  const rootHost = rootUrl.replace(/^https?:\/\//, "").replace(/\/$/, "");
+  const isVerified = site.status !== "pending_verification";
+  const topIssues = detail.topIssues.map((i) => toIssue(i));
+  const recentlyFixed = detail.recentlyFixed.map((f) => [f.title, formatDay(f.fixedAt)] as [string, string]);
+  const lastScanText = detail.latestScanSummary
+    ? `Last scan ${formatDayTime(detail.latestScanSummary.finishedAt ?? site.updatedAt)}`
+    : "Not scanned yet";
 
   return (
     <AppShell
@@ -202,36 +330,39 @@ export function SiteWorkspace({
               <Icon d={I.external} size={14} />
               <span className="sr-only">(opens in new tab)</span>
             </a>
-            <span className="capitalize">{platform}</span>
-            <span>{clientName}</span>
+            <span>{platformLabel(site.platform)}</span>
+            {site.clientName && <span>Client: {site.clientName}</span>}
             {isVerified ? (
               <span className="inline-flex items-center gap-1 font-medium text-ok">
                 <Icon d={I.fixed} />
                 Verified
               </span>
             ) : (
-              <span className="inline-flex items-center gap-1 font-medium text-mod">
+              <a href={`${siteHref}/verify`} className="inline-flex items-center gap-1 font-medium text-mod">
                 <Icon d={I.moderate} />
-                Pending verification
-              </span>
+                Verify to enable monitoring
+              </a>
             )}
-            <span>Last scan 14 Oct, 09:12</span>
+            <span>{lastScanText}</span>
           </div>
         </div>
         <div className="flex items-center gap-3">
           <button
             type="button"
+            onClick={() => setTab(4)}
             className="ease-ui h-10 rounded-full border border-line-strong bg-surface px-4 text-sm font-semibold text-ink hover:bg-subtle"
           >
             Download report
           </button>
-          <Link
-            href={scanHref}
-            className="ease-ui flex h-10 items-center gap-2 rounded-full border-0 bg-primary px-4 text-sm font-semibold text-on-primary no-underline hover:bg-primary-hover"
+          <button
+            type="button"
+            onClick={scanNow}
+            disabled={startingScan}
+            className="ease-ui flex h-10 items-center gap-2 rounded-full border-0 bg-primary px-4 text-sm font-semibold text-on-primary hover:bg-primary-hover disabled:opacity-70"
           >
             <Icon d={I.refresh} strokeWidth={2} />
-            Scan now
-          </Link>
+            {startingScan ? "Starting…" : "Scan now"}
+          </button>
         </div>
       </div>
 
@@ -290,69 +421,45 @@ export function SiteWorkspace({
       <div id="site-panel" role="tabpanel" aria-labelledby={`stab-${tab}`}>
         {tab === 0 && (
           <OverviewTab
-            active={active}
-            fixed={fixed}
-            fixedCount={8 + (fixed.length - RECENTLY_FIXED.length)}
-            trend={initialOverview?.trend}
-            trendSummary={initialOverview?.trendSummary}
-            score={initialOverview?.score ?? initialSite?.score}
-            diffSummary={initialOverview?.diffSummary}
-            severityCounts={initialOverview?.severityCounts}
-            coverage={initialOverview?.coverage}
-            verificationStatus={
-              initialSite?.status === "active"
-                ? "Active (verified)"
-                : initialSite?.status === "pending_verification"
-                  ? "Pending verification"
-                  : undefined
-            }
+            active={topIssues}
+            fixed={recentlyFixed}
+            trend={detail.trend}
+            trendSummary={detail.trendSummary}
+            score={detail.score}
+            diffSummary={detail.diffSummary}
+            severityCounts={detail.severityCounts}
+            coverage={detail.coverage}
+            verificationStatus={isVerified ? "Verified" : "Pending verification"}
             onOpen={openIssue}
             goIssues={() => setTab(1)}
           />
         )}
         {tab === 1 && (
           <IssuesTab
-            active={active}
+            orgSlug={orgSlug}
+            siteId={siteId}
+            members={members}
+            refreshKey={refreshKey}
             selected={selected}
             setSelected={setSelected}
             onOpen={openIssue}
-            onRecheckSelected={() => {
-              const n = selected.length;
-              showToast(`Rechecking ${n} ${n === 1 ? "issue" : "issues"}. We’ll update the list when it’s done.`);
-              setSelected([]);
-            }}
-            onIgnoreSelected={() => {
-              const n = selected.length;
-              setIssues((prev) =>
-                prev.map((i) =>
-                  selected.includes(i.id)
-                    ? { ...i, status: "ignored" as const, ignoreReason: "Accepted risk" }
-                    : i,
-                ),
-              );
-              setSelected([]);
-              showToast(`Ignored ${n} ${n === 1 ? "issue" : "issues"}. They remain in your evidence log.`);
-            }}
+            onBulk={onBulk}
           />
         )}
         {tab === 2 && (
           <ScansTab
-            orgSlug={orgSlug || "default"}
-            siteSlug={siteSlug || "oakhaus"}
-            scans={initialScans}
-            onTriggerScan={() => {
-              showToast("New manual scan queued. Navigating to live progress...");
-              setTimeout(() => {
-                window.location.href = scanHref;
-              }, 1200);
-            }}
+            orgSlug={orgSlug}
+            siteSlug={siteId}
+            scans={scans}
+            onTriggerScan={scanNow}
+            isTriggering={startingScan}
           />
         )}
         {tab === 3 && (
           <PagesTab
             orgSlug={orgSlug}
-            siteSlug={siteSlug}
-            siteId={initialSite?.id}
+            siteSlug={siteId}
+            siteId={siteId}
             onNavigateToSettings={() => setTab(8)}
             onToast={showToast}
           />
@@ -360,8 +467,8 @@ export function SiteWorkspace({
         {tab === 4 && (
           <ReportsTab
             orgSlug={orgSlug}
-            siteSlug={siteSlug}
-            siteId={initialSite?.id}
+            siteSlug={siteId}
+            siteId={siteId}
             siteName={displayName}
             onToast={showToast}
           />
@@ -369,9 +476,9 @@ export function SiteWorkspace({
         {tab === 8 && (
           <SettingsTab
             orgSlug={orgSlug}
-            siteSlug={siteSlug}
-            siteId={initialSite?.id}
-            initialSite={initialSite}
+            siteSlug={siteId}
+            siteId={siteId}
+            initialSite={site}
             onToast={showToast}
           />
         )}
@@ -389,9 +496,14 @@ export function SiteWorkspace({
         onClose={closeDrawer}
         onExited={onDrawerExited}
         onRecheck={recheck}
-        onIgnore={() => setIgnoreOpen(true)}
-        onReopen={() => current && setIssue(current.id, { status: "open" })}
+        onIgnore={() => current && setIgnoreTargets([current.id])}
+        onReopen={reopen}
         siteHref={siteHref}
+        orgSlug={orgSlug}
+        sitePlatform={site.platform}
+        members={members}
+        onAssign={assign}
+        onSetDue={setDue}
       />
       {ignoreOpen && <IgnoreDialog onCancel={closeIgnore} onConfirm={confirmIgnore} />}
       <Toast

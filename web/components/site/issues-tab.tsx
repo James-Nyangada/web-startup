@@ -5,7 +5,9 @@ import { Icon, I } from "@/components/icons";
 import { SeverityBadge, StatusBadge } from "@/components/badges";
 import { Collapse } from "@/components/disclosure";
 import { SEV, SEVERITIES, type Severity } from "@/lib/severity";
-import { NAMES, type Issue, type IssueStatus } from "@/lib/site-data";
+import type { Issue } from "@/lib/site-data";
+import { API_BASE_URL, ApiException } from "@/lib/api";
+import { appApi, toIssue, type ApiMember } from "@/lib/app-api";
 import { gsap, useGSAP, MOTION_OK } from "@/lib/gsap";
 
 const PILL =
@@ -16,14 +18,45 @@ const SECONDARY_SM =
 export type GroupBy = "rule" | "template" | "flat";
 export type SortBy = "impact" | "occurrences" | "firstSeen" | "lastSeen";
 
+export type BulkRequest =
+  | { action: "recheck" }
+  | { action: "ignore" }
+  | { action: "assign"; assigneeId: string | null }
+  | { action: "set_due_date"; dueDate: string | null };
+
 export interface IssuesTabProps {
-  active: Issue[];
+  orgSlug: string;
+  siteId: string;
+  members: ApiMember[];
+  /** Bump to reload the current page after an action elsewhere. */
+  refreshKey: number;
   selected: string[];
   setSelected: (fn: (s: string[]) => string[]) => void;
   onOpen: (id: string) => void;
-  onRecheckSelected: () => void;
-  onIgnoreSelected?: () => void;
-  serverTotal?: number;
+  onBulk: (request: BulkRequest) => void;
+}
+
+interface IssuePage {
+  items: Issue[];
+  total: number;
+  totalPages: number;
+  templates: string[];
+}
+
+/** Maps the status dropdown onto the API's status / isRegression / needsReview filters. */
+function statusQuery(status: string, query: URLSearchParams) {
+  if (status === "active") query.set("status", "open");
+  else if (status === "open") {
+    query.set("status", "open");
+    query.set("isRegression", "false");
+    query.set("needsReview", "false");
+  } else if (status === "regressed") {
+    query.set("status", "open");
+    query.set("isRegression", "true");
+  } else if (status === "needsReview") {
+    query.set("status", "open");
+    query.set("needsReview", "true");
+  } else if (status !== "all") query.set("status", status);
 }
 
 const STORAGE_VIEW_KEY = "plainsight_issues_default_view";
@@ -36,12 +69,14 @@ interface SavedView {
 }
 
 export function IssuesTab({
-  active,
+  orgSlug,
+  siteId,
+  members,
+  refreshKey,
   selected,
   setSelected,
   onOpen,
-  onRecheckSelected,
-  onIgnoreSelected,
+  onBulk,
 }: IssuesTabProps) {
   // Filter states
   const [search, setSearch] = useState("");
@@ -69,15 +104,13 @@ export function IssuesTab({
   const scope = useRef<HTMLDivElement>(null);
   const initialMount = useRef<boolean>(true);
 
-  // Extract unique filter options from the dataset
-  const allTemplates = useMemo(
-    () => Array.from(new Set(active.map((i) => i.template).filter(Boolean))).sort(),
-    [active],
-  );
-  const allWcag = useMemo(
-    () => Array.from(new Set(active.map((i) => i.wcag).filter(Boolean))).sort(),
-    [active],
-  );
+  // Server data (P2-12: filtering, sorting and pagination happen in the API)
+  const [data, setData] = useState<IssuePage | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [seenWcag, setSeenWcag] = useState<string[]>([]);
+  const [exporting, setExporting] = useState(false);
 
   // 1. Sync filters with URL query parameters on mount
   useEffect(() => {
@@ -171,77 +204,67 @@ export function IssuesTab({
     window.history.replaceState(null, "", newUrl);
   }, [search, sevF, statusF, templateF, wcagF, groupBy, sortBy, page]);
 
-  // Filtering logic
-  const q = search.trim().toLowerCase();
-  const filtered = useMemo(() => {
-    return active.filter((i) => {
-      // Search
-      if (q && !`${i.title} ${i.rule} ${i.template} ${i.wcag}`.toLowerCase().includes(q)) {
-        return false;
-      }
-      // Severity
-      if (sevF.length > 0 && !sevF.includes(i.sev)) {
-        return false;
-      }
-      // Status
-      if (statusF === "active") {
-        if (i.status === "fixed" || i.status === "ignored") return false;
-      } else if (statusF !== "all" && i.status !== statusF) {
-        return false;
-      }
-      // Template
-      if (templateF !== "all" && i.template !== templateF) {
-        return false;
-      }
-      // WCAG
-      if (wcagF !== "all" && i.wcag !== wcagF) {
-        return false;
-      }
-      // Assignee
-      if (assigneeF === "unassigned") {
-        if (i.assignee) return false;
-      } else if (assigneeF !== "all" && i.assignee !== assigneeF) {
-        return false;
-      }
-      // Flags
-      if (regressionOnly && i.status !== "regressed") {
-        return false;
-      }
-      if (needsReviewOnly && i.status !== "needsReview") {
-        return false;
-      }
-      return true;
-    });
-  }, [active, q, sevF, statusF, templateF, wcagF, assigneeF, regressionOnly, needsReviewOnly]);
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(search.trim()), 300);
+    return () => clearTimeout(t);
+  }, [search]);
 
-  // Sorting logic
-  const sorted = useMemo(() => {
-    const list = [...filtered];
-    return list.sort((a, b) => {
-      let diff = 0;
-      if (sortBy === "impact") {
-        diff = SEV[b.sev].weight - SEV[a.sev].weight;
-        if (diff === 0) diff = b.occ - a.occ;
-      } else if (sortBy === "occurrences") {
-        diff = b.occ - a.occ;
-      } else if (sortBy === "firstSeen") {
-        diff = a.first.localeCompare(b.first);
-      } else if (sortBy === "lastSeen") {
-        diff = b.last.localeCompare(a.last);
-      }
-      return sortOrder === "asc" ? -diff : diff;
-    });
-  }, [filtered, sortBy, sortOrder]);
+  const query = useMemo(() => {
+    const qs = new URLSearchParams();
+    statusQuery(statusF, qs);
+    sevF.forEach((sev) => qs.append("impact", sev));
+    if (templateF !== "all") qs.set("template", templateF);
+    if (wcagF !== "all") qs.set("wcag", wcagF);
+    if (assigneeF !== "all") qs.set("assignee", assigneeF);
+    if (regressionOnly) qs.set("isRegression", "true");
+    if (needsReviewOnly) qs.set("needsReview", "true");
+    if (debouncedSearch) qs.set("q", debouncedSearch);
+    qs.set("sort", sortBy);
+    qs.set("order", sortOrder);
+    return qs;
+  }, [statusF, sevF, templateF, wcagF, assigneeF, regressionOnly, needsReviewOnly, debouncedSearch, sortBy, sortOrder]);
 
-  // Pagination calculations (Handles up to 2,000+ issues with server/client pagination smoothly)
-  const totalItems = sorted.length;
-  const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
+  useEffect(() => {
+    let cancelled = false;
+    const qs = new URLSearchParams(query);
+    qs.set("group", "none");
+    qs.set("limit", String(pageSize));
+    qs.set("page", String(page));
+    setLoading(true);
+    appApi
+      .listIssues(orgSlug, siteId, qs)
+      .then((res) => {
+        if (cancelled) return;
+        const items = res.items.map((item) => toIssue(item));
+        setData({
+          items,
+          total: res.total,
+          totalPages: res.totalPages,
+          templates: res.facets.templates.map((t) => t.templateKey),
+        });
+        setSeenWcag((prev) =>
+          Array.from(new Set([...prev, ...items.flatMap((i) => i.wcagCriteria ?? [])])).sort(),
+        );
+        setLoadError(null);
+      })
+      .catch((err: unknown) => {
+        if (!cancelled) setLoadError(err instanceof ApiException ? err.message : "Could not load issues.");
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [orgSlug, siteId, query, page, pageSize, refreshKey]);
+
+  const q = debouncedSearch.toLowerCase();
+  const allTemplates = data?.templates ?? [];
+  const allWcag = seenWcag;
+  const totalItems = data?.total ?? 0;
+  const totalPages = Math.max(1, data?.totalPages ?? 1);
   const currentPage = Math.min(Math.max(1, page), totalPages);
-
-  const paginatedItems = useMemo(() => {
-    const start = (currentPage - 1) * pageSize;
-    return sorted.slice(start, start + pageSize);
-  }, [sorted, currentPage, pageSize]);
+  const paginatedItems = useMemo(() => data?.items ?? [], [data]);
 
   // Grouping structure
   const groupedData = useMemo(() => {
@@ -352,81 +375,30 @@ export function IssuesTab({
     [selected, setSelected],
   );
 
-  const handleExportCsv = () => {
-    const headers = [
-      "Issue ID",
-      "Rule ID",
-      "Rule Title",
-      "Severity",
-      "WCAG Criteria",
-      "Template",
-      "Status",
-      "Occurrences",
-      "Pages Affected",
-      "Is Regression",
-      "Needs Review",
-      "Assigned To",
-      "Due Date",
-      "Ignored Reason",
-      "Sample Location / Selector",
-      "HTML Snippet",
-      "First Seen",
-      "Last Seen",
-    ];
-
-    const escapeCsv = (val: unknown): string => {
-      if (val === null || val === undefined) return "";
-      const str = String(val);
-      if (/[",\r\n]/.test(str)) {
-        return `"${str.replace(/"/g, '""')}"`;
-      }
-      return str;
-    };
-
-    const lines = [headers.map(escapeCsv).join(",")];
-
-    for (const issue of sorted) {
-      const assigneeName = issue.assignee ? NAMES[issue.assignee] ?? issue.assignee : "Unassigned";
-      const sampleLoc = issue.occs && issue.occs.length > 0 ? `${issue.occs[0][0]} (${issue.occs[0][1]})` : "";
-
-      lines.push(
-        [
-          issue.id,
-          issue.rule,
-          issue.title,
-          issue.sev,
-          issue.wcag,
-          issue.template,
-          issue.status,
-          issue.occ,
-          issue.pages,
-          issue.status === "regressed" ? "Yes" : "No",
-          issue.status === "needsReview" ? "Yes" : "No",
-          assigneeName,
-          issue.due ?? "",
-          issue.ignoreReason ?? "",
-          sampleLoc,
-          issue.snippet ?? "",
-          issue.first,
-          issue.last,
-        ]
-          .map(escapeCsv)
-          .join(",")
-      );
+  // P2-22: the API builds the CSV from the same filters (all pages, not just this one).
+  const handleExportCsv = async () => {
+    setExporting(true);
+    try {
+      const res = await fetch(`${API_BASE_URL}/v1/orgs/${orgSlug}/sites/${siteId}/issues/export.csv?${query}`, {
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error(`Export failed (${res.status})`);
+      const blob = await res.blob();
+      const disposition = res.headers.get("content-disposition") ?? "";
+      const filename = /filename="([^"]+)"/.exec(disposition)?.[1] ?? "issues.csv";
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    } catch {
+      setLoadError("Could not export the CSV. Please try again.");
+    } finally {
+      setExporting(false);
     }
-
-    // Prepend UTF-8 BOM so Excel and Google Sheets correctly parse encoding
-    const csvContent = "\uFEFF" + lines.join("\r\n");
-    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    const dateStamp = new Date().toISOString().split("T")[0];
-    link.download = `issues-export-${dateStamp}.csv`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
   };
 
   return (
@@ -436,7 +408,7 @@ export function IssuesTab({
         <h2 className="m-0 text-2xl leading-8 font-semibold">
           Issues{" "}
           <span className="tnum text-base font-normal text-muted">
-            {totalItems} open · {filtered.reduce((a, b) => a + b.occ, 0)} occurrences
+            {totalItems} matching
           </span>
         </h2>
         <div className="flex items-center gap-2">
@@ -451,9 +423,10 @@ export function IssuesTab({
           <button
             type="button"
             onClick={handleExportCsv}
-            className="ease-ui h-9 rounded-full border border-line-strong bg-surface px-4 text-sm font-semibold text-ink hover:bg-subtle"
+            disabled={exporting}
+            className="ease-ui h-9 rounded-full border border-line-strong bg-surface px-4 text-sm font-semibold text-ink hover:bg-subtle disabled:opacity-60"
           >
-            Export CSV
+            {exporting ? "Exporting…" : "Export CSV"}
           </button>
         </div>
       </div>
@@ -606,9 +579,9 @@ export function IssuesTab({
           >
             <option value="all">Assignee: All</option>
             <option value="unassigned">Unassigned</option>
-            {Object.entries(NAMES).map(([key, name]) => (
-              <option key={key} value={key}>
-                {name}
+            {members.map((m) => (
+              <option key={m.userId} value={m.userId}>
+                {m.name || m.email}
               </option>
             ))}
           </select>
@@ -696,18 +669,36 @@ export function IssuesTab({
           <span role="status" aria-live="polite" className="flex-1 text-sm font-semibold text-ptext">
             {selected.length} {selected.length === 1 ? "issue" : "issues"} selected
           </span>
-          <button type="button" className={SECONDARY_SM}>
-            Assign
+          <select
+            value=""
+            onChange={(e) => {
+              if (!e.target.value) return;
+              onBulk({ action: "assign", assigneeId: e.target.value === "unassigned" ? null : e.target.value });
+            }}
+            aria-label="Assign selected issues"
+            className="h-8 rounded-full border border-line-strong bg-surface px-3 text-sm font-semibold text-ink"
+          >
+            <option value="">Assign…</option>
+            <option value="unassigned">Unassigned</option>
+            {members.map((m) => (
+              <option key={m.userId} value={m.userId}>
+                {m.name || m.email}
+              </option>
+            ))}
+          </select>
+          <label className="flex items-center gap-1.5 text-sm font-semibold text-ptext">
+            Due
+            <input
+              type="date"
+              onChange={(e) => onBulk({ action: "set_due_date", dueDate: e.target.value || null })}
+              aria-label="Set due date for selected issues"
+              className="h-8 rounded-full border border-line-strong bg-surface px-3 text-sm text-ink"
+            />
+          </label>
+          <button type="button" onClick={() => onBulk({ action: "ignore" })} className={SECONDARY_SM}>
+            Ignore
           </button>
-          <button type="button" className={SECONDARY_SM}>
-            Set due date
-          </button>
-          {onIgnoreSelected && (
-            <button type="button" onClick={onIgnoreSelected} className={SECONDARY_SM}>
-              Ignore
-            </button>
-          )}
-          <button type="button" onClick={onRecheckSelected} className={SECONDARY_SM}>
+          <button type="button" onClick={() => onBulk({ action: "recheck" })} className={SECONDARY_SM}>
             Recheck selected
           </button>
           <button
@@ -720,8 +711,20 @@ export function IssuesTab({
         </div>
       )}
 
+      {loadError && (
+        <div role="alert" className="rounded-lg border border-crit/40 bg-crit-soft p-3 text-sm text-crit">
+          {loadError}
+        </div>
+      )}
+
+      {loading && !data && (
+        <div role="status" className="rounded-2xl border border-line bg-surface px-6 py-12 text-center text-sm text-muted">
+          Loading issues…
+        </div>
+      )}
+
       {/* Empty State */}
-      {totalItems === 0 && (
+      {data && totalItems === 0 && (
         <div className="flex flex-col items-center gap-2 rounded-2xl border border-dashed border-line-strong px-6 py-16 text-center">
           <h3 className="m-0 text-xl leading-7 font-semibold">No issues match these filters</h3>
           <p className="m-0 text-sm text-muted">Try removing a filter or changing your search terms.</p>
@@ -827,12 +830,12 @@ export function IssuesTab({
                               <>
                                 <span>{i.due}</span>
                                 <span
-                                  title={NAMES[i.assignee as keyof typeof NAMES] ?? i.assignee}
+                                  title={i.assigneeName ?? i.assignee}
                                   className="grid size-7 place-items-center rounded-full border border-line bg-sunk text-[11px] font-semibold text-ink"
                                 >
                                   <span aria-hidden="true">{i.assignee}</span>
                                   <span className="sr-only">
-                                    Assigned to {NAMES[i.assignee as keyof typeof NAMES] ?? i.assignee}
+                                    Assigned to {i.assigneeName ?? i.assignee}
                                   </span>
                                 </span>
                               </>
@@ -901,12 +904,12 @@ export function IssuesTab({
                       <>
                         <span>{i.due}</span>
                         <span
-                          title={NAMES[i.assignee as keyof typeof NAMES] ?? i.assignee}
+                          title={i.assigneeName ?? i.assignee}
                           className="grid size-7 place-items-center rounded-full border border-line bg-sunk text-[11px] font-semibold text-ink"
                         >
                           <span aria-hidden="true">{i.assignee}</span>
                           <span className="sr-only">
-                            Assigned to {NAMES[i.assignee as keyof typeof NAMES] ?? i.assignee}
+                            Assigned to {i.assigneeName ?? i.assignee}
                           </span>
                         </span>
                       </>

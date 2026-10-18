@@ -6,7 +6,7 @@ import { SeverityBadge, StatusBadge } from "@/components/badges";
 import { useEntrance } from "@/components/reveal";
 import { TrendChart } from "./trend-chart";
 import { SEV, SEVERITIES, band, type Severity } from "@/lib/severity";
-import { TREND, type Issue } from "@/lib/site-data";
+import type { Issue } from "@/lib/site-data";
 import { computeTrendSummary, type TrendPoint } from "@/lib/trend";
 import { gsap, useGSAP, MOTION_OK } from "@/lib/gsap";
 
@@ -44,10 +44,10 @@ export function OverviewTab({
   active,
   fixed = [],
   fixedCount,
-  trend = TREND,
+  trend = [],
   trendSummary,
   score,
-  scoreDelta = 6,
+  scoreDelta,
   diffSummary,
   severityCounts,
   coverage,
@@ -60,11 +60,13 @@ export function OverviewTab({
   const scope = useEntrance<HTMLDivElement>();
   const scoreRef = useRef<HTMLSpanElement>(null);
 
-  const effectiveScore = score ?? 78;
+  const hasScore = score !== null && score !== undefined;
+  const effectiveScore = score ?? 0;
   const currentBand = band(effectiveScore);
 
   // Count the score up on first view (GSAP animated).
   useGSAP(() => {
+    if (!scoreRef.current) return;
     const mm = gsap.matchMedia();
     mm.add(MOTION_OK, () => {
       gsap.fromTo(
@@ -96,29 +98,33 @@ export function OverviewTab({
     return b.occ - a.occ;
   });
 
-  const effectiveTrend = trend && trend.length > 0 ? trend : TREND;
-  const effectiveTrendSummary = trendSummary || computeTrendSummary(effectiveTrend);
+  const effectiveTrend = trend;
+  const effectiveTrendSummary =
+    trendSummary || (trend.length > 0 ? computeTrendSummary(trend) : "No completed scans yet.");
+  // Change between the two most recent finished scans, unless the caller supplied one.
+  const delta =
+    scoreDelta ?? (trend.length >= 2 ? trend[trend.length - 1]![1] - trend[trend.length - 2]![1] : null);
 
-  const newProblemsCount = diffSummary ? diffSummary.newCount : 3;
+  const newProblemsCount = diffSummary ? diffSummary.newCount : 0;
   const effectiveFixedCount = diffSummary ? diffSummary.fixedCount : (fixedCount ?? fixed.length);
   const regressedProblemsCount = diffSummary
     ? diffSummary.regressedCount
     : active.filter((i) => i.status === "regressed").length;
-  const sinceText = diffSummary?.sinceLabel ? `Since ${diffSummary.sinceLabel}` : "Since 12 Oct";
+  const sinceText = diffSummary?.sinceLabel ? `Since ${diffSummary.sinceLabel}` : "Since the last scan";
 
   const pagesCheckedText =
     coverage?.pagesScanned !== undefined
-      ? `${coverage.pagesScanned} of ${coverage.pagesPlanned ?? 150}`
-      : "142 of 150";
+      ? `${coverage.pagesScanned} of ${coverage.pagesPlanned ?? "—"}`
+      : "—";
   const templatesFoundText =
-    coverage?.templatesFound !== undefined ? `${coverage.templatesFound}` : "7";
+    coverage?.templatesFound !== undefined ? `${coverage.templatesFound}` : "—";
   const standardText = coverage?.standard
     ? coverage.standard === "wcag22aa"
       ? "WCAG 2.2 AA"
       : coverage.standard
     : "WCAG 2.2 AA";
-  const nextScanText = coverage?.nextScanFormatted || coverage?.nextScan || "Mon 19 Oct, 03:00 EAT";
-  const verificationText = verificationStatus || "Active (verified)";
+  const nextScanText = coverage?.nextScanFormatted || coverage?.nextScan || "Not scheduled";
+  const verificationText = verificationStatus || "—";
 
   const link = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -153,33 +159,39 @@ export function OverviewTab({
             >
               This score reflects only what automated tests can detect on the checked pages — usually
               around a third of accessibility problems. It is not a compliance rating.{" "}
-              <a href="#">What automated tests can&apos;t check</a>
+              <a href="/fix" className="underline">What automated tests can&apos;t check</a>
             </div>
           )}
           <div className="flex items-baseline gap-3">
-            <span ref={scoreRef} className="tnum text-[40px] leading-[44px] font-bold tracking-[-0.02em]">
-              {effectiveScore}
-            </span>
-            <span className="text-base text-muted">/ 100</span>
-            <span
-              className={`rounded px-2 py-0.5 text-sm leading-5 font-semibold ${currentBand.bg} ${currentBand.text}`}
-            >
-              {currentBand.label}
-            </span>
+            {hasScore ? (
+              <>
+                <span ref={scoreRef} className="tnum text-[40px] leading-[44px] font-bold tracking-[-0.02em]">
+                  {effectiveScore}
+                </span>
+                <span className="text-base text-muted">/ 100</span>
+                <span
+                  className={`rounded px-2 py-0.5 text-sm leading-5 font-semibold ${currentBand.bg} ${currentBand.text}`}
+                >
+                  {currentBand.label}
+                </span>
+              </>
+            ) : (
+              <span className="text-base text-muted">No score yet — run a scan to see results.</span>
+            )}
           </div>
-          {scoreDelta > 0 && (
+          {delta !== null && delta > 0 && (
             <span className="inline-flex items-center gap-1 text-sm leading-5 font-medium text-ok">
               <Icon d={I.arrowUpRight} strokeWidth={2} />
-              Up {scoreDelta} since last scan
+              Up {delta} since last scan
             </span>
           )}
-          {scoreDelta < 0 && (
+          {delta !== null && delta < 0 && (
             <span className="inline-flex items-center gap-1 text-sm leading-5 font-medium text-crit">
               <Icon d={I.arrowDownRight ?? I.regressed} strokeWidth={2} />
-              Down {Math.abs(scoreDelta)} since last scan
+              Down {Math.abs(delta)} since last scan
             </span>
           )}
-          {scoreDelta === 0 && (
+          {delta === 0 && (
             <span className="inline-flex items-center gap-1 text-sm leading-5 font-medium text-muted">
               No score change since last scan
             </span>
@@ -244,7 +256,11 @@ export function OverviewTab({
             {chartTable ? "View as chart" : "View as table"}
           </button>
         </div>
-        {!chartTable ? (
+        {effectiveTrend.length === 0 ? (
+          <p className="m-0 rounded-lg border border-dashed border-line-strong px-4 py-8 text-center text-sm text-muted">
+            The trend appears after the first completed scan.
+          </p>
+        ) : !chartTable ? (
           <>
             <div className="min-h-[120px] w-full sm:min-h-[200px]">
               <TrendChart trend={effectiveTrend} />
@@ -304,13 +320,15 @@ export function OverviewTab({
             See all issues
           </a>
         </div>
+        {ranked.length === 0 && (
+          <p className="m-0 border-t border-line px-6 py-5 text-sm text-muted">No open problems found.</p>
+        )}
         <ul className="m-0 list-none p-0">
           {ranked.slice(0, 5).map((i) => (
             <li key={i.id} className="border-t border-line">
               <button
                 type="button"
                 onClick={() => onOpen(i.id)}
-                aria-label={`${SEV[i.sev].label}: ${i.title}, ${i.template}. Open details`}
                 className="ease-ui grid w-full grid-cols-[auto_minmax(0,1fr)] items-center gap-x-4 gap-y-2 border-0 bg-transparent px-4 py-3.5 text-left text-ink hover:bg-subtle sm:px-6 md:grid-cols-[120px_minmax(0,1fr)_auto_auto]"
               >
                 <SeverityBadge sev={i.sev} />
@@ -337,6 +355,7 @@ export function OverviewTab({
           <h2 id="h-fixed" className="m-0 text-xl leading-7 font-semibold">
             Recently fixed
           </h2>
+          {fixed.length === 0 && <p className="m-0 text-sm text-muted">Nothing fixed yet.</p>}
           <ul className="m-0 flex list-none flex-col p-0">
             {fixed.slice(0, 5).map(([title, date]) => (
               <li key={title + date} className="flex items-start gap-2.5 border-b border-line py-2.5 text-sm leading-5">
@@ -367,7 +386,7 @@ export function OverviewTab({
           </dl>
           <p className="mt-1 mb-0 text-sm leading-5 text-pretty text-muted">
             Automated tests can&apos;t judge keyboard flow, screen reader experience or whether alt
-            text makes sense. <a href="#">Log a manual check</a>
+            text makes sense, so check those by hand.
           </p>
         </section>
       </div>

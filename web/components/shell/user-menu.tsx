@@ -5,11 +5,14 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Icon, I } from "@/components/icons";
 import { useToast } from "./toast-context";
+import { authClient } from "@/lib/auth-client";
+import { resetCurrentUser, useCurrentUser } from "@/lib/use-current-user";
 
 export function UserMenu() {
   const [open, setOpen] = useState(false);
   const router = useRouter();
   const { showToast } = useToast();
+  const user = useCurrentUser();
   const menuRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
 
@@ -38,12 +41,11 @@ export function UserMenu() {
     setOpen(false);
     showToast("Signing out...");
     try {
-      if (typeof window !== "undefined") {
-        localStorage.removeItem("auth_token");
-      }
+      await authClient.signOut();
     } catch {
-      // ignore
+      // The session may already be gone; continue to the sign-in page.
     }
+    resetCurrentUser();
     router.push("/sign-in");
   };
 
@@ -55,10 +57,10 @@ export function UserMenu() {
         onClick={() => setOpen((prev) => !prev)}
         aria-expanded={open}
         aria-haspopup="true"
-        aria-label="Account menu for Daniel Mwangi"
         className="ease-ui flex size-9 items-center justify-center rounded-full border border-line bg-surface text-ink hover:border-line-strong focus-visible:outline-2 focus-visible:outline-primary"
       >
-        <span className="text-xs font-bold">DM</span>
+        <span aria-hidden="true" className="text-xs font-bold">{user.initials}</span>
+        <span className="sr-only">Account menu for {user.name}</span>
       </button>
 
       {open && (
@@ -70,11 +72,11 @@ export function UserMenu() {
           {/* User profile header */}
           <div className="flex items-center gap-3 px-3 py-2.5">
             <span className="grid size-9 place-items-center rounded-full border border-line bg-sunk text-xs font-bold">
-              DM
+              {user.initials}
             </span>
             <div className="flex min-w-0 flex-1 flex-col">
-              <span className="truncate text-sm font-semibold">Daniel Mwangi</span>
-              <span className="truncate text-xs text-muted">daniel@brightline.studio</span>
+              <span className="truncate text-sm font-semibold">{user.name}</span>
+              <span className="truncate text-xs text-muted">{user.email}</span>
             </div>
           </div>
 

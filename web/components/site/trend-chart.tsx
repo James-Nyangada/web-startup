@@ -1,7 +1,6 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { TREND } from "@/lib/site-data";
 import { band } from "@/lib/severity";
 import { gsap, useGSAP, MOTION_OK } from "@/lib/gsap";
 
@@ -28,13 +27,13 @@ export interface TrendChartProps {
  * and a visually hidden <table> alternative for screen reader users.
  */
 export function TrendChart({
-  trend = TREND,
+  trend = [],
   ariaLabel = "Score by scan date. Each point is focusable.",
 }: TrendChartProps) {
   const [hover, setHover] = useState<number | null>(null);
   const scope = useRef<SVGSVGElement>(null);
 
-  const points = trend && trend.length > 0 ? trend : TREND;
+  const points = trend;
   const n = points.length;
   const x = (i: number) => (n <= 1 ? L + pw / 2 : L + (i * pw) / (n - 1));
 

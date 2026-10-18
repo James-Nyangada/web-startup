@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { Icon, I } from "@/components/icons";
 import { useFocusTrap } from "@/components/use-focus-trap";
 import { IGNORE_REASONS } from "@/lib/site-data";
+import { IGNORE_REASON_VALUE } from "@/lib/app-api";
 import { gsap, useGSAP, MOTION, prefersReducedMotion } from "@/lib/gsap";
 
 /** Ignore dialog (S-26). Focus starts on the first radio; note is required for the last two reasons. */
@@ -31,7 +32,7 @@ export function IgnoreDialog({ onCancel, onConfirm }: { onCancel: () => void; on
       setNoteError(true);
       return;
     }
-    onConfirm(IGNORE_REASONS[reason].toLowerCase(), note.trim() || undefined);
+    onConfirm(IGNORE_REASON_VALUE[IGNORE_REASONS[reason]]!, note.trim() || undefined);
   };
 
   return (

@@ -12,13 +12,14 @@ import { CommandPalette } from "./shell/command-palette";
 import { OrgSwitcher } from "./shell/org-switcher";
 import { UserMenu } from "./shell/user-menu";
 import { NotificationsBell } from "./shell/notifications-bell";
+import { useCurrentUser } from "@/lib/use-current-user";
 
 export type NavKey = "overview" | "sites" | "tasks" | "reports" | "settings";
 
 const NAV_ITEMS: { key: NavKey; label: string; href: string; icon: string; count?: number }[] = [
   { key: "overview", label: "Overview", href: "/overview", icon: I.layout },
   { key: "sites", label: "Sites", href: "/sites", icon: I.globe },
-  { key: "tasks", label: "My tasks", href: "/tasks", icon: I.check, count: 4 },
+  { key: "tasks", label: "My tasks", href: "/tasks", icon: I.check },
   { key: "reports", label: "Reports", href: "/reports", icon: I.fileText },
 ];
 
@@ -31,6 +32,7 @@ function SidebarContent({
   collapsed?: boolean;
   onNavigate?: () => void;
 }) {
+  const user = useCurrentUser();
   const item = (key: NavKey, label: string, href: string, icon: string, count?: number) => {
     const on = key === active;
     return (
@@ -96,11 +98,11 @@ function SidebarContent({
             className="flex items-center gap-3 rounded-2xl border border-transparent p-2 text-left text-ink hover:bg-surface no-underline"
           >
             <span className="grid size-8 place-items-center rounded-full border border-line bg-sunk text-xs font-semibold flex-none">
-              DM
+              {user.initials}
             </span>
             <div className="flex flex-col min-w-0 flex-1">
-              <span className="text-sm leading-5 font-medium truncate">Daniel Mwangi</span>
-              <span className="text-xs leading-4 text-muted truncate">Owner</span>
+              <span className="text-sm leading-5 font-medium truncate">{user.name}</span>
+              <span className="text-xs leading-4 text-muted truncate">{user.role}</span>
             </div>
           </Link>
         </div>
@@ -211,6 +213,18 @@ export function AppShell({ active, crumbs = [], banners, children }: AppShellPro
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
+
+  // S-81: Ctrl+K / Cmd+K opens (or closes) the command palette from anywhere.
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        setCommandPaletteOpen((open) => !open);
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, []);
   const hamburgerRef = useRef<HTMLButtonElement>(null);
 
   const handleCloseDrawer = () => {
@@ -309,7 +323,7 @@ export function AppShell({ active, crumbs = [], banners, children }: AppShellPro
             <button
               type="button"
               onClick={() => setCommandPaletteOpen(true)}
-              aria-label="Search or jump to command palette (Press Ctrl+K or Cmd+K)"
+              aria-keyshortcuts="Control+K Meta+K"
               className="ease-ui flex h-9 items-center gap-2 sm:gap-3 rounded-full border border-line bg-surface px-3 text-sm text-muted hover:border-line-strong hover:text-ink md:min-w-[220px] lg:min-w-[260px] md:pr-2 focus-visible:outline-2 focus-visible:outline-primary"
             >
               <Icon d={I.search} size={16} />
