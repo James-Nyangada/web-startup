@@ -66,19 +66,22 @@ export const I = {
 
 export function Icon({
   d,
+  name,
   size = 16,
   strokeWidth = 1.5,
   className,
   style,
   stroke = "currentColor",
 }: {
-  d: string;
+  d?: string;
+  name?: keyof typeof I;
   size?: number;
   strokeWidth?: number;
   className?: string;
   style?: React.CSSProperties;
   stroke?: string;
 }) {
+  const pathData = d || (name ? I[name] : "");
   return (
     <svg
       width={size}
@@ -93,7 +96,7 @@ export function Icon({
       className={className}
       style={style}
     >
-      <path d={d} />
+      <path d={pathData} />
     </svg>
   );
 }

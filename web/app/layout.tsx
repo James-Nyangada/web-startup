@@ -23,10 +23,42 @@ const mono = JetBrains_Mono({
   display: "swap",
 });
 
+const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://plainsight.io";
+
 export const metadata: Metadata = {
-  title: { default: "Plainsight — accessibility monitoring for online stores", template: "%s · Plainsight" },
+  metadataBase: new URL(baseUrl),
+  title: { default: "Plainsight — Accessibility monitoring for online stores", template: "%s · Plainsight" },
   description:
-    "Weekly accessibility checks for Shopify and WordPress sites, plain-language fix guides, and a record of your progress.",
+    "Weekly accessibility checks for Shopify and WordPress sites, plain-language fix guides, and a verifiable record of your compliance progress.",
+  keywords: [
+    "accessibility",
+    "WCAG 2.2",
+    "Shopify accessibility",
+    "WordPress accessibility",
+    "European Accessibility Act",
+    "ADA compliance",
+    "accessibility monitoring",
+  ],
+  authors: [{ name: "Plainsight" }],
+  openGraph: {
+    type: "website",
+    locale: "en_US",
+    url: baseUrl,
+    siteName: "Plainsight",
+    title: "Plainsight — Accessibility monitoring for online stores",
+    description:
+      "Weekly accessibility checks for Shopify and WordPress sites, plain-language fix guides, and a verifiable record of your compliance progress.",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Plainsight — Accessibility monitoring for online stores",
+    description:
+      "Weekly accessibility checks for Shopify and WordPress sites, plain-language fix guides, and a verifiable record of your compliance progress.",
+  },
+  robots: {
+    index: true,
+    follow: true,
+  },
 };
 
 export const viewport: Viewport = {
@@ -48,6 +80,14 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     >
       <head>
         <script dangerouslySetInnerHTML={{ __html: bootScript }} />
+        {process.env.NEXT_PUBLIC_UMAMI_WEBSITE_ID && (
+          <script
+            defer
+            src={process.env.NEXT_PUBLIC_UMAMI_SRC || "https://cloud.umami.is/script.js"}
+            data-website-id={process.env.NEXT_PUBLIC_UMAMI_WEBSITE_ID}
+            data-do-not-track="true"
+          />
+        )}
       </head>
       <body>
         <ThemeProvider>{children}</ThemeProvider>

@@ -1,7 +1,9 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
-import { MarketingHeader } from "./marketing-header";
+import { MarketingHeader } from "@/components/marketing/marketing-header";
+import { MarketingFooter } from "@/components/marketing/marketing-footer";
 import { FreeCheck } from "./free-check";
 import { Collapse } from "@/components/disclosure";
 import { useReveal } from "@/components/reveal";
@@ -24,10 +26,10 @@ export function HomePage() {
   const scope = useReveal<HTMLDivElement>();
 
   return (
-    <div ref={scope} className="min-h-screen bg-page text-ink">
+    <div ref={scope} className="min-h-screen bg-page text-ink flex flex-col justify-between">
       <MarketingHeader />
 
-      <main>
+      <main id="main-content" tabIndex={-1} className="outline-none flex-1">
         <FreeCheck />
 
         <section aria-labelledby="facts-h" className="border-y border-line bg-subtle">
@@ -74,9 +76,9 @@ export function HomePage() {
                 <li>Monthly reports with your logo and colours</li>
                 <li>A calm client portal — no rule IDs, no jargon</li>
               </ul>
-              <a href="#pricing" className="font-semibold">
-                See agency plans
-              </a>
+              <Link href="/agencies" className="font-semibold text-primary hover:text-primary-hover no-underline">
+                See agency plans →
+              </Link>
             </div>
             <div data-reveal>
               <Placeholder label="screenshot: agency overview + branded report" className="aspect-[16/10] rounded-xl" />
@@ -139,12 +141,20 @@ export function HomePage() {
                   <span className="text-muted"> / month</span>
                 </span>
                 <span className="text-sm text-muted">{p.who}</span>
+                <div className="mt-4 pt-3 border-t border-line">
+                  <Link
+                    href="/sign-up"
+                    className="ease-ui flex h-9 items-center justify-center rounded-lg bg-surface border border-line text-sm font-semibold text-ink no-underline hover:border-primary hover:text-primary"
+                  >
+                    Start 14-day trial
+                  </Link>
+                </div>
               </div>
             ))}
           </div>
-          <a href="#" className="font-semibold">
-            Compare all features
-          </a>
+          <Link href="/pricing" className="font-semibold text-primary hover:text-primary-hover no-underline">
+            Compare all features and limits →
+          </Link>
         </section>
 
         <section aria-labelledby="faq-h" className="border-t border-line">
@@ -179,15 +189,7 @@ export function HomePage() {
         </section>
       </main>
 
-      <footer className="border-t border-line bg-subtle">
-        <div className="mx-auto flex max-w-[1280px] flex-wrap gap-x-8 gap-y-4 px-4 py-8 text-sm text-muted sm:px-8">
-          <span className="flex-1">© 2026 Plainsight (working name)</span>
-          <a href="#">Terms</a>
-          <a href="#">Privacy</a>
-          <a href="#">Our bot</a>
-          <a href="#">Accessibility statement</a>
-        </div>
-      </footer>
+      <MarketingFooter />
     </div>
   );
 }

@@ -1,0 +1,113 @@
+import type { Metadata } from "next";
+
+export const metadata: Metadata = {
+  title: "Subprocessors Registry",
+  description: "Official list of third-party subprocessors authorized to process data on behalf of Plainsight.",
+};
+
+const SUBPROCESSORS = [
+  {
+    name: "Cloudflare, Inc.",
+    entity: "Cloudflare, Inc. (USA / EU)",
+    service: "Cloudflare Turnstile, CDN, R2 Object Storage",
+    location: "Global / European Union edge",
+    transfer: "Standard Contractual Clauses (SCCs), EU-US Data Privacy Framework",
+    purpose: "Privacy-preserving bot protection (no captcha cookies) and secure encrypted artifact storage for reports and scan data.",
+  },
+  {
+    name: "Paddle.com Market Ltd.",
+    entity: "Paddle.com Market Ltd. (United Kingdom)",
+    service: "Merchant of Record, Billing & Invoicing",
+    location: "United Kingdom",
+    transfer: "UK Adequacy Regulations / EU Adequacy Decision",
+    purpose: "Customer billing, credit card processing, VAT/sales tax compliance, and automated invoicing.",
+  },
+  {
+    name: "Hetzner Online GmbH",
+    entity: "Hetzner Online GmbH (Germany)",
+    service: "Dedicated Cloud Compute & PostgreSQL 16 Hosting",
+    location: "Falkenstein / Nuremberg, Germany (EU)",
+    transfer: "Intra-EU data processing (GDPR direct)",
+    purpose: "Primary database storage, scan runner workers, and core API application execution.",
+  },
+  {
+    name: "Resend, Inc.",
+    entity: "Resend, Inc. (USA)",
+    service: "Transactional Email Infrastructure",
+    location: "United States",
+    transfer: "Standard Contractual Clauses (SCCs), EU-US Data Privacy Framework",
+    purpose: "Sending regression alert notifications, team invitation links, magic login emails, and PDF report deliveries.",
+  },
+  {
+    name: "Functional Software, Inc. (Sentry)",
+    entity: "Functional Software, Inc. (USA)",
+    service: "Error Monitoring & Diagnostics",
+    location: "United States",
+    transfer: "Standard Contractual Clauses (SCCs), EU-US Data Privacy Framework",
+    purpose: "Crash reporting and runtime error diagnostics. Configured with PII data scrubbers.",
+  },
+  {
+    name: "Google LLC (Optional)",
+    entity: "Google LLC (USA)",
+    service: "Gemini API (AI Fix Suggestions)",
+    location: "United States",
+    transfer: "Standard Contractual Clauses (SCCs), EU-US Data Privacy Framework",
+    purpose: "Optional on-demand AI remediation suggestions. Code snippets are scrubbed of phone numbers and email addresses prior to transmission.",
+  },
+];
+
+export default function SubprocessorsPage() {
+  return (
+    <div className="prose prose-slate max-w-none text-ink">
+      <div className="border-b border-line pb-6 mb-8">
+        <span className="text-xs font-bold tracking-wider uppercase text-primary">Plainsight Legal</span>
+        <h1 className="mt-2 font-serif text-3xl sm:text-4xl font-normal text-ink">Subprocessors Registry</h1>
+        <p className="mt-2 text-sm text-muted">
+          Current list of authorized third-party service providers · Last updated: October 18, 2026
+        </p>
+      </div>
+
+      <div className="flex flex-col gap-6 text-sm leading-relaxed text-ink/90">
+        <p>
+          To deliver our continuous accessibility monitoring service, Plainsight engages third-party service providers (&quot;subprocessors&quot;) to perform technical, infrastructure, and payment processing functions. Prior to engaging any subprocessor, Plainsight conducts due diligence to evaluate their security posture, confidentiality obligations, and data protection compliance.
+        </p>
+
+        <div className="overflow-x-auto rounded-xl border border-line">
+          <table className="w-full text-left text-xs border-collapse">
+            <thead>
+              <tr className="border-b border-line bg-subtle">
+                <th className="p-3 font-semibold text-ink">Subprocessor</th>
+                <th className="p-3 font-semibold text-ink">Service &amp; Purpose</th>
+                <th className="p-3 font-semibold text-ink">Location</th>
+                <th className="p-3 font-semibold text-ink">Transfer Mechanism</th>
+              </tr>
+            </thead>
+            <tbody>
+              {SUBPROCESSORS.map((s, idx) => (
+                <tr key={s.name} className={idx < SUBPROCESSORS.length - 1 ? "border-b border-line" : ""}>
+                  <td className="p-3 font-semibold align-top whitespace-nowrap text-ink">
+                    {s.name}
+                    <div className="text-[11px] font-normal text-muted">{s.entity}</div>
+                  </td>
+                  <td className="p-3 align-top">
+                    <strong className="text-ink">{s.service}</strong>
+                    <div className="text-muted mt-0.5">{s.purpose}</div>
+                  </td>
+                  <td className="p-3 align-top whitespace-nowrap text-muted">{s.location}</td>
+                  <td className="p-3 align-top text-muted">{s.transfer}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        <section className="mt-4 rounded-xl border border-line bg-subtle p-5">
+          <h2 className="text-base font-bold text-ink mb-2">Notification of New Subprocessors</h2>
+          <p className="mb-0 text-muted">
+            Customers with an active Data Processing Agreement can subscribe to notifications of new subprocessor additions by emailing <a href="mailto:privacy@plainsight.io" className="text-primary hover:underline">privacy@plainsight.io</a>. We provide at least 30 days notice prior to authorizing any new subprocessor.
+          </p>
+        </section>
+      </div>
+    </div>
+  );
+}
