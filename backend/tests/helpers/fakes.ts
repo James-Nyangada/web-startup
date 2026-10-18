@@ -108,6 +108,8 @@ export function fakeRepos() {
       getSeverityCounts: vi.fn().mockResolvedValue({ critical: 0, serious: 0, moderate: 0, minor: 0 }),
       getDiffSummary: vi.fn().mockResolvedValue({ newCount: 0, fixedCount: 0, regressedCount: 0, sinceDate: null }),
       listRecentlyFixed: vi.fn().mockResolvedValue([]),
+      listTemplatesBySite: vi.fn().mockResolvedValue([]),
+      listCrossSite: vi.fn().mockResolvedValue([]),
     },
   } as unknown as Repositories;
   return { repos, join };

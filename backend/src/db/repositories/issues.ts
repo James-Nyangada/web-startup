@@ -1,4 +1,4 @@
-import { and, desc, eq, inArray, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, ilike, inArray, isNull, or, sql } from 'drizzle-orm';
 import type { Database } from '../client.js';
 import type { PreviousIssue, ScanDiff } from '../../scanner/results/diff.js';
 import type { FoundIssue } from '../../scanner/results/issues.js';
@@ -9,19 +9,26 @@ import {
   pages,
   rules,
   scans,
+  users,
   type Impact,
   type IssueStatus,
 } from '../schema/index.js';
 import type { OrgId } from './org-scope.js';
 
 export interface IssueListFilters {
-  status?: IssueStatus;
-  impact?: Impact;
+  status?: IssueStatus | IssueStatus[];
+  impact?: Impact | Impact[];
+  wcag?: string;
   templateKey?: string;
   ruleId?: string;
+  assigneeId?: string | null;
   isRegression?: boolean;
   needsReview?: boolean;
+  search?: string;
 }
+
+export type IssueSortField = 'impact' | 'occurrences' | 'firstSeen' | 'lastSeen' | 'createdAt';
+export type IssueSortOrder = 'asc' | 'desc';
 
 export function issuesRepository(db: Database) {
   return {
@@ -364,49 +371,340 @@ export function issuesRepository(db: Database) {
       orgId: OrgId,
       siteId: string,
       filters: IssueListFilters = {},
-      limit = 50,
-      offset = 0,
+      optionsOrLimit:
+        | {
+            limit?: number;
+            offset?: number;
+            sort?: IssueSortField;
+            order?: IssueSortOrder;
+          }
+        | number = 50,
+      legacyOffset = 0,
     ) {
+      let limit = 50;
+      let offset = 0;
+      let sortField: IssueSortField = 'impact';
+      let sortOrder: IssueSortOrder = 'desc';
+
+      if (typeof optionsOrLimit === 'number') {
+        limit = optionsOrLimit;
+        offset = legacyOffset;
+      } else if (optionsOrLimit && typeof optionsOrLimit === 'object') {
+        limit = optionsOrLimit.limit ?? 50;
+        offset = optionsOrLimit.offset ?? 0;
+        sortField = optionsOrLimit.sort ?? 'impact';
+        sortOrder = optionsOrLimit.order ?? 'desc';
+      }
+
+      limit = Math.min(200, Math.max(1, limit));
+      offset = Math.max(0, offset);
+
       const conditions = [eq(issues.orgId, orgId), eq(issues.siteId, siteId)];
 
-      if (filters.status) conditions.push(eq(issues.status, filters.status));
-      if (filters.impact) conditions.push(eq(issues.impact, filters.impact));
-      if (filters.templateKey) conditions.push(eq(issues.templateKey, filters.templateKey));
-      if (filters.ruleId) conditions.push(eq(issues.ruleId, filters.ruleId));
+      if (filters.status) {
+        if (Array.isArray(filters.status)) {
+          if (filters.status.length > 0) {
+            conditions.push(inArray(issues.status, filters.status));
+          }
+        } else {
+          conditions.push(eq(issues.status, filters.status));
+        }
+      }
+
+      if (filters.impact) {
+        if (Array.isArray(filters.impact)) {
+          if (filters.impact.length > 0) {
+            conditions.push(inArray(issues.impact, filters.impact));
+          }
+        } else {
+          conditions.push(eq(issues.impact, filters.impact));
+        }
+      }
+
+      if (filters.templateKey) {
+        conditions.push(eq(issues.templateKey, filters.templateKey));
+      }
+
+      if (filters.ruleId) {
+        conditions.push(eq(issues.ruleId, filters.ruleId));
+      }
+
       if (filters.isRegression !== undefined) {
         conditions.push(eq(issues.isRegression, filters.isRegression));
       }
+
       if (filters.needsReview !== undefined) {
         conditions.push(eq(issues.needsReview, filters.needsReview));
       }
 
-      return db
-        .select()
+      if (filters.assigneeId !== undefined) {
+        if (filters.assigneeId === null || filters.assigneeId === 'unassigned') {
+          conditions.push(isNull(issues.assigneeId));
+        } else {
+          conditions.push(eq(issues.assigneeId, filters.assigneeId));
+        }
+      }
+
+      if (filters.wcag) {
+        conditions.push(sql`${filters.wcag} = any(${issues.wcagCriteria})`);
+      }
+
+      if (filters.search && filters.search.trim()) {
+        const query = `%${filters.search.trim()}%`;
+        const searchCondition = or(
+          ilike(rules.title, query),
+          ilike(issues.ruleId, query),
+          ilike(issues.templateKey, query),
+          ilike(issues.selector, query),
+        );
+        if (searchCondition) {
+          conditions.push(searchCondition);
+        }
+      }
+
+      const orderExpr = [];
+      const isAsc = sortOrder === 'asc';
+
+      if (sortField === 'impact') {
+        const impactSql = sql`
+          CASE ${issues.impact}
+            WHEN 'critical' THEN 4
+            WHEN 'serious' THEN 3
+            WHEN 'moderate' THEN 2
+            WHEN 'minor' THEN 1
+            ELSE 0
+          END
+        `;
+        orderExpr.push(isAsc ? asc(impactSql) : desc(impactSql));
+        orderExpr.push(desc(issues.occurrenceCount));
+      } else if (sortField === 'occurrences') {
+        orderExpr.push(isAsc ? asc(issues.occurrenceCount) : desc(issues.occurrenceCount));
+      } else if (sortField === 'firstSeen' || sortField === 'createdAt') {
+        orderExpr.push(isAsc ? asc(issues.createdAt) : desc(issues.createdAt));
+      } else if (sortField === 'lastSeen') {
+        orderExpr.push(isAsc ? asc(issues.updatedAt) : desc(issues.updatedAt));
+      } else {
+        orderExpr.push(desc(issues.occurrenceCount));
+      }
+      orderExpr.push(issues.id);
+
+      const rows = await db
+        .select({
+          id: issues.id,
+          orgId: issues.orgId,
+          siteId: issues.siteId,
+          fingerprint: issues.fingerprint,
+          ruleId: issues.ruleId,
+          title: rules.title,
+          description: rules.description,
+          impact: issues.impact,
+          wcagCriteria: issues.wcagCriteria,
+          wcagLevel: issues.wcagLevel,
+          templateKey: issues.templateKey,
+          selector: issues.selector,
+          htmlSnippet: issues.htmlSnippet,
+          failureSummary: issues.failureSummary,
+          status: issues.status,
+          ignoredReason: issues.ignoredReason,
+          ignoredNote: issues.ignoredNote,
+          isRegression: issues.isRegression,
+          regressionCount: issues.regressionCount,
+          occurrenceCount: issues.occurrenceCount,
+          assigneeId: issues.assigneeId,
+          assigneeName: users.name,
+          dueDate: issues.dueDate,
+          needsReview: issues.needsReview,
+          firstSeenScanId: issues.firstSeenScanId,
+          lastSeenScanId: issues.lastSeenScanId,
+          fixedScanId: issues.fixedScanId,
+          fixedAt: issues.fixedAt,
+          createdAt: issues.createdAt,
+          updatedAt: issues.updatedAt,
+        })
         .from(issues)
+        .leftJoin(rules, eq(issues.ruleId, rules.ruleId))
+        .leftJoin(users, eq(issues.assigneeId, users.id))
         .where(and(...conditions))
-        .orderBy(desc(issues.occurrenceCount), issues.fingerprint)
+        .orderBy(...orderExpr)
         .limit(limit)
         .offset(offset);
+
+      return rows.map((r) => ({
+        ...r,
+        title: r.title ?? r.ruleId,
+      }));
     },
 
     async countBySite(orgId: OrgId, siteId: string, filters: IssueListFilters = {}) {
       const conditions = [eq(issues.orgId, orgId), eq(issues.siteId, siteId)];
-      if (filters.status) conditions.push(eq(issues.status, filters.status));
-      if (filters.impact) conditions.push(eq(issues.impact, filters.impact));
 
-      const [row] = await db
+      if (filters.status) {
+        if (Array.isArray(filters.status)) {
+          if (filters.status.length > 0) {
+            conditions.push(inArray(issues.status, filters.status));
+          }
+        } else {
+          conditions.push(eq(issues.status, filters.status));
+        }
+      }
+
+      if (filters.impact) {
+        if (Array.isArray(filters.impact)) {
+          if (filters.impact.length > 0) {
+            conditions.push(inArray(issues.impact, filters.impact));
+          }
+        } else {
+          conditions.push(eq(issues.impact, filters.impact));
+        }
+      }
+
+      if (filters.templateKey) {
+        conditions.push(eq(issues.templateKey, filters.templateKey));
+      }
+
+      if (filters.ruleId) {
+        conditions.push(eq(issues.ruleId, filters.ruleId));
+      }
+
+      if (filters.isRegression !== undefined) {
+        conditions.push(eq(issues.isRegression, filters.isRegression));
+      }
+
+      if (filters.needsReview !== undefined) {
+        conditions.push(eq(issues.needsReview, filters.needsReview));
+      }
+
+      if (filters.assigneeId !== undefined) {
+        if (filters.assigneeId === null || filters.assigneeId === 'unassigned') {
+          conditions.push(isNull(issues.assigneeId));
+        } else {
+          conditions.push(eq(issues.assigneeId, filters.assigneeId));
+        }
+      }
+
+      if (filters.wcag) {
+        conditions.push(sql`${filters.wcag} = any(${issues.wcagCriteria})`);
+      }
+
+      let query = db
         .select({ count: sql<number>`count(*)::int` })
-        .from(issues)
-        .where(and(...conditions));
+        .from(issues);
+
+      if (filters.search && filters.search.trim()) {
+        const q = `%${filters.search.trim()}%`;
+        const searchCondition = or(
+          ilike(rules.title, q),
+          ilike(issues.ruleId, q),
+          ilike(issues.templateKey, q),
+          ilike(issues.selector, q),
+        );
+        if (searchCondition) {
+          conditions.push(searchCondition);
+        }
+        query = query.leftJoin(rules, eq(issues.ruleId, rules.ruleId)) as never;
+      }
+
+      const [row] = await query.where(and(...conditions));
       return row?.count ?? 0;
+    },
+
+    async listTemplatesBySite(orgId: OrgId, siteId: string) {
+      const rows = await db
+        .select({
+          templateKey: issues.templateKey,
+          count: sql<number>`count(*)::int`,
+        })
+        .from(issues)
+        .where(and(eq(issues.orgId, orgId), eq(issues.siteId, siteId)))
+        .groupBy(issues.templateKey)
+        .orderBy(desc(sql`count(*)`));
+      return rows;
+    },
+
+    async listCrossSite(
+      orgId: OrgId,
+      filters: IssueListFilters & { siteId?: string } = {},
+      options: { limit?: number; offset?: number; sort?: IssueSortField; order?: IssueSortOrder } = {},
+    ) {
+      const limit = Math.min(200, Math.max(1, options.limit ?? 50));
+      const offset = Math.max(0, options.offset ?? 0);
+      const conditions = [eq(issues.orgId, orgId)];
+      if (filters.siteId) conditions.push(eq(issues.siteId, filters.siteId));
+      if (filters.assigneeId) conditions.push(eq(issues.assigneeId, filters.assigneeId));
+      if (filters.status) {
+        if (Array.isArray(filters.status)) {
+          if (filters.status.length > 0) conditions.push(inArray(issues.status, filters.status));
+        } else {
+          conditions.push(eq(issues.status, filters.status));
+        }
+      }
+
+      return db
+        .select({
+          id: issues.id,
+          siteId: issues.siteId,
+          ruleId: issues.ruleId,
+          title: rules.title,
+          impact: issues.impact,
+          templateKey: issues.templateKey,
+          status: issues.status,
+          occurrenceCount: issues.occurrenceCount,
+          assigneeId: issues.assigneeId,
+          dueDate: issues.dueDate,
+          createdAt: issues.createdAt,
+          updatedAt: issues.updatedAt,
+        })
+        .from(issues)
+        .leftJoin(rules, eq(issues.ruleId, rules.ruleId))
+        .where(and(...conditions))
+        .orderBy(desc(issues.updatedAt))
+        .limit(limit)
+        .offset(offset);
     },
 
     async findById(orgId: OrgId, issueId: string) {
       const [row] = await db
-        .select()
+        .select({
+          id: issues.id,
+          orgId: issues.orgId,
+          siteId: issues.siteId,
+          fingerprint: issues.fingerprint,
+          ruleId: issues.ruleId,
+          title: rules.title,
+          description: rules.description,
+          whoIsAffected: rules.whoIsAffected,
+          helpUrl: rules.helpUrl,
+          impact: issues.impact,
+          wcagCriteria: issues.wcagCriteria,
+          wcagLevel: issues.wcagLevel,
+          templateKey: issues.templateKey,
+          selector: issues.selector,
+          htmlSnippet: issues.htmlSnippet,
+          failureSummary: issues.failureSummary,
+          status: issues.status,
+          ignoredReason: issues.ignoredReason,
+          ignoredNote: issues.ignoredNote,
+          ignoredBy: issues.ignoredBy,
+          ignoredAt: issues.ignoredAt,
+          isRegression: issues.isRegression,
+          regressionCount: issues.regressionCount,
+          occurrenceCount: issues.occurrenceCount,
+          assigneeId: issues.assigneeId,
+          assigneeName: users.name,
+          dueDate: issues.dueDate,
+          needsReview: issues.needsReview,
+          firstSeenScanId: issues.firstSeenScanId,
+          lastSeenScanId: issues.lastSeenScanId,
+          fixedScanId: issues.fixedScanId,
+          fixedAt: issues.fixedAt,
+          createdAt: issues.createdAt,
+          updatedAt: issues.updatedAt,
+        })
         .from(issues)
+        .leftJoin(rules, eq(issues.ruleId, rules.ruleId))
+        .leftJoin(users, eq(issues.assigneeId, users.id))
         .where(and(eq(issues.orgId, orgId), eq(issues.id, issueId)));
-      return row ?? null;
+      return row ? { ...row, title: row.title ?? row.ruleId } : null;
     },
 
     /**

@@ -8,6 +8,7 @@ import { requireAuth } from '../middleware/auth.js';
 import { requireOrgRole, resolveOrgContext } from '../middleware/org.js';
 import { orgSitesRouter } from './sites.js';
 import { orgScansRouter, type ScansRouterOptions } from './scans.js';
+import { orgIssuesRouter } from './issues.js';
 import { ErrorCode } from '../shared/errors.js';
 
 const createOrgSchema = z.object({
@@ -460,6 +461,9 @@ export function orgsRouter(
 
   // Mount Section 7.4 Scans router under orgScoped
   orgScoped.use(orgScansRouter(repos, scansOptions));
+
+  // Mount Section 7.5 Issues router under orgScoped
+  orgScoped.use(orgIssuesRouter(repos));
 
   router.use('/:orgId', orgScoped);
 
