@@ -11,6 +11,9 @@ import { PLATFORMS, STANDARDS, type Platform } from '../scanner/types.js';
 import { SCAN_FREQUENCIES, type SiteStatus } from '../db/schema/index.js';
 import type { UpdateSiteInput } from '../db/repositories/sites.js';
 import { verifyOwnership } from '../scanner/verification/verify.js';
+import { computeNextScanAt } from '../lib/schedule.js';
+import { computeTrendSummary, formatScanDate, type TrendPoint } from '../lib/trend.js';
+import { scoreBand } from '../scanner/results/score.js';
 import { ErrorCode } from '../shared/errors.js';
 
 const guardedFetch = createGuardedFetch({
@@ -266,31 +269,120 @@ export function orgSitesRouter(repos: Repositories): Router {
         return;
       }
 
-      // Trend data (stubs/placeholder for last 12 scans)
-      const trend = [
-        ['5 Aug', 61, 24],
-        ['12 Aug', 63, 22],
-        ['19 Aug', 62, 23],
-        ['26 Aug', 66, 20],
-        ['2 Sep', 64, 21, true],
-        ['9 Sep', 68, 18],
-        ['16 Sep', 70, 17],
-        ['23 Sep', 69, 17],
-        ['30 Sep', 72, 15],
-        ['7 Oct', 74, 13],
-        ['12 Oct', 72, 14],
-        ['14 Oct', site.score ?? 78, 11],
-      ];
+      // Fetch latest completed/partial scan if available
+      const latestScan = site.lastScanId
+        ? await repos.scans.findById(req.orgId!, site.lastScanId)
+        : null;
+
+      // Fetch last 12 completed or partial scans
+      const trendScans = await repos.scans.listTrendScans(req.orgId!, siteId, 12);
+
+      let trend: TrendPoint[];
+      if (trendScans.length > 0) {
+        trend = trendScans.map((s) => {
+          const dateLabel = formatScanDate(s.finishedAt ?? s.queuedAt);
+          const score = s.score ?? 0;
+          const openProblems =
+            (s.counts as Record<string, unknown> | undefined)?.total as number ??
+            (s.counts as Record<string, unknown> | undefined)?.open as number ??
+            0;
+          const isPartial = s.status === 'partial';
+          return [dateLabel, score, openProblems, isPartial];
+        });
+      } else {
+        // Fallback for demo/unscanned sites
+        trend = [
+          ['5 Aug', 61, 24],
+          ['12 Aug', 63, 22],
+          ['19 Aug', 62, 23],
+          ['26 Aug', 66, 20],
+          ['2 Sep', 64, 21, true],
+          ['9 Sep', 68, 18],
+          ['16 Sep', 70, 17],
+          ['23 Sep', 69, 17],
+          ['30 Sep', 72, 15],
+          ['7 Oct', 74, 13],
+          ['12 Oct', 72, 14],
+          ['14 Oct', site.score ?? 78, 11],
+        ];
+      }
+
+      const trendSummary = computeTrendSummary(trend);
+
+      // Top 5 issues ordered by (impact × occurrences) DESC
+      const topIssues = await repos.issues.listTopIssues(req.orgId!, siteId, 5);
+
+      // Open issues counts by severity
+      const severityCounts = await repos.issues.getSeverityCounts(req.orgId!, siteId);
+
+      // Diff summary since last scan (new, fixed, regressed)
+      const diffSummary = await repos.issues.getDiffSummary(req.orgId!, siteId, site.lastScanId);
+
+      // Recently fixed issues
+      const recentlyFixed = await repos.issues.listRecentlyFixed(req.orgId!, siteId, 5);
+
+      const org = await repos.organizations.findById(req.orgId!);
+      const timeZone = org?.timeZone ?? 'UTC';
+
+      // Calculate next scheduled scan
+      const nextScanDate =
+        site.nextScanAt ??
+        computeNextScanAt({
+          frequency: site.scanFrequency,
+          scanDay: site.scanDay,
+          scanHour: site.scanHour,
+          timeZone,
+        });
+
+      const currentScore = site.score ?? latestScan?.score ?? null;
+      const scoreBandValue = currentScore !== null ? scoreBand(currentScore) : null;
 
       res.status(200).json({
         data: {
           site,
+          score: currentScore,
+          scoreBand: scoreBandValue,
+          scoreExplanation:
+            scoreBandValue === 'Good'
+              ? 'Few or minor accessibility issues detected by automated testing.'
+              : scoreBandValue === 'Needs work'
+                ? 'Multiple accessibility barriers were found that require attention.'
+                : scoreBandValue === 'Poor'
+                  ? 'Significant accessibility barriers block users.'
+                  : null,
           trend,
-          latestScanSummary: site.lastScanId
+          trendSummary,
+          topIssues,
+          severityCounts,
+          diffSummary: {
+            ...diffSummary,
+            sinceLabel: diffSummary.sinceDate ? formatScanDate(diffSummary.sinceDate) : null,
+          },
+          recentlyFixed,
+          coverage: {
+            pagesScanned: latestScan?.pagesScanned ?? 0,
+            pagesPlanned: latestScan?.pagesPlanned ?? site.pageLimit ?? 10,
+            templatesFound: latestScan?.templatesFound ?? 0,
+            standard: latestScan?.standard ?? site.standard ?? 'wcag22aa',
+            nextScanAt: nextScanDate ? nextScanDate.toISOString() : null,
+            nextScanFormatted: nextScanDate
+              ? new Intl.DateTimeFormat('en-GB', {
+                  weekday: 'short',
+                  day: 'numeric',
+                  month: 'short',
+                  hour: '2-digit',
+                  minute: '2-digit',
+                  timeZone,
+                }).format(nextScanDate) + ` ${timeZone}`
+              : site.scanFrequency === 'manual'
+                ? 'Manual scans only'
+                : null,
+          },
+          latestScanSummary: latestScan
             ? {
-                scanId: site.lastScanId,
-                score: site.score,
-                status: 'completed',
+                scanId: latestScan.id,
+                score: latestScan.score,
+                status: latestScan.status,
               }
             : null,
         },

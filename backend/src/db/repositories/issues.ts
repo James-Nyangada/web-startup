@@ -7,6 +7,8 @@ import {
   issueOccurrences,
   issues,
   pages,
+  rules,
+  scans,
   type Impact,
   type IssueStatus,
 } from '../schema/index.js';
@@ -405,6 +407,197 @@ export function issuesRepository(db: Database) {
         .from(issues)
         .where(and(eq(issues.orgId, orgId), eq(issues.id, issueId)));
       return row ?? null;
+    },
+
+    /**
+     * Top issues to fix first ordered by (impact × occurrences) descending (Spec S-24, P2-11).
+     * Impact weight: critical=4, serious=3, moderate=2, minor=1.
+     */
+    async listTopIssues(orgId: OrgId, siteId: string, limit = 5) {
+      const rows = await db
+        .select({
+          id: issues.id,
+          ruleId: issues.ruleId,
+          title: rules.title,
+          impact: issues.impact,
+          wcagCriteria: issues.wcagCriteria,
+          wcagLevel: issues.wcagLevel,
+          templateKey: issues.templateKey,
+          selector: issues.selector,
+          status: issues.status,
+          isRegression: issues.isRegression,
+          occurrenceCount: issues.occurrenceCount,
+        })
+        .from(issues)
+        .leftJoin(rules, eq(issues.ruleId, rules.ruleId))
+        .where(
+          and(
+            eq(issues.orgId, orgId),
+            eq(issues.siteId, siteId),
+            eq(issues.status, 'open'),
+          ),
+        )
+        .orderBy(
+          sql`(
+            CASE ${issues.impact}
+              WHEN 'critical' THEN 4
+              WHEN 'serious' THEN 3
+              WHEN 'moderate' THEN 2
+              WHEN 'minor' THEN 1
+              ELSE 0
+            END * ${issues.occurrenceCount}
+          ) DESC`,
+          desc(issues.occurrenceCount),
+          issues.id,
+        )
+        .limit(limit);
+
+      return rows.map((r) => ({
+        id: r.id,
+        ruleId: r.ruleId,
+        title: r.title ?? r.ruleId,
+        impact: r.impact,
+        wcagCriteria: r.wcagCriteria,
+        wcagLevel: r.wcagLevel,
+        templateKey: r.templateKey,
+        selector: r.selector,
+        status: r.isRegression ? ('regressed' as const) : r.status,
+        isRegression: r.isRegression,
+        occurrenceCount: r.occurrenceCount,
+      }));
+    },
+
+    /**
+     * Open issue counts by severity (Critical, Serious, Moderate, Minor).
+     */
+    async getSeverityCounts(orgId: OrgId, siteId: string) {
+      const rows = await db
+        .select({
+          impact: issues.impact,
+          count: sql<number>`count(*)::int`,
+        })
+        .from(issues)
+        .where(
+          and(
+            eq(issues.orgId, orgId),
+            eq(issues.siteId, siteId),
+            eq(issues.status, 'open'),
+          ),
+        )
+        .groupBy(issues.impact);
+
+      const counts: Record<Impact, number> = {
+        critical: 0,
+        serious: 0,
+        moderate: 0,
+        minor: 0,
+      };
+
+      for (const row of rows) {
+        if (row.impact in counts) {
+          counts[row.impact] = row.count;
+        }
+      }
+
+      return counts;
+    },
+
+    /**
+     * Counts of new, fixed, and regressed issues since the specified scan (or last scan).
+     */
+    async getDiffSummary(orgId: OrgId, siteId: string, lastScanId?: string | null) {
+      if (!lastScanId) {
+        return {
+          newCount: 0,
+          fixedCount: 0,
+          regressedCount: 0,
+          sinceDate: null,
+        };
+      }
+
+      const [scan] = await db
+        .select({
+          finishedAt: scans.finishedAt,
+          queuedAt: scans.queuedAt,
+          counts: scans.counts,
+        })
+        .from(scans)
+        .where(and(eq(scans.orgId, orgId), eq(scans.id, lastScanId)));
+
+      const scanCounts = scan?.counts;
+
+      if (
+        scanCounts &&
+        typeof scanCounts.new === 'number' &&
+        typeof scanCounts.fixed === 'number' &&
+        typeof scanCounts.regressed === 'number'
+      ) {
+        return {
+          newCount: scanCounts.new,
+          fixedCount: scanCounts.fixed,
+          regressedCount: scanCounts.regressed,
+          sinceDate: scan?.finishedAt ?? scan?.queuedAt ?? null,
+        };
+      }
+
+      const rows = await db
+        .select({
+          type: issueEvents.type,
+          count: sql<number>`count(*)::int`,
+        })
+        .from(issueEvents)
+        .where(and(eq(issueEvents.orgId, orgId), eq(issueEvents.scanId, lastScanId)))
+        .groupBy(issueEvents.type);
+
+      let newCount = 0;
+      let fixedCount = 0;
+      let regressedCount = 0;
+
+      for (const r of rows) {
+        if (r.type === 'created') newCount = r.count;
+        if (r.type === 'fixed') fixedCount = r.count;
+        if (r.type === 'regressed') regressedCount = r.count;
+      }
+
+      return {
+        newCount,
+        fixedCount,
+        regressedCount,
+        sinceDate: scan?.finishedAt ?? scan?.queuedAt ?? null,
+      };
+    },
+
+    /**
+     * Lists recently fixed issues for a site (Spec S-24).
+     */
+    async listRecentlyFixed(orgId: OrgId, siteId: string, limit = 5) {
+      const rows = await db
+        .select({
+          id: issues.id,
+          ruleId: issues.ruleId,
+          title: rules.title,
+          templateKey: issues.templateKey,
+          fixedAt: issues.fixedAt,
+        })
+        .from(issues)
+        .leftJoin(rules, eq(issues.ruleId, rules.ruleId))
+        .where(
+          and(
+            eq(issues.orgId, orgId),
+            eq(issues.siteId, siteId),
+            eq(issues.status, 'fixed'),
+          ),
+        )
+        .orderBy(desc(issues.fixedAt))
+        .limit(limit);
+
+      return rows.map((r) => ({
+        id: r.id,
+        ruleId: r.ruleId,
+        title: r.title ? `${r.title} — ${r.templateKey}` : r.ruleId,
+        templateKey: r.templateKey,
+        fixedAt: r.fixedAt ? r.fixedAt.toISOString() : null,
+      }));
     },
   };
 }

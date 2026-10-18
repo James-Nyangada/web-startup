@@ -256,6 +256,90 @@ describe('Sites API (Chunk P2-06 & Section 7.3)', () => {
       expect(res.body.data.trend).toBeDefined();
     });
 
+    it('returns full S-24 site overview data (score, band, topIssues, trendSummary, counts)', async () => {
+      vi.mocked(repos.sites.findById).mockResolvedValue({
+        ...mockSite,
+        score: 78,
+      });
+      vi.mocked(repos.issues.listTopIssues).mockResolvedValue([
+        {
+          id: 'issue-1',
+          ruleId: 'color-contrast',
+          title: 'Elements must have sufficient color contrast',
+          impact: 'serious',
+          wcagCriteria: ['1.4.3'],
+          wcagLevel: 'AA',
+          templateKey: 'product',
+          selector: 'button.cta',
+          status: 'open',
+          isRegression: false,
+          occurrenceCount: 12,
+        },
+      ]);
+      vi.mocked(repos.issues.getSeverityCounts).mockResolvedValue({
+        critical: 1,
+        serious: 4,
+        moderate: 3,
+        minor: 3,
+      });
+      vi.mocked(repos.issues.getDiffSummary).mockResolvedValue({
+        newCount: 3,
+        fixedCount: 8,
+        regressedCount: 1,
+        sinceDate: new Date('2026-10-12T00:00:00Z'),
+      });
+      vi.mocked(repos.scans.listTrendScans).mockResolvedValue([
+        {
+          id: 'scan-1',
+          score: 62,
+          status: 'completed',
+          counts: { total: 24 },
+          finishedAt: new Date('2026-08-05T00:00:00Z'),
+          queuedAt: new Date('2026-08-05T00:00:00Z'),
+          pagesScanned: 50,
+          pagesFailed: 0,
+          pagesPlanned: 50,
+        },
+        {
+          id: 'scan-2',
+          score: 78,
+          status: 'completed',
+          counts: { total: 11 },
+          finishedAt: new Date('2026-10-14T00:00:00Z'),
+          queuedAt: new Date('2026-10-14T00:00:00Z'),
+          pagesScanned: 50,
+          pagesFailed: 0,
+          pagesPlanned: 50,
+        },
+      ]);
+
+      const res = await request(app)
+        .get(`/v1/orgs/${orgId}/sites/${siteId}`)
+        .set('Cookie', adminCookie)
+        .expect(200);
+
+      expect(res.body.data.score).toBe(78);
+      expect(res.body.data.scoreBand).toBe('Needs work');
+      expect(res.body.data.scoreExplanation).toBe(
+        'Multiple accessibility barriers were found that require attention.',
+      );
+      expect(res.body.data.severityCounts).toEqual({
+        critical: 1,
+        serious: 4,
+        moderate: 3,
+        minor: 3,
+      });
+      expect(res.body.data.diffSummary.newCount).toBe(3);
+      expect(res.body.data.diffSummary.fixedCount).toBe(8);
+      expect(res.body.data.diffSummary.regressedCount).toBe(1);
+      expect(res.body.data.diffSummary.sinceLabel).toBe('12 Oct');
+      expect(res.body.data.topIssues).toHaveLength(1);
+      expect(res.body.data.topIssues[0].ruleId).toBe('color-contrast');
+      expect(res.body.data.trend).toHaveLength(2);
+      expect(res.body.data.trendSummary).toContain('Score rose from 62 to 78 over 2 scans');
+      expect(res.body.data.coverage).toBeDefined();
+    });
+
     it('returns 404 when site does not exist or was deleted', async () => {
       vi.mocked(repos.sites.findById).mockResolvedValue(null);
 

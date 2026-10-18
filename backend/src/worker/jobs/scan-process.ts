@@ -68,7 +68,7 @@ export async function handleScanProcess(
   const diff = diffScans(previousIssues, scanResult.issues, scannedPages, scanResult.pagesPlanned);
 
   // 5. Apply diff to database: issues, occurrences, and events
-  await ctx.repos.issues.applyScanDiff(
+  const { createdCount, fixedCount, regressedCount } = await ctx.repos.issues.applyScanDiff(
     orgId,
     scan.siteId,
     scan.id,
@@ -90,7 +90,12 @@ export async function handleScanProcess(
   await ctx.repos.scans.updateRaw(scan.id, {
     status: finalStatus,
     score: scanResult.score,
-    counts,
+    counts: {
+      ...counts,
+      new: createdCount,
+      fixed: fixedCount,
+      regressed: regressedCount,
+    },
     finishedAt: new Date(),
   });
 

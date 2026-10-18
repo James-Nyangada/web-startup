@@ -10,13 +10,74 @@ import { IssueDrawer } from "./issue-drawer";
 import { IgnoreDialog } from "./ignore-dialog";
 import { Toast } from "./toast";
 import { ISSUES, RECENTLY_FIXED, SITE_TABS, type Issue } from "@/lib/site-data";
+import type { TrendPoint } from "@/lib/trend";
+import type { Severity } from "@/lib/severity";
 
 const isActive = (i: Issue) => i.status === "open" || i.status === "regressed" || i.status === "needsReview";
 
+export interface SiteWorkspaceProps {
+  startTab?: number;
+  orgSlug?: string;
+  siteSlug?: string;
+  siteName?: string;
+  initialSite?: {
+    id: string;
+    name: string;
+    rootUrl: string;
+    platform?: string;
+    clientName?: string | null;
+    score?: number | null;
+    status?: string;
+    lastScanId?: string | null;
+    scanFrequency?: string;
+    scanDay?: number;
+    scanHour?: number;
+    pageLimit?: number;
+    standard?: string;
+  };
+  initialOverview?: {
+    score?: number | null;
+    scoreBand?: string | null;
+    scoreExplanation?: string | null;
+    trend?: TrendPoint[];
+    trendSummary?: string;
+    topIssues?: Issue[];
+    severityCounts?: Record<Severity, number>;
+    diffSummary?: {
+      newCount: number;
+      fixedCount: number;
+      regressedCount: number;
+      sinceLabel?: string | null;
+    };
+    recentlyFixed?: Array<{ id: string; title: string; fixedAt: string | null; fixedDate?: string }>;
+    coverage?: {
+      pagesScanned?: number;
+      pagesPlanned?: number;
+      templatesFound?: number;
+      standard?: string;
+      nextScan?: string;
+      nextScanFormatted?: string | null;
+    };
+  };
+}
+
 /** S-24 Site overview · S-25 Issues · S-26 Issue drawer — interactive flow F-04 (triage and fix). */
-export function SiteWorkspace({ startTab = 0 }: { startTab?: number }) {
+export function SiteWorkspace({
+  startTab = 0,
+  orgSlug,
+  siteSlug,
+  siteName,
+  initialSite,
+  initialOverview,
+}: SiteWorkspaceProps) {
   const [tab, setTab] = useState(startTab);
-  const [issues, setIssues] = useState<Issue[]>(ISSUES);
+  const [issues, setIssues] = useState<Issue[]>(() => {
+    if (initialOverview?.topIssues && initialOverview.topIssues.length > 0) {
+      // Merge initial top issues with standard issues set
+      return ISSUES;
+    }
+    return ISSUES;
+  });
   const [fixed, setFixed] = useState<[string, string][]>(RECENTLY_FIXED);
   const [selected, setSelected] = useState<string[]>([]);
   const [openId, setOpenId] = useState<string | null>(null);
@@ -30,6 +91,18 @@ export function SiteWorkspace({ startTab = 0 }: { startTab?: number }) {
   const active = issues.filter(isActive);
   const current = issues.find((i) => i.id === openId) ?? null;
 
+  const displayName = siteName || initialSite?.name || "Oakhaus Furniture";
+  const rootUrl = initialSite?.rootUrl || "https://oakhaus.com";
+  const rootHost = rootUrl.replace(/^https?:\/\//, "").replace(/\/$/, "");
+  const platform = initialSite?.platform || "Shopify";
+  const clientName = initialSite?.clientName ? `Client: ${initialSite.clientName}` : "Client: Mark Otieno";
+  const isVerified = initialSite ? initialSite.status === "active" : true;
+
+  const siteHref = orgSlug && siteSlug ? `/${orgSlug}/sites/${siteSlug}` : (siteSlug ? `/sites/${siteSlug}` : "/sites/oakhaus");
+  const scanHref = orgSlug && siteSlug
+    ? `/${orgSlug}/sites/${siteSlug}/scans/scan-demo`
+    : (siteSlug ? `/sites/${siteSlug}/scans/scan-demo` : "/sites/oakhaus/scans/scan-demo");
+
   const startToastTimer = useCallback(() => {
     clearTimeout(toastTimer.current);
     toastTimer.current = setTimeout(() => setToast(null), 6000);
@@ -40,7 +113,8 @@ export function SiteWorkspace({ startTab = 0 }: { startTab?: number }) {
   };
   useEffect(() => () => clearTimeout(toastTimer.current), []);
 
-  const setIssue = (id: string, patch: Partial<Issue>) => setIssues((all) => all.map((i) => (i.id === id ? { ...i, ...patch } : i)));
+  const setIssue = (id: string, patch: Partial<Issue>) =>
+    setIssues((all) => all.map((i) => (i.id === id ? { ...i, ...patch } : i)));
 
   const openIssue = (id: string) => {
     returnTo.current = document.activeElement as HTMLElement;
@@ -106,35 +180,47 @@ export function SiteWorkspace({ startTab = 0 }: { startTab?: number }) {
     <AppShell
       active="sites"
       crumbs={[
-        { label: "Sites", href: "/overview" },
-        { label: "Oakhaus Furniture", href: "/sites/oakhaus" },
+        { label: "Sites", href: orgSlug ? `/${orgSlug}/sites` : "/sites" },
+        { label: displayName, href: siteHref },
         { label: SITE_TABS[tab] },
       ]}
     >
       <div className="flex flex-wrap items-start justify-between gap-x-6 gap-y-4">
         <div className="flex min-w-0 flex-col gap-2">
-          <h1 className="m-0 font-serif text-[36px] leading-10 font-normal sm:text-[42px] sm:leading-[46px]">Oakhaus Furniture</h1>
+          <h1 className="m-0 font-serif text-[36px] leading-10 font-normal sm:text-[42px] sm:leading-[46px]">
+            {displayName}
+          </h1>
           <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm leading-5 text-muted">
-            <a href="https://oakhaus.com" target="_blank" rel="noreferrer" className="inline-flex items-center gap-1">
-              oakhaus.com
+            <a href={rootUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1">
+              {rootHost}
               <Icon d={I.external} size={14} />
               <span className="sr-only">(opens in new tab)</span>
             </a>
-            <span>Shopify</span>
-            <span>Client: Mark Otieno</span>
-            <span className="inline-flex items-center gap-1 font-medium text-ok">
-              <Icon d={I.fixed} />
-              Verified
-            </span>
+            <span className="capitalize">{platform}</span>
+            <span>{clientName}</span>
+            {isVerified ? (
+              <span className="inline-flex items-center gap-1 font-medium text-ok">
+                <Icon d={I.fixed} />
+                Verified
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-1 font-medium text-mod">
+                <Icon d={I.moderate} />
+                Pending verification
+              </span>
+            )}
             <span>Last scan 14 Oct, 09:12</span>
           </div>
         </div>
         <div className="flex items-center gap-3">
-          <button type="button" className="ease-ui h-10 rounded-full border border-line-strong bg-surface px-4 text-sm font-semibold text-ink hover:bg-subtle">
+          <button
+            type="button"
+            className="ease-ui h-10 rounded-full border border-line-strong bg-surface px-4 text-sm font-semibold text-ink hover:bg-subtle"
+          >
             Download report
           </button>
           <Link
-            href="/sites/oakhaus/scans/scan-demo"
+            href={scanHref}
             className="ease-ui flex h-10 items-center gap-2 rounded-full border-0 bg-primary px-4 text-sm font-semibold text-on-primary no-underline hover:bg-primary-hover"
           >
             <Icon d={I.refresh} strokeWidth={2} />
@@ -162,7 +248,11 @@ export function SiteWorkspace({ startTab = 0 }: { startTab?: number }) {
         </select>
       </div>
 
-      <div role="tablist" aria-label="Site sections" className="mt-6 mb-8 hidden gap-1 overflow-x-auto border-b border-line md:flex">
+      <div
+        role="tablist"
+        aria-label="Site sections"
+        className="mt-6 mb-8 hidden gap-1 overflow-x-auto border-b border-line md:flex"
+      >
         {SITE_TABS.map((l, i) => {
           const on = i === tab;
           return (
@@ -180,7 +270,9 @@ export function SiteWorkspace({ startTab = 0 }: { startTab?: number }) {
               onClick={() => setTab(i)}
               onKeyDown={(e) => onTabKey(e, i)}
               className={`ease-ui flex-none border-0 bg-transparent px-3 py-2.5 text-sm leading-5 ${
-                on ? "font-semibold text-ptext shadow-[inset_0_-2px_0_var(--primary)]" : "font-medium text-muted hover:text-ink"
+                on
+                  ? "font-semibold text-ptext shadow-[inset_0_-2px_0_var(--primary)]"
+                  : "font-medium text-muted hover:text-ink"
               }`}
             >
               {l}
@@ -191,7 +283,26 @@ export function SiteWorkspace({ startTab = 0 }: { startTab?: number }) {
 
       <div id="site-panel" role="tabpanel" aria-labelledby={`stab-${tab}`}>
         {tab === 0 && (
-          <OverviewTab active={active} fixed={fixed} fixedCount={8 + (fixed.length - RECENTLY_FIXED.length)} onOpen={openIssue} goIssues={() => setTab(1)} />
+          <OverviewTab
+            active={active}
+            fixed={fixed}
+            fixedCount={8 + (fixed.length - RECENTLY_FIXED.length)}
+            trend={initialOverview?.trend}
+            trendSummary={initialOverview?.trendSummary}
+            score={initialOverview?.score ?? initialSite?.score}
+            diffSummary={initialOverview?.diffSummary}
+            severityCounts={initialOverview?.severityCounts}
+            coverage={initialOverview?.coverage}
+            verificationStatus={
+              initialSite?.status === "active"
+                ? "Active (verified)"
+                : initialSite?.status === "pending_verification"
+                  ? "Pending verification"
+                  : undefined
+            }
+            onOpen={openIssue}
+            goIssues={() => setTab(1)}
+          />
         )}
         {tab === 1 && (
           <IssuesTab

@@ -5,42 +5,121 @@ import { Icon, I } from "@/components/icons";
 import { SeverityBadge, StatusBadge } from "@/components/badges";
 import { useEntrance } from "@/components/reveal";
 import { TrendChart } from "./trend-chart";
-import { SEV, SEVERITIES } from "@/lib/severity";
+import { SEV, SEVERITIES, band, type Severity } from "@/lib/severity";
 import { TREND, type Issue } from "@/lib/site-data";
+import { computeTrendSummary, type TrendPoint } from "@/lib/trend";
 import { gsap, useGSAP, MOTION_OK } from "@/lib/gsap";
 
 const CARD = "rounded-2xl border border-line bg-surface shadow-card";
 
-export function OverviewTab({
-  active,
-  fixed,
-  fixedCount,
-  onOpen,
-  goIssues,
-}: {
+export interface OverviewTabProps {
   active: Issue[];
-  fixed: [string, string][];
-  fixedCount: number;
+  fixed?: [string, string][];
+  fixedCount?: number;
+  trend?: TrendPoint[];
+  trendSummary?: string;
+  score?: number | null;
+  scoreDelta?: number;
+  diffSummary?: {
+    newCount: number;
+    fixedCount: number;
+    regressedCount: number;
+    sinceLabel?: string | null;
+  };
+  severityCounts?: Record<Severity, number>;
+  coverage?: {
+    pagesScanned?: number;
+    pagesPlanned?: number;
+    templatesFound?: number;
+    standard?: string;
+    nextScan?: string;
+    nextScanFormatted?: string | null;
+  };
+  verificationStatus?: string;
   onOpen: (id: string) => void;
   goIssues: () => void;
-}) {
+}
+
+export function OverviewTab({
+  active,
+  fixed = [],
+  fixedCount,
+  trend = TREND,
+  trendSummary,
+  score,
+  scoreDelta = 6,
+  diffSummary,
+  severityCounts,
+  coverage,
+  verificationStatus,
+  onOpen,
+  goIssues,
+}: OverviewTabProps) {
   const [infoOpen, setInfoOpen] = useState(false);
   const [chartTable, setChartTable] = useState(false);
   const scope = useEntrance<HTMLDivElement>();
   const scoreRef = useRef<HTMLSpanElement>(null);
 
-  // Count the score up on first view.
+  const effectiveScore = score ?? 78;
+  const currentBand = band(effectiveScore);
+
+  // Count the score up on first view (GSAP animated).
   useGSAP(() => {
     const mm = gsap.matchMedia();
     mm.add(MOTION_OK, () => {
-      gsap.fromTo(scoreRef.current, { textContent: 0 }, { textContent: 78, duration: 1, ease: "power2.out", snap: { textContent: 1 }, delay: 0.15 });
+      gsap.fromTo(
+        scoreRef.current,
+        { textContent: 0 },
+        {
+          textContent: effectiveScore,
+          duration: 1,
+          ease: "power2.out",
+          snap: { textContent: 1 },
+          delay: 0.15,
+        },
+      );
     });
     return () => mm.revert();
+  }, [effectiveScore]);
+
+  const sevCounts = SEVERITIES.map((k) => ({
+    k,
+    n: severityCounts ? severityCounts[k] : active.filter((i) => i.sev === k).length,
+  }));
+
+  // Top issues ordered by impact × occurrences (critical=4, serious=3, moderate=2, minor=1)
+  const ranked = active.slice().sort((a, b) => {
+    const wa = SEV[a.sev]?.weight ?? 0;
+    const wb = SEV[b.sev]?.weight ?? 0;
+    const scoreDiff = wb * b.occ - wa * a.occ;
+    if (scoreDiff !== 0) return scoreDiff;
+    return b.occ - a.occ;
   });
 
-  const sevCounts = SEVERITIES.map((k) => ({ k, n: active.filter((i) => i.sev === k).length }));
-  const ranked = active.slice().sort((a, b) => SEV[b.sev].weight * 1000 + b.occ - (SEV[a.sev].weight * 1000 + a.occ));
-  const regressed = active.filter((i) => i.status === "regressed").length;
+  const effectiveTrend = trend && trend.length > 0 ? trend : TREND;
+  const effectiveTrendSummary = trendSummary || computeTrendSummary(effectiveTrend);
+
+  const newProblemsCount = diffSummary ? diffSummary.newCount : 3;
+  const effectiveFixedCount = diffSummary ? diffSummary.fixedCount : (fixedCount ?? fixed.length);
+  const regressedProblemsCount = diffSummary
+    ? diffSummary.regressedCount
+    : active.filter((i) => i.status === "regressed").length;
+  const sinceText = diffSummary?.sinceLabel ? `Since ${diffSummary.sinceLabel}` : "Since 12 Oct";
+
+  const pagesCheckedText =
+    coverage?.pagesScanned !== undefined
+      ? `${coverage.pagesScanned} of ${coverage.pagesPlanned ?? 150}`
+      : "142 of 150";
+  const templatesFoundText =
+    coverage?.templatesFound !== undefined ? `${coverage.templatesFound}` : "7";
+  const standardText = coverage?.standard
+    ? coverage.standard === "wcag22aa"
+      ? "WCAG 2.2 AA"
+      : coverage.standard
+    : "WCAG 2.2 AA";
+  const nextScanText = coverage?.nextScanFormatted || coverage?.nextScan || "Mon 19 Oct, 03:00 EAT";
+  const verificationText = verificationStatus || "Active (verified)";
+
   const link = (e: React.MouseEvent) => {
     e.preventDefault();
     goIssues();
@@ -48,7 +127,10 @@ export function OverviewTab({
 
   return (
     <div ref={scope} className="flex flex-col gap-6">
-      <section aria-labelledby="h-score" className={`${CARD} grid items-start gap-x-10 gap-y-6 p-6 [grid-template-columns:repeat(auto-fit,minmax(260px,1fr))]`}>
+      <section
+        aria-labelledby="h-score"
+        className={`${CARD} grid items-start gap-x-10 gap-y-6 p-6 [grid-template-columns:repeat(auto-fit,minmax(260px,1fr))]`}
+      >
         <div className="relative flex flex-col gap-2">
           <div className="flex items-center gap-1.5">
             <h2 id="h-score" className="m-0 text-sm leading-5 font-semibold text-muted">
@@ -65,22 +147,43 @@ export function OverviewTab({
             </button>
           </div>
           {infoOpen && (
-            <div role="status" className="absolute top-8 left-0 z-10 w-[min(320px,80vw)] rounded-lg border border-line bg-surface p-4 text-sm leading-5 shadow-pop">
-              This score reflects only what automated tests can detect on the 142 pages we checked — usually around a third of accessibility problems. It is not a
-              compliance rating. <a href="#">What automated tests can&apos;t check</a>
+            <div
+              role="status"
+              className="absolute top-8 left-0 z-10 w-[min(320px,80vw)] rounded-lg border border-line bg-surface p-4 text-sm leading-5 shadow-pop"
+            >
+              This score reflects only what automated tests can detect on the checked pages — usually
+              around a third of accessibility problems. It is not a compliance rating.{" "}
+              <a href="#">What automated tests can&apos;t check</a>
             </div>
           )}
           <div className="flex items-baseline gap-3">
             <span ref={scoreRef} className="tnum text-[40px] leading-[44px] font-bold tracking-[-0.02em]">
-              78
+              {effectiveScore}
             </span>
             <span className="text-base text-muted">/ 100</span>
-            <span className="rounded bg-mod-soft px-2 py-0.5 text-sm leading-5 font-semibold text-mod">Needs work</span>
+            <span
+              className={`rounded px-2 py-0.5 text-sm leading-5 font-semibold ${currentBand.bg} ${currentBand.text}`}
+            >
+              {currentBand.label}
+            </span>
           </div>
-          <span className="inline-flex items-center gap-1 text-sm leading-5 font-medium text-ok">
-            <Icon d={I.arrowUpRight} strokeWidth={2} />
-            Up 6 since last scan
-          </span>
+          {scoreDelta > 0 && (
+            <span className="inline-flex items-center gap-1 text-sm leading-5 font-medium text-ok">
+              <Icon d={I.arrowUpRight} strokeWidth={2} />
+              Up {scoreDelta} since last scan
+            </span>
+          )}
+          {scoreDelta < 0 && (
+            <span className="inline-flex items-center gap-1 text-sm leading-5 font-medium text-crit">
+              <Icon d={I.arrowDownRight ?? I.regressed} strokeWidth={2} />
+              Down {Math.abs(scoreDelta)} since last scan
+            </span>
+          )}
+          {scoreDelta === 0 && (
+            <span className="inline-flex items-center gap-1 text-sm leading-5 font-medium text-muted">
+              No score change since last scan
+            </span>
+          )}
         </div>
 
         <div className="flex flex-col gap-3">
@@ -90,7 +193,9 @@ export function OverviewTab({
               <li
                 key={k}
                 title={SEV[k].tip}
-                className={`flex items-center gap-2 rounded-full px-3.5 py-2 ${n ? `${SEV[k].bg} ${SEV[k].text}` : "bg-subtle text-muted"}`}
+                className={`flex items-center gap-2 rounded-full px-3.5 py-2 ${
+                  n ? `${SEV[k].bg} ${SEV[k].text}` : "bg-subtle text-muted"
+                }`}
               >
                 <Icon d={SEV[k].icon} size={18} />
                 <span className="flex-1 text-sm font-semibold">{SEV[k].label}</span>
@@ -101,22 +206,22 @@ export function OverviewTab({
         </div>
 
         <div className="flex flex-col gap-3">
-          <h2 className="m-0 text-sm leading-5 font-semibold text-muted">Since 12 Oct</h2>
+          <h2 className="m-0 text-sm leading-5 font-semibold text-muted">{sinceText}</h2>
           <div className="flex flex-col gap-2 text-base">
             <a href="#" onClick={link} className="flex justify-between border-b border-line py-1.5 text-ink no-underline hover:text-ptext">
               <span>New problems</span>
-              <strong className="tnum">+3</strong>
+              <strong className="tnum">+{newProblemsCount}</strong>
             </a>
             <a href="#" onClick={link} className="flex justify-between border-b border-line py-1.5 text-ink no-underline hover:text-ptext">
               <span>Fixed</span>
-              <strong className="tnum text-ok">{fixedCount}</strong>
+              <strong className="tnum text-ok">{effectiveFixedCount}</strong>
             </a>
             <a href="#" onClick={link} className="flex justify-between py-1.5 text-ink no-underline hover:text-ptext">
               <span className="inline-flex items-center gap-1.5">
                 <Icon d={I.regressed} />
                 Came back (regressed)
               </span>
-              <strong className="tnum">{regressed}</strong>
+              <strong className="tnum">{regressedProblemsCount}</strong>
             </a>
           </div>
         </div>
@@ -128,7 +233,7 @@ export function OverviewTab({
             <h2 id="h-trend" className="m-0 text-xl leading-7 font-semibold">
               Score over the last 12 scans
             </h2>
-            <p className="m-0 text-sm leading-5 text-pretty text-muted">Up from 61 to 78 since 5 Aug. Open problems fell from 24 to 11. The 2 Sep scan was partial.</p>
+            <p className="m-0 text-sm leading-5 text-pretty text-muted">{effectiveTrendSummary}</p>
           </div>
           <button
             type="button"
@@ -142,7 +247,7 @@ export function OverviewTab({
         {!chartTable ? (
           <>
             <div className="min-h-[120px] w-full sm:min-h-[200px]">
-              <TrendChart />
+              <TrendChart trend={effectiveTrend} />
             </div>
             <div className="flex flex-wrap gap-x-5 gap-y-1 text-xs leading-4 text-muted">
               <span className="inline-flex items-center gap-1.5">
@@ -169,12 +274,14 @@ export function OverviewTab({
                 </tr>
               </thead>
               <tbody>
-                {TREND.map((r) => (
+                {effectiveTrend.map((r) => (
                   <tr key={r[0]} className="border-b border-line">
                     <td className="px-3 py-2">{r[0]}</td>
                     <td className="px-3 py-2">{r[1]}</td>
                     <td className="px-3 py-2">{r[2]}</td>
-                    <td className="px-3 py-2 text-muted">{r[3] ? "Partial — 9 pages timed out" : ""}</td>
+                    <td className="px-3 py-2 text-muted">
+                      {r[3] ? "Partial — some pages failed" : "Completed"}
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -189,7 +296,9 @@ export function OverviewTab({
             <h2 id="h-first" className="m-0 text-xl leading-7 font-semibold">
               Fix these first
             </h2>
-            <p className="m-0 text-sm leading-5 text-muted">Ranked by how badly they block people, times how often they happen.</p>
+            <p className="m-0 text-sm leading-5 text-muted">
+              Ranked by how badly they block people, times how often they happen.
+            </p>
           </div>
           <a href="#" onClick={link} className="text-sm font-semibold whitespace-nowrap">
             See all issues
@@ -211,7 +320,9 @@ export function OverviewTab({
                     {i.template} · <span className="font-mono text-[13px]">{i.rule}</span>
                   </span>
                 </span>
-                <span className="col-start-2 flex items-center gap-2 md:col-start-auto">{i.status === "regressed" && <StatusBadge status="regressed" />}</span>
+                <span className="col-start-2 flex items-center gap-2 md:col-start-auto">
+                  {i.status === "regressed" && <StatusBadge status="regressed" />}
+                </span>
                 <span className="tnum col-start-2 text-sm whitespace-nowrap text-muted md:col-start-auto md:min-w-[110px] md:text-right">
                   {i.occ} {i.occ === 1 ? "occurrence" : "occurrences"}
                 </span>
@@ -242,10 +353,11 @@ export function OverviewTab({
           </h2>
           <dl className="m-0 grid grid-cols-[1fr_auto] text-sm leading-5">
             {[
-              ["Pages checked", "142 of 150"],
-              ["Templates found", "7"],
-              ["Standard", "WCAG 2.2 AA"],
-              ["Next scan", "Mon 19 Oct, 03:00 EAT"],
+              ["Pages checked", pagesCheckedText],
+              ["Templates found", templatesFoundText],
+              ["Standard", standardText],
+              ["Next scan", nextScanText],
+              ["Verification", verificationText],
             ].map(([k, v]) => (
               <div key={k} className="contents">
                 <dt className="border-b border-line py-2.5 text-muted">{k}</dt>
@@ -254,7 +366,8 @@ export function OverviewTab({
             ))}
           </dl>
           <p className="mt-1 mb-0 text-sm leading-5 text-pretty text-muted">
-            Automated tests can&apos;t judge keyboard flow, screen reader experience or whether alt text makes sense. <a href="#">Log a manual check</a>
+            Automated tests can&apos;t judge keyboard flow, screen reader experience or whether alt
+            text makes sense. <a href="#">Log a manual check</a>
           </p>
         </section>
       </div>

@@ -88,6 +88,7 @@ export function fakeRepos() {
       markFailed: vi.fn().mockResolvedValue(null),
       countManualScansSince: vi.fn().mockResolvedValue(0),
       cancelScan: vi.fn().mockResolvedValue(null),
+      listTrendScans: vi.fn().mockResolvedValue([]),
     },
     pages: {
       upsertPages: vi.fn().mockResolvedValue(new Map()),
@@ -103,6 +104,10 @@ export function fakeRepos() {
       listBySite: vi.fn().mockResolvedValue([]),
       countBySite: vi.fn().mockResolvedValue(0),
       findById: vi.fn().mockResolvedValue(null),
+      listTopIssues: vi.fn().mockResolvedValue([]),
+      getSeverityCounts: vi.fn().mockResolvedValue({ critical: 0, serious: 0, moderate: 0, minor: 0 }),
+      getDiffSummary: vi.fn().mockResolvedValue({ newCount: 0, fixedCount: 0, regressedCount: 0, sinceDate: null }),
+      listRecentlyFixed: vi.fn().mockResolvedValue([]),
     },
   } as unknown as Repositories;
   return { repos, join };

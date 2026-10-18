@@ -96,6 +96,33 @@ export function scansRepository(db: Database) {
         .offset(offset);
     },
 
+    async listTrendScans(orgId: OrgId, siteId: string, limit = 12) {
+      const rows = await db
+        .select({
+          id: scans.id,
+          score: scans.score,
+          status: scans.status,
+          counts: scans.counts,
+          finishedAt: scans.finishedAt,
+          queuedAt: scans.queuedAt,
+          pagesScanned: scans.pagesScanned,
+          pagesFailed: scans.pagesFailed,
+          pagesPlanned: scans.pagesPlanned,
+        })
+        .from(scans)
+        .where(
+          and(
+            eq(scans.orgId, orgId),
+            eq(scans.siteId, siteId),
+            sql`${scans.status} in ('completed', 'partial')`,
+          ),
+        )
+        .orderBy(desc(scans.queuedAt))
+        .limit(limit);
+
+      return rows.reverse();
+    },
+
     async countBySite(orgId: OrgId, siteId: string) {
       const [row] = await db
         .select({ count: sql<number>`count(*)::int` })
