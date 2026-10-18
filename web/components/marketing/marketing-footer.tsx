@@ -27,7 +27,7 @@ export function MarketingFooter() {
                 </Link>
               </li>
               <li>
-                <Link href="/#check" className="text-muted no-underline hover:text-ink">
+                <Link href="/check" className="text-muted no-underline hover:text-ink">
                   Free check
                 </Link>
               </li>

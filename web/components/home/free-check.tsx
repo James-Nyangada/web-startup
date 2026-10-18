@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { Icon, I } from "@/components/icons";
 import { SeverityBadge } from "@/components/badges";
@@ -20,6 +21,7 @@ const HEADLINE_TEXT = HEADLINE.map((h) => h.w).join(" ");
 
 /** S-01 hero + S-03 free checker (input · progress · result). */
 export function FreeCheck() {
+  const router = useRouter();
   const [phase, setPhase] = useState<Phase>("input");
   const [url, setUrl] = useState("soraskin.co");
   const [err, setErr] = useState(false);
@@ -93,14 +95,7 @@ export function FreeCheck() {
       setErr(true);
       return;
     }
-    setUrl(u);
-    setStep(0);
-    setPhase("progress");
-    timers.current = [
-      setTimeout(() => setStep(1), 1200),
-      setTimeout(() => setStep(2), 3000),
-      setTimeout(() => setPhase("result"), 4200),
-    ];
+    router.push(`/check?url=${encodeURIComponent(u)}`);
   };
 
   const reset = () => {

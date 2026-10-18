@@ -57,7 +57,7 @@ export function MarketingHeader() {
                 );
               })}
               <Link
-                href="/#check"
+                href="/check"
                 className="font-semibold text-primary no-underline hover:text-primary-hover"
               >
                 Free check
@@ -112,7 +112,7 @@ export function MarketingHeader() {
                 </Link>
               ))}
               <Link
-                href="/#check"
+                href="/check"
                 onClick={() => setMobileMenuOpen(false)}
                 className="rounded-lg px-3 py-2 text-base font-semibold text-primary no-underline hover:bg-subtle"
               >
