@@ -145,6 +145,7 @@ export function fakeRepos() {
       countOccurrences: vi.fn().mockResolvedValue(0),
       listEvents: vi.fn().mockResolvedValue([]),
       listNotes: vi.fn().mockResolvedValue([]),
+      listClientNotesBySite: vi.fn().mockResolvedValue([]),
       addNote: vi.fn().mockImplementation((_orgId, issueId, authorId, body, visibleToClient) =>
         Promise.resolve({
           id: 'note-1',

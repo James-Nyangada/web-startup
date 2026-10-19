@@ -1046,6 +1046,38 @@ export function issuesRepository(db: Database) {
     },
 
     /**
+     * Lists client-visible notes for a site (Spec S-61, P4-09).
+     */
+    async listClientNotesBySite(orgId: OrgId, siteId: string, limit = 10) {
+      const rows = await db
+        .select({
+          id: issueNotes.id,
+          issueId: issueNotes.issueId,
+          authorId: issueNotes.authorId,
+          authorName: users.name,
+          body: issueNotes.body,
+          visibleToClient: issueNotes.visibleToClient,
+          createdAt: issueNotes.createdAt,
+          updatedAt: issueNotes.updatedAt,
+        })
+        .from(issueNotes)
+        .innerJoin(issues, eq(issues.id, issueNotes.issueId))
+        .leftJoin(users, eq(issueNotes.authorId, users.id))
+        .where(
+          and(
+            eq(issueNotes.orgId, orgId),
+            eq(issues.siteId, siteId),
+            eq(issueNotes.visibleToClient, true),
+            isNull(issueNotes.deletedAt),
+          ),
+        )
+        .orderBy(desc(issueNotes.createdAt))
+        .limit(limit);
+
+      return rows;
+    },
+
+    /**
      * Adds a note to an issue (Spec S-26, P2-13/P2-14).
      */
     async addNote(

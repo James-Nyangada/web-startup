@@ -90,7 +90,7 @@ export function resolveOrgContext(repos: Repositories) {
       asOrgId(org.id),
       userId,
     );
-    let clientSiteIds: string[] = [];
+    let clientSiteIds: string[] | undefined = undefined;
 
     if (!membership && !isStaff && repos.clientAccess) {
       const accesses = await repos.clientAccess.listByUserAndOrg(userId, asOrgId(org.id));

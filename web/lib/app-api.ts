@@ -624,6 +624,12 @@ export const appApi = {
     apiClient<{ data: { success: boolean } }>(`/v1/orgs/${org}/clients/${userId}`, {
       method: "DELETE",
     }).then((r) => r.data),
+
+  getPortalHome: () =>
+    apiClient<{ data: ApiPortalHomeData }>("/v1/portal/home").then((r) => r.data),
+
+  getPortalSite: (siteId: string) =>
+    apiClient<{ data: ApiPortalSiteData }>(`/v1/portal/sites/${siteId}`).then((r) => r.data),
 };
 
 export interface ApiClientViewer {
@@ -641,6 +647,93 @@ export interface ApiClientViewer {
     platform: string;
   }[];
   createdAt: string;
+}
+
+export interface ApiPortalSiteItem {
+  id: string;
+  name: string;
+  rootUrl: string;
+  score: number | null;
+  band: string;
+  status: string;
+  cls: string;
+  date: string;
+  orgId: string;
+  orgName: string;
+}
+
+export interface ApiPortalBranding {
+  displayName: string;
+  logoLightUrl: string | null;
+  logoDarkUrl: string | null;
+  primaryColor: string;
+  emailSenderName: string;
+  reportFooter: string | null;
+  hideProductBrand: boolean;
+  contactEmail: string;
+}
+
+export interface ApiPortalHomeData {
+  user: {
+    id: string;
+    name: string | null;
+    email: string;
+    avatarUrl: string | null;
+  };
+  sites: ApiPortalSiteItem[];
+  branding: ApiPortalBranding | null;
+}
+
+export interface ApiPortalSiteDetail {
+  id: string;
+  name: string;
+  rootUrl: string;
+  score: number;
+  band: string;
+  progressText: string;
+  checkedDate: string;
+}
+
+export interface ApiPortalOpenIssueSummary {
+  severity: Severity;
+  count: number;
+  description: string;
+}
+
+export interface ApiPortalRecentFix {
+  id: string;
+  title: string;
+  fixedAt: string;
+}
+
+export interface ApiPortalNote {
+  id: string;
+  authorName: string;
+  body: string;
+  date: string;
+}
+
+export interface ApiPortalReport {
+  id: string;
+  name: string;
+  type: string;
+  downloadUrl: string;
+  date: string;
+}
+
+export interface ApiPortalSiteData {
+  site: ApiPortalSiteDetail;
+  org: {
+    id: string;
+    name: string;
+    slug: string;
+  };
+  branding: ApiPortalBranding | null;
+  trend: { month: string; score: number }[];
+  openSummary: ApiPortalOpenIssueSummary[];
+  recentFixes: ApiPortalRecentFix[];
+  notes: ApiPortalNote[];
+  reports: ApiPortalReport[];
 }
 
 export interface ApiBranding {

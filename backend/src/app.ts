@@ -28,6 +28,7 @@ import { invitationsRouter } from './routes/invitations.js';
 import { reportsPublicRouter } from './routes/reports.js';
 import { paddleWebhookRouter } from './routes/billing.js';
 import { getStorage, type StorageService } from './storage/index.js';
+import { portalRouter } from './routes/portal.js';
 
 declare module 'http' {
   interface IncomingMessage {
@@ -125,6 +126,7 @@ export function createApp({
   );
   v1.use('/emails', createEmailPreviewRouter());
   v1.use('/reports', reportsPublicRouter(repos, storage));
+  v1.use('/portal', portalRouter(repos, auth));
   app.use('/v1', v1);
   app.use('/webhooks/paddle', paddleWebhookRouter(repos, paddleWebhookOpts));
   app.use('/public', publicPlansRouter());

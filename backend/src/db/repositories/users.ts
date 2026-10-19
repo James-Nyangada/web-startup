@@ -70,17 +70,30 @@ export function usersRepository(db: Database) {
           id: clientAccess.id,
           orgId: clientAccess.orgId,
           siteId: clientAccess.siteId,
+          org: {
+            id: organizations.id,
+            name: organizations.name,
+            slug: organizations.slug,
+          },
           site: {
             id: sites.id,
             name: sites.name,
             rootUrl: sites.rootUrl,
             status: sites.status,
             platform: sites.platform,
+            score: sites.score,
           },
         })
         .from(clientAccess)
         .innerJoin(sites, eq(sites.id, clientAccess.siteId))
-        .where(and(eq(clientAccess.userId, userId), isNull(sites.deletedAt)))
+        .innerJoin(organizations, eq(organizations.id, clientAccess.orgId))
+        .where(
+          and(
+            eq(clientAccess.userId, userId),
+            isNull(sites.deletedAt),
+            isNull(organizations.deletedAt),
+          ),
+        )
         .orderBy(clientAccess.createdAt);
     },
 

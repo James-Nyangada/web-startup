@@ -142,30 +142,51 @@ export function orgReportsRouter(repos: Repositories, options?: ReportsRouterOpt
     res.status(201).json({ data: report });
   });
 
-  // GET /v1/orgs/:orgId/reports - List reports (O A M)
-  router.get('/', requireOrgRole('member'), async (req: Request, res: Response): Promise<void> => {
-    const orgId = req.orgId!;
-    const siteIdQuery = req.query.siteId;
-    const siteId = typeof siteIdQuery === 'string' ? siteIdQuery : undefined;
-    const limit = req.query.limit ? Math.min(100, Math.max(1, Number(req.query.limit))) : 50;
-    const offset = req.query.offset ? Math.max(0, Number(req.query.offset)) : 0;
+  // GET /v1/orgs/:orgId/reports - List reports (O A M C)
+  router.get(
+    '/',
+    requireOrgRole('client_viewer'),
+    async (req: Request, res: Response): Promise<void> => {
+      const orgId = req.orgId!;
+      const siteIdQuery = req.query.siteId;
+      const siteId = typeof siteIdQuery === 'string' ? siteIdQuery : undefined;
+      const limit = req.query.limit ? Math.min(100, Math.max(1, Number(req.query.limit))) : 50;
+      const offset = req.query.offset ? Math.max(0, Number(req.query.offset)) : 0;
 
-    const result = await repos.reports.listByOrg(orgId, {
-      siteId,
-      limit,
-      offset,
-    });
+      if (req.clientSiteIds) {
+        if (siteId && !req.clientSiteIds.includes(siteId)) {
+          res.status(404).json({
+            error: {
+              code: ErrorCode.NOT_FOUND,
+              message: 'Site not found.',
+              details: {},
+            },
+          });
+          return;
+        }
+      }
 
-    res.status(200).json({
-      data: result.reports,
-      total: result.total,
-    });
-  });
+      const result = await repos.reports.listByOrg(orgId, {
+        siteId,
+        limit,
+        offset,
+      });
 
-  // GET /v1/orgs/:orgId/reports/:id - Get report details (O A M)
+      const filteredReports = req.clientSiteIds
+        ? result.reports.filter((r) => Boolean(r.siteId && req.clientSiteIds!.includes(r.siteId)))
+        : result.reports;
+
+      res.status(200).json({
+        data: filteredReports,
+        total: req.clientSiteIds ? filteredReports.length : result.total,
+      });
+    },
+  );
+
+  // GET /v1/orgs/:orgId/reports/:id - Get report details (O A M C)
   router.get(
     '/:id',
-    requireOrgRole('member'),
+    requireOrgRole('client_viewer'),
     async (req: Request, res: Response): Promise<void> => {
       const orgId = req.orgId!;
       const paramId = req.params.id;
@@ -194,14 +215,25 @@ export function orgReportsRouter(repos: Repositories, options?: ReportsRouterOpt
         return;
       }
 
+      if (req.clientSiteIds && (!report.siteId || !req.clientSiteIds.includes(report.siteId))) {
+        res.status(404).json({
+          error: {
+            code: ErrorCode.NOT_FOUND,
+            message: 'Report not found.',
+            details: {},
+          },
+        });
+        return;
+      }
+
       res.status(200).json({ data: report });
     },
   );
 
-  // GET /v1/orgs/:orgId/reports/:id/download - Get signed download URL (15 min) (O A M)
+  // GET /v1/orgs/:orgId/reports/:id/download - Get signed download URL (15 min) (O A M C)
   router.get(
     '/:id/download',
-    requireOrgRole('member'),
+    requireOrgRole('client_viewer'),
     async (req: Request, res: Response): Promise<void> => {
       const orgId = req.orgId!;
       const paramId = req.params.id;
@@ -220,6 +252,17 @@ export function orgReportsRouter(repos: Repositories, options?: ReportsRouterOpt
 
       const report = await repos.reports.findById(orgId, reportId);
       if (!report) {
+        res.status(404).json({
+          error: {
+            code: ErrorCode.NOT_FOUND,
+            message: 'Report not found.',
+            details: {},
+          },
+        });
+        return;
+      }
+
+      if (req.clientSiteIds && (!report.siteId || !req.clientSiteIds.includes(report.siteId))) {
         res.status(404).json({
           error: {
             code: ErrorCode.NOT_FOUND,

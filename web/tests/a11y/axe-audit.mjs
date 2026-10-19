@@ -55,6 +55,8 @@ const screens = {
   'S-43 Branding': '/settings/branding',
   'S-44 Billing': '/settings/billing',
   'S-48 Account': '/settings/account',
+  'S-60 Portal Home': '/portal',
+  'S-61 Portal Site': `/portal/sites/${site.id}`,
 };
 
 let failures = 0;

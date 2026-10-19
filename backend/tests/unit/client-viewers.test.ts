@@ -224,14 +224,14 @@ describe('P4-08 Client Viewers (S-42) & Strict Isolation', () => {
     vi.mocked(repos.sites.listSummaries).mockResolvedValue(new Map());
 
     vi.mocked(repos.issues.findById).mockImplementation((orgId: string, issueId: string) => {
-      if (orgId === testOrg.id && issueId === issueOnA.id) return Promise.resolve(issueOnA);
-      if (orgId === testOrg.id && issueId === issueOnB.id) return Promise.resolve(issueOnB);
+      if (orgId === testOrg.id && issueId === issueOnA.id) return Promise.resolve(issueOnA as never);
+      if (orgId === testOrg.id && issueId === issueOnB.id) return Promise.resolve(issueOnB as never);
       return Promise.resolve(null);
     });
 
     vi.mocked(repos.issues.listBySite).mockImplementation((orgId: string, siteId: string) => {
-      if (orgId === testOrg.id && siteId === siteA.id) return Promise.resolve([issueOnA]);
-      if (orgId === testOrg.id && siteId === siteB.id) return Promise.resolve([issueOnB]);
+      if (orgId === testOrg.id && siteId === siteA.id) return Promise.resolve([issueOnA as never]);
+      if (orgId === testOrg.id && siteId === siteB.id) return Promise.resolve([issueOnB as never]);
       return Promise.resolve([]);
     });
 
@@ -246,6 +246,7 @@ describe('P4-08 Client Viewers (S-42) & Strict Isolation', () => {
             body: 'Internal note for agency devs only',
             visibleToClient: false,
             createdAt: new Date(),
+            updatedAt: new Date(),
           },
           {
             id: 'note-2',
@@ -255,6 +256,7 @@ describe('P4-08 Client Viewers (S-42) & Strict Isolation', () => {
             body: 'Client visible note: fixing in next sprint',
             visibleToClient: true,
             createdAt: new Date(),
+            updatedAt: new Date(),
           },
         ]);
       }
@@ -411,6 +413,8 @@ describe('P4-08 Client Viewers (S-42) & Strict Isolation', () => {
           updatedAt: new Date(),
         },
         org: testOrg,
+        inviter: null,
+        isValid: true,
         isExpired: false,
         isAccepted: false,
         isRevoked: false,
