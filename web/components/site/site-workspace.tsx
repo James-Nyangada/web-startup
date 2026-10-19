@@ -332,6 +332,11 @@ export function SiteWorkspace({ startTab = 0, orgSlug, siteId }: SiteWorkspacePr
             </a>
             <span>{platformLabel(site.platform)}</span>
             {site.clientName && <span>Client: {site.clientName}</span>}
+            {site.status === "paused" && (
+              <span className="inline-flex items-center gap-1 rounded-full bg-warn/15 px-2 py-0.5 text-xs font-semibold text-warn">
+                Paused
+              </span>
+            )}
             {isVerified ? (
               <span className="inline-flex items-center gap-1 font-medium text-ok">
                 <Icon d={I.fixed} />
@@ -357,14 +362,35 @@ export function SiteWorkspace({ startTab = 0, orgSlug, siteId }: SiteWorkspacePr
           <button
             type="button"
             onClick={scanNow}
-            disabled={startingScan}
-            className="ease-ui flex h-10 items-center gap-2 rounded-full border-0 bg-primary px-4 text-sm font-semibold text-on-primary hover:bg-primary-hover disabled:opacity-70"
+            disabled={startingScan || site.status === "paused"}
+            title={site.status === "paused" ? "Site is paused" : undefined}
+            className="ease-ui flex h-10 items-center gap-2 rounded-full border-0 bg-primary px-4 text-sm font-semibold text-on-primary hover:bg-primary-hover disabled:opacity-70 disabled:cursor-not-allowed"
           >
             <Icon d={I.refresh} strokeWidth={2} />
-            {startingScan ? "Starting…" : "Scan now"}
+            {startingScan ? "Starting…" : site.status === "paused" ? "Paused" : "Scan now"}
           </button>
         </div>
       </div>
+
+      {site.status === "paused" && (
+        <div
+          role="status"
+          className="mt-4 flex items-center justify-between gap-4 rounded-xl border border-warn/30 bg-warn/10 p-4 text-ink"
+        >
+          <div className="flex items-center gap-3">
+            <span className="text-warn font-bold">⚠</span>
+            <span className="text-sm font-medium">
+              This site is paused due to a plan downgrade. Automated scans and rechecks are inactive, but all historical data, scans, and reports remain safe and accessible.
+            </span>
+          </div>
+          <a
+            href="/settings/billing"
+            className="ease-ui rounded-full bg-primary px-4 py-1.5 text-xs font-semibold text-on-primary hover:bg-primary-hover shadow-card shrink-0"
+          >
+            Manage plan
+          </a>
+        </div>
+      )}
 
       {/* Mobile: site tabs become a "Site menu" select (spec 7.1). */}
       <div className="mt-6 mb-6 md:hidden">

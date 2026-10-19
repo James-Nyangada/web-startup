@@ -8,6 +8,7 @@ import {
   appApi,
   type ApiBillingInfo,
   type ApiInvoice,
+  type ApiPlanChangePreview,
 } from "@/lib/app-api";
 import { openPaddleCheckout } from "@/lib/paddle";
 import { useFocusTrap } from "@/components/use-focus-trap";
@@ -104,8 +105,13 @@ export default function BillingSettingsPage() {
   const [loading, setLoading] = useState(true);
   const [orgSlug, setOrgSlug] = useState<string>("brightline");
   const [changePlanOpen, setChangePlanOpen] = useState(false);
+  const [downgradeModalOpen, setDowngradeModalOpen] = useState(false);
+  const [downgradeConfirmOpen, setDowngradeConfirmOpen] = useState(false);
+  const [previewData, setPreviewData] = useState<ApiPlanChangePreview | null>(null);
+  const [selectedPauseSites, setSelectedPauseSites] = useState<string[]>([]);
   const [cancelModalOpen, setCancelModalOpen] = useState(false);
-  const [cancelReason, setCancelReason] = useState("");
+  const [cancelReason, setCancelReason] = useState("too_expensive");
+  const [cancelFeedback, setCancelFeedback] = useState("");
   const [billingCycle, setBillingCycle] = useState<"month" | "year">("month");
   const [actionLoading, setActionLoading] = useState(false);
 
@@ -115,6 +121,9 @@ export default function BillingSettingsPage() {
 
   const cancelDialogRef = useRef<HTMLDivElement>(null);
   useFocusTrap(cancelDialogRef, cancelModalOpen);
+
+  const downgradeDialogRef = useRef<HTMLDivElement>(null);
+  useFocusTrap(downgradeDialogRef, downgradeModalOpen || downgradeConfirmOpen);
 
   // Resolve current active organisation
   useEffect(() => {
@@ -168,8 +177,70 @@ export default function BillingSettingsPage() {
           setActionLoading(false);
         },
       });
-    } catch (err: any) {
-      showToast(err?.message || "Failed to initiate checkout", { type: "warning" });
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      showToast(msg || "Failed to initiate checkout", { type: "warning" });
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleSelectPlan = async (planId: string) => {
+    try {
+      setActionLoading(true);
+      const preview = await appApi.previewPlanChange(orgSlug, {
+        plan: planId,
+        interval: billingCycle,
+      });
+      setPreviewData(preview);
+
+      if (preview.requiresPause) {
+        setSelectedPauseSites([]);
+        setDowngradeModalOpen(true);
+        return;
+      }
+
+      if (preview.isDowngrade) {
+        setDowngradeConfirmOpen(true);
+        return;
+      }
+
+      // Upgrade: Open Paddle checkout
+      await handleCheckout(planId);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      showToast(msg || "Failed to preview plan change", { type: "warning" });
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleConfirmDowngrade = async (pauseSiteIds: string[] = []) => {
+    if (!previewData) return;
+    try {
+      setActionLoading(true);
+      const res = await appApi.changePlan(orgSlug, {
+        plan: previewData.targetPlan,
+        interval: previewData.targetInterval,
+        pauseSiteIds,
+      });
+
+      if (res.scheduled) {
+        showToast(
+          `Your downgrade to ${previewData.targetPlan} has been scheduled for ${res.effectiveDate ? new Date(res.effectiveDate).toLocaleDateString() : "next renewal"}.${pauseSiteIds.length ? ` ${pauseSiteIds.length} site(s) paused.` : ""}`,
+          { type: "info" },
+        );
+      } else {
+        showToast(`Plan updated to ${previewData.targetPlan}.`, { type: "info" });
+      }
+
+      setDowngradeModalOpen(false);
+      setDowngradeConfirmOpen(false);
+      setChangePlanOpen(false);
+      await fetchBilling();
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      showToast(msg || "Failed to update plan", { type: "warning" });
     } finally {
       setActionLoading(false);
     }
@@ -178,12 +249,18 @@ export default function BillingSettingsPage() {
   const handleCancelSubscription = async () => {
     try {
       setActionLoading(true);
-      const res = await appApi.cancelSubscription(orgSlug, cancelReason);
-      showToast(res.message || "Subscription scheduled for cancellation.", { type: "info" });
+      const res = await appApi.cancelSubscription(orgSlug, {
+        reason: cancelReason || "other",
+        feedback: cancelFeedback,
+      });
+      const msg =
+        res.data?.message || res.message || "Subscription scheduled for cancellation.";
+      showToast(msg, { type: "info" });
       setCancelModalOpen(false);
       await fetchBilling();
-    } catch (err: any) {
-      showToast(err?.message || "Failed to cancel subscription", { type: "warning" });
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      showToast(msg || "Failed to cancel subscription", { type: "warning" });
     } finally {
       setActionLoading(false);
     }
@@ -215,7 +292,7 @@ export default function BillingSettingsPage() {
     }
   };
 
-  const { plan, planName, billingStatus, period, cancelAtPeriodEnd, usage, invoices } = billing;
+  const { plan, planName, billingStatus, subscription, period, cancelAtPeriodEnd, usage, invoices } = billing;
 
   const sitesPercent = usage.sites.limit
     ? Math.min(100, Math.round((usage.sites.current / usage.sites.limit) * 100))
@@ -265,6 +342,47 @@ export default function BillingSettingsPage() {
             </button>
           </div>
         )}
+
+        {/* Scheduled Downgrade Alert Banner */}
+        {subscription?.scheduledChange &&
+          typeof subscription.scheduledChange === "object" &&
+          (subscription.scheduledChange as Record<string, unknown>).action === "downgrade" && (
+            <div
+              role="status"
+              className="flex items-center justify-between gap-4 rounded-xl border border-primary/30 bg-primary/10 p-4 text-ink"
+            >
+              <div className="flex items-center gap-3">
+                <span className="text-primary font-bold">ℹ</span>
+                <span className="text-sm font-medium">
+                  Your plan is scheduled to downgrade to{" "}
+                  <strong className="uppercase">
+                    {String(
+                      (subscription.scheduledChange as Record<string, unknown>).plan || "store",
+                    )}
+                  </strong>{" "}
+                  on{" "}
+                  <strong>
+                    {formattedEndDate ||
+                      new Date(
+                        String(
+                          (subscription.scheduledChange as Record<string, unknown>).effectiveAt ||
+                            Date.now(),
+                        ),
+                      ).toLocaleDateString()}
+                  </strong>
+                  .
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setChangePlanOpen(true)}
+                disabled={actionLoading}
+                className="ease-ui rounded-full border border-line bg-surface px-4 py-1.5 text-xs font-semibold text-ink hover:bg-subtle shadow-card cursor-pointer shrink-0"
+              >
+                Change plan
+              </button>
+            </div>
+          )}
 
         {/* Current Plan Card */}
         <div className="rounded-2xl border border-line bg-surface p-6 shadow-card flex flex-col gap-5">
@@ -620,14 +738,14 @@ export default function BillingSettingsPage() {
                     <button
                       type="button"
                       disabled={isCurrent || actionLoading}
-                      onClick={() => handleCheckout(p.id)}
+                      onClick={() => handleSelectPlan(p.id)}
                       className={`ease-ui flex h-10 w-full items-center justify-center rounded-full text-xs font-semibold cursor-pointer transition-colors ${
                         isCurrent
                           ? "bg-subtle text-muted cursor-not-allowed"
                           : "bg-primary text-on-primary hover:bg-primary-hover shadow-card"
                       }`}
                     >
-                      {isCurrent ? "Current plan" : `Select ${p.name}`}
+                      {isCurrent ? "Current plan" : actionLoading ? "Checking..." : `Select ${p.name}`}
                     </button>
                   </div>
                 );
@@ -641,6 +759,189 @@ export default function BillingSettingsPage() {
                 className="ease-ui rounded-full border border-line px-5 py-2 text-xs font-semibold text-ink hover:bg-subtle cursor-pointer"
               >
                 Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Downgrade Sites Pause Selection Modal */}
+      {downgradeModalOpen && previewData && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="downgrade-pause-title"
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-ink/40 backdrop-blur-xs animate-fade-in"
+        >
+          <div
+            ref={downgradeDialogRef}
+            className="w-full max-w-lg rounded-3xl border border-line bg-surface p-6 sm:p-7 shadow-card flex flex-col gap-5 max-h-[90vh] overflow-y-auto"
+          >
+            <div className="flex items-center justify-between">
+              <h2 id="downgrade-pause-title" className="text-lg font-bold text-ink m-0">
+                Select Sites to Pause
+              </h2>
+              <button
+                type="button"
+                onClick={() => setDowngradeModalOpen(false)}
+                className="grid size-8 place-items-center rounded-full text-muted hover:bg-subtle hover:text-ink cursor-pointer"
+                aria-label="Close dialog"
+              >
+                <Icon d={I.close} size={18} />
+              </button>
+            </div>
+
+            <div className="rounded-xl border border-primary/20 bg-primary/5 p-4 text-xs text-ink leading-relaxed">
+              <p className="m-0 font-medium">
+                Downgrading to <strong className="uppercase">{previewData.targetPlan}</strong> allows a maximum of{" "}
+                <strong>
+                  {PLANS_CONFIG.find((p) => p.id === previewData.targetPlan)?.sites || 1} active site(s)
+                </strong>
+                . You currently have <strong>{previewData.activeSites.length} active sites</strong>.
+              </p>
+              <p className="m-0 mt-2 text-muted">
+                Please select at least <strong>{previewData.excessSites} site(s)</strong> to pause. Paused sites retain all scan data, issue histories, and reports, but automated monitoring is halted.
+              </p>
+            </div>
+
+            <div className="flex items-center justify-between text-xs font-semibold text-ink px-1">
+              <span>Your Active Sites</span>
+              <span
+                className={
+                  selectedPauseSites.length >= previewData.excessSites
+                    ? "text-ok"
+                    : "text-warn"
+                }
+              >
+                {selectedPauseSites.length} of {previewData.excessSites} required selected
+              </span>
+            </div>
+
+            <div className="flex flex-col gap-2 max-h-56 overflow-y-auto pr-1">
+              {previewData.activeSites.map((site) => {
+                const isChecked = selectedPauseSites.includes(site.id);
+                return (
+                  <label
+                    key={site.id}
+                    className={`flex items-center justify-between p-3 rounded-xl border cursor-pointer transition-colors ${
+                      isChecked
+                        ? "border-warn/40 bg-warn/5"
+                        : "border-line bg-surface hover:bg-subtle"
+                    }`}
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <input
+                        type="checkbox"
+                        checked={isChecked}
+                        onChange={() => {
+                          setSelectedPauseSites((prev) =>
+                            prev.includes(site.id)
+                              ? prev.filter((id) => id !== site.id)
+                              : [...prev, site.id],
+                          );
+                        }}
+                        className="size-4 rounded border-line text-primary focus:ring-primary"
+                      />
+                      <div className="flex flex-col min-w-0">
+                        <span className="text-xs font-semibold text-ink truncate">{site.name}</span>
+                        <span className="text-[11px] text-muted truncate">{site.rootUrl}</span>
+                      </div>
+                    </div>
+                    {isChecked && (
+                      <span className="rounded-full bg-warn/15 px-2 py-0.5 text-[10px] font-bold text-warn shrink-0">
+                        Will Pause
+                      </span>
+                    )}
+                  </label>
+                );
+              })}
+            </div>
+
+            <div className="flex items-center justify-end gap-3 pt-3 border-t border-line">
+              <button
+                type="button"
+                onClick={() => setDowngradeModalOpen(false)}
+                className="ease-ui rounded-full border border-line px-4 py-2 text-xs font-semibold text-ink hover:bg-subtle cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={selectedPauseSites.length < previewData.excessSites || actionLoading}
+                onClick={() => handleConfirmDowngrade(selectedPauseSites)}
+                className="ease-ui rounded-full bg-primary px-4 py-2 text-xs font-semibold text-on-primary hover:bg-primary-hover cursor-pointer shadow-card disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {actionLoading ? "Processing..." : `Confirm & Pause ${selectedPauseSites.length} Site(s)`}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Downgrade Confirmation Modal (No site pausing needed) */}
+      {downgradeConfirmOpen && previewData && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="downgrade-confirm-title"
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-ink/40 backdrop-blur-xs animate-fade-in"
+        >
+          <div
+            ref={downgradeDialogRef}
+            className="w-full max-w-md rounded-3xl border border-line bg-surface p-6 sm:p-7 shadow-card flex flex-col gap-5"
+          >
+            <div className="flex items-center justify-between">
+              <h2 id="downgrade-confirm-title" className="text-lg font-bold text-ink m-0">
+                Confirm Plan Downgrade
+              </h2>
+              <button
+                type="button"
+                onClick={() => setDowngradeConfirmOpen(false)}
+                className="grid size-8 place-items-center rounded-full text-muted hover:bg-subtle hover:text-ink cursor-pointer"
+                aria-label="Close dialog"
+              >
+                <Icon d={I.close} size={18} />
+              </button>
+            </div>
+
+            <p className="text-sm text-ink m-0">
+              Are you sure you want to downgrade your subscription to{" "}
+              <strong className="uppercase">{previewData.targetPlan}</strong>?
+            </p>
+
+            <div className="rounded-xl border border-line bg-subtle/50 p-4 text-xs text-muted flex flex-col gap-2">
+              <div className="flex justify-between">
+                <span>Target Plan:</span>
+                <span className="font-semibold text-ink uppercase">{previewData.targetPlan}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Effective Date:</span>
+                <span className="font-semibold text-ink">
+                  {previewData.effectiveDate
+                    ? new Date(previewData.effectiveDate).toLocaleDateString()
+                    : "End of current billing cycle"}
+                </span>
+              </div>
+              <p className="m-0 mt-1">
+                Your current plan features will remain active until your renewal date, when your plan will automatically transition.
+              </p>
+            </div>
+
+            <div className="flex items-center justify-end gap-3 pt-3 border-t border-line">
+              <button
+                type="button"
+                onClick={() => setDowngradeConfirmOpen(false)}
+                className="ease-ui rounded-full border border-line px-4 py-2 text-xs font-semibold text-ink hover:bg-subtle cursor-pointer"
+              >
+                Keep Current Plan
+              </button>
+              <button
+                type="button"
+                disabled={actionLoading}
+                onClick={() => handleConfirmDowngrade([])}
+                className="ease-ui rounded-full bg-primary px-4 py-2 text-xs font-semibold text-on-primary hover:bg-primary-hover cursor-pointer shadow-card"
+              >
+                {actionLoading ? "Scheduling..." : "Confirm Downgrade"}
               </button>
             </div>
           </div>
@@ -677,22 +978,39 @@ export default function BillingSettingsPage() {
               Your subscription will remain active until <strong>{formattedEndDate}</strong>. After this date, your organization will transition to read-only mode.
             </p>
 
-            <div className="flex flex-col gap-2">
-              <label htmlFor="cancel-reason" className="text-xs font-medium text-muted">
-                Reason for canceling (optional)
-              </label>
-              <select
-                id="cancel-reason"
-                value={cancelReason}
-                onChange={(e) => setCancelReason(e.target.value)}
-                className="rounded-xl border border-line bg-subtle/50 px-3 py-2 text-xs text-ink focus:border-primary focus:outline-none"
-              >
-                <option value="">Select a reason...</option>
-                <option value="too_expensive">Too expensive / reduced budget</option>
-                <option value="features_missing">Missing specific accessibility features</option>
-                <option value="temporary">Temporary pause / switching client focus</option>
-                <option value="other">Other reason</option>
-              </select>
+            <div className="flex flex-col gap-3">
+              <div className="flex flex-col gap-1.5">
+                <label htmlFor="cancel-reason" className="text-xs font-medium text-muted">
+                  Reason for canceling (optional)
+                </label>
+                <select
+                  id="cancel-reason"
+                  value={cancelReason}
+                  onChange={(e) => setCancelReason(e.target.value)}
+                  className="rounded-xl border border-line bg-subtle/50 px-3 py-2 text-xs text-ink focus:border-primary focus:outline-none"
+                >
+                  <option value="too_expensive">Too expensive / reduced budget</option>
+                  <option value="missing_features">Missing features I need</option>
+                  <option value="fixed_issues">Fixed accessibility issues / project completed</option>
+                  <option value="hard_to_use">Hard to use / steep learning curve</option>
+                  <option value="switched_tool">Switched to another tool</option>
+                  <option value="other">Other reason</option>
+                </select>
+              </div>
+
+              <div className="flex flex-col gap-1.5">
+                <label htmlFor="cancel-feedback" className="text-xs font-medium text-muted">
+                  Feedback or comments (optional)
+                </label>
+                <textarea
+                  id="cancel-feedback"
+                  value={cancelFeedback}
+                  onChange={(e) => setCancelFeedback(e.target.value)}
+                  rows={3}
+                  placeholder="Tell us what we could do better..."
+                  className="rounded-xl border border-line bg-subtle/50 px-3 py-2 text-xs text-ink focus:border-primary focus:outline-none resize-none"
+                />
+              </div>
             </div>
 
             <div className="flex items-center justify-end gap-3 pt-3 border-t border-line">

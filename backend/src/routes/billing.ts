@@ -19,14 +19,36 @@ const checkoutSchema = z.object({
 });
 
 const cancelSchema = z.object({
-  reason: z.string().max(500).optional(),
+  reason: z
+    .enum([
+      'too_expensive',
+      'missing_features',
+      'fixed_issues',
+      'hard_to_use',
+      'switched_tool',
+      'other',
+    ])
+    .or(z.string().max(500))
+    .optional(),
+  feedback: z.string().max(1000).optional(),
 });
 
 const changePlanSchema = z.object({
   plan: z.enum(['store', 'growth', 'agency', 'agency_pro']),
   interval: z.enum(['month', 'year']).default('month'),
   preview: z.boolean().optional(),
+  pauseSiteIds: z.array(z.string()).optional(),
+  removeMemberIds: z.array(z.string()).optional(),
+  effectiveNow: z.boolean().optional(),
 });
+
+const PLAN_TIER_RANK: Record<string, number> = {
+  trial: 0,
+  store: 1,
+  growth: 2,
+  agency: 3,
+  agency_pro: 4,
+};
 
 export function orgBillingRouter(repos: Repositories): Router {
   const router = Router({ mergeParams: true });
@@ -170,53 +192,220 @@ export function orgBillingRouter(repos: Repositories): Router {
       return;
     }
 
-    const { plan: targetPlan, interval, preview } = parse.data;
-    const newPriceId = getPriceIdForPlan(targetPlan, interval);
+    const {
+      plan: targetPlan,
+      interval,
+      preview,
+      pauseSiteIds = [],
+      removeMemberIds = [],
+      effectiveNow,
+    } = parse.data;
+
+    const currentPlan = req.org?.plan ?? 'trial';
     const sub = await repos.subscriptions.findByOrgId(req.orgId!);
+    const currentInterval = (sub?.interval as 'month' | 'year' | undefined) ?? 'month';
+
+    const currentRank = PLAN_TIER_RANK[currentPlan] ?? 0;
+    const targetRank = PLAN_TIER_RANK[targetPlan] ?? 0;
+
+    const isUpgrade =
+      targetRank > currentRank ||
+      (targetRank === currentRank && currentInterval === 'month' && interval === 'year');
+    const isDowngrade =
+      targetRank < currentRank ||
+      (targetRank === currentRank && currentInterval === 'year' && interval === 'month');
+
+    const targetLimits = getPlanLimits(targetPlan);
+    const targetDef = getPlanDefinition(targetPlan);
+    const targetPrice = interval === 'year' ? targetDef.priceAnnual : targetDef.priceMonthly;
+    const newPriceId = getPriceIdForPlan(targetPlan, interval);
+
+    // Check active sites and members
+    const allSites = await repos.sites.list(req.orgId!, {});
+    const activeSites = allSites.filter((s) => s.status !== 'paused');
+    const excessSites = Math.max(0, activeSites.length - targetLimits.maxSites);
+
+    const members = await repos.memberships.list(req.orgId!);
+    const excessMembers = Math.max(0, members.length - targetLimits.teamMembers);
+
+    const requiresPause = isDowngrade && (excessSites > 0 || excessMembers > 0);
+
+    // Calculate proration or effective schedule
+    let estimatedProratedCents = 0;
+    let proration: 'immediate_prorated' | 'next_period' = 'immediate_prorated';
+    let effectiveDate: string | null = null;
+
+    if (isUpgrade) {
+      proration = 'immediate_prorated';
+      if (sub?.currentPeriodEnd && sub.currentPeriodStart) {
+        const now = Date.now();
+        const end = sub.currentPeriodEnd.getTime();
+        const start = sub.currentPeriodStart.getTime();
+        const totalDuration = Math.max(1, end - start);
+        const remainingRatio = Math.max(0, Math.min(1, (end - now) / totalDuration));
+
+        const currentDef = getPlanDefinition(currentPlan);
+        const currentPrice =
+          currentInterval === 'year' ? currentDef.priceAnnual : currentDef.priceMonthly;
+        const creditCents = Math.round(currentPrice * 100 * remainingRatio);
+        const chargeCents = Math.round(targetPrice * 100 * remainingRatio);
+        estimatedProratedCents = Math.max(0, chargeCents - creditCents);
+      }
+    } else if (isDowngrade) {
+      proration = 'next_period';
+      effectiveDate = sub?.currentPeriodEnd ? sub.currentPeriodEnd.toISOString() : null;
+    }
 
     if (preview) {
-      const def = getPlanDefinition(targetPlan);
-      const limits = getPlanLimits(targetPlan);
       res.status(200).json({
         data: {
           preview: true,
-          plan: targetPlan,
-          interval,
+          isUpgrade,
+          isDowngrade,
+          currentPlan,
+          targetPlan,
+          targetInterval: interval,
           priceId: newPriceId,
-          price: interval === 'year' ? def.priceAnnual : def.priceMonthly,
-          limits,
-          proration: 'prorated_immediately',
+          price: targetPrice,
+          proration,
+          estimatedProratedCents,
+          effectiveDate,
+          requiresPause,
+          excessSites,
+          excessMembers,
+          activeSites: activeSites.map((s) => ({
+            id: s.id,
+            name: s.name,
+            rootUrl: s.rootUrl,
+            score: s.score,
+          })),
+          members: members.map((m) => ({
+            userId: m.userId,
+            email: m.email,
+            role: m.role,
+          })),
         },
       });
       return;
     }
 
-    // Apply plan change
-    if (sub) {
-      await repos.subscriptions.upsert({
-        ...sub,
-        orgId: asOrgId(sub.orgId),
-        paddlePriceId: newPriceId,
-        plan: targetPlan,
-        interval,
-        cancelAtPeriodEnd: false,
-      });
+    // Apply pause requirement validation for downgrades
+    if (requiresPause) {
+      if (pauseSiteIds.length < excessSites) {
+        res.status(422).json({
+          error: {
+            code: 'PLAN_LIMIT',
+            message: `You must select at least ${excessSites} site(s) to pause before downgrading to ${targetLimits.name}.`,
+            details: {
+              limit: targetLimits.maxSites,
+              current: activeSites.length,
+              excessSites,
+              excessMembers,
+            },
+          },
+        });
+        return;
+      }
+
+      // Pause selected sites (retains all data, no data deleted!)
+      for (const siteId of pauseSiteIds) {
+        await repos.sites.pause(req.orgId!, siteId);
+        await repos.auditLog.write(req.orgId!, {
+          actorId: req.auth?.user.id,
+          actorType: 'user',
+          action: 'site.paused',
+          targetId: siteId,
+          targetType: 'site',
+          data: { reason: 'downgrade_overflow' },
+          ip: req.ip,
+          userAgent: req.headers['user-agent'],
+        });
+      }
+
+      // Remove excess members if specified
+      for (const memberId of removeMemberIds) {
+        await repos.memberships.remove(req.orgId!, memberId);
+        await repos.auditLog.write(req.orgId!, {
+          actorId: req.auth?.user.id,
+          actorType: 'user',
+          action: 'member.removed',
+          targetId: memberId,
+          targetType: 'membership',
+          data: { reason: 'downgrade_overflow' },
+          ip: req.ip,
+          userAgent: req.headers['user-agent'],
+        });
+      }
     }
 
-    await repos.organizations.update(req.orgId!, {
+    // Upgrade or immediate downgrade (e.g. trial or effectiveNow)
+    if (isUpgrade || effectiveNow || !sub?.currentPeriodEnd) {
+      if (sub) {
+        await repos.subscriptions.upsert({
+          ...sub,
+          orgId: asOrgId(sub.orgId),
+          paddlePriceId: newPriceId,
+          plan: targetPlan,
+          interval,
+          cancelAtPeriodEnd: false,
+          scheduledChange: null,
+        });
+      }
+
+      await repos.organizations.update(req.orgId!, {
+        plan: targetPlan,
+        billingStatus: 'active',
+      });
+
+      await repos.auditLog.write(req.orgId!, {
+        actorId: req.auth?.user.id,
+        actorType: 'user',
+        action: isUpgrade ? 'billing.upgraded' : 'billing.plan_changed',
+        targetType: 'organization',
+        targetId: req.orgId!,
+        ip: req.ip,
+        userAgent: req.headers['user-agent'],
+        data: { plan: targetPlan, interval, priceId: newPriceId },
+      });
+
+      res.status(200).json({
+        data: {
+          success: true,
+          plan: targetPlan,
+          interval,
+          isUpgrade,
+          isDowngrade: false,
+          scheduled: false,
+          effectiveDate: null,
+        },
+      });
+      return;
+    }
+
+    // Scheduled downgrade for next period
+    const scheduledChangeData = {
+      action: 'downgrade',
       plan: targetPlan,
-      billingStatus: 'active',
+      interval,
+      effectiveAt: sub.currentPeriodEnd.toISOString(),
+      pauseSiteIds,
+    };
+
+    await repos.subscriptions.upsert({
+      ...sub,
+      orgId: asOrgId(sub.orgId),
+      scheduledChange: scheduledChangeData,
     });
 
     await repos.auditLog.write(req.orgId!, {
       actorId: req.auth?.user.id,
       actorType: 'user',
-      action: 'billing.plan_changed',
+      action: 'billing.downgrade_scheduled',
       targetType: 'organization',
       targetId: req.orgId!,
       ip: req.ip,
       userAgent: req.headers['user-agent'],
-      data: { plan: targetPlan, interval, priceId: newPriceId },
+      data: scheduledChangeData,
     });
 
     res.status(200).json({
@@ -224,14 +413,18 @@ export function orgBillingRouter(repos: Repositories): Router {
         success: true,
         plan: targetPlan,
         interval,
+        isUpgrade: false,
+        isDowngrade: true,
+        scheduled: true,
+        effectiveDate: sub.currentPeriodEnd.toISOString(),
       },
     });
   });
 
-  // POST /v1/orgs/:orgId/billing/cancel - Cancel at period end
+  // POST /v1/orgs/:orgId/billing/cancel - Cancel at period end with reason survey
   router.post('/cancel', async (req: Request, res: Response): Promise<void> => {
     const parse = cancelSchema.safeParse(req.body);
-    const reason = parse.success ? parse.data.reason : undefined;
+    const { reason = 'unspecified', feedback = null } = parse.success ? parse.data : {};
 
     const sub = await repos.subscriptions.findByOrgId(req.orgId!);
     if (!sub) {
@@ -241,6 +434,19 @@ export function orgBillingRouter(repos: Repositories): Router {
       return;
     }
 
+    const scheduledChange = {
+      action: 'cancel',
+      reason,
+      feedback,
+      effectiveAt: sub.currentPeriodEnd ? sub.currentPeriodEnd.toISOString() : null,
+    };
+
+    await repos.subscriptions.upsert({
+      ...sub,
+      orgId: asOrgId(sub.orgId),
+      cancelAtPeriodEnd: true,
+      scheduledChange,
+    });
     await repos.subscriptions.setCancelAtPeriodEnd(req.orgId!, true);
 
     await repos.auditLog.write(req.orgId!, {
@@ -251,7 +457,7 @@ export function orgBillingRouter(repos: Repositories): Router {
       targetId: sub.id,
       ip: req.ip,
       userAgent: req.headers['user-agent'],
-      data: { reason: reason ?? null },
+      data: scheduledChange,
     });
 
     res.status(200).json({
@@ -259,6 +465,7 @@ export function orgBillingRouter(repos: Repositories): Router {
         success: true,
         cancelAtPeriodEnd: true,
         currentPeriodEnd: sub.currentPeriodEnd,
+        effectiveAt: sub.currentPeriodEnd ? sub.currentPeriodEnd.toISOString() : null,
         message:
           'Your subscription will remain active until the end of the current billing period.',
       },
@@ -275,6 +482,12 @@ export function orgBillingRouter(repos: Repositories): Router {
       return;
     }
 
+    await repos.subscriptions.upsert({
+      ...sub,
+      orgId: asOrgId(sub.orgId),
+      cancelAtPeriodEnd: false,
+      scheduledChange: null,
+    });
     await repos.subscriptions.setCancelAtPeriodEnd(req.orgId!, false);
 
     await repos.auditLog.write(req.orgId!, {
@@ -292,7 +505,7 @@ export function orgBillingRouter(repos: Repositories): Router {
       data: {
         success: true,
         cancelAtPeriodEnd: false,
-        message: 'Subscription renewal has been resumed.',
+        message: 'Your subscription cancellation has been reversed and your plan will continue.',
       },
     });
   });

@@ -201,16 +201,18 @@ describe('Chunk P4-03: Paddle Webhooks and Staff Replay Tooling', () => {
     it('replays an event by ID and flags isReplay in audit log', async () => {
       const { repos } = fakeRepos();
       const payload = loadFixture('subscription.created.json');
+      const eventId = payload.event_id || 'evt_sub_created_test';
+      const eventType = payload.event_type || 'subscription.created';
       vi.mocked(repos.paddleEvents.findById).mockResolvedValueOnce({
-        eventId: payload.event_id,
-        eventType: payload.event_type,
+        eventId,
+        eventType,
         receivedAt: new Date(),
         processedAt: new Date(),
         payload,
         error: null,
       });
 
-      const result = await replayPaddleEventById(repos, payload.event_id);
+      const result = await replayPaddleEventById(repos, eventId);
 
       expect(result.handled).toBe(true);
       // During replay, record() should NOT be called to avoid conflict

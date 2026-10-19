@@ -215,6 +215,25 @@ export interface ApiCheckoutSettings {
   clientToken: string;
 }
 
+export interface ApiPlanChangePreview {
+  preview: boolean;
+  isUpgrade: boolean;
+  isDowngrade: boolean;
+  currentPlan: string;
+  targetPlan: string;
+  targetInterval: 'month' | 'year';
+  priceId: string;
+  price: number;
+  proration: 'immediate_prorated' | 'next_period';
+  estimatedProratedCents: number;
+  effectiveDate: string | null;
+  requiresPause: boolean;
+  excessSites: number;
+  excessMembers: number;
+  activeSites: Array<{ id: string; name: string; rootUrl: string; score?: number | null }>;
+  members: Array<{ userId: string; email?: string; role: string }>;
+}
+
 /* ---------- Formatting ---------- */
 
 const DAY = new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short" });
@@ -499,16 +518,63 @@ export const appApi = {
   ) =>
     apiClient<ApiCheckoutSettings>(`/v1/orgs/${org}/billing/checkout`, json(params)),
 
-  cancelSubscription: (org: string, reason?: string) =>
-    apiClient<{ success: boolean; cancelAtPeriodEnd: boolean; message: string }>(
-      `/v1/orgs/${org}/billing/cancel`,
-      json({ reason }),
-    ),
+  previewPlanChange: (
+    org: string,
+    params: { plan: string; interval?: 'month' | 'year' },
+  ) =>
+    apiClient<{ data: ApiPlanChangePreview }>(
+      `/v1/orgs/${org}/billing/change-plan`,
+      json({ ...params, preview: true }),
+    ).then((r) => r.data),
+
+  changePlan: (
+    org: string,
+    params: {
+      plan: string;
+      interval?: 'month' | 'year';
+      pauseSiteIds?: string[];
+      removeMemberIds?: string[];
+      effectiveNow?: boolean;
+    },
+  ) =>
+    apiClient<{
+      data: {
+        success: boolean;
+        plan: string;
+        interval: string;
+        isUpgrade: boolean;
+        isDowngrade: boolean;
+        scheduled: boolean;
+        effectiveDate?: string | null;
+      };
+    }>(`/v1/orgs/${org}/billing/change-plan`, json(params)).then((r) => r.data),
+
+  cancelSubscription: (org: string, params?: { reason?: string; feedback?: string } | string) => {
+    const payload = typeof params === 'string' ? { reason: params } : (params ?? {});
+    return apiClient<{
+      data?: { success: boolean; cancelAtPeriodEnd: boolean; message: string; effectiveAt?: string | null };
+      success?: boolean;
+      cancelAtPeriodEnd?: boolean;
+      message?: string;
+    }>(`/v1/orgs/${org}/billing/cancel`, json(payload));
+  },
 
   resumeSubscription: (org: string) =>
-    apiClient<{ success: boolean; cancelAtPeriodEnd: boolean; message: string }>(
-      `/v1/orgs/${org}/billing/resume`,
-      json({}),
+    apiClient<{
+      data?: { success: boolean; cancelAtPeriodEnd: boolean; message: string };
+      success?: boolean;
+      cancelAtPeriodEnd?: boolean;
+      message?: string;
+    }>(`/v1/orgs/${org}/billing/resume`, json({})),
+
+  pauseSite: (org: string, siteId: string) =>
+    apiClient<{ data: { site: ApiSite } }>(`/v1/orgs/${org}/sites/${siteId}/pause`, json({})).then(
+      (r) => r.data.site,
+    ),
+
+  resumeSite: (org: string, siteId: string) =>
+    apiClient<{ data: { site: ApiSite } }>(`/v1/orgs/${org}/sites/${siteId}/resume`, json({})).then(
+      (r) => r.data.site,
     ),
 
   getInvoices: (org: string) =>
