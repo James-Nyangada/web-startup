@@ -1,4 +1,17 @@
-import { and, asc, desc, eq, ilike, isNotNull, isNull, lte, ne, or, sql } from 'drizzle-orm';
+import {
+  and,
+  asc,
+  desc,
+  eq,
+  ilike,
+  isNotNull,
+  isNull,
+  lte,
+  ne,
+  notInArray,
+  or,
+  sql,
+} from 'drizzle-orm';
 import { randomBytes } from 'node:crypto';
 import type { Database } from '../client.js';
 import type { Platform, Standard } from '../../scanner/types.js';
@@ -394,7 +407,7 @@ export function sitesRepository(db: Database) {
             isNotNull(sites.nextScanAt),
             lte(sites.nextScanAt, new Date()),
             isNull(organizations.deletedAt),
-            ne(organizations.billingStatus, 'read_only'),
+            notInArray(organizations.billingStatus, ['read_only', 'paused', 'canceled']),
           ),
         )
         .orderBy(asc(sites.nextScanAt))

@@ -11,6 +11,8 @@ import {
   getPlanForPriceId,
 } from '../shared/plans.js';
 import { processPaddleEvent, verifyPaddleWebhookSignature } from '../billing/paddle.js';
+import { type PaddleClient, defaultPaddleClient } from '../billing/paddle-api.js';
+import { enqueuePaddleProcess } from '../worker/boss.js';
 import { logger } from '../lib/logger.js';
 import type { EmailSender } from '../emails/sender.js';
 
@@ -52,7 +54,10 @@ const PLAN_TIER_RANK: Record<string, number> = {
   agency_pro: 4,
 };
 
-export function orgBillingRouter(repos: Repositories): Router {
+export function orgBillingRouter(
+  repos: Repositories,
+  paddleClient: PaddleClient = defaultPaddleClient,
+): Router {
   const router = Router({ mergeParams: true });
   // All billing routes are owner-only per Spec Section 7.9
   router.use(requireOrgRole('owner'));
@@ -79,10 +84,14 @@ export function orgBillingRouter(repos: Repositories): Router {
 
     const invoicesList = await repos.invoices.listByOrgId(req.orgId!, 10);
 
-    const isSandbox = (process.env.PADDLE_ENV || 'sandbox') === 'sandbox';
-    const customerPortalUrl = org.paddleCustomerId
-      ? `https://${isSandbox ? 'sandbox-' : ''}customer-portal.paddle.com`
-      : null;
+    let customerPortalUrl: string | null = null;
+    if (org.paddleCustomerId) {
+      const session = await paddleClient.createCustomerPortalSession(
+        org.paddleCustomerId,
+        sub ? [sub.paddleSubscriptionId] : undefined,
+      );
+      customerPortalUrl = session.url;
+    }
 
     res.status(200).json({
       data: {
@@ -342,6 +351,14 @@ export function orgBillingRouter(repos: Repositories): Router {
 
     // Upgrade or immediate downgrade (e.g. trial or effectiveNow)
     if (isUpgrade || effectiveNow || !sub?.currentPeriodEnd) {
+      // Update subscription in Paddle if an active Paddle subscription exists
+      if (sub?.paddleSubscriptionId) {
+        await paddleClient.updateSubscription(sub.paddleSubscriptionId, {
+          priceId: newPriceId,
+          prorationBillingMode: isUpgrade ? 'prorated_immediately' : 'full_next_billing_period',
+        });
+      }
+
       if (sub) {
         await repos.subscriptions.upsert({
           ...sub,
@@ -385,6 +402,13 @@ export function orgBillingRouter(repos: Repositories): Router {
     }
 
     // Scheduled downgrade for next period
+    if (sub?.paddleSubscriptionId) {
+      await paddleClient.updateSubscription(sub.paddleSubscriptionId, {
+        priceId: newPriceId,
+        prorationBillingMode: 'full_next_billing_period',
+      });
+    }
+
     const scheduledChangeData = {
       action: 'downgrade',
       plan: targetPlan,
@@ -436,6 +460,12 @@ export function orgBillingRouter(repos: Repositories): Router {
       return;
     }
 
+    if (sub.paddleSubscriptionId) {
+      await paddleClient.cancelSubscription(sub.paddleSubscriptionId, {
+        effectiveFrom: 'next_billing_period',
+      });
+    }
+
     const scheduledChange = {
       action: 'cancel',
       reason,
@@ -484,6 +514,10 @@ export function orgBillingRouter(repos: Repositories): Router {
       return;
     }
 
+    if (sub.paddleSubscriptionId) {
+      await paddleClient.resumeSubscription(sub.paddleSubscriptionId);
+    }
+
     await repos.subscriptions.upsert({
       ...sub,
       orgId: asOrgId(sub.orgId),
@@ -520,8 +554,18 @@ export function orgBillingRouter(repos: Repositories): Router {
       return;
     }
 
-    const isSandbox = (process.env.PADDLE_ENV || 'sandbox') === 'sandbox';
-    const portalUrl = `https://${isSandbox ? 'sandbox-' : ''}customer-portal.paddle.com`;
+    let portalUrl: string;
+    if (org.paddleCustomerId) {
+      const sub = await repos.subscriptions.findByOrgId(req.orgId!);
+      const session = await paddleClient.createCustomerPortalSession(
+        org.paddleCustomerId,
+        sub ? [sub.paddleSubscriptionId] : undefined,
+      );
+      portalUrl = session.url;
+    } else {
+      const isSandbox = (process.env.PADDLE_ENV || 'sandbox') === 'sandbox';
+      portalUrl = `https://${isSandbox ? 'sandbox-' : ''}customer-portal.paddle.com`;
+    }
 
     res.status(200).json({
       data: {
@@ -580,9 +624,46 @@ export function paddleWebhookRouter(
       return;
     }
 
-    // Process event asynchronously/idempotently per Section 12.2
+    const eventId = (bodyObj.event_id || bodyObj.eventId) as string | undefined;
+    const eventType = (bodyObj.event_type || bodyObj.eventType) as string | undefined;
+
+    if (!eventId || !eventType) {
+      res
+        .status(400)
+        .json({ error: { code: 'INVALID_EVENT', message: 'Missing event_id or event_type' } });
+      return;
+    }
+
+    // 1. Insert into paddle_events table (event_id PK makes duplicates no-ops per Section 12.2)
+    const recorded = await repos.paddleEvents.record(eventId, eventType, bodyObj);
+    if (!recorded) {
+      // Duplicate event
+      res.status(200).json({
+        received: true,
+        handled: true,
+        duplicate: true,
+        eventType,
+      });
+      return;
+    }
+
+    // 2. Return 200 immediately and enqueue paddle.process when pg-boss queue is present (Section 12.2)
+    if (options?.boss) {
+      const data = (bodyObj.data || {}) as Record<string, unknown>;
+      const subscriptionId = (data.id || data.subscription_id) as string | undefined;
+      await enqueuePaddleProcess(options.boss, eventId, subscriptionId);
+      res.status(200).json({
+        received: true,
+        handled: true,
+        queued: true,
+        duplicate: false,
+        eventType,
+      });
+      return;
+    }
+
+    // Fallback synchronous processing for tests or environments without worker
     const result = await processPaddleEvent(bodyObj, repos, {
-      boss: options?.boss,
       emailSender: options?.emailSender,
     });
 

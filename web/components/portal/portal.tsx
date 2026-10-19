@@ -482,12 +482,15 @@ export function PortalSite({ siteId: propSiteId }: { siteId?: string }) {
                   Download {data.reports[0].name} (PDF)
                 </a>
               )}
-              <a
-                href={data.reports[0] ? data.reports[0].downloadUrl : "#"}
-                className={BTN_OUTLINE}
-              >
-                Download evidence pack
-              </a>
+              {data.reports.some((r) => r.type === 'evidence_pack') && (
+                <a
+                  href={data.reports.find((r) => r.type === 'evidence_pack')!.downloadUrl}
+                  download
+                  className={BTN_OUTLINE}
+                >
+                  Download evidence pack
+                </a>
+              )}
               <a
                 href={contactHref}
                 className="ease-ui grid h-12 place-items-center rounded-full bg-brand font-semibold text-surface no-underline hover:text-surface hover:opacity-90"

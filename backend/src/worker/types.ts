@@ -46,3 +46,7 @@ export interface FreeCheckJobPayload {
 export interface ReportRenderJobPayload {
   reportId: string;
 }
+
+export interface PaddleProcessJobPayload {
+  eventId: string;
+}

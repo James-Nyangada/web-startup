@@ -12,6 +12,7 @@ import { orgIssuesRouter } from './issues.js';
 import { orgReportsRouter } from './reports.js';
 import { orgBillingRouter, orgInvoicesRouter } from './billing.js';
 import { orgBrandingRouter } from './branding.js';
+import type { PaddleClient } from '../billing/paddle-api.js';
 import { type StorageService, getStorage } from '../storage/index.js';
 import { ErrorCode } from '../shared/errors.js';
 import { assertWithinPlan, getPlanDefinition, getPlanLimits } from '../shared/plans.js';
@@ -51,6 +52,7 @@ export function orgsRouter(
   scansOptions?: ScansRouterOptions,
   emailSender?: EmailSender,
   storage?: StorageService,
+  paddleClient?: PaddleClient,
 ): Router {
   const router = Router();
   router.use(requireAuth(auth));
@@ -987,7 +989,7 @@ export function orgsRouter(
   );
 
   // Mount Section 7.9 Billing router under orgScoped
-  orgScoped.use('/billing', orgBillingRouter(repos));
+  orgScoped.use('/billing', orgBillingRouter(repos, paddleClient));
 
   // Mount Section 7.9 Invoices router under orgScoped
   orgScoped.use('/invoices', orgInvoicesRouter(repos));

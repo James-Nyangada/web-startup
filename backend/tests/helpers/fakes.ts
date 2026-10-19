@@ -8,6 +8,7 @@ import type { GuardPolicy } from '../../src/scanner/net/guard.js';
 import { isPublicAddress } from '../../src/scanner/net/ip-ranges.js';
 import type { FreeChecksRouterOptions } from '../../src/routes/public/free-checks.js';
 import { MemoryStorageService, type StorageService } from '../../src/storage/index.js';
+import type { PaddleClient } from '../../src/billing/paddle-api.js';
 
 export const testConfig = {
   APP_URL: 'http://localhost:3000',
@@ -506,6 +507,7 @@ export function buildTestApp(
     repos?: Repositories;
     storage?: StorageService;
     freeChecksOptions?: FreeChecksRouterOptions;
+    paddleClient?: PaddleClient;
   } = {},
 ) {
   const defaultRepos = fakeRepos();
@@ -524,6 +526,7 @@ export function buildTestApp(
     auth: options.auth,
     storage,
     freeChecksOptions,
+    paddleClient: options.paddleClient,
   });
   return { app, join: defaultRepos.join, repos, storage };
 }

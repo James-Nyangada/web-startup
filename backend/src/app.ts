@@ -27,6 +27,7 @@ import { createEmailPreviewRouter } from './emails/preview-router.js';
 import { invitationsRouter } from './routes/invitations.js';
 import { reportsPublicRouter } from './routes/reports.js';
 import { paddleWebhookRouter } from './routes/billing.js';
+import type { PaddleClient } from './billing/paddle-api.js';
 import { getStorage, type StorageService } from './storage/index.js';
 import { portalRouter } from './routes/portal.js';
 
@@ -55,6 +56,7 @@ export interface AppDeps {
   emailSender?: EmailSender;
   storage?: StorageService;
   freeChecksOptions?: FreeChecksRouterOptions;
+  paddleClient?: PaddleClient;
 }
 
 export function createApp({
@@ -67,6 +69,7 @@ export function createApp({
   emailSender: injectedEmailSender,
   storage: injectedStorage,
   freeChecksOptions,
+  paddleClient,
 }: AppDeps): express.Express {
   const app = express();
   const emailSender = injectedEmailSender ?? new EmailSender();
@@ -113,7 +116,7 @@ export function createApp({
   const v1 = Router();
   v1.use('/auth', authRouter(auth, verifyTurnstile, config));
   v1.use('/me', meRouter(auth, repos));
-  v1.use('/orgs', orgsRouter(auth, repos, scansOptions, emailSender, storage));
+  v1.use('/orgs', orgsRouter(auth, repos, scansOptions, emailSender, storage, paddleClient));
   v1.use('/invitations', invitationsRouter(repos, auth));
   v1.use('/sites', detectPlatformRouter(auth));
   const paddleWebhookOpts = { boss: scansOptions?.boss, emailSender };

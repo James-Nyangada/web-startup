@@ -386,14 +386,11 @@ export function assertWithinPlan(
     case 'white_label': {
       if (!def.features.whiteLabel) {
         const upgradeTo: PlanType = 'agency';
-        throw new PlanLimitError(
-          `Custom branding and white-label features are available on Agency and Agency Pro plans.`,
-          {
-            limit: false,
-            current: false,
-            upgradeTo,
-          },
-        );
+        throw new PlanLimitError(`White-label branding requires an Agency or Agency Pro plan.`, {
+          limit: 'whiteLabel',
+          current: plan,
+          upgradeTo,
+        });
       }
       break;
     }

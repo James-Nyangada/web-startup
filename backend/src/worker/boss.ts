@@ -14,7 +14,8 @@ import { handleEmailSend } from './jobs/email-send.js';
 import { handleReportRender } from './jobs/report-render.js';
 import { handleFreeCheckRun } from './jobs/free-check-run.js';
 import { handleTrialLifecycle } from './jobs/trial-lifecycle.js';
-import type { ReportRenderJobPayload } from './types.js';
+import { handlePaddleProcess } from './jobs/paddle-process.js';
+import type { PaddleProcessJobPayload, ReportRenderJobPayload } from './types.js';
 
 export const QUEUE_SCAN_RUN = 'scan.run';
 export const QUEUE_SCAN_PROCESS = 'scan.process';
@@ -24,6 +25,7 @@ export const QUEUE_EMAIL_SEND = 'email.send';
 export const QUEUE_REPORT_RENDER = 'report.render';
 export const QUEUE_FREE_CHECK_RUN = 'free-check.run';
 export const QUEUE_TRIAL_LIFECYCLE = 'trial.lifecycle';
+export const QUEUE_PADDLE_PROCESS = 'paddle.process';
 
 export const ALL_QUEUES = [
   QUEUE_SCAN_RUN,
@@ -34,6 +36,7 @@ export const ALL_QUEUES = [
   QUEUE_REPORT_RENDER,
   QUEUE_FREE_CHECK_RUN,
   QUEUE_TRIAL_LIFECYCLE,
+  QUEUE_PADDLE_PROCESS,
 ] as const;
 
 /** pg-boss refuses to send to or schedule on a queue that does not exist. Idempotent. */
@@ -149,6 +152,26 @@ export async function enqueueFreeCheckRun(boss: PgBoss, checkId: string): Promis
 }
 
 /**
+ * Enqueue a paddle.process job with Section 9 parameters:
+ * Concurrency: 1 (ordered per subscription), Retries: 5, Timeout: 30 s.
+ */
+export async function enqueuePaddleProcess(
+  boss: PgBoss,
+  eventId: string,
+  subscriptionId?: string,
+): Promise<string | null> {
+  return boss.send(
+    QUEUE_PADDLE_PROCESS,
+    { eventId },
+    {
+      expireInSeconds: 30,
+      retryLimit: 5,
+      ...(subscriptionId ? { singletonKey: subscriptionId } : {}),
+    },
+  );
+}
+
+/**
  * Registers a worker for every queue.
  */
 export async function registerWorkers(boss: PgBoss, ctx: WorkerContext): Promise<void> {
@@ -244,6 +267,18 @@ export async function registerWorkers(boss: PgBoss, ctx: WorkerContext): Promise
   await boss.work(QUEUE_TRIAL_LIFECYCLE, { localConcurrency: 1, batchSize: 1 }, async () => {
     await handleTrialLifecycle(ctx);
   });
+
+  // Concurrency 1 for paddle.process, retries 5 per spec Section 9
+  await boss.work<PaddleProcessJobPayload>(
+    QUEUE_PADDLE_PROCESS,
+    { localConcurrency: 1, batchSize: 1 },
+    async (jobs) => {
+      const job = jobs[0];
+      if (job?.data?.eventId) {
+        await handlePaddleProcess(job.data, ctx);
+      }
+    },
+  );
 }
 
 /**

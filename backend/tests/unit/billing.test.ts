@@ -1,10 +1,17 @@
 import crypto from 'node:crypto';
+import express from 'express';
 import { describe, it, expect, vi } from 'vitest';
 import request from 'supertest';
 import { buildTestApp } from '../helpers/fakes.js';
 import type { Auth } from '../../src/lib/auth.js';
 import { getPriceIdForPlan, getPlanForPriceId } from '../../src/shared/plans.js';
 import { verifyPaddleWebhookSignature, processPaddleEvent } from '../../src/billing/paddle.js';
+import { PaddleClient } from '../../src/billing/paddle-api.js';
+import { paddleWebhookRouter } from '../../src/routes/billing.js';
+import { handlePaddleProcess } from '../../src/worker/jobs/paddle-process.js';
+import type { PgBoss } from 'pg-boss';
+import type { WorkerContext } from '../../src/worker/types.js';
+import type { StorageService } from '../../src/storage/index.js';
 import { asOrgId } from '../../src/db/repositories/org-scope.js';
 
 describe('Chunk P4-02: Billing and Paddle Checkout', () => {
@@ -299,7 +306,11 @@ describe('Chunk P4-02: Billing and Paddle Checkout', () => {
   });
 
   describe('Billing API Endpoints (Spec Section 7.9, Owner Only)', () => {
-    function setupAuth(role: 'owner' | 'admin' | 'member' = 'owner') {
+    function setupAuth(
+      role: 'owner' | 'admin' | 'member' = 'owner',
+      paddleClient?: PaddleClient,
+      orgOverrides?: Partial<Record<string, unknown>>,
+    ) {
       const user = {
         id: 'usr-1',
         email: 'owner@example.com',
@@ -327,6 +338,7 @@ describe('Chunk P4-02: Billing and Paddle Checkout', () => {
         createdAt: new Date(),
         updatedAt: new Date(),
         deletedAt: null,
+        ...orgOverrides,
       };
 
       const auth: Auth = {
@@ -338,7 +350,7 @@ describe('Chunk P4-02: Billing and Paddle Checkout', () => {
         },
       } as unknown as Auth;
 
-      const { app, repos } = buildTestApp({ auth });
+      const { app, repos } = buildTestApp({ auth, paddleClient });
       vi.mocked(repos.organizations.findById).mockResolvedValue(org);
       vi.mocked(repos.organizations.findByIdOrSlug).mockResolvedValue(org);
       vi.mocked(repos.memberships.findRole).mockResolvedValue(role);
@@ -514,6 +526,192 @@ describe('Chunk P4-02: Billing and Paddle Checkout', () => {
           billingStatus: 'active',
         }),
       );
+    });
+
+    it('calls PaddleClient.updateSubscription on plan upgrade and downgrade', async () => {
+      const mockPaddle = new PaddleClient();
+      const updateSubSpy = vi
+        .spyOn(mockPaddle, 'updateSubscription')
+        .mockResolvedValue({ id: 'sub_paddle_1', status: 'active' });
+
+      const { app, org, repos } = setupAuth('owner', mockPaddle);
+      vi.mocked(repos.subscriptions.findByOrgId).mockResolvedValue({
+        id: 'sub-1',
+        paddleSubscriptionId: 'sub_paddle_1',
+        paddlePriceId: 'pri_sandbox_growth_monthly',
+        plan: 'growth',
+        interval: 'month',
+        status: 'active',
+        currentPeriodStart: new Date(),
+        currentPeriodEnd: new Date(Date.now() + 10 * 24 * 60 * 60 * 1000),
+        cancelAtPeriodEnd: false,
+        scheduledChange: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        orgId: org.id,
+      });
+
+      // 1. Upgrade from growth to agency
+      await request(app)
+        .post(`/v1/orgs/${org.id}/billing/change-plan`)
+        .send({ plan: 'agency', interval: 'month' })
+        .expect(200);
+
+      expect(updateSubSpy).toHaveBeenCalledWith('sub_paddle_1', {
+        priceId: 'pri_sandbox_agency_monthly',
+        prorationBillingMode: 'prorated_immediately',
+      });
+    });
+
+    it('calls PaddleClient.cancelSubscription and resumeSubscription', async () => {
+      const mockPaddle = new PaddleClient();
+      const cancelSpy = vi
+        .spyOn(mockPaddle, 'cancelSubscription')
+        .mockResolvedValue({ id: 'sub_paddle_1', status: 'active' });
+      const resumeSpy = vi
+        .spyOn(mockPaddle, 'resumeSubscription')
+        .mockResolvedValue({ id: 'sub_paddle_1', status: 'active' });
+
+      const { app, org, repos } = setupAuth('owner', mockPaddle);
+      vi.mocked(repos.subscriptions.findByOrgId).mockResolvedValue({
+        id: 'sub-1',
+        paddleSubscriptionId: 'sub_paddle_1',
+        paddlePriceId: 'pri_sandbox_agency_monthly',
+        plan: 'agency',
+        interval: 'month',
+        status: 'active',
+        currentPeriodStart: new Date(),
+        currentPeriodEnd: new Date(Date.now() + 10 * 24 * 60 * 60 * 1000),
+        cancelAtPeriodEnd: false,
+        scheduledChange: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        orgId: org.id,
+      });
+
+      // Cancel
+      await request(app)
+        .post(`/v1/orgs/${org.id}/billing/cancel`)
+        .send({ reason: 'fixed_issues' })
+        .expect(200);
+
+      expect(cancelSpy).toHaveBeenCalledWith('sub_paddle_1', {
+        effectiveFrom: 'next_billing_period',
+      });
+
+      // Resume
+      await request(app).post(`/v1/orgs/${org.id}/billing/resume`).send({}).expect(200);
+
+      expect(resumeSpy).toHaveBeenCalledWith('sub_paddle_1');
+    });
+
+    it('calls PaddleClient.createCustomerPortalSession when customer ID is present', async () => {
+      const mockPaddle = new PaddleClient();
+      const portalSpy = vi
+        .spyOn(mockPaddle, 'createCustomerPortalSession')
+        .mockResolvedValue({ url: 'https://customer-portal.paddle.com/cpt_session_123' });
+
+      const { app, org } = setupAuth('owner', mockPaddle);
+
+      const res = await request(app).get(`/v1/orgs/${org.id}/billing/portal`).expect(200);
+
+      expect(portalSpy).toHaveBeenCalledWith('ctm_123', undefined);
+      expect(res.body.data.url).toBe('https://customer-portal.paddle.com/cpt_session_123');
+    });
+
+    it('queues paddle.process job and returns 200 immediately when boss is present', async () => {
+      const { repos } = setupAuth('owner');
+      const mockBoss = {
+        send: vi.fn().mockResolvedValue('job-123'),
+      } as unknown as PgBoss;
+
+      vi.mocked(repos.paddleEvents.record).mockResolvedValue(true);
+
+      const webhookApp = express();
+      webhookApp.use(express.json());
+      webhookApp.use('/webhooks/paddle', paddleWebhookRouter(repos, { boss: mockBoss }));
+
+      const payload = {
+        event_id: 'evt_queue_test_1',
+        event_type: 'subscription.created',
+        data: { id: 'sub_queue_1', customer_id: 'ctm_queue_1' },
+      };
+
+      const res = await request(webhookApp)
+        .post('/webhooks/paddle')
+        .set('paddle-signature', `ts=${Math.floor(Date.now() / 1000)};h1=dummy_test`)
+        .send(payload)
+        .expect(200);
+
+      expect(res.body.received).toBe(true);
+      expect(res.body.queued).toBe(true);
+      expect(mockBoss.send).toHaveBeenCalledWith(
+        'paddle.process',
+        { eventId: 'evt_queue_test_1' },
+        expect.objectContaining({ retryLimit: 5, expireInSeconds: 30 }),
+      );
+    });
+
+    it('processes Paddle event in handlePaddleProcess worker job', async () => {
+      const { repos } = setupAuth('owner');
+      vi.mocked(repos.paddleEvents.findById).mockResolvedValue({
+        eventId: 'evt_job_test_1',
+        eventType: 'subscription.created',
+        receivedAt: new Date(),
+        processedAt: null,
+        payload: {
+          event_id: 'evt_job_test_1',
+          event_type: 'subscription.created',
+          occurred_at: new Date().toISOString(),
+          data: {
+            id: 'sub_job_1',
+            customer_id: 'ctm_job_1',
+            status: 'active',
+            custom_data: { orgId: '018f0000-0000-7000-8000-000000000001' },
+            items: [{ price: { id: 'pri_sandbox_agency_monthly' } }],
+          },
+        },
+        error: null,
+      });
+
+      const workerCtx = {
+        repos,
+        storage: {} as unknown as StorageService,
+      } as WorkerContext;
+
+      await handlePaddleProcess({ eventId: 'evt_job_test_1' }, workerCtx);
+
+      expect(repos.paddleEvents.markProcessed).toHaveBeenCalledWith('evt_job_test_1');
+      expect(repos.organizations.update).toHaveBeenCalledWith(
+        asOrgId('018f0000-0000-7000-8000-000000000001'),
+        expect.objectContaining({ plan: 'agency', billingStatus: 'active' }),
+      );
+    });
+
+    it('enforces read-only mode for canceled and paused orgs on mutating endpoints', async () => {
+      // 1. Canceled org
+      const { app: canceledApp, org: canceledOrg } = setupAuth('owner', undefined, {
+        billingStatus: 'canceled',
+      });
+      const resCanceled = await request(canceledApp)
+        .post(`/v1/orgs/${canceledOrg.id}/invitations`)
+        .send({ email: 'test@example.com', role: 'member' })
+        .expect(402);
+
+      expect(resCanceled.body.error.code).toBe('BILLING_REQUIRED');
+      expect(resCanceled.body.error.message).toContain('canceled');
+
+      // 2. Paused org
+      const { app: pausedApp, org: pausedOrg } = setupAuth('owner', undefined, {
+        billingStatus: 'paused',
+      });
+      const resPaused = await request(pausedApp)
+        .post(`/v1/orgs/${pausedOrg.id}/invitations`)
+        .send({ email: 'test@example.com', role: 'member' })
+        .expect(402);
+
+      expect(resPaused.body.error.code).toBe('BILLING_REQUIRED');
+      expect(resPaused.body.error.message).toContain('paused');
     });
   });
 });

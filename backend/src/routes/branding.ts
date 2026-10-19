@@ -3,8 +3,7 @@ import { z } from 'zod';
 import type { Repositories } from '../db/repositories/index.js';
 import type { StorageService } from '../storage/index.js';
 import { requireOrgRole } from '../middleware/org.js';
-import { getPlanDefinition } from '../shared/plans.js';
-import { ErrorCode } from '../shared/errors.js';
+import { assertWithinPlan } from '../shared/plans.js';
 import { getContrastAgainstWhite, findAccessibleAlternative } from '../shared/contrast.js';
 
 const updateBrandingSchema = z.object({
@@ -144,18 +143,7 @@ export function orgBrandingRouter(repos: Repositories, storage: StorageService):
     }
 
     // 1. Plan feature check: white-label branding requires Agency or Agency Pro
-    const plan = org.plan ?? 'trial';
-    const planDef = getPlanDefinition(plan);
-    if (!planDef.features.whiteLabel) {
-      res.status(422).json({
-        error: {
-          code: ErrorCode.PLAN_LIMIT,
-          message: 'White-label branding requires an Agency or Agency Pro plan.',
-          details: { limit: 'whiteLabel', current: plan, upgradeTo: 'agency' },
-        },
-      });
-      return;
-    }
+    assertWithinPlan(org, 'white_label');
 
     // 2. Validate request body
     const parseRes = updateBrandingSchema.safeParse(req.body);
@@ -244,18 +232,7 @@ export function orgBrandingRouter(repos: Repositories, storage: StorageService):
       return;
     }
 
-    const plan = org.plan ?? 'trial';
-    const planDef = getPlanDefinition(plan);
-    if (!planDef.features.whiteLabel) {
-      res.status(422).json({
-        error: {
-          code: ErrorCode.PLAN_LIMIT,
-          message: 'White-label branding requires an Agency or Agency Pro plan.',
-          details: { limit: 'whiteLabel', current: plan, upgradeTo: 'agency' },
-        },
-      });
-      return;
-    }
+    assertWithinPlan(org, 'white_label');
 
     const parseRes = uploadLogoSchema.safeParse(req.body);
     if (!parseRes.success) {

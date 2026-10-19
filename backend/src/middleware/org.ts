@@ -216,7 +216,12 @@ export function enforceSiteAccess(req: Request, res: Response, next: NextFunctio
  * "Read-only org can view everything and export, cannot scan or invite."
  */
 export function enforceReadOnlyOrg(req: Request, res: Response, next: NextFunction): void {
-  if (req.org?.billingStatus !== 'read_only') {
+  const isReadOnly =
+    req.org?.billingStatus === 'read_only' ||
+    req.org?.billingStatus === 'paused' ||
+    req.org?.billingStatus === 'canceled';
+
+  if (!isReadOnly) {
     next();
     return;
   }
@@ -241,13 +246,20 @@ export function enforceReadOnlyOrg(req: Request, res: Response, next: NextFuncti
     return;
   }
 
+  const statusLabel =
+    req.org?.billingStatus === 'canceled'
+      ? 'canceled'
+      : req.org?.billingStatus === 'paused'
+        ? 'paused'
+        : 'in read-only mode';
+
   res.status(402).json({
     error: {
       code: ErrorCode.BILLING_REQUIRED,
-      message: 'Your organisation is in read-only mode. Upgrade your plan to perform this action.',
+      message: `Your organisation is ${statusLabel}. Upgrade or reactivate your plan to perform this action.`,
       details: {
-        billingStatus: req.org.billingStatus,
-        plan: req.org.plan,
+        billingStatus: req.org?.billingStatus,
+        plan: req.org?.plan,
       },
     },
   });
