@@ -25,6 +25,7 @@ export interface EmailBranding {
   displayName?: string;
   logoUrl?: string;
   primaryColor?: string;
+  senderName?: string;
 }
 
 export interface VerifyEmailData {

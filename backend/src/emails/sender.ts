@@ -114,14 +114,18 @@ export class EmailSender implements AuthMailer {
     branding?: EmailBranding;
   }): Promise<{ id: string; ok: boolean }> {
     const { to, templateId, data, branding } = options;
-    const rendered = renderEmail(templateId, data, branding || this.defaultBranding);
+    const activeBranding = branding || this.defaultBranding;
+    const rendered = renderEmail(templateId, data, activeBranding);
+    const from = activeBranding?.senderName
+      ? `${activeBranding.senderName} <notifications@plainsight.app>`
+      : this.defaultFrom;
 
     return this.transport.send({
       to,
       subject: rendered.subject,
       html: rendered.html,
       text: rendered.text,
-      from: this.defaultFrom,
+      from,
     });
   }
 

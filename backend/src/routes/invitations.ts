@@ -215,14 +215,13 @@ export function invitationsRouter(repos: Repositories, auth: Auth): Router {
 
     const orgId = asOrgId(resolved.invitation.orgId);
 
-    // Add membership if not already a member
-    const existingMembership = await repos.memberships.find(orgId, userId);
-    if (!existingMembership) {
-      await repos.memberships.add(
-        orgId,
-        userId,
-        resolved.invitation.role === 'client_viewer' ? 'member' : resolved.invitation.role,
-      );
+    if (resolved.invitation.role === 'client_viewer') {
+      await repos.clientAccess.grantAccess(orgId, userId, resolved.invitation.siteIds ?? []);
+    } else {
+      const existingMembership = await repos.memberships.find(orgId, userId);
+      if (!existingMembership) {
+        await repos.memberships.add(orgId, userId, resolved.invitation.role);
+      }
     }
 
     // Consume single-use token

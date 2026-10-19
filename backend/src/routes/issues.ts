@@ -70,7 +70,7 @@ export function orgIssuesRouter(repos: Repositories, options?: IssuesRouterOptio
   // GET /v1/orgs/:orgId/sites/:siteId/issues (S-25 Issues list, Section 7.5)
   router.get(
     '/sites/:siteId/issues',
-    requireOrgRole('member'),
+    requireOrgRole('client_viewer'),
     async (req: Request, res: Response): Promise<void> => {
       const siteIdParam = req.params.siteId;
       const siteId = Array.isArray(siteIdParam) ? siteIdParam[0] : siteIdParam;
@@ -80,6 +80,17 @@ export function orgIssuesRouter(repos: Repositories, options?: IssuesRouterOptio
           error: {
             code: ErrorCode.VALIDATION_ERROR,
             message: 'Site ID is required.',
+            details: {},
+          },
+        });
+        return;
+      }
+
+      if (req.membership?.role === 'client_viewer' && !req.clientSiteIds?.includes(siteId)) {
+        res.status(404).json({
+          error: {
+            code: ErrorCode.NOT_FOUND,
+            message: 'Site not found.',
             details: {},
           },
         });
@@ -255,6 +266,17 @@ export function orgIssuesRouter(repos: Repositories, options?: IssuesRouterOptio
       return;
     }
 
+    if (req.membership?.role === 'client_viewer' && !req.clientSiteIds?.includes(siteId)) {
+      res.status(404).json({
+        error: {
+          code: ErrorCode.NOT_FOUND,
+          message: 'Site not found.',
+          details: {},
+        },
+      });
+      return;
+    }
+
     const queryParse = issuesQuerySchema.safeParse(req.query);
     if (!queryParse.success) {
       res.status(400).json({
@@ -379,8 +401,8 @@ export function orgIssuesRouter(repos: Repositories, options?: IssuesRouterOptio
     res.status(200).send(Buffer.from(csvContent, 'utf-8'));
   };
 
-  router.get('/sites/:siteId/issues/export.csv', requireOrgRole('member'), exportCsvHandler);
-  router.get('/sites/:siteId/issues/export', requireOrgRole('member'), exportCsvHandler);
+  router.get('/sites/:siteId/issues/export.csv', requireOrgRole('client_viewer'), exportCsvHandler);
+  router.get('/sites/:siteId/issues/export', requireOrgRole('client_viewer'), exportCsvHandler);
 
   // GET /v1/orgs/:orgId/issues - Cross-site issues (agency / my-tasks)
   router.get(
@@ -439,6 +461,17 @@ export function orgIssuesRouter(repos: Repositories, options?: IssuesRouterOptio
       return;
     }
 
+    if (req.membership?.role === 'client_viewer' && !req.clientSiteIds?.includes(issue.siteId)) {
+      res.status(404).json({
+        error: {
+          code: ErrorCode.NOT_FOUND,
+          message: 'Issue not found.',
+          details: {},
+        },
+      });
+      return;
+    }
+
     // Check siteId matches if provided in route
     const siteIdParam = req.params.siteId;
     const siteId = Array.isArray(siteIdParam) ? siteIdParam[0] : siteIdParam;
@@ -458,8 +491,12 @@ export function orgIssuesRouter(repos: Repositories, options?: IssuesRouterOptio
     });
   };
 
-  router.get('/issues/:issueId', requireOrgRole('member'), getIssueDetailHandler);
-  router.get('/sites/:siteId/issues/:issueId', requireOrgRole('member'), getIssueDetailHandler);
+  router.get('/issues/:issueId', requireOrgRole('client_viewer'), getIssueDetailHandler);
+  router.get(
+    '/sites/:siteId/issues/:issueId',
+    requireOrgRole('client_viewer'),
+    getIssueDetailHandler,
+  );
 
   // GET /v1/orgs/:orgId/issues/:issueId/occurrences - Paginated occurrences
   const getOccurrencesHandler = async (req: Request, res: Response): Promise<void> => {
@@ -479,6 +516,17 @@ export function orgIssuesRouter(repos: Repositories, options?: IssuesRouterOptio
 
     const issue = await repos.issues.findById(req.orgId!, issueId);
     if (!issue) {
+      res.status(404).json({
+        error: {
+          code: ErrorCode.NOT_FOUND,
+          message: 'Issue not found.',
+          details: {},
+        },
+      });
+      return;
+    }
+
+    if (req.membership?.role === 'client_viewer' && !req.clientSiteIds?.includes(issue.siteId)) {
       res.status(404).json({
         error: {
           code: ErrorCode.NOT_FOUND,
@@ -511,10 +559,14 @@ export function orgIssuesRouter(repos: Repositories, options?: IssuesRouterOptio
     });
   };
 
-  router.get('/issues/:issueId/occurrences', requireOrgRole('member'), getOccurrencesHandler);
+  router.get(
+    '/issues/:issueId/occurrences',
+    requireOrgRole('client_viewer'),
+    getOccurrencesHandler,
+  );
   router.get(
     '/sites/:siteId/issues/:issueId/occurrences',
-    requireOrgRole('member'),
+    requireOrgRole('client_viewer'),
     getOccurrencesHandler,
   );
 
@@ -584,10 +636,23 @@ export function orgIssuesRouter(repos: Repositories, options?: IssuesRouterOptio
       return;
     }
 
+    if (req.membership?.role === 'client_viewer' && !req.clientSiteIds?.includes(issue.siteId)) {
+      res.status(404).json({
+        error: {
+          code: ErrorCode.NOT_FOUND,
+          message: 'Issue not found.',
+          details: {},
+        },
+      });
+      return;
+    }
+
     const items = await repos.issues.listNotes(req.orgId!, issueId);
+    const visibleItems =
+      req.membership?.role === 'client_viewer' ? items.filter((n) => n.visibleToClient) : items;
 
     res.status(200).json({
-      data: { items },
+      data: { items: visibleItems },
     });
   };
 
@@ -660,8 +725,12 @@ export function orgIssuesRouter(repos: Repositories, options?: IssuesRouterOptio
     });
   };
 
-  router.get('/issues/:issueId/notes', requireOrgRole('member'), getNotesHandler);
-  router.get('/sites/:siteId/issues/:issueId/notes', requireOrgRole('member'), getNotesHandler);
+  router.get('/issues/:issueId/notes', requireOrgRole('client_viewer'), getNotesHandler);
+  router.get(
+    '/sites/:siteId/issues/:issueId/notes',
+    requireOrgRole('client_viewer'),
+    getNotesHandler,
+  );
   router.post('/issues/:issueId/notes', requireOrgRole('member'), createNoteHandler);
   router.post('/sites/:siteId/issues/:issueId/notes', requireOrgRole('member'), createNoteHandler);
 

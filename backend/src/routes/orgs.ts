@@ -446,6 +446,34 @@ export function orgsRouter(
         assertWithinPlan(req.org, 'team_members', membersCount + pendingCount + 1);
       }
 
+      // If client viewer, validate siteIds are provided and exist within this org
+      if (role === 'client_viewer') {
+        if (!siteIds || siteIds.length === 0) {
+          res.status(400).json({
+            error: {
+              code: ErrorCode.VALIDATION_ERROR,
+              message: 'At least one site must be selected for client viewers.',
+              details: {},
+            },
+          });
+          return;
+        }
+
+        for (const sId of siteIds) {
+          const site = await repos.sites.findById(req.orgId!, sId);
+          if (!site) {
+            res.status(400).json({
+              error: {
+                code: ErrorCode.VALIDATION_ERROR,
+                message: `Site ${sId} does not exist in this organisation.`,
+                details: {},
+              },
+            });
+            return;
+          }
+        }
+      }
+
       const { invitation, rawToken } = await repos.invitations.create(req.orgId!, {
         email,
         role,
@@ -468,6 +496,18 @@ export function orgsRouter(
       const inviteUrl = `${appUrl}/invitations/${rawToken}`;
 
       if (emailSender) {
+        let emailBranding = undefined;
+        if (role === 'client_viewer') {
+          const brand = await repos.branding.findByOrgId(req.orgId!);
+          if (brand) {
+            emailBranding = {
+              displayName: brand.displayName ?? req.org!.name,
+              senderName: brand.emailSenderName ?? brand.displayName ?? undefined,
+              primaryColor: brand.primaryColor ?? undefined,
+            };
+          }
+        }
+
         await emailSender.send({
           to: invitation.email,
           templateId: 'E-04',
@@ -478,16 +518,17 @@ export function orgsRouter(
             inviteUrl,
             expiresInDays: 7,
           },
+          branding: emailBranding,
         });
       }
 
       await repos.auditLog.write(req.orgId!, {
         actorId: req.auth!.user.id,
         actorType: 'user',
-        action: 'member.invited',
+        action: role === 'client_viewer' ? 'client_viewer.invited' : 'member.invited',
         targetId: invitation.id,
         targetType: 'invitation',
-        data: { email: invitation.email, role: invitation.role },
+        data: { email: invitation.email, role: invitation.role, siteIds: invitation.siteIds },
         ip: req.ip ?? null,
         userAgent: req.get('user-agent') ?? null,
       });
@@ -775,6 +816,120 @@ export function orgsRouter(
       res.status(200).json({
         data: { success: true, message: 'Member removed from organisation.' },
       });
+    },
+  );
+
+  // GET /v1/orgs/:orgId/clients - List client viewers with assigned sites (O A)
+  orgScoped.get(
+    '/clients',
+    requireOrgRole('admin'),
+    async (req: Request, res: Response): Promise<void> => {
+      const clients = await repos.clientAccess.listByOrg(req.orgId!);
+      res.status(200).json({ data: { clients } });
+    },
+  );
+
+  // PUT & PATCH /v1/orgs/:orgId/clients/:userId/sites - Set sites for client viewer (O A)
+  const setClientSitesSchema = z.object({
+    siteIds: z.array(z.string().uuid()).min(1, 'At least one site must be assigned.'),
+  });
+
+  const setClientSitesHandler = async (req: Request, res: Response): Promise<void> => {
+    const userIdParam = req.params.userId;
+    const userId = Array.isArray(userIdParam) ? userIdParam[0] : userIdParam;
+
+    if (!userId) {
+      res.status(400).json({
+        error: {
+          code: ErrorCode.VALIDATION_ERROR,
+          message: 'User ID is required.',
+          details: {},
+        },
+      });
+      return;
+    }
+
+    const parse = setClientSitesSchema.safeParse(req.body);
+    if (!parse.success) {
+      res.status(400).json({
+        error: {
+          code: ErrorCode.VALIDATION_ERROR,
+          message: 'Invalid site assignment payload.',
+          details: { issues: parse.error.issues },
+        },
+      });
+      return;
+    }
+
+    const { siteIds } = parse.data;
+
+    // Validate that each site belongs to org
+    for (const siteId of siteIds) {
+      const site = await repos.sites.findById(req.orgId!, siteId);
+      if (!site) {
+        res.status(400).json({
+          error: {
+            code: ErrorCode.VALIDATION_ERROR,
+            message: `Site ${siteId} does not exist in this organisation.`,
+            details: {},
+          },
+        });
+        return;
+      }
+    }
+
+    await repos.clientAccess.setSiteAccess(req.orgId!, userId, siteIds);
+
+    await repos.auditLog.write(req.orgId!, {
+      actorId: req.auth!.user.id,
+      actorType: 'user',
+      action: 'client_viewer.sites_updated',
+      targetId: userId,
+      targetType: 'user',
+      data: { siteIds },
+      ip: req.ip ?? null,
+      userAgent: req.get('user-agent') ?? null,
+    });
+
+    res.status(200).json({ data: { success: true } });
+  };
+
+  orgScoped.put('/clients/:userId/sites', requireOrgRole('admin'), setClientSitesHandler);
+  orgScoped.patch('/clients/:userId/sites', requireOrgRole('admin'), setClientSitesHandler);
+
+  // DELETE /v1/orgs/:orgId/clients/:userId - Remove client access entirely (O A)
+  orgScoped.delete(
+    '/clients/:userId',
+    requireOrgRole('admin'),
+    async (req: Request, res: Response): Promise<void> => {
+      const userIdParam = req.params.userId;
+      const userId = Array.isArray(userIdParam) ? userIdParam[0] : userIdParam;
+
+      if (!userId) {
+        res.status(400).json({
+          error: {
+            code: ErrorCode.VALIDATION_ERROR,
+            message: 'User ID is required.',
+            details: {},
+          },
+        });
+        return;
+      }
+
+      await repos.clientAccess.removeClientViewer(req.orgId!, userId);
+
+      await repos.auditLog.write(req.orgId!, {
+        actorId: req.auth!.user.id,
+        actorType: 'user',
+        action: 'client_viewer.removed',
+        targetId: userId,
+        targetType: 'user',
+        data: {},
+        ip: req.ip ?? null,
+        userAgent: req.get('user-agent') ?? null,
+      });
+
+      res.status(200).json({ data: { success: true } });
     },
   );
 

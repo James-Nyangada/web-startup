@@ -608,7 +608,40 @@ export const appApi = {
     apiClient<{ data: { success: boolean } }>(`/v1/orgs/${org}/branding/logo/${type}`, {
       method: "DELETE",
     }).then((r) => r.data),
+
+  listClients: (org: string) =>
+    apiClient<{ data: { clients: ApiClientViewer[] } }>(`/v1/orgs/${org}/clients`).then(
+      (r) => r.data.clients,
+    ),
+
+  setClientSites: (org: string, userId: string, siteIds: string[]) =>
+    apiClient<{ data: { success: boolean } }>(
+      `/v1/orgs/${org}/clients/${userId}/sites`,
+      json({ siteIds }),
+    ).then((r) => r.data),
+
+  removeClient: (org: string, userId: string) =>
+    apiClient<{ data: { success: boolean } }>(`/v1/orgs/${org}/clients/${userId}`, {
+      method: "DELETE",
+    }).then((r) => r.data),
 };
+
+export interface ApiClientViewer {
+  user: {
+    id: string;
+    email: string;
+    name: string | null;
+    avatarUrl: string | null;
+  };
+  sites: {
+    id: string;
+    name: string;
+    rootUrl: string;
+    status: string;
+    platform: string;
+  }[];
+  createdAt: string;
+}
 
 export interface ApiBranding {
   id?: string;

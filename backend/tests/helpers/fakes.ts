@@ -473,6 +473,14 @@ export function fakeRepos() {
         }),
       ),
     },
+    clientAccess: {
+      listByUserAndOrg: vi.fn().mockResolvedValue([]),
+      listByOrg: vi.fn().mockResolvedValue([]),
+      grantAccess: vi.fn().mockResolvedValue(undefined),
+      setSiteAccess: vi.fn().mockResolvedValue(undefined),
+      removeClientViewer: vi.fn().mockResolvedValue(undefined),
+      count: vi.fn().mockResolvedValue(0),
+    },
   } as unknown as Repositories;
   return { repos, join };
 }

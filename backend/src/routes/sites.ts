@@ -134,38 +134,47 @@ export function detectPlatformRouter(auth: Auth): Router {
 export function orgSitesRouter(repos: Repositories): Router {
   const router = Router();
 
-  // GET /v1/orgs/:orgId/sites - List sites (O A M)
-  router.get('/', requireOrgRole('member'), async (req: Request, res: Response): Promise<void> => {
-    const { status, platform, client, q, sort } = req.query;
+  // GET /v1/orgs/:orgId/sites - List sites (O A M C)
+  router.get(
+    '/',
+    requireOrgRole('client_viewer'),
+    async (req: Request, res: Response): Promise<void> => {
+      const { status, platform, client, q, sort } = req.query;
 
-    const sitesList = await repos.sites.list(req.orgId!, {
-      status: typeof status === 'string' ? (status as SiteStatus) : undefined,
-      platform: typeof platform === 'string' ? (platform as Platform) : undefined,
-      client: typeof client === 'string' ? client : undefined,
-      q: typeof q === 'string' ? q : undefined,
-      sort:
-        typeof sort === 'string'
-          ? (sort as 'score' | 'name' | 'lastScan' | 'openCritical')
-          : undefined,
-    });
+      let sitesList = await repos.sites.list(req.orgId!, {
+        status: typeof status === 'string' ? (status as SiteStatus) : undefined,
+        platform: typeof platform === 'string' ? (platform as Platform) : undefined,
+        client: typeof client === 'string' ? client : undefined,
+        q: typeof q === 'string' ? q : undefined,
+        sort:
+          typeof sort === 'string'
+            ? (sort as 'score' | 'name' | 'lastScan' | 'openCritical')
+            : undefined,
+      });
 
-    const summaries = await repos.sites.listSummaries(
-      req.orgId!,
-      sitesList.map((site) => site.id),
-    );
-    const withSummaries = sitesList.map(({ verifyToken: _verifyToken, ...site }) => ({
-      ...site,
-      ...summaries.get(site.id),
-    }));
-    if (sort === 'openCritical') {
-      withSummaries.sort(
-        (a, b) =>
-          (b.openCritical ?? 0) - (a.openCritical ?? 0) || (a.score ?? 101) - (b.score ?? 101),
+      if (req.membership?.role === 'client_viewer') {
+        const allowed = new Set(req.clientSiteIds ?? []);
+        sitesList = sitesList.filter((s) => allowed.has(s.id));
+      }
+
+      const summaries = await repos.sites.listSummaries(
+        req.orgId!,
+        sitesList.map((site) => site.id),
       );
-    }
+      const withSummaries = sitesList.map(({ verifyToken: _verifyToken, ...site }) => ({
+        ...site,
+        ...summaries.get(site.id),
+      }));
+      if (sort === 'openCritical') {
+        withSummaries.sort(
+          (a, b) =>
+            (b.openCritical ?? 0) - (a.openCritical ?? 0) || (a.score ?? 101) - (b.score ?? 101),
+        );
+      }
 
-    res.status(200).json({ data: { sites: withSummaries } });
-  });
+      res.status(200).json({ data: { sites: withSummaries } });
+    },
+  );
 
   // POST /v1/orgs/:orgId/sites - Add site (O A M)
   router.post('/', requireOrgRole('member'), async (req: Request, res: Response): Promise<void> => {
@@ -267,10 +276,10 @@ export function orgSitesRouter(repos: Repositories): Router {
     res.status(201).json({ data: { site } });
   });
 
-  // GET /v1/orgs/:orgId/sites/:siteId - Site detail + trend (O A M)
+  // GET /v1/orgs/:orgId/sites/:siteId - Site detail + trend (O A M C)
   router.get(
     '/:siteId',
-    requireOrgRole('member'),
+    requireOrgRole('client_viewer'),
     async (req: Request, res: Response): Promise<void> => {
       const siteIdParam = req.params.siteId;
       const siteId = Array.isArray(siteIdParam) ? siteIdParam[0] : siteIdParam;
@@ -280,6 +289,17 @@ export function orgSitesRouter(repos: Repositories): Router {
           error: {
             code: ErrorCode.VALIDATION_ERROR,
             message: 'Site ID is required.',
+            details: {},
+          },
+        });
+        return;
+      }
+
+      if (req.membership?.role === 'client_viewer' && !req.clientSiteIds?.includes(siteId)) {
+        res.status(404).json({
+          error: {
+            code: ErrorCode.NOT_FOUND,
+            message: 'Site not found.',
             details: {},
           },
         });
