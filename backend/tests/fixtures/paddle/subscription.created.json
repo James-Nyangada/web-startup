@@ -1,0 +1,26 @@
+{
+  "event_id": "evt_paddle_sub_created_001",
+  "event_type": "subscription.created",
+  "occurred_at": "2026-10-19T10:00:00.000Z",
+  "data": {
+    "id": "sub_paddle_live_001",
+    "status": "active",
+    "customer_id": "ctm_paddle_001",
+    "custom_data": {
+      "orgId": "00000000-0000-0000-0000-000000000001"
+    },
+    "current_billing_period": {
+      "starts_at": "2026-10-19T10:00:00.000Z",
+      "ends_at": "2026-11-19T10:00:00.000Z"
+    },
+    "items": [
+      {
+        "price": {
+          "id": "pri_sandbox_store_monthly"
+        },
+        "quantity": 1
+      }
+    ],
+    "scheduled_change": null
+  }
+}

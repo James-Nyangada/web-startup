@@ -1,0 +1,21 @@
+{
+  "event_id": "evt_paddle_txn_completed_005",
+  "event_type": "transaction.completed",
+  "occurred_at": "2026-10-19T10:05:00.000Z",
+  "data": {
+    "id": "txn_paddle_live_001",
+    "status": "paid",
+    "customer_id": "ctm_paddle_001",
+    "custom_data": {
+      "orgId": "00000000-0000-0000-0000-000000000001"
+    },
+    "billed_at": "2026-10-19T10:05:00.000Z",
+    "details": {
+      "totals": {
+        "total": 4900,
+        "currency_code": "USD"
+      }
+    },
+    "invoice_pdf_url": "https://paddle.com/invoice/txn_paddle_live_001.pdf"
+  }
+}

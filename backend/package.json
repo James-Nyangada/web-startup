@@ -20,6 +20,7 @@
     "scan:discover": "tsx --env-file-if-exists=.env src/scanner/cli/discover.ts",
     "scan": "tsx --env-file-if-exists=.env src/scanner/cli/scan.ts",
     "worker": "tsx --env-file-if-exists=.env src/worker/index.ts",
+    "paddle:replay": "tsx --env-file-if-exists=.env src/billing/replay.ts",
     "fixtures:serve": "tsx tests/fixtures/site/serve.ts"
   },
   "type": "module",

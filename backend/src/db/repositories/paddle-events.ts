@@ -1,4 +1,4 @@
-import { eq } from 'drizzle-orm';
+import { eq, desc, isNotNull } from 'drizzle-orm';
 import type { Database } from '../client.js';
 import { paddleEvents } from '../schema/index.js';
 
@@ -30,6 +30,19 @@ export function paddleEventsRepository(db: Database) {
           error: error ?? null,
         })
         .where(eq(paddleEvents.eventId, eventId));
+    },
+
+    async listRecent(limit = 50) {
+      return db.select().from(paddleEvents).orderBy(desc(paddleEvents.receivedAt)).limit(limit);
+    },
+
+    async listFailed(limit = 50) {
+      return db
+        .select()
+        .from(paddleEvents)
+        .where(isNotNull(paddleEvents.error))
+        .orderBy(desc(paddleEvents.receivedAt))
+        .limit(limit);
     },
   };
 }

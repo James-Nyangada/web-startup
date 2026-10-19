@@ -445,6 +445,8 @@ export function fakeRepos() {
       record: vi.fn().mockResolvedValue(true),
       findById: vi.fn().mockResolvedValue(null),
       markProcessed: vi.fn().mockResolvedValue(undefined),
+      listRecent: vi.fn().mockResolvedValue([]),
+      listFailed: vi.fn().mockResolvedValue([]),
     },
   } as unknown as Repositories;
   return { repos, join };

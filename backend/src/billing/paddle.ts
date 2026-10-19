@@ -119,12 +119,17 @@ export interface ProcessEventResult {
   error?: string;
 }
 
+export interface ProcessPaddleEventOptions {
+  isReplay?: boolean;
+}
+
 /**
  * Processes incoming Paddle webhook event idempotently according to Section 12.2.
  */
 export async function processPaddleEvent(
   payload: PaddleEventPayload,
   repos: Repositories,
+  options?: ProcessPaddleEventOptions,
 ): Promise<ProcessEventResult> {
   const eventId = payload.event_id || payload.eventId;
   const eventType = payload.event_type || payload.eventType;
@@ -136,10 +141,14 @@ export async function processPaddleEvent(
   }
 
   // 1. Idempotent recording in paddle_events table
-  const recorded = await repos.paddleEvents.record(eventId, eventType, payload);
-  if (!recorded) {
-    // Duplicate event already processed
-    return { handled: true, duplicate: true, eventType };
+  if (!options?.isReplay) {
+    const recorded = await repos.paddleEvents.record(eventId, eventType, payload);
+    if (!recorded) {
+      // Duplicate event already processed
+      return { handled: true, duplicate: true, eventType };
+    }
+  } else {
+    logger.info({ eventId, eventType }, 'Replaying Paddle webhook event');
   }
 
   try {
@@ -213,6 +222,19 @@ export async function processPaddleEvent(
             billingStatus: 'active',
             ...(data.customer_id ? { paddleCustomerId: data.customer_id } : {}),
           });
+
+          await repos.auditLog.write(orgIdScoped, {
+            actorType: 'system',
+            action: 'plan_changed',
+            targetType: 'organization',
+            targetId: orgIdScoped,
+            data: {
+              plan: planInfo.plan,
+              interval: planInfo.interval,
+              paddleSubscriptionId: subId,
+              isReplay: options?.isReplay ?? false,
+            },
+          });
         }
         break;
       }
@@ -227,12 +249,17 @@ export async function processPaddleEvent(
         // Out-of-order protection: check if existing subscription is newer
         const existingSub = await repos.subscriptions.findByPaddleSubscriptionId(subId);
 
-        if (existingSub && existingSub.updatedAt > occurredAt) {
+        if (!options?.isReplay && existingSub && existingSub.updatedAt > occurredAt) {
           logger.info(
             { eventId, occurredAt, updatedAt: existingSub.updatedAt },
             'Ignoring out-of-order subscription.updated event',
           );
-          break;
+          return {
+            handled: true,
+            eventType,
+            orgId: targetOrgId,
+            error: 'Out-of-order event ignored',
+          };
         }
 
         const priceId = data.items?.[0]?.price?.id;
@@ -269,6 +296,18 @@ export async function processPaddleEvent(
           if (planInfo?.plan) {
             await repos.organizations.update(orgIdScoped, {
               plan: planInfo.plan,
+            });
+            await repos.auditLog.write(orgIdScoped, {
+              actorType: 'system',
+              action: 'plan_changed',
+              targetType: 'organization',
+              targetId: orgIdScoped,
+              data: {
+                plan: planInfo.plan,
+                interval: currentInterval,
+                paddleSubscriptionId: subId,
+                isReplay: options?.isReplay ?? false,
+              },
             });
           }
         }
@@ -371,4 +410,71 @@ export async function processPaddleEvent(
     await repos.paddleEvents.markProcessed(eventId, errorMsg);
     return { handled: false, eventType, error: errorMsg };
   }
+}
+
+/**
+ * Replays a stored Paddle webhook event by its event ID.
+ */
+export async function replayPaddleEventById(
+  repos: Repositories,
+  eventId: string,
+): Promise<ProcessEventResult> {
+  const event = await repos.paddleEvents.findById(eventId);
+  if (!event) {
+    throw new Error(`Paddle event with ID "${eventId}" not found.`);
+  }
+  const payload = event.payload as PaddleEventPayload;
+  return processPaddleEvent(payload, repos, { isReplay: true });
+}
+
+/**
+ * Replays all failed Paddle webhook events.
+ */
+export async function replayFailedPaddleEvents(repos: Repositories): Promise<{
+  total: number;
+  succeeded: number;
+  failed: number;
+  results: ProcessEventResult[];
+}> {
+  const failedEvents = await repos.paddleEvents.listFailed();
+  const results: ProcessEventResult[] = [];
+  let succeeded = 0;
+  let failed = 0;
+
+  for (const event of failedEvents) {
+    try {
+      const payload = event.payload as PaddleEventPayload;
+      const res = await processPaddleEvent(payload, repos, { isReplay: true });
+      results.push(res);
+      if (res.handled && !res.error) {
+        succeeded++;
+      } else {
+        failed++;
+      }
+    } catch (err) {
+      failed++;
+      results.push({
+        handled: false,
+        eventType: event.eventType,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+  }
+
+  return {
+    total: failedEvents.length,
+    succeeded,
+    failed,
+    results,
+  };
+}
+
+/**
+ * Replays a Paddle webhook event payload directly (e.g. from local file or test).
+ */
+export async function replayPaddlePayload(
+  repos: Repositories,
+  payload: PaddleEventPayload,
+): Promise<ProcessEventResult> {
+  return processPaddleEvent(payload, repos, { isReplay: true });
 }

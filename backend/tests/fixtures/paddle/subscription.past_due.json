@@ -1,0 +1,13 @@
+{
+  "event_id": "evt_paddle_sub_past_due_003",
+  "event_type": "subscription.past_due",
+  "occurred_at": "2026-10-19T12:00:00.000Z",
+  "data": {
+    "id": "sub_paddle_live_001",
+    "status": "past_due",
+    "customer_id": "ctm_paddle_001",
+    "custom_data": {
+      "orgId": "00000000-0000-0000-0000-000000000001"
+    }
+  }
+}
