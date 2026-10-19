@@ -54,6 +54,7 @@ export function usersRepository(db: Database) {
             plan: organizations.plan,
             billingStatus: organizations.billingStatus,
             timeZone: organizations.timeZone,
+            trialEndsAt: organizations.trialEndsAt,
           },
         })
         .from(memberships)

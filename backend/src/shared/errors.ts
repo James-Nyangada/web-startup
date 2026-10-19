@@ -31,6 +31,7 @@ export const ErrorCode = {
   REPORT_NOT_READY: 'REPORT_NOT_READY',
   REPORT_FAILED: 'REPORT_FAILED',
   FEATURE_DISABLED: 'FEATURE_DISABLED',
+  BILLING_REQUIRED: 'BILLING_REQUIRED',
 } as const;
 
 export type ErrorCode = (typeof ErrorCode)[keyof typeof ErrorCode];

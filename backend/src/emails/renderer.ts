@@ -8,6 +8,9 @@ import {
   renderVerifyEmail,
   renderWelcomeEmail,
   renderFreeCheckReport,
+  renderTrialEnding,
+  renderTrialEnded,
+  renderDataDeletionWarning,
 } from './templates/index.js';
 import type {
   EmailBranding,
@@ -23,6 +26,9 @@ import type {
   VerifyEmailData,
   WelcomeEmailData,
   FreeCheckReportData,
+  TrialEndingData,
+  TrialEndedData,
+  DataDeletionWarningData,
 } from './types.js';
 
 export function renderEmail<T extends EmailTemplateId>(
@@ -49,6 +55,12 @@ export function renderEmail<T extends EmailTemplateId>(
       return renderReportShared(data as ReportSharedData, branding);
     case 'E-13':
       return renderFreeCheckReport(data as FreeCheckReportData, branding);
+    case 'E-14':
+      return renderTrialEnding(data as TrialEndingData, branding);
+    case 'E-15':
+      return renderTrialEnded(data as TrialEndedData, branding);
+    case 'E-20':
+      return renderDataDeletionWarning(data as DataDeletionWarningData, branding);
     default:
       throw new Error(`Unsupported email template: ${templateId}`);
   }
@@ -128,6 +140,27 @@ export function getSampleTemplateData(templateId: EmailTemplateId): unknown {
         seriousCount: 3,
         reportUrl: 'http://localhost:3000/check/sample_check_123',
         checkId: 'sample_check_123',
+      };
+    case 'E-14':
+      return {
+        daysLeft: 4,
+        orgName: 'Brightline Studio',
+        upgradeUrl: 'http://localhost:3000/settings/billing',
+        trialEndsAt: new Date(Date.now() + 4 * 24 * 60 * 60 * 1000).toISOString(),
+      };
+    case 'E-15':
+      return {
+        orgName: 'Brightline Studio',
+        upgradeUrl: 'http://localhost:3000/settings/billing',
+        readOnlySince: new Date().toISOString(),
+      };
+    case 'E-20':
+      return {
+        orgName: 'Brightline Studio',
+        daysUntilDeletion: 7,
+        reactivateUrl: 'http://localhost:3000/settings/billing',
+        exportUrl: 'http://localhost:3000/settings/account#export',
+        deletionDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
       };
   }
 }

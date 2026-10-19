@@ -213,6 +213,7 @@ export function AppShell({ active, crumbs = [], banners, children }: AppShellPro
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
+  const hamburgerRef = useRef<HTMLButtonElement>(null);
 
   // S-81: Ctrl+K / Cmd+K opens (or closes) the command palette from anywhere.
   useEffect(() => {
@@ -225,7 +226,45 @@ export function AppShell({ active, crumbs = [], banners, children }: AppShellPro
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   }, []);
-  const hamburgerRef = useRef<HTMLButtonElement>(null);
+  const userContext = useCurrentUser();
+  const activeOrg = userContext.me?.activeOrg;
+
+  const derivedBanners = React.useMemo(() => {
+    if (banners) return banners;
+    if (!activeOrg) return [];
+
+    const result: GlobalBannerData[] = [];
+
+    if (activeOrg.billingStatus === "read_only") {
+      result.push({
+        kind: "read-only",
+        id: `read-only-${activeOrg.id}`,
+        orgName: activeOrg.name,
+        href: "/settings/billing",
+      });
+    } else if (activeOrg.billingStatus === "past_due") {
+      result.push({
+        kind: "past_due",
+        id: `past-due-${activeOrg.id}`,
+        orgName: activeOrg.name,
+        href: "/settings/billing",
+      });
+    } else if (activeOrg.billingStatus === "trialing" && activeOrg.trialEndsAt) {
+      const msLeft = new Date(activeOrg.trialEndsAt).getTime() - Date.now();
+      const daysLeft = Math.max(0, Math.ceil(msLeft / (1000 * 60 * 60 * 24)));
+      if (daysLeft <= 5) {
+        result.push({
+          kind: "trial",
+          id: `trial-${activeOrg.id}`,
+          orgName: activeOrg.name,
+          daysLeft,
+          href: "/settings/billing",
+        });
+      }
+    }
+
+    return result;
+  }, [banners, activeOrg]);
 
   const handleCloseDrawer = () => {
     setDrawerOpen(false);
@@ -344,7 +383,7 @@ export function AppShell({ active, crumbs = [], banners, children }: AppShellPro
           </header>
 
           {/* S-82 Global Banners Region */}
-          <GlobalBannersRegion banners={banners} />
+          <GlobalBannersRegion banners={derivedBanners} />
 
           {/* S-81 Command Palette Dialog */}
           <CommandPalette

@@ -141,3 +141,46 @@ export function requireOrgRole(minRole: OrgRole) {
     next();
   };
 }
+
+/**
+ * SPEC REQUIREMENT (Section 1.4 & P4-05):
+ * "read-only mode (all mutating endpoints return 402 BILLING_REQUIRED except billing and data export)"
+ * "Read-only org can view everything and export, cannot scan or invite."
+ */
+export function enforceReadOnlyOrg(req: Request, res: Response, next: NextFunction): void {
+  if (req.org?.billingStatus !== 'read_only') {
+    next();
+    return;
+  }
+
+  // Safe read methods are always allowed (view everything)
+  if (req.method === 'GET' || req.method === 'HEAD' || req.method === 'OPTIONS') {
+    next();
+    return;
+  }
+
+  // Allow billing and invoice management routes so user can upgrade / manage payment
+  const path = req.path || '';
+  const isBilling = path.startsWith('/billing') || path.startsWith('/invoices');
+
+  // Allow data export endpoints (e.g. data export / export report)
+  const body = req.body as Record<string, unknown> | null | undefined;
+  const isExport =
+    path.startsWith('/export') || (path.startsWith('/reports') && Boolean(body?.isExport));
+
+  if (isBilling || isExport) {
+    next();
+    return;
+  }
+
+  res.status(402).json({
+    error: {
+      code: ErrorCode.BILLING_REQUIRED,
+      message: 'Your organisation is in read-only mode. Upgrade your plan to perform this action.',
+      details: {
+        billingStatus: req.org.billingStatus,
+        plan: req.org.plan,
+      },
+    },
+  });
+}

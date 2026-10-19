@@ -5,7 +5,7 @@ import { asOrgId } from '../db/repositories/org-scope.js';
 import type { Auth } from '../lib/auth.js';
 import { slugify } from '../lib/slugs.js';
 import { requireAuth } from '../middleware/auth.js';
-import { requireOrgRole, resolveOrgContext } from '../middleware/org.js';
+import { enforceReadOnlyOrg, requireOrgRole, resolveOrgContext } from '../middleware/org.js';
 import { orgSitesRouter } from './sites.js';
 import { orgScansRouter, type ScansRouterOptions } from './scans.js';
 import { orgIssuesRouter } from './issues.js';
@@ -138,6 +138,7 @@ export function orgsRouter(
   // Org-scoped sub-router mounted under /:orgId
   const orgScoped = Router({ mergeParams: true });
   orgScoped.use(resolveOrgContext(repos));
+  orgScoped.use(enforceReadOnlyOrg);
 
   // GET /v1/orgs/:orgId - Org details + usage (O A M)
   orgScoped.get(

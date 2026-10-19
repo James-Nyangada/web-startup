@@ -1,4 +1,4 @@
-import { desc, eq } from 'drizzle-orm';
+import { and, desc, eq } from 'drizzle-orm';
 import type { Database } from '../client.js';
 import { auditLog, type ActorType } from '../schema/index.js';
 import type { OrgId } from './org-scope.js';
@@ -28,6 +28,16 @@ export function auditLogRepository(db: Database) {
         .where(eq(auditLog.orgId, orgId))
         .orderBy(desc(auditLog.createdAt))
         .limit(limit);
+    },
+
+    async findRecentAction(orgId: OrgId, action: string) {
+      const [row] = await db
+        .select()
+        .from(auditLog)
+        .where(and(eq(auditLog.orgId, orgId), eq(auditLog.action, action)))
+        .orderBy(desc(auditLog.createdAt))
+        .limit(1);
+      return row ?? null;
     },
   };
 }

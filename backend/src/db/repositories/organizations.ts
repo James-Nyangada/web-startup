@@ -1,4 +1,4 @@
-import { and, eq, isNull, ne } from 'drizzle-orm';
+import { and, eq, isNull, ne, sql } from 'drizzle-orm';
 import type { Database } from '../client.js';
 import {
   memberships,
@@ -173,6 +173,18 @@ export function organizationsRepository(db: Database) {
 
         return { org, membership };
       });
+    },
+
+    async findDueForTrialLifecycle() {
+      return db
+        .select()
+        .from(organizations)
+        .where(
+          and(
+            isNull(organizations.deletedAt),
+            sql`(${organizations.billingStatus} = 'trialing' OR ${organizations.billingStatus} = 'read_only' OR ${organizations.billingStatus} = 'canceled')`,
+          ),
+        );
     },
   };
 }

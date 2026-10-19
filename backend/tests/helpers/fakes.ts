@@ -49,6 +49,7 @@ export function fakeRepos() {
       findByPaddleCustomerId: vi.fn().mockResolvedValue(null),
       isSlugAvailable: vi.fn().mockResolvedValue(true),
       createWithInitialOwner: vi.fn().mockResolvedValue(null),
+      findDueForTrialLifecycle: vi.fn().mockResolvedValue([]),
     },
     memberships: {
       list: vi.fn().mockResolvedValue([]),
@@ -58,10 +59,12 @@ export function fakeRepos() {
       find: vi.fn().mockResolvedValue(null),
       updateRole: vi.fn().mockResolvedValue(null),
       remove: vi.fn().mockResolvedValue(null),
+      findOwner: vi.fn().mockResolvedValue(null),
     },
     auditLog: {
       write: vi.fn().mockResolvedValue(undefined),
       list: vi.fn().mockResolvedValue([]),
+      findRecentAction: vi.fn().mockResolvedValue(null),
     },
     sites: {
       list: vi.fn().mockResolvedValue([]),

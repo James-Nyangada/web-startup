@@ -7,7 +7,10 @@ export type EmailTemplateId =
   | 'E-06' // First scan ready
   | 'E-07' // Scan completed summary
   | 'E-11' // Report ready / report shared
-  | 'E-13'; // Free check report
+  | 'E-13' // Free check report
+  | 'E-14' // Trial ending (day 10, day 13)
+  | 'E-15' // Trial ended, read-only
+  | 'E-20'; // Data deletion warning (7 days, 1 day)
 
 export interface EmailRenderOutput {
   subject: string;
@@ -93,6 +96,27 @@ export interface FreeCheckReportData {
   checkId: string;
 }
 
+export interface TrialEndingData {
+  daysLeft: number;
+  orgName: string;
+  upgradeUrl: string;
+  trialEndsAt: string | Date;
+}
+
+export interface TrialEndedData {
+  orgName: string;
+  upgradeUrl: string;
+  readOnlySince?: string | Date;
+}
+
+export interface DataDeletionWarningData {
+  orgName: string;
+  daysUntilDeletion: number;
+  reactivateUrl: string;
+  exportUrl: string;
+  deletionDate: string | Date;
+}
+
 export type TemplateDataMap = {
   'E-01': VerifyEmailData;
   'E-02': MagicLinkData;
@@ -103,4 +127,7 @@ export type TemplateDataMap = {
   'E-07': ScanSummaryData;
   'E-11': ReportSharedData;
   'E-13': FreeCheckReportData;
+  'E-14': TrialEndingData;
+  'E-15': TrialEndedData;
+  'E-20': DataDeletionWarningData;
 };

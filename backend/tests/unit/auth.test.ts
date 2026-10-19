@@ -440,6 +440,7 @@ describe('profile (/v1/me) endpoints', () => {
           plan: 'trial',
           billingStatus: 'trialing',
           timeZone: 'UTC',
+          trialEndsAt: null,
         },
       },
     ]);

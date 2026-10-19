@@ -67,5 +67,19 @@ export function membershipsRepository(db: Database) {
         .returning();
       return row ?? null;
     },
+
+    async findOwner(orgId: OrgId) {
+      const [row] = await db
+        .select({
+          userId: users.id,
+          email: users.email,
+          name: users.name,
+        })
+        .from(memberships)
+        .innerJoin(users, eq(users.id, memberships.userId))
+        .where(and(eq(memberships.orgId, orgId), eq(memberships.role, 'owner')))
+        .limit(1);
+      return row ?? null;
+    },
   };
 }

@@ -1,0 +1,254 @@
+import type { WorkerContext } from '../types.js';
+import { asOrgId } from '../../db/repositories/org-scope.js';
+import { enqueueEmailSend } from '../boss.js';
+
+export interface TrialLifecycleResult {
+  processed: number;
+  remindersDay10: number;
+  remindersDay13: number;
+  expiredCount: number;
+  warnings7d: number;
+  warnings1d: number;
+}
+
+/**
+ * Job handler for trial.lifecycle.
+ * Runs hourly via cron (Spec Section 9 & P4-05).
+ * - Day 10 reminder (4 days remaining): sends E-14 to owner
+ * - Day 13 reminder (1 day remaining): sends E-14 to owner
+ * - Expiry: transitions org to read_only mode, writes audit log, sends E-15
+ * - Data deletion warnings: 30-day retention countdown; sends E-20 at 7 days and 1 day before deletion
+ */
+export async function handleTrialLifecycle(ctx: WorkerContext): Promise<TrialLifecycleResult> {
+  const orgs = await ctx.repos.organizations.findDueForTrialLifecycle();
+  const now = new Date();
+  const result: TrialLifecycleResult = {
+    processed: orgs.length,
+    remindersDay10: 0,
+    remindersDay13: 0,
+    expiredCount: 0,
+    warnings7d: 0,
+    warnings1d: 0,
+  };
+
+  const appUrl = process.env.APP_URL || 'http://localhost:3000';
+
+  for (const org of orgs) {
+    if (ctx.abortSignal?.aborted) break;
+    const orgId = asOrgId(org.id);
+
+    // 1. Process trialing orgs
+    if (org.billingStatus === 'trialing' && org.trialEndsAt) {
+      const trialEndsAt = new Date(org.trialEndsAt);
+      const msRemaining = trialEndsAt.getTime() - now.getTime();
+      const daysRemaining = msRemaining / (1000 * 60 * 60 * 24);
+
+      // A. Trial Expired: trialEndsAt <= now()
+      if (msRemaining <= 0) {
+        // Transition to read_only mode
+        await ctx.repos.organizations.update(orgId, { billingStatus: 'read_only' });
+        await ctx.repos.auditLog.write(orgId, {
+          actorType: 'system',
+          action: 'trial_expired',
+          targetType: 'organization',
+          targetId: org.id,
+          data: { trialEndsAt: org.trialEndsAt },
+        });
+
+        const owner = await ctx.repos.memberships.findOwner(orgId);
+        if (owner?.email) {
+          const emailPayload = {
+            orgName: org.name,
+            upgradeUrl: `${appUrl}/settings/billing`,
+            readOnlySince: now.toISOString(),
+          };
+          if (ctx.boss) {
+            await enqueueEmailSend(ctx.boss, {
+              to: owner.email,
+              templateId: 'E-15',
+              data: emailPayload,
+            });
+          } else if (ctx.emailSender) {
+            await ctx.emailSender.send({
+              to: owner.email,
+              templateId: 'E-15',
+              data: emailPayload,
+            });
+          }
+        }
+        result.expiredCount++;
+        continue;
+      }
+
+      // B. Day 13 Reminder: ~1 day remaining (between 0 and 1.5 days remaining)
+      if (daysRemaining <= 1.5 && daysRemaining > 0) {
+        const alreadySent = await ctx.repos.auditLog.findRecentAction(
+          orgId,
+          'trial.reminder_day_13',
+        );
+        if (!alreadySent) {
+          const owner = await ctx.repos.memberships.findOwner(orgId);
+          if (owner?.email) {
+            const emailPayload = {
+              daysLeft: 1,
+              orgName: org.name,
+              upgradeUrl: `${appUrl}/settings/billing`,
+              trialEndsAt: org.trialEndsAt,
+            };
+            if (ctx.boss) {
+              await enqueueEmailSend(ctx.boss, {
+                to: owner.email,
+                templateId: 'E-14',
+                data: emailPayload,
+              });
+            } else if (ctx.emailSender) {
+              await ctx.emailSender.send({
+                to: owner.email,
+                templateId: 'E-14',
+                data: emailPayload,
+              });
+            }
+          }
+          await ctx.repos.auditLog.write(orgId, {
+            actorType: 'system',
+            action: 'trial.reminder_day_13',
+            targetType: 'organization',
+            targetId: org.id,
+            data: { daysRemaining: Math.round(daysRemaining) },
+          });
+          result.remindersDay13++;
+        }
+        continue;
+      }
+
+      // C. Day 10 Reminder: ~4 days remaining (between 3.5 and 4.5 days remaining)
+      if (daysRemaining <= 4.5 && daysRemaining > 1.5) {
+        const alreadySent = await ctx.repos.auditLog.findRecentAction(
+          orgId,
+          'trial.reminder_day_10',
+        );
+        if (!alreadySent) {
+          const owner = await ctx.repos.memberships.findOwner(orgId);
+          if (owner?.email) {
+            const emailPayload = {
+              daysLeft: 4,
+              orgName: org.name,
+              upgradeUrl: `${appUrl}/settings/billing`,
+              trialEndsAt: org.trialEndsAt,
+            };
+            if (ctx.boss) {
+              await enqueueEmailSend(ctx.boss, {
+                to: owner.email,
+                templateId: 'E-14',
+                data: emailPayload,
+              });
+            } else if (ctx.emailSender) {
+              await ctx.emailSender.send({
+                to: owner.email,
+                templateId: 'E-14',
+                data: emailPayload,
+              });
+            }
+          }
+          await ctx.repos.auditLog.write(orgId, {
+            actorType: 'system',
+            action: 'trial.reminder_day_10',
+            targetType: 'organization',
+            targetId: org.id,
+            data: { daysRemaining: Math.round(daysRemaining) },
+          });
+          result.remindersDay10++;
+        }
+      }
+    }
+
+    // 2. Data deletion warnings for read_only and canceled orgs (30-day retention countdown)
+    if (org.billingStatus === 'read_only' || org.billingStatus === 'canceled') {
+      const expiryAudit = await ctx.repos.auditLog.findRecentAction(orgId, 'trial_expired');
+      const startOfRetention = expiryAudit?.createdAt
+        ? new Date(expiryAudit.createdAt)
+        : new Date(org.updatedAt);
+      const deletionDate = new Date(startOfRetention.getTime() + 30 * 24 * 60 * 60 * 1000);
+      const msUntilDeletion = deletionDate.getTime() - now.getTime();
+      const daysUntilDeletion = msUntilDeletion / (1000 * 60 * 60 * 24);
+
+      // Warning 1: 7 days remaining (between 6.5 and 7.5 days)
+      if (daysUntilDeletion <= 7.5 && daysUntilDeletion > 1.5) {
+        const alreadySent = await ctx.repos.auditLog.findRecentAction(orgId, 'deletion.warning_7d');
+        if (!alreadySent) {
+          const owner = await ctx.repos.memberships.findOwner(orgId);
+          if (owner?.email) {
+            const emailPayload = {
+              orgName: org.name,
+              daysUntilDeletion: 7,
+              reactivateUrl: `${appUrl}/settings/billing`,
+              exportUrl: `${appUrl}/settings/account#export`,
+              deletionDate: deletionDate.toISOString(),
+            };
+            if (ctx.boss) {
+              await enqueueEmailSend(ctx.boss, {
+                to: owner.email,
+                templateId: 'E-20',
+                data: emailPayload,
+              });
+            } else if (ctx.emailSender) {
+              await ctx.emailSender.send({
+                to: owner.email,
+                templateId: 'E-20',
+                data: emailPayload,
+              });
+            }
+          }
+          await ctx.repos.auditLog.write(orgId, {
+            actorType: 'system',
+            action: 'deletion.warning_7d',
+            targetType: 'organization',
+            targetId: org.id,
+            data: { deletionDate: deletionDate.toISOString() },
+          });
+          result.warnings7d++;
+        }
+      }
+
+      // Warning 2: 1 day remaining (between 0 and 1.5 days)
+      if (daysUntilDeletion <= 1.5 && daysUntilDeletion > 0) {
+        const alreadySent = await ctx.repos.auditLog.findRecentAction(orgId, 'deletion.warning_1d');
+        if (!alreadySent) {
+          const owner = await ctx.repos.memberships.findOwner(orgId);
+          if (owner?.email) {
+            const emailPayload = {
+              orgName: org.name,
+              daysUntilDeletion: 1,
+              reactivateUrl: `${appUrl}/settings/billing`,
+              exportUrl: `${appUrl}/settings/account#export`,
+              deletionDate: deletionDate.toISOString(),
+            };
+            if (ctx.boss) {
+              await enqueueEmailSend(ctx.boss, {
+                to: owner.email,
+                templateId: 'E-20',
+                data: emailPayload,
+              });
+            } else if (ctx.emailSender) {
+              await ctx.emailSender.send({
+                to: owner.email,
+                templateId: 'E-20',
+                data: emailPayload,
+              });
+            }
+          }
+          await ctx.repos.auditLog.write(orgId, {
+            actorType: 'system',
+            action: 'deletion.warning_1d',
+            targetType: 'organization',
+            targetId: org.id,
+            data: { deletionDate: deletionDate.toISOString() },
+          });
+          result.warnings1d++;
+        }
+      }
+    }
+  }
+
+  return result;
+}

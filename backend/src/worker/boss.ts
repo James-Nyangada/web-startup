@@ -13,6 +13,7 @@ import { handleIssueRecheck } from './jobs/issue-recheck.js';
 import { handleEmailSend } from './jobs/email-send.js';
 import { handleReportRender } from './jobs/report-render.js';
 import { handleFreeCheckRun } from './jobs/free-check-run.js';
+import { handleTrialLifecycle } from './jobs/trial-lifecycle.js';
 import type { ReportRenderJobPayload } from './types.js';
 
 export const QUEUE_SCAN_RUN = 'scan.run';
@@ -22,6 +23,7 @@ export const QUEUE_ISSUE_RECHECK = 'issue.recheck';
 export const QUEUE_EMAIL_SEND = 'email.send';
 export const QUEUE_REPORT_RENDER = 'report.render';
 export const QUEUE_FREE_CHECK_RUN = 'free-check.run';
+export const QUEUE_TRIAL_LIFECYCLE = 'trial.lifecycle';
 
 export const ALL_QUEUES = [
   QUEUE_SCAN_RUN,
@@ -31,6 +33,7 @@ export const ALL_QUEUES = [
   QUEUE_EMAIL_SEND,
   QUEUE_REPORT_RENDER,
   QUEUE_FREE_CHECK_RUN,
+  QUEUE_TRIAL_LIFECYCLE,
 ] as const;
 
 /** pg-boss refuses to send to or schedule on a queue that does not exist. Idempotent. */
@@ -236,6 +239,11 @@ export async function registerWorkers(boss: PgBoss, ctx: WorkerContext): Promise
       }
     },
   );
+
+  // Concurrency 1 for trial.lifecycle cron
+  await boss.work(QUEUE_TRIAL_LIFECYCLE, { localConcurrency: 1, batchSize: 1 }, async () => {
+    await handleTrialLifecycle(ctx);
+  });
 }
 
 /**
@@ -244,4 +252,7 @@ export async function registerWorkers(boss: PgBoss, ctx: WorkerContext): Promise
 export async function registerSchedules(boss: PgBoss): Promise<void> {
   // scan.schedule runs every 10 minutes (cron: '*/10 * * * *')
   await boss.schedule(QUEUE_SCAN_SCHEDULE, '*/10 * * * *', {});
+
+  // trial.lifecycle runs hourly (cron: '0 * * * *')
+  await boss.schedule(QUEUE_TRIAL_LIFECYCLE, '0 * * * *', {});
 }

@@ -18,6 +18,8 @@ export interface OrganizationSummary {
   slug: string;
   type: 'agency' | 'store';
   plan: string;
+  billingStatus?: 'trialing' | 'active' | 'past_due' | 'paused' | 'canceled' | 'read_only';
+  trialEndsAt?: string | null;
 }
 
 export interface Membership {

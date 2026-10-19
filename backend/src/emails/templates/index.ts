@@ -11,6 +11,9 @@ import type {
   VerifyEmailData,
   WelcomeEmailData,
   FreeCheckReportData,
+  TrialEndingData,
+  TrialEndedData,
+  DataDeletionWarningData,
 } from '../types.js';
 
 // E-01: Verify your email
@@ -498,6 +501,160 @@ Summary:
 
 View the full report and download PDF:
 ${data.reportUrl}
+
+— The ${brandName} Team`;
+
+  return { subject, html, text };
+}
+
+// E-14: Trial ending (day 10, day 13)
+export function renderTrialEnding(
+  data: TrialEndingData,
+  branding?: EmailBranding,
+): EmailRenderOutput {
+  const brandName = branding?.displayName || 'Plainsight';
+  const subject = `Your ${brandName} trial ends in ${data.daysLeft} day${data.daysLeft === 1 ? '' : 's'}`;
+
+  const contentHtml = `
+    <p style="margin: 0 0 16px 0;">Hello,</p>
+    <p style="margin: 0 0 16px 0;">
+      Your 14-day free trial for <strong>${data.orgName}</strong> will conclude in <strong>${data.daysLeft} day${data.daysLeft === 1 ? '' : 's'}</strong> on ${new Date(data.trialEndsAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}.
+    </p>
+    <p style="margin: 0 0 16px 0;">
+      To keep automated WCAG monitoring, instant regression email alerts, and continuous verification active, choose a subscription plan before your trial ends.
+    </p>
+    <p style="margin: 0;">
+      If you choose not to subscribe, your account will enter read-only mode when your trial expires. All historical scans, issues, and reports will remain safe.
+    </p>
+  `;
+
+  const html = renderEmailLayout({
+    preheader: `Keep your automated accessibility monitoring active for ${data.orgName}`,
+    title: `Your trial ends in ${data.daysLeft} day${data.daysLeft === 1 ? '' : 's'}`,
+    contentHtml,
+    buttonLabel: 'Choose a subscription plan',
+    buttonUrl: data.upgradeUrl,
+    secondaryLinkText: 'Billing settings',
+    secondaryLinkUrl: data.upgradeUrl,
+    branding,
+  });
+
+  const text = `Your ${brandName} trial ends in ${data.daysLeft} day${data.daysLeft === 1 ? '' : 's'}
+
+Hello,
+
+Your 14-day free trial for ${data.orgName} will conclude in ${data.daysLeft} day${data.daysLeft === 1 ? '' : 's'} on ${new Date(data.trialEndsAt).toLocaleDateString('en-US')}.
+
+To keep automated WCAG monitoring and continuous verification active, choose a subscription plan:
+${data.upgradeUrl}
+
+If you do not choose a plan, your account will enter read-only mode on expiry. All historical scans and reports remain safe.
+
+— The ${brandName} Team`;
+
+  return { subject, html, text };
+}
+
+// E-15: Trial ended, read-only
+export function renderTrialEnded(
+  data: TrialEndedData,
+  branding?: EmailBranding,
+): EmailRenderOutput {
+  const brandName = branding?.displayName || 'Plainsight';
+  const subject = `Your ${brandName} trial has ended — account in read-only mode`;
+
+  const contentHtml = `
+    <p style="margin: 0 0 16px 0;">Hello,</p>
+    <p style="margin: 0 0 16px 0;">
+      The 14-day free trial for <strong>${data.orgName}</strong> has ended, and your organization has transitioned to <strong>read-only mode</strong>.
+    </p>
+    <p style="margin: 0 0 16px 0;">
+      <strong>What this means:</strong>
+    </p>
+    <ul style="margin: 0 0 16px 0; padding-left: 20px;">
+      <li>Automated scheduled scans and rechecks are temporarily paused.</li>
+      <li>New member invitations are disabled.</li>
+      <li>All existing scan histories, issue records, notes, and PDF reports remain completely safe and accessible.</li>
+    </ul>
+    <p style="margin: 0;">
+      You can reactivate full scanning and team features at any time by selecting a subscription plan.
+    </p>
+  `;
+
+  const html = renderEmailLayout({
+    preheader: `Your scans are paused, but your data is safe for ${data.orgName}`,
+    title: 'Your trial has ended',
+    contentHtml,
+    buttonLabel: 'Upgrade to resume monitoring',
+    buttonUrl: data.upgradeUrl,
+    secondaryLinkText: 'Choose plan',
+    secondaryLinkUrl: data.upgradeUrl,
+    branding,
+  });
+
+  const text = `Your ${brandName} trial has ended — account in read-only mode
+
+Hello,
+
+The 14-day free trial for ${data.orgName} has ended, and your organization has transitioned to read-only mode.
+
+- Automated scheduled scans and rechecks are paused.
+- All historical scans, issues, and reports remain safely preserved.
+
+To resume automated monitoring and team access, choose a plan:
+${data.upgradeUrl}
+
+— The ${brandName} Team`;
+
+  return { subject, html, text };
+}
+
+// E-20: Data deletion warning (7 days, 1 day)
+export function renderDataDeletionWarning(
+  data: DataDeletionWarningData,
+  branding?: EmailBranding,
+): EmailRenderOutput {
+  const brandName = branding?.displayName || 'Plainsight';
+  const subject = `Action required: Data deletion notice for ${data.orgName} (${data.daysUntilDeletion} day${data.daysUntilDeletion === 1 ? '' : 's'} remaining)`;
+
+  const contentHtml = `
+    <p style="margin: 0 0 16px 0;">Hello,</p>
+    <p style="margin: 0 0 16px 0;">
+      This is an important notice regarding <strong>${data.orgName}</strong>.
+    </p>
+    <p style="margin: 0 0 16px 0;">
+      Your organization has been inactive in read-only mode for over 3 weeks. Under our data retention policy, all historical scan records, issue logs, and audit files are scheduled for permanent deletion in <strong>${data.daysUntilDeletion} day${data.daysUntilDeletion === 1 ? '' : 's'}</strong> on <strong>${new Date(data.deletionDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</strong>.
+    </p>
+    <p style="margin: 0 0 16px 0;">
+      To keep your compliance history, you can either reactivate your subscription or export your complete data before this date.
+    </p>
+    <p style="margin: 0;">
+      <a href="${data.exportUrl}" style="color: #635F59; text-decoration: underline;">Download complete data export</a>
+    </p>
+  `;
+
+  const html = renderEmailLayout({
+    preheader: `Your compliance data will be deleted in ${data.daysUntilDeletion} days`,
+    title: 'Data deletion notice',
+    contentHtml,
+    buttonLabel: 'Reactivate subscription',
+    buttonUrl: data.reactivateUrl,
+    secondaryLinkText: 'Export data before deletion',
+    secondaryLinkUrl: data.exportUrl,
+    branding,
+  });
+
+  const text = `Action required: Data deletion notice for ${data.orgName}
+
+Hello,
+
+Your organization ${data.orgName} has been inactive in read-only mode. All scan records, issue logs, and audit files will be permanently deleted in ${data.daysUntilDeletion} day${data.daysUntilDeletion === 1 ? '' : 's'} on ${new Date(data.deletionDate).toLocaleDateString('en-US')}.
+
+To keep your monitoring and data active:
+${data.reactivateUrl}
+
+To export your data:
+${data.exportUrl}
 
 — The ${brandName} Team`;
 
