@@ -222,6 +222,24 @@ export function sitesRepository(db: Database) {
       return row?.count ?? 0;
     },
 
+    async countActive(orgId: OrgId): Promise<number> {
+      const [row] = await db
+        .select({ count: sql<number>`count(*)::int` })
+        .from(sites)
+        .where(and(eq(sites.orgId, orgId), isNull(sites.deletedAt), ne(sites.status, 'paused')));
+      return row?.count ?? 0;
+    },
+
+    async countDailySites(orgId: OrgId): Promise<number> {
+      const [row] = await db
+        .select({ count: sql<number>`count(*)::int` })
+        .from(sites)
+        .where(
+          and(eq(sites.orgId, orgId), isNull(sites.deletedAt), eq(sites.scanFrequency, 'daily')),
+        );
+      return row?.count ?? 0;
+    },
+
     async create(orgId: OrgId, input: CreateSiteInput) {
       const verifyToken = `ps_${randomBytes(16).toString('hex')}`;
       const scanFrequency = input.scanFrequency ?? 'weekly';

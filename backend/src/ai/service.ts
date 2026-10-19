@@ -30,11 +30,14 @@ export interface AiSuggestionResult {
   model: string;
 }
 
+import { getPlanLimits, getUpgradeTarget } from '../shared/plans.js';
+
 export class AiServiceError extends Error {
   constructor(
     public readonly code: string,
     message: string,
     public readonly statusCode: number = 400,
+    public readonly details: Record<string, unknown> = {},
   ) {
     super(message);
     this.name = 'AiServiceError';
@@ -42,7 +45,7 @@ export class AiServiceError extends Error {
 }
 
 export class AiService {
-  private readonly monthlyCap: number;
+  private readonly monthlyCapOverride?: number;
   private readonly featureEnabled: boolean;
   private readonly provider: AiProvider;
 
@@ -50,11 +53,11 @@ export class AiService {
     private readonly repos: Repositories,
     options: AiServiceOptions = {},
   ) {
-    this.monthlyCap =
+    this.monthlyCapOverride =
       options.monthlyCap ??
       (process.env.AI_SUGGESTIONS_MONTHLY_CAP
         ? Number.parseInt(process.env.AI_SUGGESTIONS_MONTHLY_CAP, 10)
-        : 50);
+        : undefined);
     this.featureEnabled =
       options.featureEnabled ??
       (process.env.FEATURE_AI_SUGGESTIONS === undefined ||
@@ -96,11 +99,23 @@ export class AiService {
     // 4. Monthly cap check
     const currentMonth = new Date().toISOString().slice(0, 7); // 'YYYY-MM'
     const usage = await this.repos.aiSuggestions.getMonthlyUsage(params.orgId, currentMonth);
-    if (usage >= this.monthlyCap) {
+    const org = this.repos.organizations
+      ? await this.repos.organizations.findById(params.orgId)
+      : null;
+    const plan = org?.plan ?? 'trial';
+    const effectiveCap = this.monthlyCapOverride ?? getPlanLimits(plan).aiSuggestionsMonthly;
+
+    if (usage >= effectiveCap) {
+      const upgradeTo = getUpgradeTarget(plan, 'ai_suggestions', usage + 1);
       throw new AiServiceError(
         ErrorCode.PLAN_LIMIT,
-        `Monthly AI suggestion limit reached (${this.monthlyCap} suggestions/month). Upgrade your plan or wait until next month.`,
+        `Monthly AI suggestion limit reached (${effectiveCap} suggestions/month). Upgrade your plan or wait until next month.`,
         422,
+        {
+          limit: effectiveCap,
+          current: usage,
+          upgradeTo,
+        },
       );
     }
 

@@ -1265,7 +1265,7 @@ export function orgIssuesRouter(repos: Repositories, options?: IssuesRouterOptio
           error: {
             code: err.code,
             message: err.message,
-            details: {},
+            details: err.details,
           },
         });
         return;

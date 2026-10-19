@@ -6,7 +6,7 @@ import { requireOrgRole } from '../middleware/org.js';
 import { ErrorCode } from '../shared/errors.js';
 import { STANDARDS, type Standard } from '../scanner/types.js';
 import { enqueueScanRun } from '../worker/boss.js';
-import { getPlanLimits } from '../shared/plans.js';
+import { assertWithinPlan } from '../shared/plans.js';
 import { getZonedParts, zonedWallClockToUtc } from '../lib/schedule.js';
 import { getScanFailureHint } from '../shared/scan-hints.js';
 
@@ -146,12 +146,11 @@ export function orgScansRouter(repos: Repositories, options?: ScansRouterOptions
         return;
       }
 
+      const org = await repos.organizations.findById(req.orgId!);
+
       // Enforce daily manual scan limit per site based on org plan
       if (trigger === 'manual') {
-        const org = await repos.organizations.findById(req.orgId!);
         const timeZone = org?.timeZone ?? 'UTC';
-        const planLimits = getPlanLimits(org?.plan);
-        const maxManualScans = planLimits.manualScansPerDayPerSite;
 
         const currentParts = getZonedParts(new Date(), timeZone);
         const startOfDay = zonedWallClockToUtc(
@@ -169,27 +168,11 @@ export function orgScansRouter(repos: Repositories, options?: ScansRouterOptions
           startOfDay,
         );
 
-        if (manualCountToday >= maxManualScans) {
-          res.status(422).json({
-            error: {
-              code: ErrorCode.PLAN_LIMIT,
-              message: `You have reached your daily limit of ${maxManualScans} manual scan${maxManualScans === 1 ? '' : 's'} for this site on the ${planLimits.name} plan.`,
-              details: {
-                limit: maxManualScans,
-                current: manualCountToday,
-                upgradeTo:
-                  org?.plan === 'trial'
-                    ? 'store'
-                    : org?.plan === 'store'
-                      ? 'growth'
-                      : org?.plan === 'growth'
-                        ? 'agency'
-                        : 'agency_pro',
-              },
-            },
-          });
-          return;
-        }
+        assertWithinPlan(org, 'manual_scans', manualCountToday + 1);
+      }
+
+      if (pagesPlanned !== undefined) {
+        assertWithinPlan(org, 'pages', pagesPlanned);
       }
 
       const effectivePagesPlanned =

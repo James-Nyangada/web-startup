@@ -12,6 +12,7 @@ import { orgIssuesRouter } from './issues.js';
 import { orgReportsRouter } from './reports.js';
 import type { StorageService } from '../storage/index.js';
 import { ErrorCode } from '../shared/errors.js';
+import { assertWithinPlan, getPlanDefinition, getPlanLimits } from '../shared/plans.js';
 
 const createOrgSchema = z.object({
   name: z.string().min(1, 'Organisation name is required').max(100),
@@ -137,15 +138,83 @@ export function orgsRouter(
   const orgScoped = Router({ mergeParams: true });
   orgScoped.use(resolveOrgContext(repos));
 
-  // GET /v1/orgs/:orgId - Org details
-  orgScoped.get('/', requireOrgRole('member'), (req: Request, res: Response): void => {
-    res.status(200).json({
-      data: {
-        org: req.org,
-        membership: req.membership,
-      },
-    });
-  });
+  // GET /v1/orgs/:orgId - Org details + usage (O A M)
+  orgScoped.get(
+    '/',
+    requireOrgRole('member'),
+    async (req: Request, res: Response): Promise<void> => {
+      const org = req.org!;
+      const planLimits = getPlanLimits(org.plan);
+      const def = getPlanDefinition(org.plan);
+      const [sitesCount, teamMembersCount] = await Promise.all([
+        repos.sites.count(req.orgId!),
+        repos.memberships.count(req.orgId!),
+      ]);
+
+      res.status(200).json({
+        data: {
+          org: req.org,
+          membership: req.membership,
+          limits: planLimits,
+          usage: {
+            sites: sitesCount,
+            teamMembers: teamMembersCount,
+          },
+          features: def.features,
+        },
+      });
+    },
+  );
+
+  // GET /v1/orgs/:orgId/usage - Resource usage and plan limits (P4-01 & Section 12.3)
+  orgScoped.get(
+    '/usage',
+    requireOrgRole('member'),
+    async (req: Request, res: Response): Promise<void> => {
+      const orgId = req.orgId!;
+      const org = req.org!;
+      const planLimits = getPlanLimits(org.plan);
+      const def = getPlanDefinition(org.plan);
+
+      const [sitesCount, dailySitesCount, teamMembersCount, clientViewersCount] = await Promise.all(
+        [
+          repos.sites.count(orgId),
+          repos.sites.countDailySites(orgId),
+          repos.memberships.count(orgId),
+          repos.invitations.countClientViewers(orgId),
+        ],
+      );
+
+      const currentMonth = new Date().toISOString().slice(0, 7);
+      const aiUsageCount = await repos.aiSuggestions.getMonthlyUsage(orgId, currentMonth);
+
+      res.status(200).json({
+        data: {
+          plan: org.plan,
+          planName: planLimits.name,
+          limits: {
+            maxSites: planLimits.maxSites,
+            maxPagesPerScan: planLimits.maxPagesPerScan,
+            manualScansPerDayPerSite: planLimits.manualScansPerDayPerSite,
+            scheduledFrequency: planLimits.scheduledFrequency,
+            maxDailySites: planLimits.maxDailySites,
+            teamMembers: planLimits.teamMembers,
+            clientViewers: planLimits.clientViewers,
+            retentionMonths: planLimits.retentionMonths,
+            aiSuggestionsMonthly: planLimits.aiSuggestionsMonthly,
+          },
+          usage: {
+            sites: sitesCount,
+            dailySites: dailySitesCount,
+            teamMembers: teamMembersCount,
+            clientViewers: clientViewersCount,
+            aiSuggestionsThisMonth: aiUsageCount,
+          },
+          features: def.features,
+        },
+      });
+    },
+  );
 
   // PATCH /v1/orgs/:orgId - Update org (O A)
   orgScoped.patch(
@@ -362,6 +431,16 @@ export function orgsRouter(
           });
           return;
         }
+      }
+
+      // Plan limit check: client viewer or team member seats (Section 12.3)
+      if (role === 'client_viewer') {
+        const clientViewersCount = await repos.invitations.countClientViewers(req.orgId!);
+        assertWithinPlan(req.org, 'client_viewers', clientViewersCount + 1);
+      } else {
+        const membersCount = await repos.memberships.count(req.orgId!);
+        const pendingCount = await repos.invitations.countPendingNonClient(req.orgId!);
+        assertWithinPlan(req.org, 'team_members', membersCount + pendingCount + 1);
       }
 
       const { invitation, rawToken } = await repos.invitations.create(req.orgId!, {

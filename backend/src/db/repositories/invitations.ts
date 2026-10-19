@@ -1,4 +1,4 @@
-import { and, desc, eq, gt, isNull } from 'drizzle-orm';
+import { and, desc, eq, gt, isNull, ne, sql } from 'drizzle-orm';
 import { createHash, randomBytes } from 'node:crypto';
 import type { Database } from '../client.js';
 import { invitations, organizations, users, type InvitationRole } from '../schema/index.js';
@@ -17,6 +17,37 @@ export interface CreateInvitationInput {
 
 export function invitationsRepository(db: Database) {
   return {
+    async countPendingNonClient(orgId: OrgId): Promise<number> {
+      const now = new Date();
+      const [row] = await db
+        .select({ count: sql<number>`count(*)::int` })
+        .from(invitations)
+        .where(
+          and(
+            eq(invitations.orgId, orgId),
+            ne(invitations.role, 'client_viewer'),
+            isNull(invitations.acceptedAt),
+            isNull(invitations.revokedAt),
+            gt(invitations.expiresAt, now),
+          ),
+        );
+      return row?.count ?? 0;
+    },
+
+    async countClientViewers(orgId: OrgId): Promise<number> {
+      const [row] = await db
+        .select({ count: sql<number>`count(*)::int` })
+        .from(invitations)
+        .where(
+          and(
+            eq(invitations.orgId, orgId),
+            eq(invitations.role, 'client_viewer'),
+            isNull(invitations.revokedAt),
+          ),
+        );
+      return row?.count ?? 0;
+    },
+
     /**
      * Creates an invitation with a single-use token that expires after 7 days,
      * stored as a SHA-256 hash. Returns the created record and raw token for delivery.

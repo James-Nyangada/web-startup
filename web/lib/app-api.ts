@@ -128,6 +128,38 @@ export interface ApiSiteDetail {
   latestScanSummary: { scanId: string; score: number | null; status: string; finishedAt?: string | null } | null;
 }
 
+export interface ApiUsage {
+  plan: string;
+  planName: string;
+  limits: {
+    maxSites: number;
+    maxPagesPerScan: number;
+    manualScansPerDayPerSite: number;
+    scheduledFrequency: string;
+    maxDailySites: number;
+    teamMembers: number;
+    clientViewers: number;
+    retentionMonths: number;
+    aiSuggestionsMonthly: number;
+  };
+  usage: {
+    sites: number;
+    dailySites: number;
+    teamMembers: number;
+    clientViewers: number;
+    aiSuggestionsThisMonth: number;
+  };
+  features: {
+    regressionAlerts: boolean;
+    slackWebhook: boolean;
+    whiteLabel: boolean;
+    customDomain: boolean;
+    scheduledClientReports: boolean;
+    evidencePack: boolean;
+    publicApi: boolean;
+  };
+}
+
 /* ---------- Formatting ---------- */
 
 const DAY = new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short" });
@@ -401,6 +433,8 @@ export const appApi = {
     apiClient<{ scan: { id: string } }>(`/v1/orgs/${org}/sites/${siteId}/scans`, json({ trigger })).then(
       (r) => r.scan,
     ),
+
+  getUsage: (org: string) => apiClient<ApiUsage>(`/v1/orgs/${org}/usage`),
 };
 
 export type RecheckOutcome = "fixed" | "still_open" | "unchecked";

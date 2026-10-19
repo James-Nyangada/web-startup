@@ -1,10 +1,18 @@
-import { and, eq } from 'drizzle-orm';
+import { and, eq, sql } from 'drizzle-orm';
 import type { Database } from '../client.js';
 import { memberships, users, type OrgRole } from '../schema/index.js';
 import type { OrgId } from './org-scope.js';
 
 export function membershipsRepository(db: Database) {
   return {
+    async count(orgId: OrgId): Promise<number> {
+      const [row] = await db
+        .select({ count: sql<number>`count(*)::int` })
+        .from(memberships)
+        .where(eq(memberships.orgId, orgId));
+      return row?.count ?? 0;
+    },
+
     async list(orgId: OrgId) {
       return db
         .select({

@@ -6,6 +6,7 @@ import type { EmailSender } from '../emails/sender.js';
 import type { PgBoss } from 'pg-boss';
 import { requireOrgRole } from '../middleware/org.js';
 import { ErrorCode } from '../shared/errors.js';
+import { assertWithinPlan } from '../shared/plans.js';
 import { signReportDownloadToken, verifyReportDownloadToken } from '../reports/token.js';
 import { enqueueReportRender } from '../worker/boss.js';
 import { handleReportRender } from '../worker/jobs/report-render.js';
@@ -62,6 +63,13 @@ export function orgReportsRouter(repos: Repositories, options?: ReportsRouterOpt
 
     const { type, scanId, branded } = parse.data;
     let { siteId } = parse.data;
+
+    if (branded) {
+      assertWithinPlan(req.org, 'white_label');
+    }
+    if (type === 'client_monthly') {
+      assertWithinPlan(req.org, 'scheduled_reports');
+    }
 
     if (!siteId && !scanId) {
       res.status(400).json({

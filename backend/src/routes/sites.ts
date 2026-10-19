@@ -8,13 +8,14 @@ import { detectPlatform } from '../scanner/platform/detect.js';
 import { createGuardedFetch } from '../scanner/net/guarded-fetch.js';
 import { rootUrlOf } from '../scanner/url/normalize.js';
 import { PLATFORMS, STANDARDS, type Platform } from '../scanner/types.js';
-import { SCAN_FREQUENCIES, type SiteStatus } from '../db/schema/index.js';
+import { SCAN_FREQUENCIES, type ScanFrequency, type SiteStatus } from '../db/schema/index.js';
 import type { UpdateSiteInput } from '../db/repositories/sites.js';
 import { verifyOwnership } from '../scanner/verification/verify.js';
 import { computeNextScanAt } from '../lib/schedule.js';
 import { computeTrendSummary, formatScanDate, type TrendPoint } from '../lib/trend.js';
 import { scoreBand } from '../scanner/results/score.js';
 import { ErrorCode } from '../shared/errors.js';
+import { assertWithinPlan } from '../shared/plans.js';
 
 const guardedFetch = createGuardedFetch({
   userAgent: 'Mozilla/5.0 (compatible; PlainsightBot/1.0; +https://plainsight.app/bot)',
@@ -28,6 +29,10 @@ const createSiteSchema = z.object({
   platform: z.enum(PLATFORMS as unknown as [Platform, ...Platform[]]).optional(),
   clientName: z.string().trim().max(255).optional().nullable(),
   freeCheckId: z.string().uuid().optional(),
+  scanFrequency: z
+    .enum(SCAN_FREQUENCIES as unknown as [ScanFrequency, ...ScanFrequency[]])
+    .optional(),
+  pageLimit: z.number().int().min(1).max(1000).optional(),
 });
 
 const updateSiteSchema = z.object({
@@ -63,9 +68,6 @@ const pinPageSchema = z
 const previewExclusionsSchema = z.object({
   patterns: z.array(z.string()).default([]),
 });
-
-// Default stub limit for sites per org (real limits in Phase 4)
-const DEFAULT_SITE_LIMIT = 25;
 
 /** Non-org-scoped platform detection router mounted at /v1/sites */
 export function detectPlatformRouter(auth: Auth): Router {
@@ -207,21 +209,17 @@ export function orgSitesRouter(repos: Repositories): Router {
       return;
     }
 
-    // Plan limit check stub
+    // Plan limit checks (P4-01 & Section 12.3)
     const currentCount = await repos.sites.count(req.orgId!);
-    if (currentCount >= DEFAULT_SITE_LIMIT) {
-      res.status(422).json({
-        error: {
-          code: ErrorCode.PLAN_LIMIT,
-          message: `You have reached your plan limit of ${DEFAULT_SITE_LIMIT} monitored sites.`,
-          details: {
-            limit: DEFAULT_SITE_LIMIT,
-            current: currentCount,
-            upgradeTo: 'agency_plus',
-          },
-        },
-      });
-      return;
+    assertWithinPlan(req.org, 'sites', currentCount + 1);
+
+    if (parse.data.pageLimit !== undefined) {
+      assertWithinPlan(req.org, 'pages', parse.data.pageLimit);
+    }
+
+    if (parse.data.scanFrequency === 'daily') {
+      const dailyCount = await repos.sites.countDailySites(req.orgId!);
+      assertWithinPlan(req.org, 'daily_scans', dailyCount + 1);
     }
 
     // Auto-detect platform if omitted or unknown
@@ -245,6 +243,8 @@ export function orgSitesRouter(repos: Repositories): Router {
       rootUrl: normalizedRoot,
       platform: finalPlatform,
       clientName: clientName ?? null,
+      scanFrequency: parse.data.scanFrequency,
+      pageLimit: parse.data.pageLimit,
       timeZone: org?.timeZone ?? 'UTC',
     });
 
@@ -445,6 +445,15 @@ export function orgSitesRouter(repos: Repositories): Router {
         return;
       }
 
+      if (parse.data.pageLimit !== undefined) {
+        assertWithinPlan(req.org, 'pages', parse.data.pageLimit);
+      }
+
+      if (parse.data.scanFrequency === 'daily' && existing.scanFrequency !== 'daily') {
+        const dailyCount = await repos.sites.countDailySites(req.orgId!);
+        assertWithinPlan(req.org, 'daily_scans', dailyCount + 1);
+      }
+
       const org = await repos.organizations.findById(req.orgId!);
       const updated = await repos.sites.update(req.orgId!, siteId, {
         ...(parse.data as UpdateSiteInput),
@@ -544,6 +553,11 @@ export function orgSitesRouter(repos: Repositories): Router {
           },
         });
         return;
+      }
+
+      if (existing.status === 'paused') {
+        const activeCount = await repos.sites.countActive(req.orgId!);
+        assertWithinPlan(req.org, 'sites', activeCount + 1);
       }
 
       const updated = await repos.sites.resume(req.orgId!, siteId);
