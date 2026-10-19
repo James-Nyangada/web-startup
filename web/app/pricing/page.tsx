@@ -6,6 +6,9 @@ import { MarketingHeader } from "@/components/marketing/marketing-header";
 import { MarketingFooter } from "@/components/marketing/marketing-footer";
 import { Collapse } from "@/components/disclosure";
 import { COMPARISON_CATEGORIES, PRICING_FAQS } from "@/lib/pricing-data";
+import { appApi } from "@/lib/app-api";
+import { openPaddleCheckout } from "@/lib/paddle";
+import { apiClient } from "@/lib/api";
 
 const H2 = "m-0 font-serif text-[38px] leading-[42px] font-normal sm:text-[48px] sm:leading-[52px]";
 
@@ -75,6 +78,7 @@ export default function PricingPage() {
   const [billingCycle, setBillingCycle] = useState<"monthly" | "annual">("annual");
   const [plans, setPlans] = useState<PlanItem[]>(DEFAULT_PLANS);
   const [openFaq, setOpenFaq] = useState<number | null>(0);
+  const [userOrg, setUserOrg] = useState<{ id: string; slug: string } | null>(null);
 
   useEffect(() => {
     // Attempt to fetch fresh plan table from API
@@ -88,7 +92,38 @@ export default function PricingPage() {
       .catch(() => {
         // Fallback to static defaults
       });
+
+    // Detect if user is signed in to open Paddle checkout directly
+    apiClient<{ user: any; orgs: Array<{ id: string; slug: string }> }>("/v1/me")
+      .then((data) => {
+        if (data?.orgs?.length && data.orgs[0]?.slug) {
+          setUserOrg(data.orgs[0]);
+        }
+      })
+      .catch(() => {});
   }, []);
+
+  const handlePricingCheckout = async (planId: string) => {
+    if (!userOrg) return;
+    try {
+      const checkoutSettings = await appApi.createCheckoutSession(userOrg.slug, {
+        plan: planId,
+        interval: billingCycle === "annual" ? "year" : "month",
+      });
+      await openPaddleCheckout({
+        priceId: checkoutSettings.priceId,
+        customerEmail: checkoutSettings.customerEmail,
+        customData: checkoutSettings.customData,
+        paddleEnvironment: checkoutSettings.paddleEnvironment,
+        clientToken: checkoutSettings.clientToken,
+        onSuccess: () => {
+          window.location.href = "/settings/billing";
+        },
+      });
+    } catch (err: any) {
+      console.error("Pricing checkout failed:", err);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-page text-ink flex flex-col justify-between">
@@ -245,16 +280,30 @@ export default function PricingPage() {
 
                   {/* Action CTA Button */}
                   <div className="mt-8 pt-4 border-t border-line">
-                    <Link
-                      href={`/sign-up?plan=${p.id}&billing=${billingCycle}`}
-                      className={`ease-ui flex h-11 w-full items-center justify-center rounded-full text-sm font-semibold no-underline transition-colors ${
-                        isAgency
-                          ? "bg-primary text-on-primary hover:bg-primary-hover hover:text-on-primary"
-                          : "border border-line bg-surface text-ink hover:border-primary hover:text-primary"
-                      }`}
-                    >
-                      Start 14-day free trial
-                    </Link>
+                    {userOrg ? (
+                      <button
+                        type="button"
+                        onClick={() => handlePricingCheckout(p.id)}
+                        className={`ease-ui flex h-11 w-full items-center justify-center rounded-full text-sm font-semibold cursor-pointer transition-colors ${
+                          isAgency
+                            ? "bg-primary text-on-primary hover:bg-primary-hover hover:text-on-primary shadow-card"
+                            : "border border-line bg-surface text-ink hover:border-primary hover:text-primary"
+                        }`}
+                      >
+                        Choose {p.name}
+                      </button>
+                    ) : (
+                      <Link
+                        href={`/sign-up?plan=${p.id}&billing=${billingCycle}`}
+                        className={`ease-ui flex h-11 w-full items-center justify-center rounded-full text-sm font-semibold no-underline transition-colors ${
+                          isAgency
+                            ? "bg-primary text-on-primary hover:bg-primary-hover hover:text-on-primary"
+                            : "border border-line bg-surface text-ink hover:border-primary hover:text-primary"
+                        }`}
+                      >
+                        Start 14-day free trial
+                      </Link>
+                    )}
                   </div>
                 </div>
               );

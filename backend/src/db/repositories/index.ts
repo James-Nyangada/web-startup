@@ -12,6 +12,9 @@ import { invitationsRepository } from './invitations.js';
 import { reportsRepository } from './reports.js';
 import { freeChecksRepository } from './free-checks.js';
 import { aiSuggestionsRepository } from './ai-suggestions.js';
+import { subscriptionsRepository } from './subscriptions.js';
+import { invoicesRepository } from './invoices.js';
+import { paddleEventsRepository } from './paddle-events.js';
 
 export function createRepositories(db: Database) {
   return {
@@ -28,6 +31,9 @@ export function createRepositories(db: Database) {
     reports: reportsRepository(db),
     freeChecks: freeChecksRepository(db),
     aiSuggestions: aiSuggestionsRepository(db),
+    subscriptions: subscriptionsRepository(db),
+    invoices: invoicesRepository(db),
+    paddleEvents: paddleEventsRepository(db),
   };
 }
 

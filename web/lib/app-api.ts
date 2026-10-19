@@ -160,6 +160,61 @@ export interface ApiUsage {
   };
 }
 
+export interface ApiSubscription {
+  id: string;
+  priceId: string;
+  plan: string;
+  interval: string;
+  status: string;
+  currentPeriodStart?: string | null;
+  currentPeriodEnd?: string | null;
+  cancelAtPeriodEnd: boolean;
+  scheduledChange?: Record<string, unknown> | null;
+}
+
+export interface ApiInvoice {
+  id: string;
+  paddleTransactionId: string;
+  amountCents: number;
+  currency: string;
+  status: string;
+  billedAt: string;
+  invoiceUrl: string | null;
+}
+
+export interface ApiBillingInfo {
+  plan: string;
+  planName: string;
+  billingStatus: string;
+  trialEndsAt?: string | null;
+  paddleCustomerId?: string | null;
+  subscription: ApiSubscription | null;
+  period: {
+    currentPeriodStart: string | null;
+    currentPeriodEnd: string | null;
+  };
+  cancelAtPeriodEnd: boolean;
+  usage: {
+    sites: { current: number; limit: number };
+    teamMembers: { current: number; limit: number };
+    aiSuggestions: { current: number; limit: number };
+  };
+  customerPortalUrl: string | null;
+  invoices: ApiInvoice[];
+}
+
+export interface ApiCheckoutSettings {
+  priceId: string;
+  plan?: string;
+  interval: string;
+  customerEmail: string;
+  customData: {
+    orgId: string;
+  };
+  paddleEnvironment: string;
+  clientToken: string;
+}
+
 /* ---------- Formatting ---------- */
 
 const DAY = new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short" });
@@ -435,6 +490,32 @@ export const appApi = {
     ),
 
   getUsage: (org: string) => apiClient<ApiUsage>(`/v1/orgs/${org}/usage`),
+
+  getBilling: (org: string) => apiClient<ApiBillingInfo>(`/v1/orgs/${org}/billing`),
+
+  createCheckoutSession: (
+    org: string,
+    params: { plan?: string; interval?: 'month' | 'year'; priceId?: string },
+  ) =>
+    apiClient<ApiCheckoutSettings>(`/v1/orgs/${org}/billing/checkout`, json(params)),
+
+  cancelSubscription: (org: string, reason?: string) =>
+    apiClient<{ success: boolean; cancelAtPeriodEnd: boolean; message: string }>(
+      `/v1/orgs/${org}/billing/cancel`,
+      json({ reason }),
+    ),
+
+  resumeSubscription: (org: string) =>
+    apiClient<{ success: boolean; cancelAtPeriodEnd: boolean; message: string }>(
+      `/v1/orgs/${org}/billing/resume`,
+      json({}),
+    ),
+
+  getInvoices: (org: string) =>
+    apiClient<{ invoices: ApiInvoice[] }>(`/v1/orgs/${org}/invoices`).then((r) => r.invoices),
+
+  getCustomerPortalUrl: (org: string) =>
+    apiClient<{ url: string }>(`/v1/orgs/${org}/billing/portal`).then((r) => r.url),
 };
 
 export type RecheckOutcome = "fixed" | "still_open" | "unchecked";

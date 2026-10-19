@@ -69,12 +69,27 @@ export function organizationsRepository(db: Database) {
       return this.findBySlug(idOrSlug);
     },
 
+    async findByPaddleCustomerId(paddleCustomerId: string) {
+      const [row] = await db
+        .select()
+        .from(organizations)
+        .where(
+          and(
+            eq(organizations.paddleCustomerId, paddleCustomerId),
+            isNull(organizations.deletedAt),
+          ),
+        )
+        .limit(1);
+
+      return row ?? null;
+    },
+
     async update(
       orgId: OrgId,
       data: Partial<
         Pick<
           typeof organizations.$inferInsert,
-          'name' | 'slug' | 'timeZone' | 'plan' | 'billingStatus'
+          'name' | 'slug' | 'timeZone' | 'plan' | 'billingStatus' | 'paddleCustomerId'
         >
       >,
     ) {

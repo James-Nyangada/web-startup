@@ -46,6 +46,7 @@ export function fakeRepos() {
       findByIdOrSlug: vi.fn().mockResolvedValue(null),
       update: vi.fn().mockResolvedValue(null),
       softDelete: vi.fn().mockResolvedValue(null),
+      findByPaddleCustomerId: vi.fn().mockResolvedValue(null),
       isSlugAvailable: vi.fn().mockResolvedValue(true),
       createWithInitialOwner: vi.fn().mockResolvedValue(null),
     },
@@ -391,6 +392,59 @@ export function fakeRepos() {
       getMonthlyUsage: vi.fn().mockResolvedValue(0),
       incrementMonthlyUsage: vi.fn().mockResolvedValue(1),
       isFeatureEnabled: vi.fn().mockResolvedValue(true),
+    },
+    subscriptions: {
+      findByOrgId: vi.fn().mockResolvedValue(null),
+      findByPaddleSubscriptionId: vi.fn().mockResolvedValue(null),
+      upsert: vi.fn().mockImplementation((data) =>
+        Promise.resolve({
+          id: 'sub-1',
+          orgId: data.orgId,
+          paddleSubscriptionId: data.paddleSubscriptionId,
+          paddlePriceId: data.paddlePriceId,
+          plan: data.plan,
+          interval: data.interval,
+          status: data.status,
+          currentPeriodStart: data.currentPeriodStart ?? new Date(),
+          currentPeriodEnd:
+            data.currentPeriodEnd ?? new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+          cancelAtPeriodEnd: data.cancelAtPeriodEnd ?? false,
+          scheduledChange: data.scheduledChange ?? null,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        }),
+      ),
+      setCancelAtPeriodEnd: vi.fn().mockImplementation((orgId, cancelAtPeriodEnd) =>
+        Promise.resolve({
+          id: 'sub-1',
+          orgId,
+          cancelAtPeriodEnd,
+          updatedAt: new Date(),
+        }),
+      ),
+    },
+    invoices: {
+      listByOrgId: vi.fn().mockResolvedValue([]),
+      findByPaddleTransactionId: vi.fn().mockResolvedValue(null),
+      upsert: vi.fn().mockImplementation((data) =>
+        Promise.resolve({
+          id: 'inv-1',
+          orgId: data.orgId,
+          paddleTransactionId: data.paddleTransactionId,
+          amountCents: data.amountCents,
+          currency: data.currency,
+          status: data.status,
+          billedAt: data.billedAt,
+          invoiceUrl: data.invoiceUrl ?? null,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        }),
+      ),
+    },
+    paddleEvents: {
+      record: vi.fn().mockResolvedValue(true),
+      findById: vi.fn().mockResolvedValue(null),
+      markProcessed: vi.fn().mockResolvedValue(undefined),
     },
   } as unknown as Repositories;
   return { repos, join };

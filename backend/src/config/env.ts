@@ -37,6 +37,19 @@ const envSchema = z.object({
   R2_SECRET_ACCESS_KEY: z.string().optional(),
   R2_BUCKET: z.string().optional(),
   STORAGE_DIR: z.string().optional(),
+  /** Paddle Billing (Phase 4). */
+  PADDLE_ENV: z.enum(['sandbox', 'production']).default('sandbox'),
+  PADDLE_API_KEY: z.string().optional(),
+  PADDLE_WEBHOOK_SECRET: z.string().optional(),
+  NEXT_PUBLIC_PADDLE_CLIENT_TOKEN: z.string().optional(),
+  PADDLE_PRICE_STORE_MONTHLY: z.string().optional(),
+  PADDLE_PRICE_STORE_ANNUAL: z.string().optional(),
+  PADDLE_PRICE_GROWTH_MONTHLY: z.string().optional(),
+  PADDLE_PRICE_GROWTH_ANNUAL: z.string().optional(),
+  PADDLE_PRICE_AGENCY_MONTHLY: z.string().optional(),
+  PADDLE_PRICE_AGENCY_ANNUAL: z.string().optional(),
+  PADDLE_PRICE_AGENCY_PRO_MONTHLY: z.string().optional(),
+  PADDLE_PRICE_AGENCY_PRO_ANNUAL: z.string().optional(),
 });
 
 export type Env = z.infer<typeof envSchema>;

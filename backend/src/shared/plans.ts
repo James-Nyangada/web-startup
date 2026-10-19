@@ -489,3 +489,63 @@ export function listPublicPlans(): PlanDefinition[] {
     PLAN_DEFINITIONS.agency_pro,
   ];
 }
+
+export interface PlanPriceMapping {
+  plan: PlanType;
+  interval: 'month' | 'year';
+}
+
+export function getPaddlePriceMap(): Record<string, PlanPriceMapping> {
+  return {
+    [process.env.PADDLE_PRICE_STORE_MONTHLY || 'pri_sandbox_store_monthly']: {
+      plan: 'store',
+      interval: 'month',
+    },
+    [process.env.PADDLE_PRICE_STORE_ANNUAL || 'pri_sandbox_store_annual']: {
+      plan: 'store',
+      interval: 'year',
+    },
+    [process.env.PADDLE_PRICE_GROWTH_MONTHLY || 'pri_sandbox_growth_monthly']: {
+      plan: 'growth',
+      interval: 'month',
+    },
+    [process.env.PADDLE_PRICE_GROWTH_ANNUAL || 'pri_sandbox_growth_annual']: {
+      plan: 'growth',
+      interval: 'year',
+    },
+    [process.env.PADDLE_PRICE_AGENCY_MONTHLY || 'pri_sandbox_agency_monthly']: {
+      plan: 'agency',
+      interval: 'month',
+    },
+    [process.env.PADDLE_PRICE_AGENCY_ANNUAL || 'pri_sandbox_agency_annual']: {
+      plan: 'agency',
+      interval: 'year',
+    },
+    [process.env.PADDLE_PRICE_AGENCY_PRO_MONTHLY || 'pri_sandbox_agency_pro_monthly']: {
+      plan: 'agency_pro',
+      interval: 'month',
+    },
+    [process.env.PADDLE_PRICE_AGENCY_PRO_ANNUAL || 'pri_sandbox_agency_pro_annual']: {
+      plan: 'agency_pro',
+      interval: 'year',
+    },
+  };
+}
+
+export function getPriceIdForPlan(plan: PlanType, interval: 'month' | 'year'): string {
+  if (plan === 'trial') {
+    throw new Error('Trial tier has no Paddle price ID');
+  }
+  const envKey = `PADDLE_PRICE_${plan.toUpperCase()}_${interval === 'month' ? 'MONTHLY' : 'ANNUAL'}`;
+  const envVal = process.env[envKey];
+  if (envVal && envVal.trim()) {
+    return envVal.trim();
+  }
+  return `pri_sandbox_${plan}_${interval === 'month' ? 'monthly' : 'annual'}`;
+}
+
+export function getPlanForPriceId(priceId: string): PlanPriceMapping | null {
+  if (!priceId) return null;
+  const map = getPaddlePriceMap();
+  return map[priceId] ?? null;
+}

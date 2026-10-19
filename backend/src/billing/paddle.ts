@@ -1,0 +1,374 @@
+import crypto from 'node:crypto';
+import type { Repositories } from '../db/repositories/index.js';
+import { asOrgId } from '../db/repositories/org-scope.js';
+import { getPlanForPriceId } from '../shared/plans.js';
+import { logger } from '../lib/logger.js';
+
+export interface VerifySignatureOptions {
+  rawBody: string | Buffer;
+  signatureHeader?: string;
+  secret?: string;
+  isProduction?: boolean;
+}
+
+/**
+ * Verifies Paddle Billing webhook signature header `ts=...;h1=...`.
+ * Spec 12.2: Verify Paddle-Signature with PADDLE_WEBHOOK_SECRET (reject > 5 min old).
+ */
+export function verifyPaddleWebhookSignature({
+  rawBody,
+  signatureHeader,
+  secret,
+  isProduction = process.env.NODE_ENV === 'production',
+}: VerifySignatureOptions): boolean {
+  if (!signatureHeader) {
+    return false;
+  }
+
+  // Parse header into key-value pairs (e.g. ts=1671552777;h1=eb3b...)
+  const parts = signatureHeader.split(';').map((part) => part.trim());
+  let tsStr = '';
+  let h1 = '';
+
+  for (const part of parts) {
+    const [k, v] = part.split('=');
+    if (k === 'ts' && v) tsStr = v;
+    if (k === 'h1' && v) h1 = v;
+  }
+
+  if (!tsStr || !h1) {
+    return false;
+  }
+
+  // Reject events older or in the future by more than 5 minutes (300 seconds)
+  const tsSeconds = parseInt(tsStr, 10);
+  if (isNaN(tsSeconds)) {
+    return false;
+  }
+
+  const nowSeconds = Math.floor(Date.now() / 1000);
+  if (Math.abs(nowSeconds - tsSeconds) > 300) {
+    return false;
+  }
+
+  if (!secret) {
+    // In development/test mode without a secret configured, allow signature verification to pass
+    if (!isProduction) {
+      return true;
+    }
+    return false;
+  }
+
+  const bodyStr = typeof rawBody === 'string' ? rawBody : rawBody.toString('utf8');
+  const signedPayload = `${tsStr}:${bodyStr}`;
+  const computedHmac = crypto.createHmac('sha256', secret).update(signedPayload).digest('hex');
+
+  try {
+    return crypto.timingSafeEqual(Buffer.from(computedHmac, 'utf8'), Buffer.from(h1, 'utf8'));
+  } catch {
+    return false;
+  }
+}
+
+export interface PaddleEventData {
+  id?: string;
+  customer_id?: string;
+  status?: string;
+  custom_data?: { orgId?: string; org_id?: string; [key: string]: unknown };
+  customData?: { orgId?: string; [key: string]: unknown };
+  current_billing_period?: {
+    starts_at?: string;
+    ends_at?: string;
+  };
+  items?: Array<{
+    price?: {
+      id?: string;
+    };
+  }>;
+  scheduled_change?: {
+    action?: string;
+    [key: string]: unknown;
+  } | null;
+  details?: {
+    totals?: {
+      total?: number | string;
+      currency_code?: string;
+    };
+  };
+  billed_at?: string;
+  invoice_pdf_url?: string;
+  invoiceUrl?: string;
+  [key: string]: unknown;
+}
+
+export interface PaddleEventPayload {
+  event_id?: string;
+  eventId?: string;
+  event_type?: string;
+  eventType?: string;
+  occurred_at?: string;
+  data?: PaddleEventData;
+  [key: string]: unknown;
+}
+
+export interface ProcessEventResult {
+  handled: boolean;
+  duplicate?: boolean;
+  eventType: string;
+  orgId?: string | null;
+  error?: string;
+}
+
+/**
+ * Processes incoming Paddle webhook event idempotently according to Section 12.2.
+ */
+export async function processPaddleEvent(
+  payload: PaddleEventPayload,
+  repos: Repositories,
+): Promise<ProcessEventResult> {
+  const eventId = payload.event_id || payload.eventId;
+  const eventType = payload.event_type || payload.eventType;
+  const occurredAt = payload.occurred_at ? new Date(payload.occurred_at) : new Date();
+  const data: PaddleEventData = payload.data ?? {};
+
+  if (!eventId || !eventType) {
+    return { handled: false, eventType: 'unknown', error: 'Missing event_id or event_type' };
+  }
+
+  // 1. Idempotent recording in paddle_events table
+  const recorded = await repos.paddleEvents.record(eventId, eventType, payload);
+  if (!recorded) {
+    // Duplicate event already processed
+    return { handled: true, duplicate: true, eventType };
+  }
+
+  try {
+    // 2. Resolve organization ID from payload custom_data or customer lookup
+    let targetOrgId =
+      data.custom_data?.orgId || data.customData?.orgId || data.custom_data?.org_id || null;
+
+    if (!targetOrgId && data.customer_id) {
+      const org = await repos.organizations.findByPaddleCustomerId(data.customer_id);
+      if (org) {
+        targetOrgId = org.id;
+      }
+    }
+
+    if (!targetOrgId && data.id) {
+      const existingSub = await repos.subscriptions.findByPaddleSubscriptionId(data.id);
+      if (existingSub) {
+        targetOrgId = existingSub.orgId;
+      }
+    }
+
+    switch (eventType) {
+      case 'customer.created':
+      case 'customer.updated': {
+        if (targetOrgId && data.id) {
+          await repos.organizations.update(asOrgId(targetOrgId), {
+            paddleCustomerId: data.id,
+          });
+        }
+        break;
+      }
+
+      case 'subscription.created':
+      case 'subscription.activated': {
+        const priceId = data.items?.[0]?.price?.id;
+        const subId = data.id;
+        if (!priceId || !subId) {
+          logger.warn({ eventId }, 'Missing price ID or subscription ID in subscription event');
+          return { handled: false, eventType, error: 'Missing price ID or subscription ID' };
+        }
+        const planInfo = getPlanForPriceId(priceId);
+
+        if (!planInfo) {
+          logger.warn({ priceId, eventId }, 'Unknown Paddle price ID in subscription event');
+          // Section 12.2: unknown price ID -> error to Sentry, no state change
+          await repos.paddleEvents.markProcessed(eventId, `Unknown price ID: ${priceId}`);
+          return { handled: true, eventType, error: `Unknown price ID: ${priceId}` };
+        }
+
+        if (targetOrgId) {
+          const orgIdScoped = asOrgId(targetOrgId);
+          await repos.subscriptions.upsert({
+            orgId: orgIdScoped,
+            paddleSubscriptionId: subId,
+            paddlePriceId: priceId,
+            plan: planInfo.plan,
+            interval: planInfo.interval,
+            status: data.status || 'active',
+            currentPeriodStart: data.current_billing_period?.starts_at
+              ? new Date(data.current_billing_period.starts_at)
+              : occurredAt,
+            currentPeriodEnd: data.current_billing_period?.ends_at
+              ? new Date(data.current_billing_period.ends_at)
+              : null,
+            cancelAtPeriodEnd: data.scheduled_change?.action === 'cancel',
+            scheduledChange: data.scheduled_change ?? null,
+          });
+
+          await repos.organizations.update(orgIdScoped, {
+            plan: planInfo.plan,
+            billingStatus: 'active',
+            ...(data.customer_id ? { paddleCustomerId: data.customer_id } : {}),
+          });
+        }
+        break;
+      }
+
+      case 'subscription.updated': {
+        const subId = data.id;
+        if (!subId) {
+          logger.warn({ eventId }, 'Missing subscription ID in subscription.updated event');
+          break;
+        }
+
+        // Out-of-order protection: check if existing subscription is newer
+        const existingSub = await repos.subscriptions.findByPaddleSubscriptionId(subId);
+
+        if (existingSub && existingSub.updatedAt > occurredAt) {
+          logger.info(
+            { eventId, occurredAt, updatedAt: existingSub.updatedAt },
+            'Ignoring out-of-order subscription.updated event',
+          );
+          break;
+        }
+
+        const priceId = data.items?.[0]?.price?.id;
+        const planInfo = priceId ? getPlanForPriceId(priceId) : null;
+
+        if (priceId && !planInfo) {
+          logger.warn({ priceId, eventId }, 'Unknown Paddle price ID in subscription.updated');
+          await repos.paddleEvents.markProcessed(eventId, `Unknown price ID: ${priceId}`);
+          return { handled: true, eventType, error: `Unknown price ID: ${priceId}` };
+        }
+
+        if (targetOrgId) {
+          const orgIdScoped = asOrgId(targetOrgId);
+          const currentPlan = planInfo?.plan ?? existingSub?.plan ?? 'store';
+          const currentInterval = planInfo?.interval ?? existingSub?.interval ?? 'month';
+
+          await repos.subscriptions.upsert({
+            orgId: orgIdScoped,
+            paddleSubscriptionId: subId,
+            paddlePriceId: priceId ?? existingSub?.paddlePriceId ?? '',
+            plan: currentPlan,
+            interval: currentInterval,
+            status: data.status || existingSub?.status || 'active',
+            currentPeriodStart: data.current_billing_period?.starts_at
+              ? new Date(data.current_billing_period.starts_at)
+              : (existingSub?.currentPeriodStart ?? null),
+            currentPeriodEnd: data.current_billing_period?.ends_at
+              ? new Date(data.current_billing_period.ends_at)
+              : (existingSub?.currentPeriodEnd ?? null),
+            cancelAtPeriodEnd: data.scheduled_change?.action === 'cancel',
+            scheduledChange: data.scheduled_change ?? null,
+          });
+
+          if (planInfo?.plan) {
+            await repos.organizations.update(orgIdScoped, {
+              plan: planInfo.plan,
+            });
+          }
+        }
+        break;
+      }
+
+      case 'subscription.past_due': {
+        if (targetOrgId) {
+          const orgIdScoped = asOrgId(targetOrgId);
+          await repos.organizations.update(orgIdScoped, {
+            billingStatus: 'past_due',
+          });
+          const existingSub = await repos.subscriptions.findByOrgId(orgIdScoped);
+          if (existingSub) {
+            await repos.subscriptions.upsert({
+              ...existingSub,
+              orgId: orgIdScoped,
+              status: 'past_due',
+            });
+          }
+        }
+        break;
+      }
+
+      case 'subscription.paused': {
+        if (targetOrgId) {
+          const orgIdScoped = asOrgId(targetOrgId);
+          await repos.organizations.update(orgIdScoped, {
+            billingStatus: 'paused',
+          });
+          const existingSub = await repos.subscriptions.findByOrgId(orgIdScoped);
+          if (existingSub) {
+            await repos.subscriptions.upsert({
+              ...existingSub,
+              orgId: orgIdScoped,
+              status: 'paused',
+            });
+          }
+        }
+        break;
+      }
+
+      case 'subscription.canceled': {
+        if (targetOrgId) {
+          const orgIdScoped = asOrgId(targetOrgId);
+          await repos.organizations.update(orgIdScoped, {
+            billingStatus: 'canceled',
+          });
+          const existingSub = await repos.subscriptions.findByOrgId(orgIdScoped);
+          if (existingSub) {
+            await repos.subscriptions.upsert({
+              ...existingSub,
+              orgId: orgIdScoped,
+              status: 'canceled',
+              cancelAtPeriodEnd: false,
+            });
+          }
+        }
+        break;
+      }
+
+      case 'transaction.completed': {
+        if (targetOrgId && data.id) {
+          const amountCents =
+            typeof data.details?.totals?.total === 'number'
+              ? data.details.totals.total
+              : typeof data.details?.totals?.total === 'string'
+                ? parseInt(data.details.totals.total, 10)
+                : 0;
+
+          await repos.invoices.upsert({
+            orgId: asOrgId(targetOrgId),
+            paddleTransactionId: data.id,
+            amountCents: isNaN(amountCents) ? 0 : amountCents,
+            currency: data.details?.totals?.currency_code || 'USD',
+            status: data.status || 'paid',
+            billedAt: data.billed_at ? new Date(data.billed_at) : occurredAt,
+            invoiceUrl: data.invoice_pdf_url || data.invoiceUrl || null,
+          });
+        }
+        break;
+      }
+
+      case 'transaction.payment_failed': {
+        logger.warn({ data, eventId }, 'Paddle payment failed event received');
+        break;
+      }
+
+      default: {
+        logger.info({ eventType, eventId }, 'Unhandled Paddle event type');
+        break;
+      }
+    }
+
+    await repos.paddleEvents.markProcessed(eventId);
+    return { handled: true, eventType, orgId: targetOrgId };
+  } catch (err: unknown) {
+    const errorMsg = err instanceof Error ? err.message : String(err);
+    logger.error({ err, eventId, eventType }, 'Error processing Paddle event');
+    await repos.paddleEvents.markProcessed(eventId, errorMsg);
+    return { handled: false, eventType, error: errorMsg };
+  }
+}

@@ -26,7 +26,14 @@ import { EmailSender } from './emails/sender.js';
 import { createEmailPreviewRouter } from './emails/preview-router.js';
 import { invitationsRouter } from './routes/invitations.js';
 import { reportsPublicRouter } from './routes/reports.js';
+import { paddleWebhookRouter } from './routes/billing.js';
 import { getStorage, type StorageService } from './storage/index.js';
+
+declare module 'http' {
+  interface IncomingMessage {
+    rawBody?: Buffer;
+  }
+}
 
 export interface AppDeps {
   config: Pick<
@@ -81,7 +88,14 @@ export function createApp({
       credentials: true,
     }),
   );
-  app.use(express.json({ limit: '100kb' }));
+  app.use(
+    express.json({
+      limit: '100kb',
+      verify: (req, _res, buf) => {
+        req.rawBody = buf;
+      },
+    }),
+  );
 
   app.use(healthRouter(pool));
 
@@ -101,6 +115,7 @@ export function createApp({
   v1.use('/orgs', orgsRouter(auth, repos, scansOptions, emailSender, storage));
   v1.use('/invitations', invitationsRouter(repos, auth));
   v1.use('/sites', detectPlatformRouter(auth));
+  v1.use('/webhooks/paddle', paddleWebhookRouter(repos));
   v1.use('/public', waitlistRouter(repos, verifyTurnstile));
   v1.use('/public', publicPlansRouter());
   v1.use(
@@ -110,6 +125,7 @@ export function createApp({
   v1.use('/emails', createEmailPreviewRouter());
   v1.use('/reports', reportsPublicRouter(repos, storage));
   app.use('/v1', v1);
+  app.use('/webhooks/paddle', paddleWebhookRouter(repos));
   app.use('/public', publicPlansRouter());
   app.use(
     '/public',
