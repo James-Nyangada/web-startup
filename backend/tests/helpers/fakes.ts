@@ -141,6 +141,7 @@ export function fakeRepos() {
       listRecentlyFixed: vi.fn().mockResolvedValue([]),
       listTemplatesBySite: vi.fn().mockResolvedValue([]),
       listCrossSite: vi.fn().mockResolvedValue([]),
+      listCrossSiteCommonIssues: vi.fn().mockResolvedValue([]),
       listOccurrences: vi.fn().mockResolvedValue([]),
       countOccurrences: vi.fn().mockResolvedValue(0),
       listEvents: vi.fn().mockResolvedValue([]),

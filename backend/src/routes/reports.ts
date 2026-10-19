@@ -6,7 +6,7 @@ import type { EmailSender } from '../emails/sender.js';
 import type { PgBoss } from 'pg-boss';
 import { requireOrgRole } from '../middleware/org.js';
 import { ErrorCode } from '../shared/errors.js';
-import { assertWithinPlan } from '../shared/plans.js';
+import { assertWithinPlan, PlanLimitError } from '../shared/plans.js';
 import { signReportDownloadToken, verifyReportDownloadToken } from '../reports/token.js';
 import { enqueueReportRender } from '../worker/boss.js';
 import { handleReportRender } from '../worker/jobs/report-render.js';
@@ -70,8 +70,20 @@ export function orgReportsRouter(repos: Repositories, options?: ReportsRouterOpt
     if (type === 'client_monthly') {
       assertWithinPlan(req.org, 'scheduled_reports');
     }
+    if (type === 'agency_overview') {
+      if (req.org?.plan === 'store') {
+        throw new PlanLimitError(
+          'Agency overview reports are not available on the Store plan. Upgrade to Agency for multi-site overview reports.',
+          {
+            limit: 1,
+            current: 1,
+            upgradeTo: 'agency',
+          },
+        );
+      }
+    }
 
-    if (!siteId && !scanId) {
+    if (type !== 'agency_overview' && !siteId && !scanId) {
       res.status(400).json({
         error: {
           code: ErrorCode.VALIDATION_ERROR,

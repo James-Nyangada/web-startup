@@ -7,10 +7,12 @@ import {
   ScanSummaryReport,
   FreeCheckReport,
   type FreeCheckReportInput,
+  AgencyOverviewReport,
+  type AgencyOverviewReportData,
 } from './templates.js';
 import type { ReportBranding } from './components.js';
 
-export type ReportType = 'summary' | 'full' | 'free_check';
+export type ReportType = 'summary' | 'full' | 'free_check' | 'agency_overview';
 export type Paper = 'a4' | 'letter';
 
 export interface ReportOptions {
@@ -93,6 +95,40 @@ export async function renderFreeCheckReportPdf(
       displayHeaderFooter: true,
       headerTemplate: '<span></span>',
       footerTemplate: footerTemplate(check.url),
+      margin: { top: '16mm', bottom: '18mm', left: '15mm', right: '15mm' },
+    });
+    return pdf;
+  } finally {
+    await browser.close();
+  }
+}
+
+export function renderAgencyOverviewReportHtml(
+  data: AgencyOverviewReportData,
+  branding?: ReportBranding,
+): string {
+  return `<!doctype html>${renderToStaticMarkup(createElement(AgencyOverviewReport, { data, branding }))}`;
+}
+
+export async function renderAgencyOverviewReportPdf(
+  data: AgencyOverviewReportData,
+  options: { paper?: Paper; branding?: ReportBranding } = {},
+): Promise<Buffer> {
+  const html = renderAgencyOverviewReportHtml(data, options.branding);
+  const browser = await chromium.launch();
+  try {
+    const context = await browser.newContext({ javaScriptEnabled: false });
+    await context.route('**/*', (route) => route.abort());
+    const page = await context.newPage();
+    await page.setContent(html, { waitUntil: 'load' });
+    const pdf = await page.pdf({
+      format: options.paper === 'letter' ? 'Letter' : 'A4',
+      printBackground: true,
+      tagged: true,
+      outline: true,
+      displayHeaderFooter: true,
+      headerTemplate: '<span></span>',
+      footerTemplate: footerTemplate(data.orgName, options.branding),
       margin: { top: '16mm', bottom: '18mm', left: '15mm', right: '15mm' },
     });
     return pdf;

@@ -204,3 +204,236 @@ export function FreeCheckReport({ check }: { check: FreeCheckReportInput }) {
     </Document>
   );
 }
+
+export interface AgencyOverviewReportData {
+  orgName: string;
+  generatedAt: string;
+  totals: {
+    sitesCount: number;
+    averageScore: number | null;
+    totalCritical: number;
+    totalSerious: number;
+    sitesWithRegressions: number;
+  };
+  sites: Array<{
+    id: string;
+    name: string;
+    clientName: string | null;
+    rootUrl: string;
+    score: number | null;
+    scoreBand: string;
+    critical: number;
+    serious: number;
+    regressions: number;
+    verified: boolean;
+    lastScanAt: string | null;
+  }>;
+  commonIssues: Array<{
+    ruleId: string;
+    title: string;
+    impact: string;
+    affectedSitesCount: number;
+    totalOccurrences: number;
+  }>;
+  attentionSites: Array<{
+    name: string;
+    reason: string;
+    score: number | null;
+  }>;
+}
+
+/** R-05: Agency portfolio overview report. */
+export function AgencyOverviewReport({
+  data,
+  branding,
+}: {
+  data: AgencyOverviewReportData;
+  branding?: ReportBranding;
+}) {
+  const title = 'Agency Portfolio Accessibility Overview';
+  const orgDisplayName = branding?.displayName || data.orgName;
+
+  return (
+    <Document title={`${title} – ${orgDisplayName}`} branding={branding}>
+      <header className="cover">
+        {branding?.logoUrl && (
+          <div style={{ marginBottom: '10pt' }}>
+            <img
+              src={branding.logoUrl}
+              alt={orgDisplayName}
+              style={{ maxHeight: '36pt', objectFit: 'contain' }}
+            />
+          </div>
+        )}
+        <h1>{title}</h1>
+        <p className="site">{orgDisplayName} · Multi-storefront portfolio audit (R-05)</p>
+        <dl className="meta">
+          <dt>Generated</dt>
+          <dd>{new Date(data.generatedAt).toUTCString()}</dd>
+          <dt>Scope</dt>
+          <dd>{data.totals.sitesCount} monitored client storefronts</dd>
+          <dt>Standard checked</dt>
+          <dd>WCAG 2.2 level A and AA (automated audits)</dd>
+        </dl>
+      </header>
+
+      {/* Portfolio Totals */}
+      <section className="counts" aria-label="Portfolio metrics">
+        <div className="count">
+          <span className="n">{data.totals.sitesCount}</span>
+          <span className="muted small">Sites Monitored</span>
+        </div>
+        <div className="count">
+          <span className="n">{data.totals.averageScore ?? '—'}</span>
+          <span className="muted small">Average Score</span>
+        </div>
+        <div className="count sev-critical">
+          <span className="n">{data.totals.totalCritical}</span>
+          <span className="small">Critical Issues</span>
+        </div>
+        <div className="count sev-serious">
+          <span className="n">{data.totals.totalSerious}</span>
+          <span className="small">Serious Issues</span>
+        </div>
+      </section>
+
+      {/* Sites Needing Attention */}
+      {data.attentionSites.length > 0 && (
+        <section
+          aria-labelledby="attention-heading"
+          className="callout"
+          style={{ margin: '14pt 0' }}
+        >
+          <h3 id="attention-heading" style={{ margin: '0 0 4pt', color: 'var(--crit)' }}>
+            Stores needing immediate attention ({data.attentionSites.length})
+          </h3>
+          <p className="small muted">
+            Failed scans, new regressions, or low accessibility health requiring prompt developer
+            review:
+          </p>
+          <ul style={{ margin: '4pt 0 0', fontSize: '9pt' }}>
+            {data.attentionSites.map((s, idx) => (
+              <li key={idx}>
+                <strong>{s.name}</strong>: {s.reason}{' '}
+                {s.score !== null ? `(Score: ${s.score})` : ''}
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
+      {/* Portfolio Sites Table */}
+      <section aria-labelledby="sites-heading">
+        <h2 id="sites-heading">Storefronts Overview ({data.sites.length})</h2>
+        <table className="data-table">
+          <thead>
+            <tr>
+              <th scope="col">Store / Client</th>
+              <th scope="col">Score</th>
+              <th scope="col">Critical · Serious</th>
+              <th scope="col">Regressions</th>
+              <th scope="col">Verification</th>
+              <th scope="col">Last Scanned</th>
+            </tr>
+          </thead>
+          <tbody>
+            {data.sites.map((site) => (
+              <tr key={site.id}>
+                <td>
+                  <strong>{site.name}</strong>
+                  {site.clientName && <span className="muted"> · {site.clientName}</span>}
+                  <div className="url muted">{site.rootUrl}</div>
+                </td>
+                <td>
+                  <span className="score-number" style={{ fontWeight: 700 }}>
+                    {site.score ?? '—'}
+                  </span>{' '}
+                  <span
+                    className={`badge band-${site.scoreBand.toLowerCase().replace(/\s+/g, '-')}`}
+                  >
+                    {site.scoreBand}
+                  </span>
+                </td>
+                <td>
+                  <span style={{ color: 'var(--crit)', fontWeight: 600 }}>
+                    {site.critical} crit
+                  </span>{' '}
+                  · <span style={{ color: 'var(--ser)', fontWeight: 600 }}>{site.serious} ser</span>
+                </td>
+                <td>
+                  {site.regressions > 0 ? (
+                    <span style={{ color: 'var(--crit)', fontWeight: 600 }}>
+                      {site.regressions} regression{site.regressions === 1 ? '' : 's'}
+                    </span>
+                  ) : (
+                    <span className="muted">—</span>
+                  )}
+                </td>
+                <td>
+                  {site.verified ? (
+                    <span
+                      className="badge"
+                      style={{ color: 'var(--ok)', background: 'var(--ok-soft)' }}
+                    >
+                      Verified
+                    </span>
+                  ) : (
+                    <span
+                      className="badge"
+                      style={{ color: 'var(--ser)', background: 'var(--ser-soft)' }}
+                    >
+                      Pending
+                    </span>
+                  )}
+                </td>
+                <td className="muted small">
+                  {site.lastScanAt ? new Date(site.lastScanAt).toLocaleDateString('en-GB') : '—'}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </section>
+
+      {/* Most Common Issues Across Sites */}
+      <section aria-labelledby="common-heading">
+        <h2 id="common-heading">Most Common Problems Across Sites</h2>
+        <p className="muted small" style={{ marginBottom: '8pt' }}>
+          Fix these patterns in your shared themes, navigation templates, or component libraries to
+          resolve issues across multiple client storefronts at once.
+        </p>
+        <table className="data-table">
+          <thead>
+            <tr>
+              <th scope="col">Severity</th>
+              <th scope="col">Problem / Rule</th>
+              <th scope="col" className="num">
+                Affected Stores
+              </th>
+              <th scope="col" className="num">
+                Total Occurrences
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {data.commonIssues.map((issue) => (
+              <tr key={issue.ruleId}>
+                <td>
+                  <span className={`badge sev-${issue.impact}`}>{issue.impact}</span>
+                </td>
+                <td>
+                  <strong>{issue.title}</strong>
+                  <div className="muted small">{issue.ruleId}</div>
+                </td>
+                <td className="num font-semibold">{issue.affectedSitesCount} stores</td>
+                <td className="num">{issue.totalOccurrences}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </section>
+
+      <Limitations />
+    </Document>
+  );
+}

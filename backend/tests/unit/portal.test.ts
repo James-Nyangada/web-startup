@@ -341,16 +341,16 @@ describe('P4-09 Client Portal (S-60, S-61)', () => {
 
       // Recent fixes
       expect(data.recentFixes).toHaveLength(1);
-      expect(data.recentFixes[0].title).toBe('Checkout errors and cart actions are announced');
+      expect(data.recentFixes[0]!.title).toBe('Checkout errors and cart actions are announced');
 
       // Client visible notes
       expect(data.notes).toHaveLength(1);
-      expect(data.notes[0].authorName).toBe('Daniel');
-      expect(data.notes[0].body).toContain('theme update removed descriptions');
+      expect(data.notes[0]!.authorName).toBe('Daniel');
+      expect(data.notes[0]!.body).toContain('theme update removed descriptions');
 
       // Published reports
       expect(data.reports).toHaveLength(1);
-      expect(data.reports[0].downloadUrl).toContain('/v1/reports/download/');
+      expect(data.reports[0]!.downloadUrl).toContain('/v1/reports/download/');
     });
   });
 });

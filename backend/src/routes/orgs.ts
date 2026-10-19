@@ -219,6 +219,29 @@ export function orgsRouter(
     },
   );
 
+  // GET /v1/orgs/:orgId/overview/cross-site-issues - Cross-site common issues (P4-10) (O A M)
+  orgScoped.get(
+    '/overview/cross-site-issues',
+    requireOrgRole('member'),
+    async (req: Request, res: Response): Promise<void> => {
+      const orgId = req.orgId!;
+      const items = await repos.issues.listCrossSiteCommonIssues(orgId);
+      const uniqueSites = new Set<string>();
+      for (const item of items) {
+        for (const s of item.sites) {
+          uniqueSites.add(s.siteId);
+        }
+      }
+      res.status(200).json({
+        data: {
+          items,
+          totalRules: items.length,
+          totalAffectedSites: uniqueSites.size,
+        },
+      });
+    },
+  );
+
   // PATCH /v1/orgs/:orgId - Update org (O A)
   orgScoped.patch(
     '/',

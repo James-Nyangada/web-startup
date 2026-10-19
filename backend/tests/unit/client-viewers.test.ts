@@ -224,8 +224,10 @@ describe('P4-08 Client Viewers (S-42) & Strict Isolation', () => {
     vi.mocked(repos.sites.listSummaries).mockResolvedValue(new Map());
 
     vi.mocked(repos.issues.findById).mockImplementation((orgId: string, issueId: string) => {
-      if (orgId === testOrg.id && issueId === issueOnA.id) return Promise.resolve(issueOnA as never);
-      if (orgId === testOrg.id && issueId === issueOnB.id) return Promise.resolve(issueOnB as never);
+      if (orgId === testOrg.id && issueId === issueOnA.id)
+        return Promise.resolve(issueOnA as never);
+      if (orgId === testOrg.id && issueId === issueOnB.id)
+        return Promise.resolve(issueOnB as never);
       return Promise.resolve(null);
     });
 

@@ -1159,43 +1159,43 @@ Provider interface + Gemini adapter, prompt per section 6.10, input scrubbing, o
 
 **P4-01 — Plans and limit enforcement** · *Depends on:* P2 complete · *Size:* M
 `plans.ts` (section 1.4), `assertWithinPlan(org, feature, nextValue)` used at every point in 12.3, `422 PLAN_LIMIT` errors, usage endpoint, UI upgrade prompts (DESIGN_SPEC pattern).
-- [ ] Test per enforcement point.
+- [x] Test per enforcement point.
 
 **P4-02 — Paddle checkout and billing page** · *Depends on:* P4-01 · *Size:* M
 Sandbox + live products and prices, Paddle.js loaded only on pricing/billing pages, checkout endpoint, S-44 Billing (current plan, usage meters, change plan, cancel/resume, customer portal link, invoices).
-- [ ] Sandbox purchase activates the plan in the app within 30 seconds.
+- [x] Sandbox purchase activates the plan in the app within 30 seconds.
 
 **P4-03 — Paddle webhooks** · *Depends on:* P4-02 · *Size:* M
 Section 12.2 in full, with replay tooling for staff.
-- [ ] Duplicate and out-of-order events are handled (tests with recorded payloads).
+- [x] Duplicate and out-of-order events are handled (tests with recorded payloads).
 
 **P4-04 — Plan changes and downgrades** · *Depends on:* P4-03 · *Size:* M
 Upgrade (immediate, prorated), downgrade (next period) with preview of price; downgrade flow that asks which sites/members to pause or remove when over the new limit; cancel at period end with reason survey; resume.
-- [ ] No data is deleted by a downgrade; paused sites are clearly labelled.
+- [x] No data is deleted by a downgrade; paused sites are clearly labelled.
 
 **P4-05 — Trial lifecycle and read-only mode** · *Depends on:* P4-01 · *Size:* M
 `trial.lifecycle` job, E-14, E-15, E-20; read-only mode (all mutating endpoints return `402 BILLING_REQUIRED` except billing and data export); banners per DESIGN_SPEC.
-- [ ] Read-only org can view everything and export, cannot scan or invite.
+- [x] Read-only org can view everything and export, cannot scan or invite.
 
 **P4-06 — Payment problems** · *Depends on:* P4-03 · *Size:* S
 Past-due banner, 7-day grace period then read-only, E-17, E-18, E-19.
 
 **P4-07 — Branding (white-label)** · *Depends on:* P4-01 · *Size:* L
 S-43: display name, light/dark logo upload with preview, primary colour with automatic contrast check and suggested accessible alternative, email sender name, report footer, "hide PRODUCT_NAME branding". Applied to reports (R-01 … R-05), client-facing emails (E-04 for clients, E-11, E-12), and client portal.
-- [ ] Live preview of a report cover, an email header and the portal header.
-- [ ] Colours failing 4.5:1 on white cannot be saved for buttons/links (user sees the suggested alternative).
+- [x] Live preview of a report cover, an email header and the portal header.
+- [x] Colours failing 4.5:1 on white cannot be saved for buttons/links (user sees the suggested alternative).
 
 **P4-08 — Client viewers** · *Depends on:* P2-17, P4-07 · *Size:* M
 Invite client viewers to one or more sites (S-42), manage their site access, remove; branded invitation email.
-- [ ] A client viewer can never see another site or any org settings (tests).
+- [x] A client viewer can never see another site or any org settings (tests).
 
 **P4-09 — Client portal** · *Depends on:* P4-08 · *Size:* L
 S-60 portal home (their sites, status in plain language), S-61 site view (score, trend, open issues by severity in simple language, progress since last month, published reports, evidence pack download, notes marked visible to client). Agency branding throughout; no upsell or PRODUCT_NAME marketing.
-- [ ] Portal passes the same accessibility gate as the main app.
+- [x] Portal passes the same accessibility gate as the main app.
 
 **P4-10 — Agency overview and cross-site views** · *Depends on:* P2-20 · *Size:* M
 S-20 enhancements: group by client, cross-site "most common issues" (same rule across many sites → fix once in shared theme), R-05 Agency overview report.
-- [ ] Cross-site view links each rule to the affected sites and counts.
+- [x] Cross-site view links each rule to the affected sites and counts.
 
 **P4-11 — Scan frequency by plan** · *Depends on:* P4-01, P2-09 · *Size:* S
 Daily toggles with plan caps (Agency: 5 daily sites).

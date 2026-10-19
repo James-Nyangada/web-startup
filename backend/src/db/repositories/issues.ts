@@ -10,6 +10,7 @@ import {
   pages,
   rules,
   scans,
+  sites,
   users,
   type Impact,
   type IssueStatus,
@@ -39,6 +40,20 @@ export interface IssueListFilters {
 
 export type IssueSortField = 'impact' | 'occurrences' | 'firstSeen' | 'lastSeen' | 'createdAt';
 export type IssueSortOrder = 'asc' | 'desc';
+
+export interface CrossSiteCommonIssue {
+  ruleId: string;
+  title: string;
+  impact: Impact;
+  affectedSitesCount: number;
+  totalOccurrences: number;
+  sites: Array<{
+    siteId: string;
+    siteName: string;
+    clientName: string | null;
+    occurrences: number;
+  }>;
+}
 
 export function issuesRepository(db: Database) {
   return {
@@ -703,6 +718,61 @@ export function issuesRepository(db: Database) {
         .orderBy(desc(issues.updatedAt))
         .limit(limit)
         .offset(offset);
+    },
+
+    async listCrossSiteCommonIssues(orgId: OrgId): Promise<CrossSiteCommonIssue[]> {
+      const rows = await db
+        .select({
+          ruleId: issues.ruleId,
+          title: rules.title,
+          impact: issues.impact,
+          siteId: issues.siteId,
+          siteName: sites.name,
+          clientName: sites.clientName,
+          occurrenceCount: sql<number>`sum(${issues.occurrenceCount})::int`,
+        })
+        .from(issues)
+        .innerJoin(rules, eq(issues.ruleId, rules.ruleId))
+        .innerJoin(sites, eq(issues.siteId, sites.id))
+        .where(and(eq(issues.orgId, orgId), eq(issues.status, 'open'), isNull(sites.deletedAt)))
+        .groupBy(
+          issues.ruleId,
+          rules.title,
+          issues.impact,
+          issues.siteId,
+          sites.name,
+          sites.clientName,
+        );
+
+      const ruleMap = new Map<string, CrossSiteCommonIssue>();
+
+      for (const row of rows) {
+        let entry = ruleMap.get(row.ruleId);
+        if (!entry) {
+          entry = {
+            ruleId: row.ruleId,
+            title: row.title ?? row.ruleId,
+            impact: row.impact,
+            affectedSitesCount: 0,
+            totalOccurrences: 0,
+            sites: [],
+          };
+          ruleMap.set(row.ruleId, entry);
+        }
+        entry.affectedSitesCount += 1;
+        entry.totalOccurrences += row.occurrenceCount;
+        entry.sites.push({
+          siteId: row.siteId,
+          siteName: row.siteName,
+          clientName: row.clientName,
+          occurrences: row.occurrenceCount,
+        });
+      }
+
+      return Array.from(ruleMap.values()).sort(
+        (a, b) =>
+          b.affectedSitesCount - a.affectedSitesCount || b.totalOccurrences - a.totalOccurrences,
+      );
     },
 
     async findById(orgId: OrgId, issueId: string) {

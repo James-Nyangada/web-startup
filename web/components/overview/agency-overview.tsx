@@ -9,15 +9,15 @@ import { Icon, I } from "@/components/icons";
 import { useEntrance } from "@/components/reveal";
 import type { SiteRow } from "@/lib/site-data";
 import { apiClient, ApiException } from "@/lib/api";
-import { appApi, toSiteRow } from "@/lib/app-api";
+import { appApi, toSiteRow, type ApiCrossSiteIssue } from "@/lib/app-api";
 
 interface OverviewData {
   orgSlug: string;
   sites: SiteRow[];
-  common: { t: string; n: number }[];
+  commonIssues: ApiCrossSiteIssue[];
 }
 
-const OverviewContext = createContext<OverviewData>({ orgSlug: "", sites: [], common: [] });
+const OverviewContext = createContext<OverviewData>({ orgSlug: "", sites: [], commonIssues: [] });
 
 function useOverview() {
   const data = useContext(OverviewContext);
@@ -76,7 +76,40 @@ function TableLayout({
   onUpdatePrefs: (updater: Partial<OverviewUserPrefs>) => void;
 }) {
   const [search, setSearch] = useState("");
-  const { orgSlug, sites: SITES, siteHref } = useOverview();
+  const { orgSlug, sites: SITES, siteHref, commonIssues } = useOverview();
+  const [isExporting, setIsExporting] = useState(false);
+  const [exportMessage, setExportMessage] = useState<{
+    text: string;
+    isError?: boolean;
+    downloadUrl?: string;
+  } | null>(null);
+
+  const handleExportReport = async () => {
+    try {
+      setIsExporting(true);
+      setExportMessage({ text: "Generating Agency Portfolio Report (R-05)..." });
+      const report = await appApi.generateAgencyOverviewReport(orgSlug, true);
+      setExportMessage({ text: "Report ready! Fetching download link..." });
+      const dl = await apiClient<{ data: { downloadUrl: string } }>(
+        `/v1/orgs/${orgSlug}/reports/${report.id}/download`,
+      );
+      if (dl.data?.downloadUrl) {
+        window.open(dl.data.downloadUrl, "_blank");
+        setExportMessage({
+          text: "Agency Overview Report (R-05) downloaded successfully.",
+          downloadUrl: dl.data.downloadUrl,
+        });
+      }
+    } catch (err: unknown) {
+      if (err instanceof ApiException && err.status === 422) {
+        setExportMessage({ text: "Agency Overview Reports require an Agency plan.", isError: true });
+      } else {
+        setExportMessage({ text: "Could not generate report. Please try again later.", isError: true });
+      }
+    } finally {
+      setIsExporting(false);
+    }
+  };
 
   const clientsList = useMemo(() => {
     return Array.from(new Set(SITES.map((s) => s.client).filter(Boolean))).sort();
@@ -202,7 +235,16 @@ function TableLayout({
             Monitored storefronts sorted worst-first. Track scores, open violations, regressions, and scheduled scans.
           </p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
+          <button
+            type="button"
+            onClick={handleExportReport}
+            disabled={isExporting}
+            className="ease-ui inline-flex h-10 items-center rounded-full border border-line-strong bg-surface px-4 text-sm font-semibold text-ink hover:bg-subtle hover:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:opacity-50"
+          >
+            <Icon d={I.download} size={15} className="mr-1.5 text-primary" />
+            <span>{isExporting ? "Generating R-05..." : "Export Agency Report (R-05)"}</span>
+          </button>
           <Link href={`/${orgSlug}/sites`} className={PRIMARY}>
             <Icon d={I.plus} size={16} className="mr-1.5" />
             <span>Add site</span>
@@ -235,6 +277,113 @@ function TableLayout({
           ))}
         </div>
       </div>
+      )}
+
+      {/* Report Export Status Toast */}
+      {exportMessage && (
+        <div
+          role="status"
+          className={`flex items-center justify-between gap-3 rounded-xl border px-4 py-3 text-xs font-semibold ${
+            exportMessage.isError
+              ? "border-crit/30 bg-crit-soft text-crit"
+              : "border-primary/30 bg-primary-soft text-ptext"
+          }`}
+        >
+          <div className="flex items-center gap-2">
+            <Icon d={exportMessage.isError ? I.alert : I.check} size={15} />
+            <span>{exportMessage.text}</span>
+          </div>
+          <div className="flex items-center gap-3">
+            {exportMessage.downloadUrl && (
+              <a
+                href={exportMessage.downloadUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="underline hover:text-primary font-bold"
+              >
+                Download PDF
+              </a>
+            )}
+            <button
+              type="button"
+              onClick={() => setExportMessage(null)}
+              className="text-muted hover:text-ink text-sm font-bold"
+              aria-label="Dismiss message"
+            >
+              ✕
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* S-20 Cross-Site View: Most Common Problems Across Sites */}
+      {commonIssues.length > 0 && (
+        <section aria-labelledby="common-issues-heading" className={`${CARD} p-5`}>
+          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line pb-3">
+            <div>
+              <h2 id="common-issues-heading" className="m-0 text-base font-semibold text-ink flex items-center gap-2">
+                <Icon d={I.audit} size={18} className="text-primary" />
+                <span>Most common problems across sites</span>
+              </h2>
+              <p className="mt-0.5 text-xs text-muted">
+                Fix once in a shared theme to resolve across multiple client storefronts.
+              </p>
+            </div>
+            <span className="text-xs font-semibold text-muted bg-subtle px-2.5 py-1 rounded-full">
+              {commonIssues.length} shared {commonIssues.length === 1 ? "pattern" : "patterns"}
+            </span>
+          </div>
+
+          <div className="mt-4 divide-y divide-line">
+            {commonIssues.slice(0, 5).map((issue) => (
+              <div key={issue.ruleId} className="py-3 first:pt-0 last:pb-0 flex flex-col gap-2">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <span
+                      className={`inline-block px-2 py-0.5 rounded text-xs font-bold capitalize ${
+                        issue.impact === "critical"
+                          ? "bg-crit-soft text-crit"
+                          : issue.impact === "serious"
+                            ? "bg-ser-soft text-ser"
+                            : issue.impact === "moderate"
+                              ? "bg-amber-100 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300"
+                              : "bg-subtle text-muted"
+                      }`}
+                    >
+                      {issue.impact}
+                    </span>
+                    <span className="text-sm font-semibold text-ink">{issue.title}</span>
+                    <code className="text-xs text-muted font-mono">{issue.ruleId}</code>
+                  </div>
+                  <div className="flex items-center gap-2 text-xs font-medium text-muted">
+                    <strong className="text-ink">{issue.affectedSitesCount} stores affected</strong>
+                    <span>·</span>
+                    <span>{issue.totalOccurrences} total occurrences</span>
+                  </div>
+                </div>
+
+                {/* Affected sites links */}
+                <div className="flex flex-wrap items-center gap-1.5 pl-2 text-xs">
+                  <span className="text-muted font-medium mr-1">Affected stores:</span>
+                  {issue.sites.map((s) => (
+                    <Link
+                      key={s.siteId}
+                      href={`/${orgSlug}/sites/${s.siteId}/issues?rule=${encodeURIComponent(issue.ruleId)}`}
+                      className="inline-flex items-center gap-1 rounded-md border border-line bg-subtle/50 px-2 py-0.5 text-ink hover:border-primary hover:text-primary transition-colors no-underline"
+                      title={`View ${issue.title} in ${s.siteName}`}
+                    >
+                      <span className="font-medium">{s.siteName}</span>
+                      {s.clientName && <span className="text-muted">({s.clientName})</span>}
+                      <span className="rounded bg-surface px-1 text-[11px] font-semibold text-muted">
+                        {s.occurrences}
+                      </span>
+                    </Link>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
       )}
 
       {/* Filtering and Grouping Controls Bar */}
@@ -549,7 +698,7 @@ function LanesLayout() {
 
 /* ---------- 1c — Grouped by client + common problems ---------- */
 function ClientsLayout() {
-  const { sites: SITES, siteHref, common: COMMON_PROBLEMS } = useOverview();
+  const { sites: SITES, siteHref, commonIssues } = useOverview();
   const groups = [...new Set(SITES.map((s) => s.client))].map((c) => ({
     name: c,
     items: SITES.filter((s) => s.client === c),
@@ -592,10 +741,10 @@ function ClientsLayout() {
         <section className={`${CARD} flex flex-col gap-3 p-5`}>
           <h2 className="m-0 text-xl leading-7 font-semibold">Most common problems</h2>
           <p className="m-0 text-sm leading-5 text-muted">Fix once in a shared theme, help many clients.</p>
-          {COMMON_PROBLEMS.map((p) => (
-            <div key={p.t} className="flex justify-between gap-3 border-t border-line py-2 text-sm text-ink">
-              <span>{p.t}</span>
-              <span className="whitespace-nowrap text-muted text-xs font-semibold">{p.n} sites</span>
+          {commonIssues.map((p) => (
+            <div key={p.ruleId} className="flex justify-between gap-3 border-t border-line py-2 text-sm text-ink">
+              <span>{p.title}</span>
+              <span className="whitespace-nowrap text-muted text-xs font-semibold">{p.affectedSitesCount} sites</span>
             </div>
           ))}
         </section>
@@ -627,11 +776,9 @@ export function AgencyOverview({ orgSlug }: AgencyOverviewProps) {
     Promise.all([
       apiClient<{ org: { type: "agency" | "store" } }>(`/v1/orgs/${orgSlug}`),
       appApi.listSites(orgSlug),
-      apiClient<{ items: { title: string; siteId: string }[] }>(
-        `/v1/orgs/${orgSlug}/issues?status=open&limit=200`,
-      ).catch(() => ({ items: [] })),
+      appApi.listCrossSiteIssues(orgSlug).catch(() => []),
     ])
-      .then(([orgRes, sites, issues]) => {
+      .then(([orgRes, sites, commonIssues]) => {
         if (cancelled) return;
         // Stores with one site go straight to that site's overview (S-20).
         if (orgRes.org.type === "store" && sites.length === 1) {
@@ -639,17 +786,7 @@ export function AgencyOverview({ orgSlug }: AgencyOverviewProps) {
           router.replace(`/${orgSlug}/sites/${sites[0]!.id}`);
           return;
         }
-        const sitesByProblem = new Map<string, Set<string>>();
-        for (const issue of issues.items) {
-          const set = sitesByProblem.get(issue.title) ?? new Set<string>();
-          set.add(issue.siteId);
-          sitesByProblem.set(issue.title, set);
-        }
-        const common = [...sitesByProblem.entries()]
-          .map(([t, set]) => ({ t, n: set.size }))
-          .sort((a, b) => b.n - a.n)
-          .slice(0, 5);
-        setData({ orgSlug, sites: sites.map(toSiteRow), common });
+        setData({ orgSlug, sites: sites.map(toSiteRow), commonIssues });
       })
       .catch((err: unknown) => {
         if (cancelled) return;

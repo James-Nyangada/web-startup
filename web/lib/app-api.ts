@@ -630,7 +630,34 @@ export const appApi = {
 
   getPortalSite: (siteId: string) =>
     apiClient<{ data: ApiPortalSiteData }>(`/v1/portal/sites/${siteId}`).then((r) => r.data),
+
+  listCrossSiteIssues: (org: string) =>
+    apiClient<{ data: { items: ApiCrossSiteIssue[]; totalRules: number; totalAffectedSites: number } }>(
+      `/v1/orgs/${org}/overview/cross-site-issues`,
+    ).then((r) => r.data.items),
+
+  generateAgencyOverviewReport: (org: string, branded = false) =>
+    apiClient<{ data: { id: string } }>(`/v1/orgs/${org}/reports`, {
+      method: "POST",
+      body: JSON.stringify({ type: "agency_overview", branded }),
+    }).then((r) => r.data),
 };
+
+export interface ApiCrossSiteIssueSite {
+  siteId: string;
+  siteName: string;
+  clientName: string | null;
+  occurrences: number;
+}
+
+export interface ApiCrossSiteIssue {
+  ruleId: string;
+  title: string;
+  impact: 'critical' | 'serious' | 'moderate' | 'minor';
+  affectedSitesCount: number;
+  totalOccurrences: number;
+  sites: ApiCrossSiteIssueSite[];
+}
 
 export interface ApiClientViewer {
   user: {

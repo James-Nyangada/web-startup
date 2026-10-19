@@ -41,6 +41,7 @@ const PLATFORMS_LIST = [
 ];
 
 const FREQUENCIES = [
+  { value: "daily", label: "Daily (7 days a week)" },
   { value: "weekly", label: "Weekly" },
   { value: "fortnightly", label: "Every two weeks (Fortnightly)" },
   { value: "monthly", label: "Monthly" },
@@ -486,23 +487,25 @@ export function SettingsTab({
 
             {scanFrequency !== "manual" && (
               <>
-                <div className="flex flex-col gap-1.5">
-                  <label htmlFor="day-select" className="text-xs font-semibold text-ink uppercase tracking-wider">
-                    Scheduled Day of Week
-                  </label>
-                  <select
-                    id="day-select"
-                    value={scanDay}
-                    onChange={(e) => setScanDay(Number(e.target.value))}
-                    className="h-10 rounded-lg border border-line-strong bg-surface px-3 text-sm text-ink focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-                  >
-                    {DAYS_OF_WEEK.map((d) => (
-                      <option key={d.value} value={d.value}>
-                        {d.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+                {scanFrequency !== "daily" && (
+                  <div className="flex flex-col gap-1.5">
+                    <label htmlFor="day-select" className="text-xs font-semibold text-ink uppercase tracking-wider">
+                      Scheduled Day of Week
+                    </label>
+                    <select
+                      id="day-select"
+                      value={scanDay}
+                      onChange={(e) => setScanDay(Number(e.target.value))}
+                      className="h-10 rounded-lg border border-line-strong bg-surface px-3 text-sm text-ink focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                    >
+                      {DAYS_OF_WEEK.map((d) => (
+                        <option key={d.value} value={d.value}>
+                          {d.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
 
                 <div className="flex flex-col gap-1.5">
                   <label htmlFor="hour-select" className="text-xs font-semibold text-ink uppercase tracking-wider">
