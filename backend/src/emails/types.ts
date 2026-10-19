@@ -10,6 +10,9 @@ export type EmailTemplateId =
   | 'E-13' // Free check report
   | 'E-14' // Trial ending (day 10, day 13)
   | 'E-15' // Trial ended, read-only
+  | 'E-17' // Payment failed / past due
+  | 'E-18' // Subscription canceled / will end
+  | 'E-19' // Plan changed
   | 'E-20'; // Data deletion warning (7 days, 1 day)
 
 export interface EmailRenderOutput {
@@ -117,6 +120,28 @@ export interface DataDeletionWarningData {
   deletionDate: string | Date;
 }
 
+export interface PaymentFailedData {
+  orgName: string;
+  updateBillingUrl: string;
+  daysRemaining?: number;
+  amountFormatted?: string;
+}
+
+export interface SubscriptionCanceledData {
+  orgName: string;
+  effectiveDate: string | Date;
+  reactivateUrl: string;
+  isImmediate?: boolean;
+}
+
+export interface PlanChangedData {
+  orgName: string;
+  oldPlanName?: string;
+  newPlanName: string;
+  interval: 'month' | 'year';
+  billingUrl: string;
+}
+
 export type TemplateDataMap = {
   'E-01': VerifyEmailData;
   'E-02': MagicLinkData;
@@ -129,5 +154,8 @@ export type TemplateDataMap = {
   'E-13': FreeCheckReportData;
   'E-14': TrialEndingData;
   'E-15': TrialEndedData;
+  'E-17': PaymentFailedData;
+  'E-18': SubscriptionCanceledData;
+  'E-19': PlanChangedData;
   'E-20': DataDeletionWarningData;
 };

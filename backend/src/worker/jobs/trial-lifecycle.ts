@@ -7,16 +7,18 @@ export interface TrialLifecycleResult {
   remindersDay10: number;
   remindersDay13: number;
   expiredCount: number;
+  pastDueExpiredCount: number;
   warnings7d: number;
   warnings1d: number;
 }
 
 /**
  * Job handler for trial.lifecycle.
- * Runs hourly via cron (Spec Section 9 & P4-05).
+ * Runs hourly via cron (Spec Section 9 & P4-05/P4-06).
  * - Day 10 reminder (4 days remaining): sends E-14 to owner
  * - Day 13 reminder (1 day remaining): sends E-14 to owner
  * - Expiry: transitions org to read_only mode, writes audit log, sends E-15
+ * - Past-due grace period: after 7 days past due, transitions org to read_only mode, sends E-15
  * - Data deletion warnings: 30-day retention countdown; sends E-20 at 7 days and 1 day before deletion
  */
 export async function handleTrialLifecycle(ctx: WorkerContext): Promise<TrialLifecycleResult> {
@@ -27,6 +29,7 @@ export async function handleTrialLifecycle(ctx: WorkerContext): Promise<TrialLif
     remindersDay10: 0,
     remindersDay13: 0,
     expiredCount: 0,
+    pastDueExpiredCount: 0,
     warnings7d: 0,
     warnings1d: 0,
   };
@@ -246,6 +249,55 @@ export async function handleTrialLifecycle(ctx: WorkerContext): Promise<TrialLif
           });
           result.warnings1d++;
         }
+      }
+    }
+
+    // 3. Process past_due orgs (7-day grace period, then transition to read_only per P4-06)
+    if (org.billingStatus === 'past_due') {
+      const pastDueAudit = await ctx.repos.auditLog.findRecentAction(
+        orgId,
+        'subscription.past_due',
+      );
+      const startOfPastDue = pastDueAudit?.createdAt
+        ? new Date(pastDueAudit.createdAt)
+        : new Date(org.updatedAt);
+      const msPastDue = now.getTime() - startOfPastDue.getTime();
+      const sevenDaysMs = 7 * 24 * 60 * 60 * 1000;
+
+      if (msPastDue >= sevenDaysMs) {
+        // Grace period expired: transition to read_only mode
+        await ctx.repos.organizations.update(orgId, { billingStatus: 'read_only' });
+        await ctx.repos.auditLog.write(orgId, {
+          actorType: 'system',
+          action: 'past_due_expired',
+          targetType: 'organization',
+          targetId: org.id,
+          data: { pastDueSince: startOfPastDue.toISOString() },
+        });
+
+        const owner = await ctx.repos.memberships.findOwner(orgId);
+        if (owner?.email) {
+          const emailPayload = {
+            orgName: org.name,
+            upgradeUrl: `${appUrl}/settings/billing`,
+            readOnlySince: now.toISOString(),
+          };
+          if (ctx.boss) {
+            await enqueueEmailSend(ctx.boss, {
+              to: owner.email,
+              templateId: 'E-15',
+              data: emailPayload,
+            });
+          } else if (ctx.emailSender) {
+            await ctx.emailSender.send({
+              to: owner.email,
+              templateId: 'E-15',
+              data: emailPayload,
+            });
+          }
+        }
+        result.expiredCount++;
+        result.pastDueExpiredCount++;
       }
     }
   }

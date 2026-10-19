@@ -11,6 +11,9 @@ import {
   renderTrialEnding,
   renderTrialEnded,
   renderDataDeletionWarning,
+  renderPaymentFailed,
+  renderSubscriptionCanceled,
+  renderPlanChanged,
 } from './templates/index.js';
 import type {
   EmailBranding,
@@ -29,6 +32,9 @@ import type {
   TrialEndingData,
   TrialEndedData,
   DataDeletionWarningData,
+  PaymentFailedData,
+  SubscriptionCanceledData,
+  PlanChangedData,
 } from './types.js';
 
 export function renderEmail<T extends EmailTemplateId>(
@@ -59,6 +65,12 @@ export function renderEmail<T extends EmailTemplateId>(
       return renderTrialEnding(data as TrialEndingData, branding);
     case 'E-15':
       return renderTrialEnded(data as TrialEndedData, branding);
+    case 'E-17':
+      return renderPaymentFailed(data as PaymentFailedData, branding);
+    case 'E-18':
+      return renderSubscriptionCanceled(data as SubscriptionCanceledData, branding);
+    case 'E-19':
+      return renderPlanChanged(data as PlanChangedData, branding);
     case 'E-20':
       return renderDataDeletionWarning(data as DataDeletionWarningData, branding);
     default:
@@ -153,6 +165,28 @@ export function getSampleTemplateData(templateId: EmailTemplateId): unknown {
         orgName: 'Brightline Studio',
         upgradeUrl: 'http://localhost:3000/settings/billing',
         readOnlySince: new Date().toISOString(),
+      };
+    case 'E-17':
+      return {
+        orgName: 'Brightline Studio',
+        updateBillingUrl: 'http://localhost:3000/settings/billing',
+        daysRemaining: 7,
+        amountFormatted: '$49.00',
+      };
+    case 'E-18':
+      return {
+        orgName: 'Brightline Studio',
+        effectiveDate: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
+        reactivateUrl: 'http://localhost:3000/settings/billing',
+        isImmediate: false,
+      };
+    case 'E-19':
+      return {
+        orgName: 'Brightline Studio',
+        oldPlanName: 'Store',
+        newPlanName: 'Growth',
+        interval: 'month' as const,
+        billingUrl: 'http://localhost:3000/settings/billing',
       };
     case 'E-20':
       return {

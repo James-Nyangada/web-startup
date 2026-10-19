@@ -441,6 +441,7 @@ describe('profile (/v1/me) endpoints', () => {
           billingStatus: 'trialing',
           timeZone: 'UTC',
           trialEndsAt: null,
+          updatedAt: new Date(),
         },
       },
     ]);

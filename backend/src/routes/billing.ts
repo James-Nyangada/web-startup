@@ -1,5 +1,6 @@
 import { Router, type Request, type Response } from 'express';
 import { z } from 'zod';
+import type { PgBoss } from 'pg-boss';
 import type { Repositories } from '../db/repositories/index.js';
 import { asOrgId } from '../db/repositories/org-scope.js';
 import { requireOrgRole } from '../middleware/org.js';
@@ -11,6 +12,7 @@ import {
 } from '../shared/plans.js';
 import { processPaddleEvent, verifyPaddleWebhookSignature } from '../billing/paddle.js';
 import { logger } from '../lib/logger.js';
+import type { EmailSender } from '../emails/sender.js';
 
 const checkoutSchema = z.object({
   plan: z.enum(['store', 'growth', 'agency', 'agency_pro']).optional(),
@@ -545,7 +547,15 @@ export function orgInvoicesRouter(repos: Repositories): Router {
   return router;
 }
 
-export function paddleWebhookRouter(repos: Repositories): Router {
+export interface PaddleWebhookRouterOptions {
+  boss?: PgBoss;
+  emailSender?: EmailSender;
+}
+
+export function paddleWebhookRouter(
+  repos: Repositories,
+  options?: PaddleWebhookRouterOptions,
+): Router {
   const router = Router();
 
   // POST /webhooks/paddle
@@ -571,7 +581,10 @@ export function paddleWebhookRouter(repos: Repositories): Router {
     }
 
     // Process event asynchronously/idempotently per Section 12.2
-    const result = await processPaddleEvent(bodyObj, repos);
+    const result = await processPaddleEvent(bodyObj, repos, {
+      boss: options?.boss,
+      emailSender: options?.emailSender,
+    });
 
     res.status(200).json({
       received: true,

@@ -1,8 +1,12 @@
 import crypto from 'node:crypto';
+import type { PgBoss } from 'pg-boss';
 import type { Repositories } from '../db/repositories/index.js';
 import { asOrgId } from '../db/repositories/org-scope.js';
-import { getPlanForPriceId } from '../shared/plans.js';
+import { getPlanDefinition, getPlanForPriceId, type PlanType } from '../shared/plans.js';
 import { logger } from '../lib/logger.js';
+import { enqueueEmailSend } from '../worker/boss.js';
+import type { EmailSender } from '../emails/sender.js';
+import type { EmailTemplateId, TemplateDataMap } from '../emails/types.js';
 
 export interface VerifySignatureOptions {
   rawBody: string | Buffer;
@@ -121,6 +125,30 @@ export interface ProcessEventResult {
 
 export interface ProcessPaddleEventOptions {
   isReplay?: boolean;
+  boss?: PgBoss;
+  emailSender?: EmailSender;
+  appUrl?: string;
+}
+
+async function dispatchEmail<T extends EmailTemplateId>(
+  options: ProcessPaddleEventOptions | undefined,
+  to: string,
+  templateId: T,
+  data: TemplateDataMap[T],
+): Promise<void> {
+  if (options?.boss) {
+    await enqueueEmailSend(options.boss, {
+      to,
+      templateId,
+      data: data as unknown as Record<string, unknown>,
+    });
+  } else if (options?.emailSender) {
+    await options.emailSender.send({
+      to,
+      templateId,
+      data,
+    });
+  }
 }
 
 /**
@@ -294,6 +322,7 @@ export async function processPaddleEvent(
           });
 
           if (planInfo?.plan) {
+            const isPlanChanged = !existingSub || existingSub.plan !== planInfo.plan;
             await repos.organizations.update(orgIdScoped, {
               plan: planInfo.plan,
             });
@@ -309,6 +338,25 @@ export async function processPaddleEvent(
                 isReplay: options?.isReplay ?? false,
               },
             });
+
+            // Spec 12.2: E-19 sent on plan change (not sent on first activation)
+            if (isPlanChanged) {
+              const owner = await repos.memberships.findOwner(orgIdScoped);
+              const org = await repos.organizations.findById(orgIdScoped);
+              if (owner?.email && org) {
+                const appUrl = options?.appUrl || process.env.APP_URL || 'http://localhost:3000';
+                const newPlanDef = getPlanDefinition(planInfo.plan);
+                await dispatchEmail(options, owner.email, 'E-19', {
+                  orgName: org.name,
+                  oldPlanName: existingSub?.plan
+                    ? getPlanDefinition(existingSub.plan as PlanType).name
+                    : undefined,
+                  newPlanName: newPlanDef.name,
+                  interval: currentInterval as 'month' | 'year',
+                  billingUrl: `${appUrl}/settings/billing`,
+                });
+              }
+            }
           }
         }
         break;
@@ -327,6 +375,39 @@ export async function processPaddleEvent(
               orgId: orgIdScoped,
               status: 'past_due',
             });
+          }
+
+          await repos.auditLog.write(orgIdScoped, {
+            actorType: 'system',
+            action: 'subscription.past_due',
+            targetType: 'organization',
+            targetId: orgIdScoped,
+            data: { paddleSubscriptionId: data.id },
+          });
+
+          // Spec 12.2: E-17 if not already sent this period
+          const alreadySent = await repos.auditLog.findRecentAction(
+            orgIdScoped,
+            'payment.warning_e17',
+          );
+          if (!alreadySent) {
+            const owner = await repos.memberships.findOwner(orgIdScoped);
+            const org = await repos.organizations.findById(orgIdScoped);
+            if (owner?.email && org) {
+              const appUrl = options?.appUrl || process.env.APP_URL || 'http://localhost:3000';
+              await dispatchEmail(options, owner.email, 'E-17', {
+                orgName: org.name,
+                updateBillingUrl: `${appUrl}/settings/billing`,
+                daysRemaining: 7,
+              });
+              await repos.auditLog.write(orgIdScoped, {
+                actorType: 'system',
+                action: 'payment.warning_e17',
+                targetType: 'organization',
+                targetId: orgIdScoped,
+                data: { eventType },
+              });
+            }
           }
         }
         break;
@@ -365,6 +446,29 @@ export async function processPaddleEvent(
               cancelAtPeriodEnd: false,
             });
           }
+
+          await repos.auditLog.write(orgIdScoped, {
+            actorType: 'system',
+            action: 'subscription.canceled',
+            targetType: 'organization',
+            targetId: orgIdScoped,
+            data: { paddleSubscriptionId: data.id },
+          });
+
+          // Spec 12.2: E-18 sent to Owner; data retention countdown 30 days
+          const owner = await repos.memberships.findOwner(orgIdScoped);
+          const org = await repos.organizations.findById(orgIdScoped);
+          if (owner?.email && org) {
+            const appUrl = options?.appUrl || process.env.APP_URL || 'http://localhost:3000';
+            await dispatchEmail(options, owner.email, 'E-18', {
+              orgName: org.name,
+              effectiveDate: data.current_billing_period?.ends_at
+                ? new Date(data.current_billing_period.ends_at)
+                : occurredAt,
+              reactivateUrl: `${appUrl}/settings/billing`,
+              isImmediate: true,
+            });
+          }
         }
         break;
       }
@@ -393,6 +497,53 @@ export async function processPaddleEvent(
 
       case 'transaction.payment_failed': {
         logger.warn({ data, eventId }, 'Paddle payment failed event received');
+        if (targetOrgId) {
+          const orgIdScoped = asOrgId(targetOrgId);
+          await repos.auditLog.write(orgIdScoped, {
+            actorType: 'system',
+            action: 'payment_failed',
+            targetType: 'organization',
+            targetId: orgIdScoped,
+            data: {
+              paddleTransactionId: data.id,
+              amount: data.details?.totals?.total,
+            },
+          });
+
+          // Spec 12.2: E-17 if not already sent this period
+          const alreadySent = await repos.auditLog.findRecentAction(
+            orgIdScoped,
+            'payment.warning_e17',
+          );
+          if (!alreadySent) {
+            const owner = await repos.memberships.findOwner(orgIdScoped);
+            const org = await repos.organizations.findById(orgIdScoped);
+            if (owner?.email && org) {
+              const appUrl = options?.appUrl || process.env.APP_URL || 'http://localhost:3000';
+              const rawTotal = data.details?.totals?.total;
+              const formattedAmount =
+                typeof rawTotal === 'number'
+                  ? `$${(rawTotal / 100).toFixed(2)}`
+                  : typeof rawTotal === 'string'
+                    ? rawTotal
+                    : undefined;
+
+              await dispatchEmail(options, owner.email, 'E-17', {
+                orgName: org.name,
+                updateBillingUrl: `${appUrl}/settings/billing`,
+                daysRemaining: 7,
+                amountFormatted: formattedAmount,
+              });
+              await repos.auditLog.write(orgIdScoped, {
+                actorType: 'system',
+                action: 'payment.warning_e17',
+                targetType: 'organization',
+                targetId: orgIdScoped,
+                data: { eventType },
+              });
+            }
+          }
+        }
         break;
       }
 

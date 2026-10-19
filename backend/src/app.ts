@@ -115,7 +115,8 @@ export function createApp({
   v1.use('/orgs', orgsRouter(auth, repos, scansOptions, emailSender, storage));
   v1.use('/invitations', invitationsRouter(repos, auth));
   v1.use('/sites', detectPlatformRouter(auth));
-  v1.use('/webhooks/paddle', paddleWebhookRouter(repos));
+  const paddleWebhookOpts = { boss: scansOptions?.boss, emailSender };
+  v1.use('/webhooks/paddle', paddleWebhookRouter(repos, paddleWebhookOpts));
   v1.use('/public', waitlistRouter(repos, verifyTurnstile));
   v1.use('/public', publicPlansRouter());
   v1.use(
@@ -125,7 +126,7 @@ export function createApp({
   v1.use('/emails', createEmailPreviewRouter());
   v1.use('/reports', reportsPublicRouter(repos, storage));
   app.use('/v1', v1);
-  app.use('/webhooks/paddle', paddleWebhookRouter(repos));
+  app.use('/webhooks/paddle', paddleWebhookRouter(repos, paddleWebhookOpts));
   app.use('/public', publicPlansRouter());
   app.use(
     '/public',

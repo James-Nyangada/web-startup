@@ -182,7 +182,7 @@ export function organizationsRepository(db: Database) {
         .where(
           and(
             isNull(organizations.deletedAt),
-            sql`(${organizations.billingStatus} = 'trialing' OR ${organizations.billingStatus} = 'read_only' OR ${organizations.billingStatus} = 'canceled')`,
+            sql`(${organizations.billingStatus} = 'trialing' OR ${organizations.billingStatus} = 'past_due' OR ${organizations.billingStatus} = 'read_only' OR ${organizations.billingStatus} = 'canceled')`,
           ),
         );
     },

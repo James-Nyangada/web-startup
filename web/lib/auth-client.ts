@@ -20,6 +20,7 @@ export interface OrganizationSummary {
   plan: string;
   billingStatus?: 'trialing' | 'active' | 'past_due' | 'paused' | 'canceled' | 'read_only';
   trialEndsAt?: string | null;
+  updatedAt?: string | null;
 }
 
 export interface Membership {

@@ -14,6 +14,9 @@ import type {
   TrialEndingData,
   TrialEndedData,
   DataDeletionWarningData,
+  PaymentFailedData,
+  SubscriptionCanceledData,
+  PlanChangedData,
 } from '../types.js';
 
 // E-01: Verify your email
@@ -655,6 +658,155 @@ ${data.reactivateUrl}
 
 To export your data:
 ${data.exportUrl}
+
+— The ${brandName} Team`;
+
+  return { subject, html, text };
+}
+
+// E-17: Payment failed / past due
+export function renderPaymentFailed(
+  data: PaymentFailedData,
+  branding?: EmailBranding,
+): EmailRenderOutput {
+  const brandName = branding?.displayName || 'Plainsight';
+  const subject = `Action required: Payment failed for ${data.orgName}`;
+
+  const contentHtml = `
+    <p style="margin: 0 0 16px 0;">Hello,</p>
+    <p style="margin: 0 0 16px 0;">
+      We were unable to process the subscription payment for <strong>${data.orgName}</strong>${data.amountFormatted ? ` (${data.amountFormatted})` : ''}.
+    </p>
+    <p style="margin: 0 0 16px 0;">
+      Please update your payment method within <strong>${data.daysRemaining ?? 7} days</strong> to ensure your automated scans and accessibility monitoring continue uninterrupted.
+    </p>
+    <p style="margin: 0 0 16px 0; color: #635F59; font-size: 14px;">
+      Your historical scan records and issue logs remain secure. If payment cannot be processed after 7 days, your organization will enter read-only mode and automated scanning will pause.
+    </p>
+  `;
+
+  const html = renderEmailLayout({
+    preheader: `Payment failed for ${data.orgName}. Update payment details to keep scanning active.`,
+    title: 'Payment failed',
+    contentHtml,
+    buttonLabel: 'Update payment method',
+    buttonUrl: data.updateBillingUrl,
+    branding,
+  });
+
+  const text = `Action required: Payment failed for ${data.orgName}
+
+Hello,
+
+We were unable to process the subscription payment for ${data.orgName}${data.amountFormatted ? ` (${data.amountFormatted})` : ''}.
+
+Please update your payment method within ${data.daysRemaining ?? 7} days to keep your automated scans and monitoring active:
+${data.updateBillingUrl}
+
+Your historical records remain secure. If payment cannot be processed after 7 days, your account will enter read-only mode and scanning will pause.
+
+— The ${brandName} Team`;
+
+  return { subject, html, text };
+}
+
+// E-18: Subscription canceled / will end
+export function renderSubscriptionCanceled(
+  data: SubscriptionCanceledData,
+  branding?: EmailBranding,
+): EmailRenderOutput {
+  const brandName = branding?.displayName || 'Plainsight';
+  const subject = `Your subscription for ${data.orgName} has been canceled`;
+
+  const formattedDate = new Date(data.effectiveDate).toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  });
+
+  const contentHtml = `
+    <p style="margin: 0 0 16px 0;">Hello,</p>
+    <p style="margin: 0 0 16px 0;">
+      Your subscription for <strong>${data.orgName}</strong> has been canceled.
+    </p>
+    <p style="margin: 0 0 16px 0;">
+      ${
+        data.isImmediate
+          ? 'Your organization has transitioned to read-only mode. Automated scheduled scans and rechecks are now paused.'
+          : `Your subscription features will remain active until the end of your current billing period on <strong>${formattedDate}</strong>, after which your account will transition to read-only mode.`
+      }
+    </p>
+    <p style="margin: 0 0 16px 0; color: #635F59; font-size: 14px;">
+      Under our retention policy, your scan data and reports will be preserved for 30 days. You can reactivate anytime to resume automated compliance checks.
+    </p>
+  `;
+
+  const html = renderEmailLayout({
+    preheader: `Your subscription for ${data.orgName} has been canceled.`,
+    title: 'Subscription canceled',
+    contentHtml,
+    buttonLabel: 'Reactivate subscription',
+    buttonUrl: data.reactivateUrl,
+    branding,
+  });
+
+  const text = `Your subscription for ${data.orgName} has been canceled
+
+Hello,
+
+Your subscription for ${data.orgName} has been canceled.
+
+${
+  data.isImmediate
+    ? 'Your organization has transitioned to read-only mode. Scheduled scans are now paused.'
+    : `Your subscription features will remain active until the end of your billing period on ${formattedDate}, after which your account will transition to read-only mode.`
+}
+
+Your scan history and reports will be retained for 30 days. You can reactivate anytime:
+${data.reactivateUrl}
+
+— The ${brandName} Team`;
+
+  return { subject, html, text };
+}
+
+// E-19: Plan changed
+export function renderPlanChanged(
+  data: PlanChangedData,
+  branding?: EmailBranding,
+): EmailRenderOutput {
+  const brandName = branding?.displayName || 'Plainsight';
+  const subject = `Your ${data.orgName} plan has been updated to ${data.newPlanName}`;
+
+  const contentHtml = `
+    <p style="margin: 0 0 16px 0;">Hello,</p>
+    <p style="margin: 0 0 16px 0;">
+      Your subscription plan for <strong>${data.orgName}</strong> has been successfully updated to <strong>${data.newPlanName}</strong> (${data.interval === 'year' ? 'Annual' : 'Monthly'} billing).
+    </p>
+    <p style="margin: 0 0 16px 0;">
+      Your updated site limits, scan capacities, and feature access are now active on your dashboard.
+    </p>
+  `;
+
+  const html = renderEmailLayout({
+    preheader: `Your ${data.orgName} plan has been updated to ${data.newPlanName}.`,
+    title: 'Plan updated',
+    contentHtml,
+    buttonLabel: 'View billing & limits',
+    buttonUrl: data.billingUrl,
+    branding,
+  });
+
+  const text = `Your ${data.orgName} plan has been updated to ${data.newPlanName}
+
+Hello,
+
+Your subscription plan for ${data.orgName} has been updated to ${data.newPlanName} (${data.interval === 'year' ? 'Annual' : 'Monthly'} billing).
+
+Your updated site limits, scan capacities, and feature access are now active.
+
+View your account details:
+${data.billingUrl}
 
 — The ${brandName} Team`;
 

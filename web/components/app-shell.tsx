@@ -243,10 +243,17 @@ export function AppShell({ active, crumbs = [], banners, children }: AppShellPro
         href: "/settings/billing",
       });
     } else if (activeOrg.billingStatus === "past_due") {
+      let daysRemaining = 7;
+      if (activeOrg.updatedAt) {
+        const msElapsed = Date.now() - new Date(activeOrg.updatedAt).getTime();
+        const msRemaining = 7 * 24 * 60 * 60 * 1000 - msElapsed;
+        daysRemaining = Math.max(0, Math.ceil(msRemaining / (1000 * 60 * 60 * 24)));
+      }
       result.push({
         kind: "past_due",
         id: `past-due-${activeOrg.id}`,
         orgName: activeOrg.name,
+        daysRemaining,
         href: "/settings/billing",
       });
     } else if (activeOrg.billingStatus === "trialing" && activeOrg.trialEndsAt) {
