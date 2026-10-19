@@ -8,16 +8,28 @@ import {
   PagesTable,
   ScoreBlock,
   TopIssuesTable,
+  type ReportBranding,
 } from './components.js';
 import { reportCss } from './styles.js';
 
-function Document({ title, children }: { title: string; children: React.ReactNode }) {
+function Document({
+  title,
+  branding,
+  children,
+}: {
+  title: string;
+  branding?: ReportBranding;
+  children: React.ReactNode;
+}) {
+  const dynamicCss = branding?.primaryColor
+    ? `${reportCss}\n:root { --primary: ${branding.primaryColor}; }`
+    : reportCss;
   return (
     <html lang="en">
       <head>
         <meta charSet="utf-8" />
         <title>{title}</title>
-        <style dangerouslySetInnerHTML={{ __html: reportCss }} />
+        <style dangerouslySetInnerHTML={{ __html: dynamicCss }} />
       </head>
       <body>
         <main>{children}</main>
@@ -27,11 +39,17 @@ function Document({ title, children }: { title: string; children: React.ReactNod
 }
 
 /** R-01: one-to-two page scan summary. */
-export function ScanSummaryReport({ scan }: { scan: ScanResult }) {
+export function ScanSummaryReport({
+  scan,
+  branding,
+}: {
+  scan: ScanResult;
+  branding?: ReportBranding;
+}) {
   const title = 'Accessibility scan summary';
   return (
-    <Document title={`${title} – ${scan.rootUrl}`}>
-      <Cover scan={scan} title={title} />
+    <Document title={`${title} – ${scan.rootUrl}`} branding={branding}>
+      <Cover scan={scan} title={title} branding={branding} />
       <ScoreBlock scan={scan} />
       <CountsBlock scan={scan} />
       <section aria-labelledby="top-heading">
@@ -45,13 +63,13 @@ export function ScanSummaryReport({ scan }: { scan: ScanResult }) {
 }
 
 /** R-02: full report with every issue, where it occurs, and per-page results. */
-export function FullReport({ scan }: { scan: ScanResult }) {
+export function FullReport({ scan, branding }: { scan: ScanResult; branding?: ReportBranding }) {
   const title = 'Accessibility scan report';
   const confirmed = scan.issues.filter((i) => !i.needsReview);
   const review = scan.issues.filter((i) => i.needsReview);
   return (
-    <Document title={`${title} – ${scan.rootUrl}`}>
-      <Cover scan={scan} title={title} />
+    <Document title={`${title} – ${scan.rootUrl}`} branding={branding}>
+      <Cover scan={scan} title={title} branding={branding} />
       <ScoreBlock scan={scan} />
       <CountsBlock scan={scan} />
       <section aria-labelledby="top-heading">

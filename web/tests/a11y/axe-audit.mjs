@@ -52,6 +52,8 @@ const screens = {
   'S-30 Reports': `${siteBase}/reports`,
   'S-34 Site settings': `${siteBase}/settings`,
   'S-41 Members': '/settings/members',
+  'S-43 Branding': '/settings/branding',
+  'S-44 Billing': '/settings/billing',
   'S-48 Account': '/settings/account',
 };
 

@@ -582,7 +582,55 @@ export const appApi = {
 
   getCustomerPortalUrl: (org: string) =>
     apiClient<{ url: string }>(`/v1/orgs/${org}/billing/portal`).then((r) => r.url),
+
+  getBranding: (org: string) =>
+    apiClient<{ data: ApiBranding }>(`/v1/orgs/${org}/branding`).then((r) => r.data),
+
+  updateBranding: (org: string, payload: Partial<ApiBranding>) =>
+    apiClient<{ data: ApiBranding }>(`/v1/orgs/${org}/branding`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    }).then((r) => r.data),
+
+  checkContrast: (org: string, color: string) =>
+    apiClient<{ data: ApiContrastCheck }>(`/v1/orgs/${org}/branding/check-contrast`, json({ color })).then(
+      (r) => r.data,
+    ),
+
+  uploadLogo: (org: string, type: "light" | "dark", dataUrl: string) =>
+    apiClient<{ data: { success: boolean; key: string; logoType: string } }>(
+      `/v1/orgs/${org}/branding/logo`,
+      json({ type, dataUrl }),
+    ).then((r) => r.data),
+
+  deleteLogo: (org: string, type: "light" | "dark") =>
+    apiClient<{ data: { success: boolean } }>(`/v1/orgs/${org}/branding/logo/${type}`, {
+      method: "DELETE",
+    }).then((r) => r.data),
 };
+
+export interface ApiBranding {
+  id?: string;
+  orgId: string;
+  displayName: string | null;
+  primaryColor: string;
+  logoLightKey: string | null;
+  logoDarkKey: string | null;
+  emailSenderName: string | null;
+  reportFooter: string | null;
+  hidePlainsightBranding: boolean;
+  customDomain: string | null;
+  customDomainVerified: boolean;
+  contrastRatio?: number;
+}
+
+export interface ApiContrastCheck {
+  color: string;
+  contrastRatio: number;
+  meetsWcagAa: boolean;
+  suggestedAlternative: string;
+}
 
 export type RecheckOutcome = "fixed" | "still_open" | "unchecked";
 

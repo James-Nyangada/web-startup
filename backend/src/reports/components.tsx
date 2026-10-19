@@ -30,11 +30,41 @@ export function SeverityBadge({ impact }: { impact: Impact }) {
   return <span className={`badge sev-${impact}`}>{impact}</span>;
 }
 
-export function Cover({ scan, title }: { scan: ScanResult; title: string }) {
+export interface ReportBranding {
+  displayName?: string | null;
+  logoUrl?: string | null;
+  primaryColor?: string | null;
+  reportFooter?: string | null;
+  hideProductBrand?: boolean | null;
+}
+
+export function Cover({
+  scan,
+  title,
+  branding,
+}: {
+  scan: ScanResult;
+  title: string;
+  branding?: ReportBranding;
+}) {
   return (
     <header className="cover">
+      {branding?.logoUrl && (
+        <div style={{ marginBottom: '12pt' }}>
+          <img
+            src={branding.logoUrl}
+            alt={branding.displayName || 'Brand Logo'}
+            style={{ maxHeight: '36pt', width: 'auto' }}
+          />
+        </div>
+      )}
       <h1>{title}</h1>
       <p className="site">{scan.rootUrl}</p>
+      {branding?.displayName && (
+        <p style={{ margin: '4pt 0 0', fontSize: '10pt', color: 'var(--muted)' }}>
+          Prepared by <strong>{branding.displayName}</strong>
+        </p>
+      )}
       <dl className="meta">
         <dt>Scanned</dt>
         <dd>{formatDate(scan.finishedAt)}</dd>

@@ -1,5 +1,6 @@
 import { renderReportPdf } from '../../reports/render.js';
 import type { ScanResult } from '../../scanner/scan.js';
+import type { ReportBranding } from '../../reports/components.js';
 import { asOrgId } from '../../db/repositories/org-scope.js';
 import type { ReportRenderJobPayload, WorkerContext } from '../types.js';
 
@@ -87,9 +88,35 @@ export async function handleReportRender(
     }
 
     const reportType = report.type === 'scan_summary' ? 'summary' : 'full';
+    let reportBranding: ReportBranding | undefined;
+    if (ctx.repos.branding) {
+      const bRow = await ctx.repos.branding.findByOrgId(asOrgId(report.orgId));
+      if (bRow) {
+        let logoDataUrl: string | undefined;
+        if (bRow.logoLightKey) {
+          const logoBuf = await ctx.storage.getObject(bRow.logoLightKey);
+          if (logoBuf) {
+            const isSvg = bRow.logoLightKey.endsWith('.svg');
+            const mime = isSvg ? 'image/svg+xml' : 'image/png';
+            logoDataUrl = `data:${mime};base64,${logoBuf.toString('base64')}`;
+          }
+        }
+        reportBranding = {
+          displayName: bRow.displayName ?? undefined,
+          logoUrl: logoDataUrl,
+          primaryColor: bRow.primaryColor ?? undefined,
+          reportFooter: bRow.reportFooter ?? undefined,
+        };
+      }
+    }
+
     let pdfBuffer: Buffer;
     try {
-      pdfBuffer = await renderReportPdf(scanResult, { type: reportType, paper: 'a4' });
+      pdfBuffer = await renderReportPdf(scanResult, {
+        type: reportType,
+        paper: 'a4',
+        branding: reportBranding,
+      });
     } catch {
       // Fallback valid minimal PDF for environments without Chromium
       pdfBuffer = Buffer.from(

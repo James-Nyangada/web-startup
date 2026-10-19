@@ -8,6 +8,7 @@ import {
   FreeCheckReport,
   type FreeCheckReportInput,
 } from './templates.js';
+import type { ReportBranding } from './components.js';
 
 export type ReportType = 'summary' | 'full' | 'free_check';
 export type Paper = 'a4' | 'letter';
@@ -15,19 +16,30 @@ export type Paper = 'a4' | 'letter';
 export interface ReportOptions {
   type: ReportType;
   paper?: Paper;
+  branding?: ReportBranding;
 }
 
 /** R-01 / R-02 as a complete HTML document. */
-export function renderReportHtml(scan: ScanResult, type: ReportType): string {
+export function renderReportHtml(
+  scan: ScanResult,
+  type: ReportType,
+  branding?: ReportBranding,
+): string {
   const component = type === 'summary' ? ScanSummaryReport : FullReport;
-  return `<!doctype html>${renderToStaticMarkup(createElement(component, { scan }))}`;
+  return `<!doctype html>${renderToStaticMarkup(createElement(component, { scan, branding }))}`;
 }
 
-const footerTemplate = (site: string) => `
+const footerTemplate = (site: string, branding?: ReportBranding) => {
+  const defaultText = `${site.replace(/[<>&"]/g, '')} · Automated checks only, not a compliance assessment`;
+  const footerText = branding?.reportFooter
+    ? branding.reportFooter.replace(/[<>&"]/g, '')
+    : defaultText;
+  return `
   <div style="width:100%;font-size:8px;color:#476788;padding:0 15mm;display:flex;justify-content:space-between;font-family:Helvetica,Arial,sans-serif;">
-    <span>${site.replace(/[<>&"]/g, '')} · Automated checks only, not a compliance assessment</span>
+    <span>${footerText}</span>
     <span>Page <span class="pageNumber"></span> of <span class="totalPages"></span></span>
   </div>`;
+};
 
 /**
  * Prints the report with Chromium (P1-13): A4 or US Letter, tagged PDF and a
@@ -35,7 +47,7 @@ const footerTemplate = (site: string) => `
  * page is rendered offline: every network request is refused.
  */
 export async function renderReportPdf(scan: ScanResult, options: ReportOptions): Promise<Buffer> {
-  const html = renderReportHtml(scan, options.type);
+  const html = renderReportHtml(scan, options.type, options.branding);
   const browser = await chromium.launch();
   try {
     const context = await browser.newContext({ javaScriptEnabled: false });
@@ -49,7 +61,7 @@ export async function renderReportPdf(scan: ScanResult, options: ReportOptions):
       outline: true,
       displayHeaderFooter: true,
       headerTemplate: '<span></span>',
-      footerTemplate: footerTemplate(scan.rootUrl),
+      footerTemplate: footerTemplate(scan.rootUrl, options.branding),
       margin: { top: '16mm', bottom: '18mm', left: '15mm', right: '15mm' },
     });
     return pdf;

@@ -11,7 +11,8 @@ import { orgScansRouter, type ScansRouterOptions } from './scans.js';
 import { orgIssuesRouter } from './issues.js';
 import { orgReportsRouter } from './reports.js';
 import { orgBillingRouter, orgInvoicesRouter } from './billing.js';
-import type { StorageService } from '../storage/index.js';
+import { orgBrandingRouter } from './branding.js';
+import { type StorageService, getStorage } from '../storage/index.js';
 import { ErrorCode } from '../shared/errors.js';
 import { assertWithinPlan, getPlanDefinition, getPlanLimits } from '../shared/plans.js';
 
@@ -812,6 +813,10 @@ export function orgsRouter(
 
   // Mount Section 7.9 Invoices router under orgScoped
   orgScoped.use('/invoices', orgInvoicesRouter(repos));
+
+  // Mount S-43 Branding router under orgScoped
+  const resolvedStorage = storage ?? getStorage();
+  orgScoped.use('/branding', orgBrandingRouter(repos, resolvedStorage));
 
   router.use('/:orgId', orgScoped);
 

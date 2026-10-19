@@ -9,6 +9,7 @@ const SETTINGS_NAV = [
   { href: "/settings/general", label: "General" },
   { href: "/settings/members", label: "Team & Members" },
   { href: "/settings/billing", label: "Billing & Plans" },
+  { href: "/settings/branding", label: "Branding" },
   { href: "/settings/notifications", label: "Notifications" },
   { href: "/settings/integrations", label: "Integrations" },
   { href: "/settings/audit-log", label: "Audit Log" },

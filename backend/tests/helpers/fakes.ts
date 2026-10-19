@@ -7,6 +7,7 @@ import type { TurnstileVerifier } from '../../src/lib/turnstile.js';
 import type { GuardPolicy } from '../../src/scanner/net/guard.js';
 import { isPublicAddress } from '../../src/scanner/net/ip-ranges.js';
 import type { FreeChecksRouterOptions } from '../../src/routes/public/free-checks.js';
+import { MemoryStorageService, type StorageService } from '../../src/storage/index.js';
 
 export const testConfig = {
   APP_URL: 'http://localhost:3000',
@@ -451,6 +452,27 @@ export function fakeRepos() {
       listRecent: vi.fn().mockResolvedValue([]),
       listFailed: vi.fn().mockResolvedValue([]),
     },
+    branding: {
+      findByOrgId: vi.fn().mockResolvedValue(null),
+      upsert: vi.fn().mockImplementation((orgId, data) =>
+        Promise.resolve({
+          id: 'brand-1',
+          orgId,
+          displayName: data.displayName ?? null,
+          logoLightKey: data.logoLightKey ?? null,
+          logoDarkKey: data.logoDarkKey ?? null,
+          primaryColor: data.primaryColor ?? null,
+          emailSenderName: data.emailSenderName ?? null,
+          reportFooter: data.reportFooter ?? null,
+          hideProductBrand: data.hideProductBrand ?? false,
+          customDomain: data.customDomain ?? null,
+          customDomainVerifiedAt: null,
+          customDomainVerifyToken: null,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        }),
+      ),
+    },
   } as unknown as Repositories;
   return { repos, join };
 }
@@ -472,11 +494,13 @@ export function buildTestApp(
     turnstile?: TurnstileVerifier;
     auth?: Auth;
     repos?: Repositories;
+    storage?: StorageService;
     freeChecksOptions?: FreeChecksRouterOptions;
   } = {},
 ) {
   const defaultRepos = fakeRepos();
   const repos = options.repos ?? defaultRepos.repos;
+  const storage = options.storage ?? new MemoryStorageService();
   const freeChecksOptions: FreeChecksRouterOptions = {
     guardPolicy: testGuardPolicy,
     customRunner: () => Promise.resolve(),
@@ -488,7 +512,8 @@ export function buildTestApp(
     repos,
     verifyTurnstile: options.turnstile ?? (() => Promise.resolve(true)),
     auth: options.auth,
+    storage,
     freeChecksOptions,
   });
-  return { app, join: defaultRepos.join, repos };
+  return { app, join: defaultRepos.join, repos, storage };
 }

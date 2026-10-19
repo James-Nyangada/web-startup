@@ -15,6 +15,7 @@ import { aiSuggestionsRepository } from './ai-suggestions.js';
 import { subscriptionsRepository } from './subscriptions.js';
 import { invoicesRepository } from './invoices.js';
 import { paddleEventsRepository } from './paddle-events.js';
+import { brandingRepository } from './branding.js';
 
 export function createRepositories(db: Database) {
   return {
@@ -34,6 +35,7 @@ export function createRepositories(db: Database) {
     subscriptions: subscriptionsRepository(db),
     invoices: invoicesRepository(db),
     paddleEvents: paddleEventsRepository(db),
+    branding: brandingRepository(db),
   };
 }
 
