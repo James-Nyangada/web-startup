@@ -1,6 +1,11 @@
 import { describe, it, expect, vi } from 'vitest';
 import request from 'supertest';
-import { buildTestApp } from '../helpers/fakes.js';
+import express from 'express';
+import { buildTestApp, fakeRepos } from '../helpers/fakes.js';
+import { processPaddleEvent } from '../../src/billing/paddle.js';
+import { paddleWebhookRouter } from '../../src/routes/billing.js';
+import { handleTrialLifecycle } from '../../src/worker/jobs/trial-lifecycle.js';
+import type { StorageService } from '../../src/storage/index.js';
 import type { Auth } from '../../src/lib/auth.js';
 import { asOrgId } from '../../src/db/repositories/org-scope.js';
 
@@ -39,6 +44,7 @@ describe('Chunk P4-04: Plan changes, downgrades, and site pausing', () => {
       billingStatus: 'active' as const,
       trialEndsAt: null,
       paddleCustomerId: 'ctm_test_123',
+      pastDueSince: null,
       timeZone: 'UTC',
       createdAt: new Date(),
       updatedAt: new Date(),
@@ -326,6 +332,128 @@ describe('Chunk P4-04: Plan changes, downgrades, and site pausing', () => {
           action: 'billing.subscription_resumed',
         }),
       );
+    });
+  });
+
+  describe('Scheduled downgrade timing and webhook delivery', () => {
+    const orgId = asOrgId('018f0000-0000-7000-8000-000000000001');
+    const periodEnd = new Date(Date.now() + 10 * 24 * 60 * 60 * 1000);
+    const agencySub = {
+      id: 'sub-1',
+      orgId,
+      paddleSubscriptionId: 'sub_paddle_123',
+      paddlePriceId: 'pri_sandbox_agency_monthly',
+      plan: 'agency',
+      interval: 'month',
+      status: 'active',
+      currentPeriodStart: new Date(Date.now() - 20 * 24 * 60 * 60 * 1000),
+      currentPeriodEnd: periodEnd,
+      cancelAtPeriodEnd: false,
+      createdAt: new Date(),
+      updatedAt: new Date(Date.now() - 60 * 60 * 1000),
+    };
+
+    it('keeps the current plan when Paddle confirms a downgrade scheduled for period end', async () => {
+      const { repos } = fakeRepos();
+      vi.mocked(repos.subscriptions.findByPaddleSubscriptionId).mockResolvedValue({
+        ...agencySub,
+        scheduledChange: {
+          action: 'downgrade',
+          plan: 'growth',
+          interval: 'month',
+          effectiveAt: periodEnd.toISOString(),
+        },
+      });
+
+      await processPaddleEvent(
+        {
+          event_id: 'evt_downgrade_confirm_1',
+          event_type: 'subscription.updated',
+          occurred_at: new Date().toISOString(),
+          data: {
+            id: 'sub_paddle_123',
+            status: 'active',
+            custom_data: { orgId },
+            items: [{ price: { id: 'pri_sandbox_growth_monthly' } }],
+          },
+        },
+        repos,
+      );
+
+      expect(repos.subscriptions.upsert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          plan: 'agency',
+          scheduledChange: expect.objectContaining({ action: 'downgrade', plan: 'growth' }),
+        }),
+      );
+      expect(repos.organizations.update).not.toHaveBeenCalledWith(
+        orgId,
+        expect.objectContaining({ plan: 'growth' }),
+      );
+    });
+
+    it('applies the downgrade in trial.lifecycle once the period has ended', async () => {
+      const { repos } = fakeRepos();
+      vi.mocked(repos.organizations.findDueForTrialLifecycle).mockResolvedValue([]);
+      vi.mocked(repos.subscriptions.listDueScheduledDowngrades).mockResolvedValue([
+        {
+          ...agencySub,
+          currentPeriodEnd: new Date(Date.now() - 60 * 1000),
+          scheduledChange: {
+            action: 'downgrade',
+            plan: 'growth',
+            interval: 'month',
+            effectiveAt: new Date(Date.now() - 60 * 1000).toISOString(),
+          },
+        },
+      ]);
+
+      const result = await handleTrialLifecycle({
+        repos,
+        storage: {} as unknown as StorageService,
+      });
+
+      expect(result.downgradesApplied).toBe(1);
+      expect(repos.subscriptions.upsert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          plan: 'growth',
+          paddlePriceId: 'pri_sandbox_growth_monthly',
+          scheduledChange: null,
+        }),
+      );
+      expect(repos.organizations.update).toHaveBeenCalledWith(orgId, { plan: 'growth' });
+    });
+
+    it('treats a repeated webhook delivery as a no-op', async () => {
+      const { repos } = fakeRepos();
+      const app = express();
+      app.use(express.json());
+      app.use('/webhooks/paddle', paddleWebhookRouter(repos));
+
+      const payload = {
+        event_id: 'evt_redelivered_1',
+        event_type: 'subscription.activated',
+        occurred_at: new Date().toISOString(),
+        data: {
+          id: 'sub_paddle_123',
+          status: 'active',
+          custom_data: { orgId },
+          items: [{ price: { id: 'pri_sandbox_agency_monthly' } }],
+        },
+      };
+      const send = () =>
+        request(app)
+          .post('/webhooks/paddle')
+          .set('paddle-signature', `ts=${Math.floor(Date.now() / 1000)};h1=dummy_test`)
+          .send(payload)
+          .expect(200);
+
+      const first = await send();
+      const second = await send();
+
+      expect(first.body.duplicate).toBe(false);
+      expect(second.body.duplicate).toBe(true);
+      expect(repos.organizations.update).toHaveBeenCalledTimes(1);
     });
   });
 });

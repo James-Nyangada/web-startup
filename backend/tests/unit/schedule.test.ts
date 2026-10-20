@@ -69,6 +69,7 @@ describe('Scheduling and Manual Scans (Chunk P2-09)', () => {
     timeZone: 'Europe/London',
     trialEndsAt: null,
     paddleCustomerId: null,
+    pastDueSince: null,
     deletedAt: null,
     createdAt: new Date(),
     updatedAt: new Date(),

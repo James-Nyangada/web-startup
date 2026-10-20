@@ -431,6 +431,28 @@ export function toSiteRow(site: ApiSite): SiteRow {
 
 const json = (body: unknown): RequestInit => ({ method: "POST", body: JSON.stringify(body) });
 
+/** One plan from GET /v1/public/plans (backend plans.ts is the source of truth). */
+export interface ApiPublicPlan {
+  id: string;
+  name: string;
+  priceMonthly: number;
+  priceAnnual: number;
+  currency: string;
+  tag?: string;
+  who: string;
+  maxSites: number;
+  maxPagesPerScan: number;
+  scheduledFrequency: "weekly" | "daily";
+  maxDailySites: number;
+  teamMembers: number;
+}
+
+/** "Daily", "Weekly" or "Weekly (5 daily)" for a plan's scan schedule. */
+export function planFrequencyLabel(plan: Pick<ApiPublicPlan, "scheduledFrequency" | "maxDailySites">): string {
+  if (plan.scheduledFrequency === "daily") return "Daily";
+  return plan.maxDailySites > 0 ? `Weekly (${plan.maxDailySites} daily)` : "Weekly";
+}
+
 export const appApi = {
   listSites: (org: string, params: Record<string, string> = {}) =>
     apiClient<{ sites: ApiSite[] }>(
@@ -511,6 +533,9 @@ export const appApi = {
   getUsage: (org: string) => apiClient<ApiUsage>(`/v1/orgs/${org}/usage`),
 
   getBilling: (org: string) => apiClient<ApiBillingInfo>(`/v1/orgs/${org}/billing`),
+
+  getPublicPlans: () =>
+    apiClient<{ data: { plans: ApiPublicPlan[] } }>("/v1/public/plans").then((r) => r.data.plans),
 
   createCheckoutSession: (
     org: string,

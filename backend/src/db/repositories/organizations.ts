@@ -89,7 +89,13 @@ export function organizationsRepository(db: Database) {
       data: Partial<
         Pick<
           typeof organizations.$inferInsert,
-          'name' | 'slug' | 'timeZone' | 'plan' | 'billingStatus' | 'paddleCustomerId'
+          | 'name'
+          | 'slug'
+          | 'timeZone'
+          | 'plan'
+          | 'billingStatus'
+          | 'paddleCustomerId'
+          | 'pastDueSince'
         >
       >,
     ) {

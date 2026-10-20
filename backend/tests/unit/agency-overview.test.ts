@@ -26,6 +26,7 @@ describe('P4-10: Agency Overview & Cross-Site Views (S-20, R-05)', () => {
     timeZone: 'UTC',
     trialEndsAt: null,
     paddleCustomerId: null,
+    pastDueSince: null,
     deletedAt: null,
     createdAt: new Date(),
     updatedAt: new Date(),

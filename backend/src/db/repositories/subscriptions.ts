@@ -1,4 +1,4 @@
-import { eq } from 'drizzle-orm';
+import { and, eq, sql } from 'drizzle-orm';
 import type { Database } from '../client.js';
 import { subscriptions } from '../schema/index.js';
 import type { OrgId } from './org-scope.js';
@@ -64,6 +64,19 @@ export function subscriptionsRepository(db: Database) {
         .returning();
       if (!row) throw new Error('Failed to upsert subscription');
       return row;
+    },
+
+    /** Subscriptions with a scheduled downgrade whose effective date has passed (all orgs). */
+    async listDueScheduledDowngrades(now: Date = new Date()) {
+      return db
+        .select()
+        .from(subscriptions)
+        .where(
+          and(
+            sql`${subscriptions.scheduledChange}->>'action' = 'downgrade'`,
+            sql`(${subscriptions.scheduledChange}->>'effectiveAt')::timestamptz <= ${now.toISOString()}::timestamptz`,
+          ),
+        );
     },
 
     async setCancelAtPeriodEnd(orgId: OrgId, cancelAtPeriodEnd: boolean) {

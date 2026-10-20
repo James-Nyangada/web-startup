@@ -86,6 +86,7 @@ describe('organisations router and authorization core', () => {
     billingStatus: 'trialing' as const,
     trialEndsAt: new Date(Date.now() + 14 * 86400000),
     paddleCustomerId: null,
+    pastDueSince: null,
     timeZone: 'UTC',
     deletedAt: null,
     createdAt: new Date(),

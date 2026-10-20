@@ -664,6 +664,7 @@ export function paddleWebhookRouter(
 
     // Fallback synchronous processing for tests or environments without worker
     const result = await processPaddleEvent(bodyObj, repos, {
+      alreadyRecorded: true,
       emailSender: options?.emailSender,
     });
 

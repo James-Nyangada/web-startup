@@ -216,6 +216,7 @@ describe('Chunk P4-02: Billing and Paddle Checkout', () => {
           plan: 'agency',
           billingStatus: 'active',
           paddleCustomerId: 'ctm_123',
+          pastDueSince: null,
         }),
       );
     });
@@ -334,6 +335,7 @@ describe('Chunk P4-02: Billing and Paddle Checkout', () => {
         billingStatus: 'trialing' as const,
         trialEndsAt: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000),
         paddleCustomerId: 'ctm_123',
+        pastDueSince: null,
         timeZone: 'UTC',
         createdAt: new Date(),
         updatedAt: new Date(),
@@ -679,6 +681,8 @@ describe('Chunk P4-02: Billing and Paddle Checkout', () => {
         storage: {} as unknown as StorageService,
       } as WorkerContext;
 
+      // The webhook route records the event before enqueuing; the worker must still apply it.
+      await repos.paddleEvents.record('evt_job_test_1', 'subscription.created', {});
       await handlePaddleProcess({ eventId: 'evt_job_test_1' }, workerCtx);
 
       expect(repos.paddleEvents.markProcessed).toHaveBeenCalledWith('evt_job_test_1');

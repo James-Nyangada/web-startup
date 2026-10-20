@@ -53,6 +53,7 @@ describe('Chunk P4-03: Paddle Webhooks and Staff Replay Tooling', () => {
           plan: 'store',
           billingStatus: 'active',
           paddleCustomerId: 'ctm_paddle_001',
+          pastDueSince: null,
         }),
       );
       expect(repos.auditLog.write).toHaveBeenCalledWith(

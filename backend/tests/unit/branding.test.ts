@@ -78,6 +78,7 @@ describe('Chunk P4-07: White-label branding & contrast checks', () => {
         billingStatus: 'active' as const,
         trialEndsAt: null,
         paddleCustomerId: 'ctm_123',
+        pastDueSince: null,
         timeZone: 'UTC',
         createdAt: new Date(),
         updatedAt: new Date(),

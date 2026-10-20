@@ -125,6 +125,8 @@ export interface ProcessEventResult {
 
 export interface ProcessPaddleEventOptions {
   isReplay?: boolean;
+  /** The webhook route already inserted the event into paddle_events; skip the idempotency insert. */
+  alreadyRecorded?: boolean;
   boss?: PgBoss;
   emailSender?: EmailSender;
   appUrl?: string;
@@ -169,14 +171,14 @@ export async function processPaddleEvent(
   }
 
   // 1. Idempotent recording in paddle_events table
-  if (!options?.isReplay) {
+  if (options?.isReplay) {
+    logger.info({ eventId, eventType }, 'Replaying Paddle webhook event');
+  } else if (!options?.alreadyRecorded) {
     const recorded = await repos.paddleEvents.record(eventId, eventType, payload);
     if (!recorded) {
       // Duplicate event already processed
       return { handled: true, duplicate: true, eventType };
     }
-  } else {
-    logger.info({ eventId, eventType }, 'Replaying Paddle webhook event');
   }
 
   try {
@@ -248,6 +250,7 @@ export async function processPaddleEvent(
           await repos.organizations.update(orgIdScoped, {
             plan: planInfo.plan,
             billingStatus: 'active',
+            pastDueSince: null,
             ...(data.customer_id ? { paddleCustomerId: data.customer_id } : {}),
           });
 
@@ -301,6 +304,45 @@ export async function processPaddleEvent(
 
         if (targetOrgId) {
           const orgIdScoped = asOrgId(targetOrgId);
+
+          // A retried payment that succeeds arrives as subscription.updated with status active.
+          if (data.status === 'active') {
+            const org = await repos.organizations.findById(orgIdScoped);
+            if (org && (org.billingStatus === 'past_due' || org.billingStatus === 'paused')) {
+              await repos.organizations.update(orgIdScoped, {
+                billingStatus: 'active',
+                pastDueSince: null,
+              });
+            }
+          }
+
+          // A downgrade is sent to Paddle straight away (full_next_billing_period bills the new
+          // price from the next renewal), but the org keeps its current plan until the period
+          // ends. trial.lifecycle applies the plan once effectiveAt has passed.
+          const pendingDowngrade = existingSub?.scheduledChange as
+            { action?: string; plan?: string; effectiveAt?: string } | null | undefined;
+          const holdForDowngrade =
+            pendingDowngrade?.action === 'downgrade' &&
+            planInfo?.plan === pendingDowngrade.plan &&
+            !!pendingDowngrade.effectiveAt &&
+            new Date(pendingDowngrade.effectiveAt) > new Date();
+
+          if (holdForDowngrade && existingSub) {
+            await repos.subscriptions.upsert({
+              orgId: orgIdScoped,
+              paddleSubscriptionId: subId,
+              paddlePriceId: existingSub.paddlePriceId,
+              plan: existingSub.plan,
+              interval: existingSub.interval,
+              status: data.status || existingSub.status,
+              currentPeriodStart: existingSub.currentPeriodStart,
+              currentPeriodEnd: existingSub.currentPeriodEnd,
+              cancelAtPeriodEnd: data.scheduled_change?.action === 'cancel',
+              scheduledChange: data.scheduled_change ?? existingSub.scheduledChange,
+            });
+            break;
+          }
+
           const currentPlan = planInfo?.plan ?? existingSub?.plan ?? 'store';
           const currentInterval = planInfo?.interval ?? existingSub?.interval ?? 'month';
 
@@ -365,8 +407,12 @@ export async function processPaddleEvent(
       case 'subscription.past_due': {
         if (targetOrgId) {
           const orgIdScoped = asOrgId(targetOrgId);
+          const orgBefore = await repos.organizations.findById(orgIdScoped);
+          // A repeated past_due event must not restart the grace period.
+          const alreadyPastDue = orgBefore?.billingStatus === 'past_due' && orgBefore.pastDueSince;
           await repos.organizations.update(orgIdScoped, {
             billingStatus: 'past_due',
+            ...(alreadyPastDue ? {} : { pastDueSince: occurredAt }),
           });
           const existingSub = await repos.subscriptions.findByOrgId(orgIdScoped);
           if (existingSub) {

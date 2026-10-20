@@ -91,6 +91,7 @@ describe('Team Members and Invitations (Chunk P2-17)', () => {
     timeZone: 'UTC',
     trialEndsAt: null,
     paddleCustomerId: null,
+    pastDueSince: null,
     deletedAt: null,
     createdAt: new Date(),
     updatedAt: new Date(),

@@ -31,6 +31,7 @@ describe('Chunk P4-06: Payment Problems (Past-Due, 7-Day Grace Period, E-17, E-1
     billingStatus: 'active' as const,
     trialEndsAt: null,
     paddleCustomerId: 'ctm_123',
+    pastDueSince: null,
     timeZone: 'UTC',
     createdAt: new Date(),
     updatedAt: new Date(),
@@ -385,6 +386,98 @@ describe('Chunk P4-06: Payment Problems (Past-Due, 7-Day Grace Period, E-17, E-1
           }),
         }),
       );
+    });
+  });
+
+  describe('Grace period start (past_due_since)', () => {
+    const pastDuePayload = (eventId: string, occurredAt: string): PaddleEventPayload => ({
+      event_id: eventId,
+      event_type: 'subscription.past_due',
+      occurred_at: occurredAt,
+      data: { id: 'sub_123', custom_data: { orgId: testOrgId }, status: 'past_due' },
+    });
+
+    it('stores when the org first went past due', async () => {
+      const { repos } = fakeRepos();
+      vi.mocked(repos.organizations.findById).mockResolvedValue(sampleOrg);
+      const occurredAt = '2026-10-10T08:00:00.000Z';
+
+      await processPaddleEvent(pastDuePayload('evt_pd_start', occurredAt), repos);
+
+      expect(repos.organizations.update).toHaveBeenCalledWith(testOrgId, {
+        billingStatus: 'past_due',
+        pastDueSince: new Date(occurredAt),
+      });
+    });
+
+    it('does not restart the grace period on a repeated past_due event', async () => {
+      const { repos } = fakeRepos();
+      vi.mocked(repos.organizations.findById).mockResolvedValue({
+        ...sampleOrg,
+        billingStatus: 'past_due' as const,
+        pastDueSince: new Date('2026-10-10T08:00:00.000Z'),
+      });
+
+      await processPaddleEvent(pastDuePayload('evt_pd_again', '2026-10-12T08:00:00.000Z'), repos);
+
+      expect(repos.organizations.update).toHaveBeenCalledWith(testOrgId, {
+        billingStatus: 'past_due',
+      });
+    });
+
+    it('restores active status when a retried payment succeeds', async () => {
+      const { repos } = fakeRepos();
+      vi.mocked(repos.organizations.findById).mockResolvedValue({
+        ...sampleOrg,
+        billingStatus: 'past_due' as const,
+        pastDueSince: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000),
+      });
+
+      await processPaddleEvent(
+        {
+          event_id: 'evt_pd_recovered',
+          event_type: 'subscription.updated',
+          occurred_at: new Date().toISOString(),
+          data: {
+            id: 'sub_123',
+            custom_data: { orgId: testOrgId },
+            status: 'active',
+            items: [{ price: { id: 'pri_sandbox_store_monthly' } }],
+          },
+        },
+        repos,
+      );
+
+      expect(repos.organizations.update).toHaveBeenCalledWith(testOrgId, {
+        billingStatus: 'active',
+        pastDueSince: null,
+      });
+    });
+
+    it('counts the 7 days from past_due_since rather than the audit log', async () => {
+      const { repos } = fakeRepos();
+      vi.mocked(repos.organizations.findDueForTrialLifecycle).mockResolvedValue([
+        {
+          ...sampleOrg,
+          billingStatus: 'past_due' as const,
+          pastDueSince: new Date(Date.now() - 8 * 24 * 60 * 60 * 1000),
+          updatedAt: new Date(),
+        },
+      ]);
+
+      const res = await handleTrialLifecycle({
+        repos,
+        storage: {} as unknown as StorageService,
+      });
+
+      expect(res.pastDueExpiredCount).toBe(1);
+      expect(repos.auditLog.findRecentAction).not.toHaveBeenCalledWith(
+        testOrgId,
+        'subscription.past_due',
+      );
+      expect(repos.organizations.update).toHaveBeenCalledWith(testOrgId, {
+        billingStatus: 'read_only',
+      });
     });
   });
 

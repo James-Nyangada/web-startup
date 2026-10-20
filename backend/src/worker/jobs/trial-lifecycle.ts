@@ -1,6 +1,7 @@
 import type { WorkerContext } from '../types.js';
 import { asOrgId } from '../../db/repositories/org-scope.js';
 import { enqueueEmailSend } from '../boss.js';
+import { getPlanDefinition, getPriceIdForPlan, type PlanType } from '../../shared/plans.js';
 
 export interface TrialLifecycleResult {
   processed: number;
@@ -10,6 +11,7 @@ export interface TrialLifecycleResult {
   pastDueExpiredCount: number;
   warnings7d: number;
   warnings1d: number;
+  downgradesApplied: number;
 }
 
 /**
@@ -20,6 +22,7 @@ export interface TrialLifecycleResult {
  * - Expiry: transitions org to read_only mode, writes audit log, sends E-15
  * - Past-due grace period: after 7 days past due, transitions org to read_only mode, sends E-15
  * - Data deletion warnings: 30-day retention countdown; sends E-20 at 7 days and 1 day before deletion
+ * - Scheduled downgrades: applies the new plan once the paid period has ended (P4-04), sends E-19
  */
 export async function handleTrialLifecycle(ctx: WorkerContext): Promise<TrialLifecycleResult> {
   const orgs = await ctx.repos.organizations.findDueForTrialLifecycle();
@@ -32,6 +35,7 @@ export async function handleTrialLifecycle(ctx: WorkerContext): Promise<TrialLif
     pastDueExpiredCount: 0,
     warnings7d: 0,
     warnings1d: 0,
+    downgradesApplied: 0,
   };
 
   const appUrl = process.env.APP_URL || 'http://localhost:3000';
@@ -254,13 +258,15 @@ export async function handleTrialLifecycle(ctx: WorkerContext): Promise<TrialLif
 
     // 3. Process past_due orgs (7-day grace period, then transition to read_only per P4-06)
     if (org.billingStatus === 'past_due') {
-      const pastDueAudit = await ctx.repos.auditLog.findRecentAction(
-        orgId,
-        'subscription.past_due',
-      );
-      const startOfPastDue = pastDueAudit?.createdAt
-        ? new Date(pastDueAudit.createdAt)
-        : new Date(org.updatedAt);
+      // Orgs that went past due before past_due_since existed fall back to the audit log.
+      const pastDueAudit = org.pastDueSince
+        ? null
+        : await ctx.repos.auditLog.findRecentAction(orgId, 'subscription.past_due');
+      const startOfPastDue = org.pastDueSince
+        ? new Date(org.pastDueSince)
+        : pastDueAudit?.createdAt
+          ? new Date(pastDueAudit.createdAt)
+          : new Date(org.updatedAt);
       const msPastDue = now.getTime() - startOfPastDue.getTime();
       const sevenDaysMs = 7 * 24 * 60 * 60 * 1000;
 
@@ -302,5 +308,63 @@ export async function handleTrialLifecycle(ctx: WorkerContext): Promise<TrialLif
     }
   }
 
+  result.downgradesApplied = await applyDueDowngrades(ctx, now, appUrl);
+
   return result;
+}
+
+async function applyDueDowngrades(ctx: WorkerContext, now: Date, appUrl: string): Promise<number> {
+  const due = await ctx.repos.subscriptions.listDueScheduledDowngrades(now);
+  let applied = 0;
+
+  for (const sub of due) {
+    if (ctx.abortSignal?.aborted) break;
+    const orgId = asOrgId(sub.orgId);
+    const change = sub.scheduledChange as { plan?: string; interval?: string } | null;
+    if (!change?.plan) continue;
+
+    const plan = change.plan as PlanType;
+    const interval = change.interval === 'year' ? 'year' : 'month';
+
+    await ctx.repos.subscriptions.upsert({
+      ...sub,
+      orgId,
+      paddlePriceId: getPriceIdForPlan(plan, interval),
+      plan,
+      interval,
+      scheduledChange: null,
+    });
+    await ctx.repos.organizations.update(orgId, { plan });
+    await ctx.repos.auditLog.write(orgId, {
+      actorType: 'system',
+      action: 'plan_changed',
+      targetType: 'organization',
+      targetId: sub.orgId,
+      data: { plan, interval, oldPlan: sub.plan, reason: 'scheduled_downgrade' },
+    });
+
+    const owner = await ctx.repos.memberships.findOwner(orgId);
+    const org = await ctx.repos.organizations.findById(orgId);
+    if (owner?.email && org) {
+      const emailPayload = {
+        orgName: org.name,
+        oldPlanName: getPlanDefinition(sub.plan as PlanType).name,
+        newPlanName: getPlanDefinition(plan).name,
+        interval,
+        billingUrl: `${appUrl}/settings/billing`,
+      } as const;
+      if (ctx.boss) {
+        await enqueueEmailSend(ctx.boss, {
+          to: owner.email,
+          templateId: 'E-19',
+          data: emailPayload,
+        });
+      } else if (ctx.emailSender) {
+        await ctx.emailSender.send({ to: owner.email, templateId: 'E-19', data: emailPayload });
+      }
+    }
+    applied++;
+  }
+
+  return applied;
 }

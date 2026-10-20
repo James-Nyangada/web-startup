@@ -6,7 +6,7 @@ import { MarketingHeader } from "@/components/marketing/marketing-header";
 import { MarketingFooter } from "@/components/marketing/marketing-footer";
 import { Collapse } from "@/components/disclosure";
 import { COMPARISON_CATEGORIES, PRICING_FAQS } from "@/lib/pricing-data";
-import { appApi } from "@/lib/app-api";
+import { appApi, planFrequencyLabel } from "@/lib/app-api";
 import { openPaddleCheckout } from "@/lib/paddle";
 import { apiClient } from "@/lib/api";
 
@@ -82,11 +82,11 @@ export default function PricingPage() {
 
   useEffect(() => {
     // Attempt to fetch fresh plan table from API
-    fetch("/public/plans")
-      .then((res) => (res.ok ? res.json() : null))
-      .then((data) => {
-        if (data?.data?.plans) {
-          setPlans(data.data.plans);
+    appApi
+      .getPublicPlans()
+      .then((apiPlans) => {
+        if (apiPlans.length) {
+          setPlans(apiPlans.map((p) => ({ ...p, scheduledFrequency: planFrequencyLabel(p) })));
         }
       })
       .catch(() => {

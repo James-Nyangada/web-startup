@@ -65,6 +65,7 @@ describe('Scans API & Onboarding Scans (Section 7.4 & Chunk P2-05)', () => {
     timeZone: 'UTC',
     trialEndsAt: null,
     paddleCustomerId: null,
+    pastDueSince: null,
     deletedAt: null,
     createdAt: new Date(),
     updatedAt: new Date(),

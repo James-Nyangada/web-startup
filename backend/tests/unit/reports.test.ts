@@ -146,6 +146,7 @@ describe('Reports API Endpoints (Chunk P2-19)', () => {
     timeZone: 'UTC',
     trialEndsAt: null,
     paddleCustomerId: null,
+    pastDueSince: null,
     deletedAt: null,
     createdAt: new Date(),
     updatedAt: new Date(),

@@ -22,6 +22,7 @@ export async function handlePaddleProcess(
 
   try {
     const result = await processPaddleEvent(eventRecord.payload as PaddleEventPayload, ctx.repos, {
+      alreadyRecorded: true,
       boss: ctx.boss,
       emailSender: ctx.emailSender,
       appUrl: process.env.APP_URL,

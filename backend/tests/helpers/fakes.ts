@@ -29,6 +29,7 @@ export function fakePool(healthy = true): pg.Pool {
 }
 
 export function fakeRepos() {
+  const recordedPaddleEventIds = new Set<string>();
   const join = vi.fn<Repositories['waitlist']['join']>().mockResolvedValue(undefined);
   const repos = {
     waitlist: { join },
@@ -421,6 +422,7 @@ export function fakeRepos() {
           updatedAt: new Date(),
         }),
       ),
+      listDueScheduledDowngrades: vi.fn().mockResolvedValue([]),
       setCancelAtPeriodEnd: vi.fn().mockImplementation((orgId, cancelAtPeriodEnd) =>
         Promise.resolve({
           id: 'sub-1',
@@ -449,7 +451,12 @@ export function fakeRepos() {
       ),
     },
     paddleEvents: {
-      record: vi.fn().mockResolvedValue(true),
+      // Mirrors the real insert ... ON CONFLICT DO NOTHING: false when the event_id already exists.
+      record: vi.fn().mockImplementation((eventId: string) => {
+        if (recordedPaddleEventIds.has(eventId)) return Promise.resolve(false);
+        recordedPaddleEventIds.add(eventId);
+        return Promise.resolve(true);
+      }),
       findById: vi.fn().mockResolvedValue(null),
       markProcessed: vi.fn().mockResolvedValue(undefined),
       listRecent: vi.fn().mockResolvedValue([]),

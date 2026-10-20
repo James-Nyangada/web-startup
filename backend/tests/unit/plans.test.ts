@@ -318,6 +318,7 @@ describe('Plan Limits & Enforcement (Chunk P4-01 & Section 1.4 / 12.3)', () => {
         timeZone: 'UTC',
         trialEndsAt: null,
         paddleCustomerId: null,
+        pastDueSince: null,
         deletedAt: null,
         createdAt: new Date(),
         updatedAt: new Date(),

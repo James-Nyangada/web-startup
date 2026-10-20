@@ -72,6 +72,7 @@ describe('Sites API (Chunk P2-06 & Section 7.3)', () => {
     timeZone: 'UTC',
     trialEndsAt: null,
     paddleCustomerId: null,
+    pastDueSince: null,
     deletedAt: null,
     createdAt: new Date(),
     updatedAt: new Date(),

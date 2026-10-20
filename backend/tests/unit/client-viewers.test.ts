@@ -74,6 +74,7 @@ describe('P4-08 Client Viewers (S-42) & Strict Isolation', () => {
     createdAt: new Date(),
     updatedAt: new Date(),
     paddleCustomerId: null,
+    pastDueSince: null,
     trialEndsAt: null,
     deletedAt: null,
   } as unknown as typeof organizations.$inferSelect;

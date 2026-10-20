@@ -66,6 +66,7 @@ describe('Issues API (Chunk P2-12, Screen S-25, Section 7.5)', () => {
     timeZone: 'UTC',
     trialEndsAt: null,
     paddleCustomerId: null,
+    pastDueSince: null,
     deletedAt: null,
     createdAt: new Date(),
     updatedAt: new Date(),

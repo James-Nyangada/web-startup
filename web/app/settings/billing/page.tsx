@@ -9,6 +9,7 @@ import {
   type ApiBillingInfo,
   type ApiInvoice,
   type ApiPlanChangePreview,
+  type ApiPublicPlan,
 } from "@/lib/app-api";
 import { openPaddleCheckout } from "@/lib/paddle";
 import { useFocusTrap } from "@/components/use-focus-trap";
@@ -99,8 +100,28 @@ const PLANS_CONFIG = [
   },
 ];
 
+type PlanCard = (typeof PLANS_CONFIG)[number];
+
+/** Prices and limits come from the API; PLANS_CONFIG only supplies card copy and offline fallbacks. */
+function mergePlanLimits(cards: readonly PlanCard[], apiPlans: ApiPublicPlan[]): PlanCard[] {
+  return cards.map((card) => {
+    const api = apiPlans.find((p) => p.id === card.id);
+    if (!api) return card;
+    return {
+      ...card,
+      name: api.name,
+      priceMonthly: api.priceMonthly,
+      priceAnnual: api.priceAnnual,
+      sites: api.maxSites,
+      pagesPerScan: api.maxPagesPerScan,
+      seats: api.teamMembers,
+    };
+  });
+}
+
 export default function BillingSettingsPage() {
   const { showToast } = useToast();
+  const [plans, setPlans] = useState<PlanCard[]>(PLANS_CONFIG);
   const [billing, setBilling] = useState<ApiBillingInfo>(DEFAULT_BILLING);
   const [loading, setLoading] = useState(true);
   const [orgSlug, setOrgSlug] = useState<string>("brightline");
@@ -124,6 +145,13 @@ export default function BillingSettingsPage() {
 
   const downgradeDialogRef = useRef<HTMLDivElement>(null);
   useFocusTrap(downgradeDialogRef, downgradeModalOpen || downgradeConfirmOpen);
+
+  useEffect(() => {
+    appApi
+      .getPublicPlans()
+      .then((apiPlans) => setPlans((cards) => mergePlanLimits(cards, apiPlans)))
+      .catch(() => {});
+  }, []);
 
   // Resolve current active organisation
   useEffect(() => {
@@ -690,7 +718,7 @@ export default function BillingSettingsPage() {
 
             {/* Plan Cards Grid */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {PLANS_CONFIG.map((p) => {
+              {plans.map((p) => {
                 const isCurrent = plan === p.id;
                 const price = billingCycle === "year" ? Math.round(p.priceAnnual / 12) : p.priceMonthly;
 
@@ -795,7 +823,7 @@ export default function BillingSettingsPage() {
               <p className="m-0 font-medium">
                 Downgrading to <strong className="uppercase">{previewData.targetPlan}</strong> allows a maximum of{" "}
                 <strong>
-                  {PLANS_CONFIG.find((p) => p.id === previewData.targetPlan)?.sites || 1} active site(s)
+                  {plans.find((p) => p.id === previewData.targetPlan)?.sites || 1} active site(s)
                 </strong>
                 . You currently have <strong>{previewData.activeSites.length} active sites</strong>.
               </p>

@@ -61,6 +61,8 @@ export const organizations = pgTable(
     billingStatus: text('billing_status').$type<BillingStatus>().notNull().default('trialing'),
     trialEndsAt: timestamp('trial_ends_at', { withTimezone: true }),
     paddleCustomerId: text('paddle_customer_id').unique(),
+    /** Start of the current past-due spell; the 7-day grace period (P4-06) counts from here. */
+    pastDueSince: timestamp('past_due_since', { withTimezone: true }),
     timeZone: text('time_zone').notNull().default('UTC'),
     deletedAt: timestamp('deleted_at', { withTimezone: true }),
     ...timestamps(),

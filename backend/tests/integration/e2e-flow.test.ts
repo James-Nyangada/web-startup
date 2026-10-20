@@ -32,6 +32,7 @@ describe('Phase 2 End-to-End Core App Flow (Section 13.2, Chunk P2-23)', () => {
     timeZone: 'Europe/London',
     trialEndsAt: null,
     paddleCustomerId: null,
+    pastDueSince: null,
     deletedAt: null,
     createdAt: new Date(),
     updatedAt: new Date(),
