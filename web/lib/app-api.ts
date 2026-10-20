@@ -736,7 +736,28 @@ export const appApi = {
       `/v1/orgs/${org}/report-schedules/${id}/send-now`,
       { method: 'POST' },
     ),
+
+  listMyTasks: (org: string) =>
+    apiClient<{ data: { items: ApiMyTask[] } }>(
+      `/v1/orgs/${org}/issues?assignee=me&limit=100`,
+    ).then((r) => r.data.items),
 };
+
+export interface ApiMyTask {
+  id: string;
+  siteId: string;
+  siteName?: string;
+  ruleId: string;
+  title: string | null;
+  impact: 'critical' | 'serious' | 'moderate' | 'minor';
+  templateKey: string | null;
+  status: string;
+  occurrenceCount: number;
+  assigneeId: string | null;
+  dueDate: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
 
 export interface ApiReportSchedule {
   id: string;

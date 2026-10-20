@@ -726,6 +726,7 @@ export function issuesRepository(db: Database) {
         .select({
           id: issues.id,
           siteId: issues.siteId,
+          siteName: sites.name,
           ruleId: issues.ruleId,
           title: rules.title,
           impact: issues.impact,
@@ -739,6 +740,7 @@ export function issuesRepository(db: Database) {
         })
         .from(issues)
         .leftJoin(rules, eq(issues.ruleId, rules.ruleId))
+        .leftJoin(sites, eq(issues.siteId, sites.id))
         .where(and(...conditions))
         .orderBy(desc(issues.updatedAt))
         .limit(limit)
