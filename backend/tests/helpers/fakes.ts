@@ -53,6 +53,7 @@ export function fakeRepos() {
       isSlugAvailable: vi.fn().mockResolvedValue(true),
       createWithInitialOwner: vi.fn().mockResolvedValue(null),
       findDueForTrialLifecycle: vi.fn().mockResolvedValue([]),
+      listAllActive: vi.fn().mockResolvedValue([]),
     },
     memberships: {
       list: vi.fn().mockResolvedValue([]),
@@ -221,6 +222,8 @@ export function fakeRepos() {
         }),
       ),
       bulkAction: vi.fn().mockResolvedValue({ updatedCount: 1 }),
+      getWeeklyStats: vi.fn().mockResolvedValue({ newCount: 0, fixedCount: 0 }),
+      countOverdueAssigned: vi.fn().mockResolvedValue(0),
     },
     invitations: {
       create: vi.fn().mockImplementation((orgId, input) =>

@@ -1,4 +1,4 @@
-import { and, eq, isNull, ne, sql } from 'drizzle-orm';
+import { and, eq, isNull, ne, notInArray, sql } from 'drizzle-orm';
 import type { Database } from '../client.js';
 import {
   memberships,
@@ -189,6 +189,18 @@ export function organizationsRepository(db: Database) {
           and(
             isNull(organizations.deletedAt),
             sql`(${organizations.billingStatus} = 'trialing' OR ${organizations.billingStatus} = 'past_due' OR ${organizations.billingStatus} = 'read_only' OR ${organizations.billingStatus} = 'canceled')`,
+          ),
+        );
+    },
+
+    async listAllActive() {
+      return db
+        .select()
+        .from(organizations)
+        .where(
+          and(
+            isNull(organizations.deletedAt),
+            notInArray(organizations.billingStatus, ['read_only', 'canceled']),
           ),
         );
     },

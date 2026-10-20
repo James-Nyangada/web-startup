@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, ilike, inArray, isNull, or, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, ilike, inArray, isNull, lt, or, sql } from 'drizzle-orm';
 import type { Database } from '../client.js';
 import type { PreviousIssue, ScanDiff } from '../../scanner/results/diff.js';
 import type { FoundIssue } from '../../scanner/results/issues.js';
@@ -1672,6 +1672,42 @@ export function issuesRepository(db: Database) {
         new: newIssues,
         fixed,
       };
+    },
+
+    async getWeeklyStats(
+      orgId: OrgId,
+      siteId: string,
+      since: Date,
+    ): Promise<{ newCount: number; fixedCount: number }> {
+      const [row] = await db
+        .select({
+          newCount: sql<number>`count(*) filter (where ${issues.createdAt} >= ${since})::int`,
+          fixedCount: sql<number>`count(*) filter (where ${issues.status} = 'fixed' and (${issues.fixedAt} >= ${since} or ${issues.updatedAt} >= ${since}))::int`,
+        })
+        .from(issues)
+        .where(and(eq(issues.orgId, orgId), eq(issues.siteId, siteId)));
+
+      return {
+        newCount: row?.newCount ?? 0,
+        fixedCount: row?.fixedCount ?? 0,
+      };
+    },
+
+    async countOverdueAssigned(orgId: OrgId, userId: string): Promise<number> {
+      const todayStr = new Date().toISOString().slice(0, 10);
+      const [row] = await db
+        .select({ count: sql<number>`count(*)::int` })
+        .from(issues)
+        .where(
+          and(
+            eq(issues.orgId, orgId),
+            eq(issues.assigneeId, userId),
+            eq(issues.status, 'open'),
+            lt(issues.dueDate, todayStr),
+          ),
+        );
+
+      return row?.count ?? 0;
     },
   };
 }

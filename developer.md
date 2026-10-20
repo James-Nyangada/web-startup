@@ -1226,6 +1226,7 @@ Regression and new-critical detection in `scan.process`; E-08; in-app notificati
 
 **P5-06 — Weekly digest** · *Depends on:* P5-05 · *Size:* S
 E-10 summarising each site's score change, new/fixed counts and overdue assigned issues.
+- [x] Weekly digest cron and E-10 emails dispatched to opted-in members with idempotency.
 
 **P5-07 — Integrations: Slack and generic webhooks** · *Depends on:* P5-05 · *Size:* M
 S-46: add Slack incoming webhook or generic URL, choose events and sites, test button, delivery log (last 20), auto-disable + E-21. Signed payloads for generic webhooks.

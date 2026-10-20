@@ -15,7 +15,8 @@ import { handleReportRender } from './jobs/report-render.js';
 import { handleFreeCheckRun } from './jobs/free-check-run.js';
 import { handleTrialLifecycle } from './jobs/trial-lifecycle.js';
 import { handlePaddleProcess } from './jobs/paddle-process.js';
-import type { PaddleProcessJobPayload, ReportRenderJobPayload } from './types.js';
+import { handleWeeklyDigest } from './jobs/digest-weekly.js';
+import type { DigestWeeklyJobPayload, PaddleProcessJobPayload, ReportRenderJobPayload } from './types.js';
 
 export const QUEUE_SCAN_RUN = 'scan.run';
 export const QUEUE_SCAN_PROCESS = 'scan.process';
@@ -26,6 +27,7 @@ export const QUEUE_REPORT_RENDER = 'report.render';
 export const QUEUE_FREE_CHECK_RUN = 'free-check.run';
 export const QUEUE_TRIAL_LIFECYCLE = 'trial.lifecycle';
 export const QUEUE_PADDLE_PROCESS = 'paddle.process';
+export const QUEUE_DIGEST_WEEKLY = 'digest.weekly';
 
 export const ALL_QUEUES = [
   QUEUE_SCAN_RUN,
@@ -37,6 +39,7 @@ export const ALL_QUEUES = [
   QUEUE_FREE_CHECK_RUN,
   QUEUE_TRIAL_LIFECYCLE,
   QUEUE_PADDLE_PROCESS,
+  QUEUE_DIGEST_WEEKLY,
 ] as const;
 
 /** pg-boss refuses to send to or schedule on a queue that does not exist. Idempotent. */
@@ -172,6 +175,20 @@ export async function enqueuePaddleProcess(
 }
 
 /**
+ * Enqueue a digest.weekly job.
+ * Concurrency: 1.
+ */
+export async function enqueueWeeklyDigest(
+  boss: PgBoss,
+  payload?: DigestWeeklyJobPayload,
+): Promise<string | null> {
+  return boss.send(QUEUE_DIGEST_WEEKLY, payload ?? {}, {
+    expireInSeconds: 15 * 60,
+    retryLimit: 1,
+  });
+}
+
+/**
  * Registers a worker for every queue.
  */
 export async function registerWorkers(boss: PgBoss, ctx: WorkerContext): Promise<void> {
@@ -279,6 +296,16 @@ export async function registerWorkers(boss: PgBoss, ctx: WorkerContext): Promise
       }
     },
   );
+
+  // Concurrency 1 for digest.weekly cron (Spec Section 9 & P5-06)
+  await boss.work<DigestWeeklyJobPayload>(
+    QUEUE_DIGEST_WEEKLY,
+    { localConcurrency: 1, batchSize: 1 },
+    async (jobs) => {
+      const job = jobs[0];
+      await handleWeeklyDigest(job?.data, ctx);
+    },
+  );
 }
 
 /**
@@ -290,4 +317,7 @@ export async function registerSchedules(boss: PgBoss): Promise<void> {
 
   // trial.lifecycle runs hourly (cron: '0 * * * *')
   await boss.schedule(QUEUE_TRIAL_LIFECYCLE, '0 * * * *', {});
+
+  // digest.weekly runs hourly to catch Mon 07:00 in each org's time zone (Spec Section 9 & P5-06)
+  await boss.schedule(QUEUE_DIGEST_WEEKLY, '0 * * * *', {});
 }

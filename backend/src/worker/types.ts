@@ -50,3 +50,8 @@ export interface ReportRenderJobPayload {
 export interface PaddleProcessJobPayload {
   eventId: string;
 }
+
+export interface DigestWeeklyJobPayload {
+  orgId?: string;
+  force?: boolean;
+}
