@@ -585,6 +585,32 @@ export function fakeRepos() {
       ),
       listOptedInMembers: vi.fn().mockResolvedValue([]),
     },
+    webhooks: {
+      create: vi.fn().mockImplementation((orgId, input) =>
+        Promise.resolve({
+          id: '018f0000-0000-7000-8000-000000000401',
+          orgId,
+          ...input,
+          urlMasked: 'https://***',
+          active: true,
+          lastStatus: null,
+          lastError: null,
+          failureCount: 0,
+          secret: input.secret ?? 'sec-123',
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        }),
+      ),
+      listByOrg: vi.fn().mockResolvedValue([]),
+      findById: vi.fn().mockResolvedValue(null),
+      findRawById: vi.fn().mockResolvedValue(null),
+      update: vi.fn().mockResolvedValue(null),
+      delete: vi.fn().mockResolvedValue(true),
+      recordDeliveryResult: vi.fn().mockResolvedValue({ webhook: {}, autoDisabled: false }),
+      findActiveByEvent: vi.fn().mockResolvedValue([]),
+      logDelivery: vi.fn().mockResolvedValue(undefined),
+      listDeliveries: vi.fn().mockResolvedValue([]),
+    },
   } as unknown as Repositories;
   return { repos, join };
 }

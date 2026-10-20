@@ -1230,7 +1230,7 @@ E-10 summarising each site's score change, new/fixed counts and overdue assigned
 
 **P5-07 — Integrations: Slack and generic webhooks** · *Depends on:* P5-05 · *Size:* M
 S-46: add Slack incoming webhook or generic URL, choose events and sites, test button, delivery log (last 20), auto-disable + E-21. Signed payloads for generic webhooks.
-- [ ] Webhook URL validated with the SSRF guard.
+- [x] Webhook URL validated with the SSRF guard.
 
 **P5-08 — Scheduled client reports** · *Depends on:* P4-07, P2-19 · *Size:* M
 Report schedules UI (inside S-30 for agency plans), `report.schedule` job, R-04 Client monthly report, E-12 branded.

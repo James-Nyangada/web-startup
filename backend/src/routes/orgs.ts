@@ -16,6 +16,7 @@ import { orgEvidenceRouter } from './evidence.js';
 import { orgManualChecksRouter, orgManualCheckItemRouter } from './manual-checks.js';
 import { orgStatementsRouter, orgStatementItemRouter } from './statements.js';
 import { orgNotificationsRouter } from './notifications.js';
+import { orgWebhooksRouter } from './webhooks.js';
 import type { PaddleClient } from '../billing/paddle-api.js';
 import { type StorageService, getStorage } from '../storage/index.js';
 import { ErrorCode } from '../shared/errors.js';
@@ -1008,6 +1009,9 @@ export function orgsRouter(
 
   // Mount S-43 Branding router under orgScoped
   orgScoped.use('/branding', orgBrandingRouter(repos, resolvedStorage));
+
+  // Mount S-46 Webhooks router under orgScoped (P5-07)
+  orgScoped.use('/webhooks', orgWebhooksRouter(repos, { boss: scansOptions?.boss, emailSender }));
 
   router.use('/:orgId', orgScoped);
 

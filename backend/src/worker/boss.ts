@@ -16,7 +16,13 @@ import { handleFreeCheckRun } from './jobs/free-check-run.js';
 import { handleTrialLifecycle } from './jobs/trial-lifecycle.js';
 import { handlePaddleProcess } from './jobs/paddle-process.js';
 import { handleWeeklyDigest } from './jobs/digest-weekly.js';
-import type { DigestWeeklyJobPayload, PaddleProcessJobPayload, ReportRenderJobPayload } from './types.js';
+import { handleWebhookDeliver } from './jobs/webhook-deliver.js';
+import type {
+  DigestWeeklyJobPayload,
+  PaddleProcessJobPayload,
+  ReportRenderJobPayload,
+  WebhookDeliverJobPayload,
+} from './types.js';
 
 export const QUEUE_SCAN_RUN = 'scan.run';
 export const QUEUE_SCAN_PROCESS = 'scan.process';
@@ -28,6 +34,7 @@ export const QUEUE_FREE_CHECK_RUN = 'free-check.run';
 export const QUEUE_TRIAL_LIFECYCLE = 'trial.lifecycle';
 export const QUEUE_PADDLE_PROCESS = 'paddle.process';
 export const QUEUE_DIGEST_WEEKLY = 'digest.weekly';
+export const QUEUE_WEBHOOK_DELIVER = 'webhook.deliver';
 
 export const ALL_QUEUES = [
   QUEUE_SCAN_RUN,
@@ -40,6 +47,7 @@ export const ALL_QUEUES = [
   QUEUE_TRIAL_LIFECYCLE,
   QUEUE_PADDLE_PROCESS,
   QUEUE_DIGEST_WEEKLY,
+  QUEUE_WEBHOOK_DELIVER,
 ] as const;
 
 /** pg-boss refuses to send to or schedule on a queue that does not exist. Idempotent. */
@@ -189,6 +197,20 @@ export async function enqueueWeeklyDigest(
 }
 
 /**
+ * Enqueue a webhook.deliver job with Section 9 parameters:
+ * Concurrency: 5, Timeout: 10 s, Retries: 5.
+ */
+export async function enqueueWebhookDeliver(
+  boss: PgBoss,
+  payload: WebhookDeliverJobPayload,
+): Promise<string | null> {
+  return boss.send(QUEUE_WEBHOOK_DELIVER, payload, {
+    expireInSeconds: 10,
+    retryLimit: 5,
+  });
+}
+
+/**
  * Registers a worker for every queue.
  */
 export async function registerWorkers(boss: PgBoss, ctx: WorkerContext): Promise<void> {
@@ -304,6 +326,18 @@ export async function registerWorkers(boss: PgBoss, ctx: WorkerContext): Promise
     async (jobs) => {
       const job = jobs[0];
       await handleWeeklyDigest(job?.data, ctx);
+    },
+  );
+
+  // Concurrency 5 for webhook.deliver (Spec Section 9 & P5-07)
+  await boss.work<WebhookDeliverJobPayload>(
+    QUEUE_WEBHOOK_DELIVER,
+    { localConcurrency: 5, batchSize: 1 },
+    async (jobs) => {
+      const job = jobs[0];
+      if (job?.data?.webhookId) {
+        await handleWebhookDeliver(job.data, ctx);
+      }
     },
   );
 }

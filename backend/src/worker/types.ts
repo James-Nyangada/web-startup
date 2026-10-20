@@ -55,3 +55,9 @@ export interface DigestWeeklyJobPayload {
   orgId?: string;
   force?: boolean;
 }
+
+export interface WebhookDeliverJobPayload {
+  webhookId: string;
+  event: string;
+  payload: Record<string, unknown>;
+}

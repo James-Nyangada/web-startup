@@ -4,6 +4,7 @@ import { diffScans, type ScannedPage } from '../../scanner/results/diff.js';
 import { asOrgId } from '../../db/repositories/index.js';
 import type { ScanJobPayload, WorkerContext } from '../types.js';
 import { publishScanProgress } from '../progress.js';
+import { dispatchWebhooks } from './webhook-deliver.js';
 
 export async function handleScanProcess(job: ScanJobPayload, ctx: WorkerContext): Promise<void> {
   const scan = await ctx.repos.scans.findRawById(job.scanId);
@@ -269,6 +270,60 @@ export async function handleScanProcess(job: ScanJobPayload, ctx: WorkerContext)
           },
         });
       }
+
+      // Webhook events: issue.regressed & issues.new_critical (P5-07)
+      if (ctx.repos.webhooks) {
+        if (hasRegressions && eligibleRegressions.length > 0) {
+          await dispatchWebhooks(
+            orgId,
+            'issue.regressed',
+            scan.siteId,
+            {
+              scanId: scan.id,
+              siteId: scan.siteId,
+              siteName,
+              regressedCount: eligibleRegressions.length,
+              issues: eligibleRegressions.map((r) => ({ id: r.id, ruleId: r.ruleId })),
+            },
+            ctx,
+          );
+        }
+
+        if (hasSpike) {
+          await dispatchWebhooks(
+            orgId,
+            'issues.new_critical',
+            scan.siteId,
+            {
+              scanId: scan.id,
+              siteId: scan.siteId,
+              siteName,
+              count: newCriticalOrSerious,
+            },
+            ctx,
+          );
+        }
+      }
+    }
+
+    // 11. Webhook event: scan.completed (P5-07)
+    if (ctx.repos.webhooks) {
+      const site = await ctx.repos.sites.findRawById(scan.siteId);
+      const siteName = site?.name ?? 'Site';
+      await dispatchWebhooks(
+        orgId,
+        'scan.completed',
+        scan.siteId,
+        {
+          scanId: scan.id,
+          siteId: scan.siteId,
+          siteName,
+          score: scanResult.score,
+          criticalCount: counts.critical,
+          seriousCount: counts.serious,
+        },
+        ctx,
+      );
     }
   }
 }

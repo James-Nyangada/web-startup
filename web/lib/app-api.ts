@@ -666,7 +666,73 @@ export const appApi = {
       method: "POST",
       body: JSON.stringify({ type: "agency_overview", branded }),
     }).then((r) => r.data),
+
+  listWebhooks: (org: string) =>
+    apiClient<{ webhooks: ApiWebhook[] }>(`/v1/orgs/${org}/webhooks`).then((r) => r.webhooks),
+
+  createWebhook: (
+    org: string,
+    data: {
+      kind: 'slack' | 'generic';
+      url: string;
+      events: string[];
+      siteIds?: string[];
+      secret?: string;
+    },
+  ) =>
+    apiClient<{ webhook: ApiWebhook }>(`/v1/orgs/${org}/webhooks`, json(data)).then((r) => r.webhook),
+
+  updateWebhook: (org: string, id: string, data: Partial<ApiWebhook>) =>
+    apiClient<{ webhook: ApiWebhook }>(`/v1/orgs/${org}/webhooks/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    }).then((r) => r.webhook),
+
+  deleteWebhook: (org: string, id: string) =>
+    apiClient<{ ok: boolean }>(`/v1/orgs/${org}/webhooks/${id}`, {
+      method: 'DELETE',
+    }),
+
+  testWebhook: (org: string, id: string) =>
+    apiClient<{ ok: boolean; status: number | null; durationMs: number; error?: string }>(
+      `/v1/orgs/${org}/webhooks/${id}/test`,
+      { method: 'POST' },
+    ),
+
+  listWebhookDeliveries: (org: string, id: string) =>
+    apiClient<{ deliveries: ApiWebhookDelivery[] }>(`/v1/orgs/${org}/webhooks/${id}/deliveries`).then(
+      (r) => r.deliveries,
+    ),
 };
+
+export interface ApiWebhook {
+  id: string;
+  orgId: string;
+  kind: 'slack' | 'generic';
+  url: string;
+  urlMasked: string;
+  events: string[];
+  siteIds: string[];
+  active: boolean;
+  lastStatus: number | null;
+  lastError: string | null;
+  failureCount: number;
+  secret?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ApiWebhookDelivery {
+  id: string;
+  webhookId: string;
+  event: string;
+  status: number | null;
+  error: string | null;
+  durationMs: number;
+  createdAt: string;
+  payload?: Record<string, unknown>;
+}
 
 export interface ApiCrossSiteIssueSite {
   siteId: string;

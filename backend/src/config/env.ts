@@ -21,6 +21,10 @@ const envSchema = z.object({
   SENTRY_DSN_API: z.string().optional(),
   SENTRY_RELEASE: z.string().optional(),
   TURNSTILE_SECRET_KEY: z.string().optional(),
+  ENCRYPTION_KEY: z
+    .string()
+    .min(16)
+    .default('dev_encryption_key_32_characters_long_for_aes_256'),
   AUTH_SECRET: z
     .string()
     .min(32)
