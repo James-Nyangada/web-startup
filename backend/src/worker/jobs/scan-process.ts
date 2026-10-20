@@ -65,14 +65,15 @@ export async function handleScanProcess(job: ScanJobPayload, ctx: WorkerContext)
   const diff = diffScans(previousIssues, scanResult.issues, scannedPages, scanResult.pagesPlanned);
 
   // 5. Apply diff to database: issues, occurrences, and events
-  const { createdCount, fixedCount, regressedCount } = await ctx.repos.issues.applyScanDiff(
-    orgId,
-    scan.siteId,
-    scan.id,
-    diff,
-    scanResult.issues,
-    pageUrlToIdMap,
-  );
+  const { createdCount, fixedCount, regressedCount, fixedIssues, regressedIssues } =
+    await ctx.repos.issues.applyScanDiff(
+      orgId,
+      scan.siteId,
+      scan.id,
+      diff,
+      scanResult.issues,
+      pageUrlToIdMap,
+    );
 
   // 6. Calculate counts and final status
   const counts = countIssues(scanResult.issues);
@@ -104,4 +105,54 @@ export async function handleScanProcess(job: ScanJobPayload, ctx: WorkerContext)
     pagesPlanned: scanResult.pagesPlanned,
     score: scanResult.score,
   });
+
+  // 9. Record compliance evidence events (P5-01)
+  if (ctx.repos.evidenceEvents?.record) {
+    if (finalStatus === 'completed' || finalStatus === 'partial') {
+      await ctx.repos.evidenceEvents.record(orgId, {
+        siteId: scan.siteId,
+        type: 'scan_completed',
+        actorId: scan.requestedBy,
+        data: {
+          scanId: scan.id,
+          score: scanResult.score,
+          pagesScanned: scanResult.pagesScanned,
+          counts: {
+            ...counts,
+            new: createdCount,
+            fixed: fixedCount,
+            regressed: regressedCount,
+          },
+        },
+      });
+    }
+
+    for (const item of fixedIssues) {
+      await ctx.repos.evidenceEvents.record(orgId, {
+        siteId: scan.siteId,
+        type: 'issue_fixed',
+        actorId: null,
+        data: {
+          issueId: item.id,
+          ruleId: item.ruleId,
+          scanId: scan.id,
+          score: scanResult.score,
+        },
+      });
+    }
+
+    for (const item of regressedIssues) {
+      await ctx.repos.evidenceEvents.record(orgId, {
+        siteId: scan.siteId,
+        type: 'issue_regressed',
+        actorId: null,
+        data: {
+          issueId: item.id,
+          ruleId: item.ruleId,
+          scanId: scan.id,
+          score: scanResult.score,
+        },
+      });
+    }
+  }
 }

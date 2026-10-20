@@ -273,6 +273,14 @@ export function orgSitesRouter(repos: Repositories): Router {
       userAgent: req.get('user-agent') ?? null,
     });
 
+    // Evidence event (P5-01)
+    await repos.evidenceEvents.record(req.orgId!, {
+      siteId: site.id,
+      type: 'site_added',
+      actorId: req.auth!.user.id,
+      data: { name: site.name, rootUrl: site.rootUrl, platform: site.platform },
+    });
+
     res.status(201).json({ data: { site } });
   });
 
@@ -794,6 +802,14 @@ export function orgSitesRouter(repos: Repositories): Router {
         data: { method, verifiedAt: new Date().toISOString() },
         ip: req.ip ?? null,
         userAgent: req.get('user-agent') ?? null,
+      });
+
+      // Evidence event (P5-01)
+      await repos.evidenceEvents.record(req.orgId!, {
+        siteId,
+        type: 'site_verified',
+        actorId: req.auth!.user.id,
+        data: { method, verifiedAt: new Date().toISOString() },
       });
 
       res.status(200).json({

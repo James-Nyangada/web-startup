@@ -266,6 +266,23 @@ export async function processPaddleEvent(
               isReplay: options?.isReplay ?? false,
             },
           });
+
+          // Record compliance evidence event for all sites (P5-01)
+          if (repos.evidenceEvents?.record) {
+            const createdOrgSites = await repos.sites.list(orgIdScoped);
+            for (const s of createdOrgSites) {
+              await repos.evidenceEvents.record(orgIdScoped, {
+                siteId: s.id,
+                type: 'plan_changed',
+                actorId: null,
+                data: {
+                  plan: planInfo.plan,
+                  interval: planInfo.interval,
+                  paddleSubscriptionId: subId,
+                },
+              });
+            }
+          }
         }
         break;
       }
@@ -380,6 +397,23 @@ export async function processPaddleEvent(
                 isReplay: options?.isReplay ?? false,
               },
             });
+
+            // Record compliance evidence event for all sites (P5-01)
+            if (repos.evidenceEvents?.record) {
+              const updatedOrgSites = await repos.sites.list(orgIdScoped);
+              for (const s of updatedOrgSites) {
+                await repos.evidenceEvents.record(orgIdScoped, {
+                  siteId: s.id,
+                  type: 'plan_changed',
+                  actorId: null,
+                  data: {
+                    plan: planInfo.plan,
+                    interval: currentInterval,
+                    paddleSubscriptionId: subId,
+                  },
+                });
+              }
+            }
 
             // Spec 12.2: E-19 sent on plan change (not sent on first activation)
             if (isPlanChanged) {

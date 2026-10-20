@@ -50,6 +50,7 @@ const screens = {
   'S-27 Scan history': `${siteBase}/scans`,
   'S-29 Pages': `${siteBase}/pages`,
   'S-30 Reports': `${siteBase}/reports`,
+  'S-31 Evidence': `${siteBase}/evidence`,
   'S-34 Site settings': `${siteBase}/settings`,
   'S-41 Members': '/settings/members',
   'S-43 Branding': '/settings/branding',

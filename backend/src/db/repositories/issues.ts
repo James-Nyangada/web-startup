@@ -136,11 +136,19 @@ export function issuesRepository(db: Database) {
       diff: ScanDiff,
       allFoundIssues: readonly FoundIssue[],
       pageUrlToIdMap: Map<string, string>,
-    ): Promise<{ createdCount: number; fixedCount: number; regressedCount: number }> {
+    ): Promise<{
+      createdCount: number;
+      fixedCount: number;
+      regressedCount: number;
+      fixedIssues: Array<{ id: string; ruleId?: string }>;
+      regressedIssues: Array<{ id: string; ruleId?: string }>;
+    }> {
       return await db.transaction(async (tx) => {
         let createdCount = 0;
         let fixedCount = 0;
         let regressedCount = 0;
+        const fixedIssues: Array<{ id: string; ruleId?: string }> = [];
+        const regressedIssues: Array<{ id: string; ruleId?: string }> = [];
 
         // issues.rule_id references rules; axe can report rules the catalog doesn't list yet.
         const ruleIds = [...new Set(allFoundIssues.map((issue) => issue.ruleId))];
@@ -283,10 +291,15 @@ export function issuesRepository(db: Database) {
                 eq(issues.fingerprint, issue.fingerprint),
               ),
             )
-            .returning({ id: issues.id, regressionCount: issues.regressionCount });
+            .returning({
+              id: issues.id,
+              ruleId: issues.ruleId,
+              regressionCount: issues.regressionCount,
+            });
 
           if (updated) {
             regressedCount++;
+            regressedIssues.push({ id: updated.id, ruleId: updated.ruleId });
             await tx.insert(issueEvents).values({
               orgId,
               issueId: updated.id,
@@ -336,10 +349,11 @@ export function issuesRepository(db: Database) {
                 eq(issues.fingerprint, prev.fingerprint),
               ),
             )
-            .returning({ id: issues.id });
+            .returning({ id: issues.id, ruleId: issues.ruleId });
 
           if (updated) {
             fixedCount++;
+            fixedIssues.push({ id: updated.id, ruleId: updated.ruleId });
             await tx.insert(issueEvents).values({
               orgId,
               issueId: updated.id,
@@ -413,7 +427,13 @@ export function issuesRepository(db: Database) {
           }
         }
 
-        return { createdCount, fixedCount, regressedCount };
+        return {
+          createdCount,
+          fixedCount,
+          regressedCount,
+          fixedIssues,
+          regressedIssues,
+        };
       });
     },
 

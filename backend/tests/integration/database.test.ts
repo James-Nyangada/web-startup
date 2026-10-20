@@ -7,6 +7,7 @@ import { createDb, createPool, type Database } from '../../src/db/client.js';
 import { asOrgId, createRepositories } from '../../src/db/repositories/index.js';
 import {
   auditLog,
+  evidenceEvents,
   issues,
   memberships,
   organizations,
@@ -57,6 +58,14 @@ const ALL_APP_TABLES = [
   'ai_suggestions',
   'ai_usage',
   'free_checks',
+  'subscriptions',
+  'paddle_events',
+  'invoices',
+  'report_schedules',
+  'evidence_events',
+  'manual_checks',
+  'statements',
+  'webhooks',
 ];
 
 describe.skipIf(!url)('database (integration)', () => {
@@ -301,6 +310,37 @@ describe.skipIf(!url)('database (integration)', () => {
     await expect(db.delete(auditLog)).rejects.toMatchObject(appendOnly);
     await expect(db.execute(sql`truncate audit_log`)).rejects.toMatchObject(appendOnly);
     expect(await repos.auditLog.list(asOrgId(org!.id))).toMatchObject([{ action: 'test.event' }]);
+  });
+
+  it('evidence_events is append-only', async () => {
+    const [org] = await db
+      .select()
+      .from(organizations)
+      .where(eq(organizations.slug, 'demo-agency'));
+    const repos = createRepositories(db);
+    const orgSites = await repos.sites.list(asOrgId(org!.id));
+    const site = orgSites[0]!;
+    const event = await repos.evidenceEvents.record(asOrgId(org!.id), {
+      siteId: site.id,
+      type: 'site_added',
+      data: { name: site.name },
+    });
+    const entries = await repos.evidenceEvents.list(asOrgId(org!.id), site.id);
+    expect(entries.length).toBeGreaterThanOrEqual(1);
+
+    const appendOnly = {
+      cause: expect.objectContaining({ message: expect.stringMatching(/append-only/) }),
+    };
+    await expect(
+      db
+        .update(evidenceEvents)
+        .set({ type: 'scan_completed' })
+        .where(eq(evidenceEvents.id, event.id)),
+    ).rejects.toMatchObject(appendOnly);
+    await expect(
+      db.delete(evidenceEvents).where(eq(evidenceEvents.id, event.id)),
+    ).rejects.toMatchObject(appendOnly);
+    await expect(db.execute(sql`truncate evidence_events`)).rejects.toMatchObject(appendOnly);
   });
 
   it('enables row-level security on every app table', async () => {

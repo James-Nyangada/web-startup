@@ -53,3 +53,30 @@ export const reports = pgTable(
 
 export type ReportRow = typeof reports.$inferSelect;
 export type NewReportRow = typeof reports.$inferInsert;
+
+export const reportSchedules = pgTable(
+  'report_schedules',
+  {
+    id: id(),
+    orgId: uuid('org_id')
+      .notNull()
+      .references(() => organizations.id, { onDelete: 'cascade' }),
+    siteId: uuid('site_id')
+      .notNull()
+      .references(() => sites.id, { onDelete: 'cascade' }),
+    recipients: text('recipients').array().notNull(),
+    dayOfMonth: integer('day_of_month').notNull(),
+    type: text('type').$type<'client_monthly'>().notNull().default('client_monthly'),
+    active: boolean('active').notNull().default(true),
+    lastSentAt: timestamp('last_sent_at', { withTimezone: true }),
+    ...timestamps(),
+  },
+  (t) => [
+    index('report_schedules_org_site_idx').on(t.orgId, t.siteId),
+    index('report_schedules_day_active_idx').on(t.dayOfMonth, t.active),
+    check('report_schedules_day_check', sql`${t.dayOfMonth} >= 1 and ${t.dayOfMonth} <= 28`),
+  ],
+);
+
+export type ReportScheduleRow = typeof reportSchedules.$inferSelect;
+export type NewReportScheduleRow = typeof reportSchedules.$inferInsert;

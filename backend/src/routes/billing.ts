@@ -387,6 +387,17 @@ export function orgBillingRouter(
         data: { plan: targetPlan, interval, priceId: newPriceId },
       });
 
+      // Record compliance evidence event for all sites (P5-01)
+      const changePlanSites = await repos.sites.list(req.orgId!);
+      for (const s of changePlanSites) {
+        await repos.evidenceEvents.record(req.orgId!, {
+          siteId: s.id,
+          type: 'plan_changed',
+          actorId: req.auth?.user.id,
+          data: { plan: targetPlan, interval, priceId: newPriceId },
+        });
+      }
+
       res.status(200).json({
         data: {
           success: true,

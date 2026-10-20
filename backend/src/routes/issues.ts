@@ -800,6 +800,19 @@ export function orgIssuesRouter(repos: Repositories, options?: IssuesRouterOptio
       parseResult.data.note,
     );
 
+    // Record compliance evidence event (P5-01)
+    await repos.evidenceEvents.record(req.orgId!, {
+      siteId: issue.siteId,
+      type: 'issue_ignored',
+      actorId: req.auth!.user.id,
+      data: {
+        issueId: issue.id,
+        ruleId: issue.ruleId,
+        reason: parseResult.data.reason,
+        note: parseResult.data.note,
+      },
+    });
+
     res.status(200).json({
       data: { issue: updated },
     });

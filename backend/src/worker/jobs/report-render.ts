@@ -252,6 +252,20 @@ export async function handleReportRender(
         fileSize: pdfBuffer.length,
       },
     });
+
+    if (report.siteId && ctx.repos.evidenceEvents?.record) {
+      await ctx.repos.evidenceEvents.record(asOrgId(report.orgId), {
+        siteId: report.siteId,
+        type: 'report_generated',
+        actorId: report.requestedBy ?? null,
+        data: {
+          reportId: report.id,
+          type: report.type,
+          scanId: report.scanId,
+          fileSize: pdfBuffer.length,
+        },
+      });
+    }
   } catch (err: unknown) {
     await ctx.repos.reports.updateStatus(report.id, 'failed');
     throw err;

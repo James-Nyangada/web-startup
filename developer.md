@@ -1206,7 +1206,7 @@ Daily toggles with plan caps (Agency: 5 daily sites).
 
 **P5-01 — Evidence events and timeline** · *Depends on:* P2 complete · *Size:* M
 Write every event type in 5.4 at its source; S-31 timeline with filters and date range; append-only verified by test (app DB user lacks update/delete).
-- [ ] Every row on the timeline links to its source (scan, issue, check, report).
+- [x] Every row on the timeline links to its source (scan, issue, check, report).
 
 **P5-02 — Manual checks** · *Depends on:* P5-01 · *Size:* M
 S-32: log a check (type, date, tester name, tools, result, notes, optional attachment), list, edit, delete (audited); built-in guidance for each check type (what to test, how long it takes).

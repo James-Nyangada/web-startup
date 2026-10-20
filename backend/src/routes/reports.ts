@@ -419,6 +419,19 @@ export function orgReportsRouter(repos: Repositories, options?: ReportsRouterOpt
         },
       });
 
+      if (report.siteId && repos.evidenceEvents?.record) {
+        await repos.evidenceEvents.record(orgId, {
+          siteId: report.siteId,
+          type: 'report_sent',
+          actorId: req.auth?.user?.id ?? null,
+          data: {
+            reportId: report.id,
+            recipients: parse.data.recipients,
+            type: report.type,
+          },
+        });
+      }
+
       res.status(200).json({
         data: {
           sent: true,

@@ -92,6 +92,20 @@
       "when": 1792487265190,
       "tag": "0012_organizations_past_due_since",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1792488957234,
+      "tag": "0013_phase5_tables",
+      "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1792488960000,
+      "tag": "0014_phase5_triggers_and_rls",
+      "breakpoints": true
     }
   ]
 }

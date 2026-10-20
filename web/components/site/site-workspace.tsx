@@ -9,6 +9,7 @@ import { IssuesTab, type BulkRequest } from "./issues-tab";
 import { ScansTab, type ScanHistoryItem } from "./scans-tab";
 import { PagesTab } from "./pages-tab";
 import { ReportsTab } from "./reports-tab";
+import { EvidenceTab } from "./evidence-tab";
 import { SettingsTab } from "./settings-tab";
 import { IssueDrawer } from "./issue-drawer";
 import { IgnoreDialog } from "./ignore-dialog";
@@ -499,6 +500,14 @@ export function SiteWorkspace({ startTab = 0, orgSlug, siteId }: SiteWorkspacePr
             onToast={showToast}
           />
         )}
+        {tab === 5 && (
+          <EvidenceTab
+            orgSlug={orgSlug}
+            siteId={siteId}
+            siteName={displayName}
+            onToast={showToast}
+          />
+        )}
         {tab === 8 && (
           <SettingsTab
             orgSlug={orgSlug}
@@ -508,9 +517,9 @@ export function SiteWorkspace({ startTab = 0, orgSlug, siteId }: SiteWorkspacePr
             onToast={showToast}
           />
         )}
-        {tab > 2 && tab !== 3 && tab !== 4 && tab !== 8 && (
+        {tab > 2 && tab !== 3 && tab !== 4 && tab !== 5 && tab !== 8 && (
           <div className="rounded-lg border border-dashed border-line-strong px-6 py-12 text-center text-sm text-muted">
-            {SITE_TABS[tab]} is not part of this design pass. Overview, Issues, Scans, Pages, Reports, and Settings are interactive.
+            {SITE_TABS[tab]} is not part of this design pass. Overview, Issues, Scans, Pages, Reports, Evidence, and Settings are interactive.
           </div>
         )}
       </div>

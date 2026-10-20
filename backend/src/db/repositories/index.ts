@@ -17,6 +17,7 @@ import { invoicesRepository } from './invoices.js';
 import { paddleEventsRepository } from './paddle-events.js';
 import { brandingRepository } from './branding.js';
 import { clientAccessRepository } from './client-access.js';
+import { evidenceEventsRepository } from './evidence-events.js';
 
 export function createRepositories(db: Database) {
   return {
@@ -38,6 +39,7 @@ export function createRepositories(db: Database) {
     paddleEvents: paddleEventsRepository(db),
     branding: brandingRepository(db),
     clientAccess: clientAccessRepository(db),
+    evidenceEvents: evidenceEventsRepository(db),
   };
 }
 
