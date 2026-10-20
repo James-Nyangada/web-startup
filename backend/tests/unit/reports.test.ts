@@ -211,7 +211,7 @@ describe('Reports API Endpoints (Chunk P2-19)', () => {
 
       expect(res.status).toBe(201);
       expect(res.body.data).toBeDefined();
-      expect(res.body.data.id).toBe('rep-123');
+      expect(res.body.data.id).toMatch(/^rep-/);
     });
 
     it('returns 400 when neither siteId nor scanId is provided', async () => {

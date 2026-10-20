@@ -197,7 +197,10 @@ export async function handleReportRender(
             100,
           )
         : [];
-      const fixedList = fixedRes.map((i) => ({
+      const fixedRows = Array.isArray(fixedRes)
+        ? fixedRes
+        : (((fixedRes as unknown as { items?: unknown[] })?.items as typeof fixedRes) ?? []);
+      const fixedList = fixedRows.map((i) => ({
         id: i.id,
         ruleId: i.ruleId,
         title: i.title ?? i.ruleId,
@@ -210,7 +213,10 @@ export async function handleReportRender(
       const openRes = site
         ? await ctx.repos.issues.listBySite(asOrgId(report.orgId), site.id, { status: 'open' }, 100)
         : [];
-      const openList = openRes.map((i) => ({
+      const openRows = Array.isArray(openRes)
+        ? openRes
+        : (((openRes as unknown as { items?: unknown[] })?.items as typeof openRes) ?? []);
+      const openList = openRows.map((i) => ({
         id: i.id,
         ruleId: i.ruleId,
         title: i.title ?? i.ruleId,
@@ -229,13 +235,19 @@ export async function handleReportRender(
             100,
           )
         : [];
-      const ignoredList = ignoredRes.map((i) => ({
+      const ignoredRows = Array.isArray(ignoredRes)
+        ? ignoredRes
+        : (((ignoredRes as unknown as { items?: unknown[] })?.items as typeof ignoredRes) ?? []);
+      const ignoredList = ignoredRows.map((i) => ({
         id: i.id,
         ruleId: i.ruleId,
         title: i.title ?? i.ruleId,
         impact: i.impact,
-        reason: i.ignoredReason || 'Accepted risk',
-        note: i.ignoredNote ?? null,
+        reason:
+          i.ignoredReason ||
+          (i as unknown as { ignoreReason?: string }).ignoreReason ||
+          'Accepted risk',
+        note: i.ignoredNote ?? (i as unknown as { ignoreNote?: string }).ignoreNote ?? null,
       }));
 
       // 5. Manual checks
@@ -244,7 +256,10 @@ export async function handleReportRender(
         const mcRes = await ctx.repos.manualChecks.listBySite(asOrgId(report.orgId), site.id, {
           limit: 100,
         });
-        manualChecksList = mcRes.map((c) => ({
+        const mcRows = Array.isArray(mcRes)
+          ? mcRes
+          : (((mcRes as unknown as { items?: unknown[] })?.items as typeof mcRes) ?? []);
+        manualChecksList = mcRows.map((c) => ({
           id: c.id,
           checkType: c.checkType,
           performedAt: c.performedAt,
@@ -347,7 +362,11 @@ export async function handleReportRender(
       const fixedIssuesRaw = site
         ? await ctx.repos.issues.listBySite(asOrgId(report.orgId), site.id, { status: 'fixed' }, 15)
         : [];
-      const fixedIssues = fixedIssuesRaw.map((f) => ({
+      const fixedIssuesRows = Array.isArray(fixedIssuesRaw)
+        ? fixedIssuesRaw
+        : (((fixedIssuesRaw as unknown as { items?: unknown[] })?.items as typeof fixedIssuesRaw) ??
+          []);
+      const fixedIssues = fixedIssuesRows.map((f) => ({
         title: f.title ?? f.ruleId,
         impact: f.impact,
         fixedAt: f.updatedAt ? new Date(f.updatedAt).toLocaleDateString('en-GB') : 'Verified',
@@ -357,7 +376,11 @@ export async function handleReportRender(
       const openIssuesRaw = site
         ? await ctx.repos.issues.listBySite(asOrgId(report.orgId), site.id, { status: 'open' }, 10)
         : [];
-      const topOpenIssues = openIssuesRaw.map((o) => ({
+      const openIssuesRows = Array.isArray(openIssuesRaw)
+        ? openIssuesRaw
+        : (((openIssuesRaw as unknown as { items?: unknown[] })?.items as typeof openIssuesRaw) ??
+          []);
+      const topOpenIssues = openIssuesRows.map((o) => ({
         title: o.title ?? o.ruleId,
         impact: o.impact,
         selector: o.selector ?? '—',
