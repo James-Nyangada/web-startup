@@ -1214,7 +1214,7 @@ S-32: log a check (type, date, tester name, tools, result, notes, optional attac
 
 **P5-03 — Accessibility statement generator** · *Depends on:* P5-01 · *Size:* L
 S-33 multi-step form (organisation, scope, standard targeted, measures taken, known limitations — pre-filled from open issues the user selects, feedback contact, enforcement procedure note for EU sites, date), live preview, versioning, publish to a public URL with the org's branding, embed snippet. Clear "template, not legal advice" notice.
-- [ ] Published statement is valid HTML, accessible, and shows its last-updated date.
+- [x] Published statement is valid HTML, accessible, and shows its last-updated date.
 
 **P5-04 — Evidence pack** · *Depends on:* P5-01, P5-02, P1-13 · *Size:* M
 R-03 PDF: cover, summary, scan history table and trend, issues fixed with dates, open issues with assignee and due date, ignored issues with reasons, manual-check log, published statement link, methodology and limitations. Date-range selectable.

@@ -11,6 +11,7 @@ import { PagesTab } from "./pages-tab";
 import { ReportsTab } from "./reports-tab";
 import { EvidenceTab } from "./evidence-tab";
 import { ManualChecksTab } from "./manual-checks-tab";
+import { StatementTab } from "./statement-tab";
 import { SettingsTab } from "./settings-tab";
 import { IssueDrawer } from "./issue-drawer";
 import { IgnoreDialog } from "./ignore-dialog";
@@ -589,6 +590,15 @@ export function SiteWorkspace({
             onToast={showToast}
           />
         )}
+        {tab === 7 && (
+          <StatementTab
+            orgSlug={orgSlug}
+            siteId={siteId}
+            siteName={displayName}
+            siteUrl={site.rootUrl}
+            onToast={showToast}
+          />
+        )}
         {tab === 8 && (
           <SettingsTab
             orgSlug={orgSlug}
@@ -603,11 +613,12 @@ export function SiteWorkspace({
           tab !== 4 &&
           tab !== 5 &&
           tab !== 6 &&
+          tab !== 7 &&
           tab !== 8 && (
             <div className="rounded-lg border border-dashed border-line-strong px-6 py-12 text-center text-sm text-muted">
               {SITE_TABS[tab]} is not part of this design pass. Overview,
-              Issues, Scans, Pages, Reports, Evidence, and Settings are
-              interactive.
+              Issues, Scans, Pages, Reports, Evidence, Manual checks, Statement,
+              and Settings are interactive.
             </div>
           )}
       </div>

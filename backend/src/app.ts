@@ -27,6 +27,7 @@ import { createEmailPreviewRouter } from './emails/preview-router.js';
 import { invitationsRouter } from './routes/invitations.js';
 import { reportsPublicRouter } from './routes/reports.js';
 import { manualChecksPublicRouter } from './routes/manual-checks.js';
+import { statementsPublicRouter } from './routes/statements.js';
 import { paddleWebhookRouter } from './routes/billing.js';
 import type { PaddleClient } from './billing/paddle-api.js';
 import { getStorage, type StorageService } from './storage/index.js';
@@ -131,10 +132,12 @@ export function createApp({
   v1.use('/emails', createEmailPreviewRouter());
   v1.use('/reports', reportsPublicRouter(repos, storage));
   v1.use('/manual-checks', manualChecksPublicRouter(repos, storage));
+  v1.use('/public/statements', statementsPublicRouter(repos));
   v1.use('/portal', portalRouter(repos, auth));
   app.use('/v1', v1);
   app.use('/webhooks/paddle', paddleWebhookRouter(repos, paddleWebhookOpts));
   app.use('/public', publicPlansRouter());
+  app.use('/public/statements', statementsPublicRouter(repos));
   app.use(
     '/public',
     freeChecksPublicRouter(repos, verifyTurnstile, emailSender, storage, freeChecksOptions),

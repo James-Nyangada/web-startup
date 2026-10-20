@@ -66,6 +66,7 @@ const screens = {
   "S-30 Reports": `${siteBase}/reports`,
   "S-31 Evidence": `${siteBase}/evidence`,
   "S-32 Manual checks": `${siteBase}/manual-checks`,
+  "S-33 Statement": `${siteBase}/statement`,
   "S-34 Site settings": `${siteBase}/settings`,
   "S-41 Members": "/settings/members",
   "S-43 Branding": "/settings/branding",
@@ -73,6 +74,7 @@ const screens = {
   "S-48 Account": "/settings/account",
   "S-60 Portal Home": "/portal",
   "S-61 Portal Site": `/portal/sites/${site.id}`,
+  "Public Statement": `/s/${site.id}/accessibility-statement`,
 };
 
 let failures = 0;
