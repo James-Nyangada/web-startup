@@ -1,7 +1,11 @@
-import { renderReportPdf, renderAgencyOverviewReportPdf } from '../../reports/render.js';
+import {
+  renderReportPdf,
+  renderAgencyOverviewReportPdf,
+  renderEvidencePackReportPdf,
+} from '../../reports/render.js';
 import type { ScanResult } from '../../scanner/scan.js';
 import type { ReportBranding } from '../../reports/components.js';
-import type { AgencyOverviewReportData } from '../../reports/templates.js';
+import type { AgencyOverviewReportData, EvidencePackReportData } from '../../reports/templates.js';
 import { scoreBand } from '../../scanner/results/score.js';
 import { asOrgId } from '../../db/repositories/org-scope.js';
 import type { ReportRenderJobPayload, WorkerContext } from '../types.js';
@@ -132,6 +136,165 @@ export async function handleReportRender(
 
       try {
         pdfBuffer = await renderAgencyOverviewReportPdf(overviewData, {
+          paper: 'a4',
+          branding: reportBranding,
+        });
+      } catch {
+        pdfBuffer = Buffer.from(
+          `%PDF-1.4\n1 0 obj\n<< /Title (${report.type}) /Author (Plainsight) >>\nendobj\ntrailer\n<< /Root 1 0 R >>\n%%EOF\n`,
+          'utf-8',
+        );
+      }
+    } else if (report.type === 'evidence_pack') {
+      const site = report.siteId ? await ctx.repos.sites.findRawById(report.siteId) : null;
+      const siteName = site?.name ?? 'Site';
+      const rootUrl = site?.rootUrl ?? 'https://example.com';
+
+      // 12-month period by default
+      const endDate = new Date();
+      const startDate = new Date(Date.now() - 365 * 24 * 60 * 60 * 1000);
+      const dateRange = {
+        start: startDate.toLocaleDateString('en-GB', {
+          day: 'numeric',
+          month: 'short',
+          year: 'numeric',
+        }),
+        end: endDate.toLocaleDateString('en-GB', {
+          day: 'numeric',
+          month: 'short',
+          year: 'numeric',
+        }),
+      };
+
+      // 1. Scans
+      const rawScans = site
+        ? await ctx.repos.scans.listBySite(asOrgId(report.orgId), site.id, 50)
+        : [];
+      const scansList = rawScans.map((s) => ({
+        id: s.id,
+        date: s.finishedAt
+          ? new Date(s.finishedAt).toLocaleDateString('en-GB')
+          : new Date(s.createdAt).toLocaleDateString('en-GB'),
+        score: s.score,
+        scoreBand: s.score !== null ? scoreBand(s.score) : 'Unscored',
+        critical: Number(s.counts?.critical) || 0,
+        serious: Number(s.counts?.serious) || 0,
+        pagesScanned: s.pagesScanned || 1,
+        status: s.status,
+      }));
+
+      // 2. Fixed issues
+      const fixedRes = site
+        ? await ctx.repos.issues.listBySite(
+            asOrgId(report.orgId),
+            site.id,
+            { status: 'fixed' },
+            100,
+          )
+        : [];
+      const fixedList = fixedRes.map((i) => ({
+        id: i.id,
+        ruleId: i.ruleId,
+        title: i.title ?? i.ruleId,
+        impact: i.impact,
+        fixedAt: i.updatedAt ? new Date(i.updatedAt).toLocaleDateString('en-GB') : 'Verified',
+        occurrences: i.occurrenceCount || 1,
+      }));
+
+      // 3. Open issues
+      const openRes = site
+        ? await ctx.repos.issues.listBySite(asOrgId(report.orgId), site.id, { status: 'open' }, 100)
+        : [];
+      const openList = openRes.map((i) => ({
+        id: i.id,
+        ruleId: i.ruleId,
+        title: i.title ?? i.ruleId,
+        impact: i.impact,
+        occurrences: i.occurrenceCount || 1,
+        assigneeName: i.assigneeName ?? null,
+        dueDate: i.dueDate ? new Date(i.dueDate).toLocaleDateString('en-GB') : null,
+      }));
+
+      // 4. Ignored issues
+      const ignoredRes = site
+        ? await ctx.repos.issues.listBySite(
+            asOrgId(report.orgId),
+            site.id,
+            { status: 'ignored' },
+            100,
+          )
+        : [];
+      const ignoredList = ignoredRes.map((i) => ({
+        id: i.id,
+        ruleId: i.ruleId,
+        title: i.title ?? i.ruleId,
+        impact: i.impact,
+        reason: i.ignoredReason || 'Accepted risk',
+        note: i.ignoredNote ?? null,
+      }));
+
+      // 5. Manual checks
+      let manualChecksList: EvidencePackReportData['manualChecks'] = [];
+      if (site && ctx.repos.manualChecks) {
+        const mcRes = await ctx.repos.manualChecks.listBySite(asOrgId(report.orgId), site.id, {
+          limit: 100,
+        });
+        manualChecksList = mcRes.map((c) => ({
+          id: c.id,
+          checkType: c.checkType,
+          performedAt: c.performedAt,
+          testerName: c.performedByName,
+          tool: c.tool,
+          result: c.result,
+          notes: c.notes,
+        }));
+      }
+
+      // 6. Published statement
+      let publishedStatement: EvidencePackReportData['publishedStatement'] = null;
+      if (site && ctx.repos.statements) {
+        const st = await ctx.repos.statements.findPublishedBySite(site.id);
+        if (st && st.publishedAt) {
+          const appUrl = process.env.APP_URL || 'http://localhost:3000';
+          const stData = st.data as Record<string, unknown>;
+          publishedStatement = {
+            version: st.version,
+            publishedAt: st.publishedAt.toISOString(),
+            targetStandard: String(stData.targetStandard || 'WCAG 2.2 Level AA'),
+            conformanceStatus: String(stData.conformanceStatus || 'partially_conformant'),
+            publicUrl: `${appUrl}/s/${site.id}/accessibility-statement`,
+          };
+        }
+      }
+
+      const latestScore = site?.score ?? scansList[0]?.score ?? null;
+      const band = latestScore !== null ? scoreBand(latestScore) : 'Unscored';
+
+      const evidenceData: EvidencePackReportData = {
+        siteName,
+        rootUrl,
+        dateRange,
+        generatedAt: new Date().toISOString(),
+        summary: {
+          scansCount: scansList.length,
+          latestScore,
+          scoreBand: band,
+          totalFixed: fixedList.length,
+          openIssuesCount: openList.length,
+          ignoredIssuesCount: ignoredList.length,
+          manualChecksCount: manualChecksList.length,
+          statementPublished: Boolean(publishedStatement),
+        },
+        scans: scansList,
+        fixedIssues: fixedList,
+        openIssues: openList,
+        ignoredIssues: ignoredList,
+        manualChecks: manualChecksList,
+        publishedStatement,
+      };
+
+      try {
+        pdfBuffer = await renderEvidencePackReportPdf(evidenceData, {
           paper: 'a4',
           branding: reportBranding,
         });

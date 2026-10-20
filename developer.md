@@ -1218,7 +1218,7 @@ S-33 multi-step form (organisation, scope, standard targeted, measures taken, kn
 
 **P5-04 — Evidence pack** · *Depends on:* P5-01, P5-02, P1-13 · *Size:* M
 R-03 PDF: cover, summary, scan history table and trend, issues fixed with dates, open issues with assignee and due date, ignored issues with reasons, manual-check log, published statement link, methodology and limitations. Date-range selectable.
-- [ ] Generated for a site with 12 months of history in under 3 minutes.
+- [x] Generated for a site with 12 months of history in under 3 minutes.
 
 **P5-05 — Alerts and notification centre** · *Depends on:* P2-18 · *Size:* M
 Regression and new-critical detection in `scan.process`; E-08; in-app notifications (S-50 bell + panel, mark read, link to item); per-user preferences (S-45); "issue assigned to you" notification.

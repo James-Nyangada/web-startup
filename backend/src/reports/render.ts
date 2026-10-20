@@ -9,6 +9,8 @@ import {
   type FreeCheckReportInput,
   AgencyOverviewReport,
   type AgencyOverviewReportData,
+  EvidencePackReport,
+  type EvidencePackReportData,
 } from './templates.js';
 import type { ReportBranding } from './components.js';
 
@@ -129,6 +131,40 @@ export async function renderAgencyOverviewReportPdf(
       displayHeaderFooter: true,
       headerTemplate: '<span></span>',
       footerTemplate: footerTemplate(data.orgName, options.branding),
+      margin: { top: '16mm', bottom: '18mm', left: '15mm', right: '15mm' },
+    });
+    return pdf;
+  } finally {
+    await browser.close();
+  }
+}
+
+export function renderEvidencePackReportHtml(
+  data: EvidencePackReportData,
+  branding?: ReportBranding,
+): string {
+  return `<!doctype html>${renderToStaticMarkup(createElement(EvidencePackReport, { data, branding }))}`;
+}
+
+export async function renderEvidencePackReportPdf(
+  data: EvidencePackReportData,
+  options: { paper?: Paper; branding?: ReportBranding } = {},
+): Promise<Buffer> {
+  const html = renderEvidencePackReportHtml(data, options.branding);
+  const browser = await chromium.launch();
+  try {
+    const context = await browser.newContext({ javaScriptEnabled: false });
+    await context.route('**/*', (route) => route.abort());
+    const page = await context.newPage();
+    await page.setContent(html, { waitUntil: 'load' });
+    const pdf = await page.pdf({
+      format: options.paper === 'letter' ? 'Letter' : 'A4',
+      printBackground: true,
+      tagged: true,
+      outline: true,
+      displayHeaderFooter: true,
+      headerTemplate: '<span></span>',
+      footerTemplate: footerTemplate(data.siteName, options.branding),
       margin: { top: '16mm', bottom: '18mm', left: '15mm', right: '15mm' },
     });
     return pdf;

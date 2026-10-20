@@ -437,3 +437,419 @@ export function AgencyOverviewReport({
     </Document>
   );
 }
+
+export interface EvidencePackScanItem {
+  id: string;
+  date: string;
+  score: number | null;
+  scoreBand: string;
+  critical: number;
+  serious: number;
+  pagesScanned: number;
+  status: string;
+}
+
+export interface EvidencePackFixedIssue {
+  id: string;
+  ruleId: string;
+  title: string;
+  impact: string;
+  fixedAt: string;
+  occurrences: number;
+}
+
+export interface EvidencePackOpenIssue {
+  id: string;
+  ruleId: string;
+  title: string;
+  impact: string;
+  occurrences: number;
+  assigneeName?: string | null;
+  dueDate?: string | null;
+}
+
+export interface EvidencePackIgnoredIssue {
+  id: string;
+  ruleId: string;
+  title: string;
+  impact: string;
+  reason: string;
+  note?: string | null;
+}
+
+export interface EvidencePackManualCheck {
+  id: string;
+  checkType: string;
+  performedAt: string;
+  testerName: string;
+  tool: string;
+  result: 'pass' | 'issues_found' | 'partial';
+  notes: string;
+}
+
+export interface EvidencePackPublishedStatement {
+  version: number;
+  publishedAt: string;
+  targetStandard: string;
+  conformanceStatus: string;
+  publicUrl: string;
+}
+
+export interface EvidencePackReportData {
+  siteName: string;
+  rootUrl: string;
+  dateRange: {
+    start: string;
+    end: string;
+  };
+  generatedAt: string;
+  summary: {
+    scansCount: number;
+    latestScore: number | null;
+    scoreBand: string;
+    totalFixed: number;
+    openIssuesCount: number;
+    ignoredIssuesCount: number;
+    manualChecksCount: number;
+    statementPublished: boolean;
+  };
+  scans: EvidencePackScanItem[];
+  fixedIssues: EvidencePackFixedIssue[];
+  openIssues: EvidencePackOpenIssue[];
+  ignoredIssues: EvidencePackIgnoredIssue[];
+  manualChecks: EvidencePackManualCheck[];
+  publishedStatement?: EvidencePackPublishedStatement | null;
+}
+
+/** R-03: Complete Accessibility Evidence Pack across automated and manual testing. */
+export function EvidencePackReport({
+  data,
+  branding,
+}: {
+  data: EvidencePackReportData;
+  branding?: ReportBranding;
+}) {
+  const title = 'Accessibility Evidence Pack';
+  const orgDisplayName = branding?.displayName || data.siteName;
+
+  return (
+    <Document title={`${title} – ${data.siteName}`} branding={branding}>
+      <header className="cover">
+        {branding?.logoUrl && (
+          <div style={{ marginBottom: '10pt' }}>
+            <img
+              src={branding.logoUrl}
+              alt={orgDisplayName}
+              style={{ maxHeight: '36pt', objectFit: 'contain' }}
+            />
+          </div>
+        )}
+        <h1>{title}</h1>
+        <p className="site">
+          {data.siteName} ({data.rootUrl})
+        </p>
+        <dl className="meta">
+          <dt>Period Covered</dt>
+          <dd>
+            {data.dateRange.start} – {data.dateRange.end}
+          </dd>
+          <dt>Generated</dt>
+          <dd>{new Date(data.generatedAt).toUTCString()}</dd>
+          <dt>Evaluation Standard</dt>
+          <dd>WCAG 2.2 Level AA (Automated &amp; Assistive Tech Testing)</dd>
+          {branding?.displayName && (
+            <>
+              <dt>Prepared by</dt>
+              <dd>{branding.displayName}</dd>
+            </>
+          )}
+        </dl>
+      </header>
+
+      {/* Executive Summary Cards */}
+      <section className="counts" aria-label="Evidence pack executive summary">
+        <div className="count">
+          <span className="n">{data.summary.latestScore ?? '—'}</span>
+          <span className="muted small">Latest Score ({data.summary.scoreBand})</span>
+        </div>
+        <div className="count">
+          <span className="n">{data.summary.scansCount}</span>
+          <span className="muted small">Automated Scans</span>
+        </div>
+        <div className="count" style={{ borderColor: 'var(--ok)' }}>
+          <span className="n" style={{ color: 'var(--ok)' }}>
+            {data.summary.totalFixed}
+          </span>
+          <span className="small">Issues Remediated</span>
+        </div>
+        <div className="count">
+          <span className="n">{data.summary.manualChecksCount}</span>
+          <span className="muted small">Manual Tests</span>
+        </div>
+      </section>
+
+      {/* Published Accessibility Statement Section */}
+      <section aria-labelledby="statement-heading">
+        <h2 id="statement-heading">Accessibility Statement Declaration</h2>
+        {data.publishedStatement ? (
+          <div className="callout" style={{ margin: '8pt 0' }}>
+            <h3 style={{ margin: '0 0 4pt', color: 'var(--ok)' }}>
+              Public Statement Active (Version {data.publishedStatement.version})
+            </h3>
+            <p className="small">
+              <strong>Target Standard:</strong> {data.publishedStatement.targetStandard} ·{' '}
+              <strong>Declared Status:</strong>{' '}
+              {data.publishedStatement.conformanceStatus.replace('_', ' ')} ·{' '}
+              <strong>Published:</strong>{' '}
+              {new Date(data.publishedStatement.publishedAt).toLocaleDateString('en-GB')}
+            </p>
+            <p className="small" style={{ marginTop: '4pt' }}>
+              <strong>Public URL:</strong>{' '}
+              <a href={data.publishedStatement.publicUrl} target="_blank" rel="noopener noreferrer">
+                {data.publishedStatement.publicUrl}
+              </a>
+            </p>
+          </div>
+        ) : (
+          <p className="muted small">
+            No public accessibility statement has been published yet for this site.
+          </p>
+        )}
+      </section>
+
+      {/* Scan History & Trend Table */}
+      <section aria-labelledby="scans-heading">
+        <h2 id="scans-heading">Automated Scan History ({data.scans.length})</h2>
+        {data.scans.length === 0 ? (
+          <p className="muted small">No automated scans recorded in this period.</p>
+        ) : (
+          <table className="data-table">
+            <thead>
+              <tr>
+                <th scope="col">Date</th>
+                <th scope="col">Score</th>
+                <th scope="col">Critical</th>
+                <th scope="col">Serious</th>
+                <th scope="col">Pages Tested</th>
+                <th scope="col">Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {data.scans.map((scan) => (
+                <tr key={scan.id}>
+                  <td>
+                    <strong>{scan.date}</strong>
+                  </td>
+                  <td>
+                    {scan.score !== null ? (
+                      <span>
+                        <strong>{scan.score}</strong>{' '}
+                        <span className="muted small">({scan.scoreBand})</span>
+                      </span>
+                    ) : (
+                      '—'
+                    )}
+                  </td>
+                  <td style={{ color: 'var(--crit)', fontWeight: 600 }}>{scan.critical}</td>
+                  <td style={{ color: 'var(--ser)', fontWeight: 600 }}>{scan.serious}</td>
+                  <td>{scan.pagesScanned}</td>
+                  <td>
+                    <span
+                      className="badge"
+                      style={{
+                        background: scan.status === 'completed' ? 'var(--ok-soft)' : 'var(--bgs)',
+                        color: scan.status === 'completed' ? 'var(--ok)' : 'var(--muted)',
+                      }}
+                    >
+                      {scan.status}
+                    </span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </section>
+
+      {/* Remediated / Fixed Issues Table */}
+      <section aria-labelledby="fixed-heading">
+        <h2 id="fixed-heading">Remediated Issues ({data.fixedIssues.length})</h2>
+        <p className="muted small" style={{ marginBottom: '6pt' }}>
+          Documented evidence of verified fixes confirmed by automated scans during this period.
+        </p>
+        {data.fixedIssues.length === 0 ? (
+          <p className="muted small">No issues were marked fixed during this period.</p>
+        ) : (
+          <table className="data-table">
+            <thead>
+              <tr>
+                <th scope="col">Severity</th>
+                <th scope="col">Issue Description</th>
+                <th scope="col">WCAG Rule</th>
+                <th scope="col">Date Verified</th>
+                <th scope="col" className="num">
+                  Occurrences
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {data.fixedIssues.map((issue) => (
+                <tr key={issue.id}>
+                  <td>
+                    <span className={`badge sev-${issue.impact}`}>{issue.impact}</span>
+                  </td>
+                  <td>
+                    <strong>{issue.title}</strong>
+                  </td>
+                  <td className="muted small">{issue.ruleId}</td>
+                  <td>{issue.fixedAt}</td>
+                  <td className="num">{issue.occurrences}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </section>
+
+      {/* Open Issues Backlog */}
+      <section aria-labelledby="open-heading">
+        <h2 id="open-heading">Current Open Backlog ({data.openIssues.length})</h2>
+        {data.openIssues.length === 0 ? (
+          <p className="muted small">No open automated issues found.</p>
+        ) : (
+          <table className="data-table">
+            <thead>
+              <tr>
+                <th scope="col">Severity</th>
+                <th scope="col">Issue Description</th>
+                <th scope="col">Rule</th>
+                <th scope="col">Assignee</th>
+                <th scope="col">Due Date</th>
+                <th scope="col" className="num">
+                  Occurrences
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {data.openIssues.map((issue) => (
+                <tr key={issue.id}>
+                  <td>
+                    <span className={`badge sev-${issue.impact}`}>{issue.impact}</span>
+                  </td>
+                  <td>
+                    <strong>{issue.title}</strong>
+                  </td>
+                  <td className="muted small">{issue.ruleId}</td>
+                  <td>{issue.assigneeName || <span className="muted">Unassigned</span>}</td>
+                  <td>{issue.dueDate || <span className="muted">—</span>}</td>
+                  <td className="num">{issue.occurrences}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </section>
+
+      {/* Ignored Issues with Justification */}
+      <section aria-labelledby="ignored-heading">
+        <h2 id="ignored-heading">Ignored Findings &amp; Rationale ({data.ignoredIssues.length})</h2>
+        {data.ignoredIssues.length === 0 ? (
+          <p className="muted small">No issues were marked as ignored or false positive.</p>
+        ) : (
+          <table className="data-table">
+            <thead>
+              <tr>
+                <th scope="col">Severity</th>
+                <th scope="col">Issue</th>
+                <th scope="col">Reason Category</th>
+                <th scope="col">Documented Note</th>
+              </tr>
+            </thead>
+            <tbody>
+              {data.ignoredIssues.map((issue) => (
+                <tr key={issue.id}>
+                  <td>
+                    <span className={`badge sev-${issue.impact}`}>{issue.impact}</span>
+                  </td>
+                  <td>
+                    <strong>{issue.title}</strong>
+                    <div className="muted small">{issue.ruleId}</div>
+                  </td>
+                  <td>
+                    <strong>{issue.reason}</strong>
+                  </td>
+                  <td className="small">{issue.note || <span className="muted">—</span>}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </section>
+
+      {/* Manual Assistive Technology Audit Log */}
+      <section aria-labelledby="manual-heading">
+        <h2 id="manual-heading">
+          Human &amp; Assistive Technology Checks ({data.manualChecks.length})
+        </h2>
+        <p className="muted small" style={{ marginBottom: '6pt' }}>
+          Manual verification conducted with screen readers, keyboard navigation, and zoom tools.
+        </p>
+        {data.manualChecks.length === 0 ? (
+          <p className="muted small">No manual checks recorded in this period.</p>
+        ) : (
+          <table className="data-table">
+            <thead>
+              <tr>
+                <th scope="col">Check Type</th>
+                <th scope="col">Date</th>
+                <th scope="col">Tester</th>
+                <th scope="col">Tool / Environment</th>
+                <th scope="col">Result</th>
+                <th scope="col">Notes</th>
+              </tr>
+            </thead>
+            <tbody>
+              {data.manualChecks.map((check) => (
+                <tr key={check.id}>
+                  <td>
+                    <strong>{check.checkType.replace('_', ' ')}</strong>
+                  </td>
+                  <td>{check.performedAt}</td>
+                  <td>{check.testerName}</td>
+                  <td className="muted small">{check.tool}</td>
+                  <td>
+                    <span
+                      className="badge"
+                      style={{
+                        background:
+                          check.result === 'pass'
+                            ? 'var(--ok-soft)'
+                            : check.result === 'issues_found'
+                              ? 'var(--crit-soft)'
+                              : 'var(--ser-soft)',
+                        color:
+                          check.result === 'pass'
+                            ? 'var(--ok)'
+                            : check.result === 'issues_found'
+                              ? 'var(--crit)'
+                              : 'var(--ser)',
+                      }}
+                    >
+                      {check.result.replace('_', ' ')}
+                    </span>
+                  </td>
+                  <td className="small">{check.notes}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </section>
+
+      {/* Methodology & Limitations */}
+      <section aria-labelledby="limits-heading">
+        <Limitations />
+      </section>
+    </Document>
+  );
+}

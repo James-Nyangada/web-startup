@@ -82,7 +82,10 @@ export function ReportsTab({
   const [selectedReport, setSelectedReport] = useState<ReportItem | null>(null);
 
   // Generate modal form state
-  const [reportType, setReportType] = useState<"scan_summary" | "full">("scan_summary");
+  const [reportType, setReportType] = useState<
+    "scan_summary" | "full" | "evidence_pack"
+  >("scan_summary");
+  const [dateRangeMonths, setDateRangeMonths] = useState<number>(12);
   const [paper, setPaper] = useState<"a4" | "letter">("a4");
   const [branded, setBranded] = useState(false);
   const [generating, setGenerating] = useState(false);
@@ -116,7 +119,9 @@ export function ReportsTab({
                 : r.type === "full"
                   ? "Full Accessibility Audit Report"
                   : "Accessibility Report",
-            scanLabel: r.scanScore ? `Scan Score: ${r.scanScore}/100` : "Latest scan",
+            scanLabel: r.scanScore
+              ? `Scan Score: ${r.scanScore}/100`
+              : "Latest scan",
             scanScore: r.scanScore,
             fileSize: r.fileSize,
             createdAt: new Date(r.createdAt).toLocaleDateString("en-GB", {
@@ -167,6 +172,16 @@ export function ReportsTab({
     e.preventDefault();
     setGenerating(true);
     try {
+      const startDate = new Date();
+      startDate.setMonth(startDate.getMonth() - dateRangeMonths);
+      const dateRange =
+        reportType === "evidence_pack"
+          ? {
+              start: startDate.toISOString().split("T")[0],
+              end: new Date().toISOString().split("T")[0],
+            }
+          : undefined;
+
       const res = await apiClient<{ data: { id: string } }>(
         `/v1/orgs/${orgSlug}/reports`,
         {
@@ -175,6 +190,7 @@ export function ReportsTab({
             type: reportType,
             siteId: siteId || undefined,
             branded,
+            dateRange,
           }),
         },
       );
@@ -187,8 +203,13 @@ export function ReportsTab({
         title:
           reportType === "scan_summary"
             ? "Accessibility Scan Summary (R-01)"
-            : "Full Accessibility Audit Report (R-02)",
-        scanLabel: "Scan #23 · 14 Oct 2026",
+            : reportType === "full"
+              ? "Full Accessibility Audit Report (R-02)"
+              : "Accessibility Evidence Pack (R-03)",
+        scanLabel:
+          reportType === "evidence_pack"
+            ? `Past ${dateRangeMonths} Months History`
+            : "Scan #23 · 14 Oct 2026",
         scanScore: 78,
         fileSize: null,
         createdAt: "Just now",
@@ -196,7 +217,9 @@ export function ReportsTab({
 
       setReports((prev) => [newReport, ...prev]);
       setIsGenerateOpen(false);
-      onToast(`Generating ${newReport.title}. It will be ready in under a minute.`);
+      onToast(
+        `Generating ${newReport.title}. It will be ready in under a minute.`,
+      );
 
       // Simulate completion in UI
       setTimeout(() => {
@@ -206,14 +229,19 @@ export function ReportsTab({
               ? {
                   ...r,
                   status: "ready",
-                  fileSize: reportType === "scan_summary" ? 512000 : 1920000,
+                  fileSize:
+                    reportType === "scan_summary"
+                      ? 512000
+                      : reportType === "full"
+                        ? 1920000
+                        : 2450000,
                 }
               : r,
           ),
         );
         onToast(`${newReport.title} is ready to download.`);
       }, 4000);
-    } catch (err: any) {
+    } catch {
       // Demo fallback
       const newId = `rep-${Date.now()}`;
       const newReport: ReportItem = {
@@ -223,10 +251,20 @@ export function ReportsTab({
         title:
           reportType === "scan_summary"
             ? "Scan #23 Summary Report (R-01)"
-            : "Full Accessibility Audit Report (R-02)",
-        scanLabel: "Scan #23 · 14 Oct 2026",
+            : reportType === "full"
+              ? "Full Accessibility Audit Report (R-02)"
+              : "Accessibility Evidence Pack (R-03)",
+        scanLabel:
+          reportType === "evidence_pack"
+            ? `Past ${dateRangeMonths} Months History`
+            : "Scan #23 · 14 Oct 2026",
         scanScore: 78,
-        fileSize: reportType === "scan_summary" ? 491520 : 1887436,
+        fileSize:
+          reportType === "scan_summary"
+            ? 491520
+            : reportType === "full"
+              ? 1887436
+              : 2450000,
         createdAt: "Just now",
       };
       setReports((prev) => [newReport, ...prev]);
@@ -275,11 +313,15 @@ export function ReportsTab({
         }),
       });
       setIsSendOpen(false);
-      onToast(`Report emailed to ${emailList.length} recipient${emailList.length === 1 ? "" : "s"}.`);
+      onToast(
+        `Report emailed to ${emailList.length} recipient${emailList.length === 1 ? "" : "s"}.`,
+      );
     } catch {
       // Demo fallback
       setIsSendOpen(false);
-      onToast(`Report emailed to ${emailList.length} recipient${emailList.length === 1 ? "" : "s"}.`);
+      onToast(
+        `Report emailed to ${emailList.length} recipient${emailList.length === 1 ? "" : "s"}.`,
+      );
     } finally {
       setSending(false);
     }
@@ -290,10 +332,13 @@ export function ReportsTab({
       {/* Tab Header & Action Banner */}
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h2 className="m-0 text-xl font-semibold text-ink">On-demand Reports</h2>
+          <h2 className="m-0 text-xl font-semibold text-ink">
+            On-demand Reports
+          </h2>
           <p className="mt-1 text-sm text-muted">
-            Generate and download tagged, accessible PDFs (R-01 Scan Summary, R-02 Full Report)
-            or share them directly with clients and stakeholders.
+            Generate and download tagged, accessible PDFs (R-01 Scan Summary,
+            R-02 Full Report) or share them directly with clients and
+            stakeholders.
           </p>
         </div>
         <button
@@ -309,14 +354,22 @@ export function ReportsTab({
       {/* Reports Table */}
       <div className="overflow-hidden rounded-2xl border border-line bg-surface shadow-card">
         {loading ? (
-          <div className="p-12 text-center text-sm text-muted">Loading reports...</div>
+          <div className="p-12 text-center text-sm text-muted">
+            Loading reports...
+          </div>
         ) : reports.length === 0 ? (
           <div className="p-12 text-center">
-            <Icon d={I.fileText} size={32} className="mx-auto text-muted mb-3" />
-            <p className="text-base font-semibold text-ink">No reports generated yet</p>
+            <Icon
+              d={I.fileText}
+              size={32}
+              className="mx-auto text-muted mb-3"
+            />
+            <p className="text-base font-semibold text-ink">
+              No reports generated yet
+            </p>
             <p className="text-sm text-muted mt-1 max-w-md mx-auto">
-              Generate an executive summary (R-01) or a full developer remediation report (R-02)
-              for this site.
+              Generate an executive summary (R-01) or a full developer
+              remediation report (R-02) for this site.
             </p>
             <button
               type="button"
@@ -343,21 +396,34 @@ export function ReportsTab({
               </thead>
               <tbody className="divide-y divide-line">
                 {reports.map((r) => (
-                  <tr key={r.id} className="hover:bg-subtle/50 transition-colors">
+                  <tr
+                    key={r.id}
+                    className="hover:bg-subtle/50 transition-colors"
+                  >
                     <td className="px-4 py-3 sm:px-6 font-semibold text-ink">
                       <div className="flex items-center gap-3">
                         <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-subtle text-primary">
                           <Icon d={I.fileText} size={16} />
                         </div>
                         <div>
-                          <div className="text-sm font-semibold text-ink">{r.title}</div>
-                          <div className="text-xs font-normal text-muted">{siteName}</div>
+                          <div className="text-sm font-semibold text-ink">
+                            {r.title}
+                          </div>
+                          <div className="text-xs font-normal text-muted">
+                            {siteName}
+                          </div>
                         </div>
                       </div>
                     </td>
                     <td className="px-4 py-3">
                       <span className="rounded-full bg-subtle px-2.5 py-0.5 text-xs font-medium text-ink">
-                        {r.type === "scan_summary" ? "R-01 Summary" : "R-02 Full Report"}
+                        {r.type === "scan_summary"
+                          ? "R-01 Summary"
+                          : r.type === "full"
+                            ? "R-02 Full Report"
+                            : r.type === "evidence_pack"
+                              ? "R-03 Evidence Pack"
+                              : "Client Monthly"}
                       </span>
                     </td>
                     <td className="px-4 py-3 text-xs text-muted">
@@ -390,7 +456,9 @@ export function ReportsTab({
                     <td className="px-4 py-3 text-xs text-muted">
                       {formatFileSize(r.fileSize)}
                     </td>
-                    <td className="px-4 py-3 text-xs text-muted">{r.createdAt}</td>
+                    <td className="px-4 py-3 text-xs text-muted">
+                      {r.createdAt}
+                    </td>
                     <td className="px-4 py-3 text-right">
                       <div className="flex items-center justify-end gap-2">
                         <button
@@ -433,7 +501,10 @@ export function ReportsTab({
         >
           <div className="w-full max-w-lg rounded-2xl border border-line bg-surface p-6 shadow-2xl">
             <div className="flex items-center justify-between pb-4 border-b border-line">
-              <h3 id={generateTitleId} className="text-lg font-semibold text-ink m-0">
+              <h3
+                id={generateTitleId}
+                className="text-lg font-semibold text-ink m-0"
+              >
                 Generate On-demand Report
               </h3>
               <button
@@ -445,12 +516,15 @@ export function ReportsTab({
               </button>
             </div>
 
-            <form onSubmit={handleGenerateSubmit} className="mt-4 flex flex-col gap-4">
+            <form
+              onSubmit={handleGenerateSubmit}
+              className="mt-4 flex flex-col gap-4"
+            >
               <div>
                 <label className="block text-xs font-semibold text-ink mb-1.5">
                   Report Type
                 </label>
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   <button
                     type="button"
                     onClick={() => setReportType("scan_summary")}
@@ -460,9 +534,11 @@ export function ReportsTab({
                         : "border-line bg-surface text-muted hover:border-line-strong"
                     }`}
                   >
-                    <div className="text-sm font-semibold text-ink">R-01 Summary</div>
+                    <div className="text-sm font-semibold text-ink">
+                      R-01 Summary
+                    </div>
                     <div className="text-xs text-muted mt-1">
-                      1–2 pages executive summary with score, breakdown, and top 10 issues.
+                      1–2 pages executive summary with score and top 10 issues.
                     </div>
                   </button>
                   <button
@@ -474,27 +550,73 @@ export function ReportsTab({
                         : "border-line bg-surface text-muted hover:border-line-strong"
                     }`}
                   >
-                    <div className="text-sm font-semibold text-ink">R-02 Full Report</div>
+                    <div className="text-sm font-semibold text-ink">
+                      R-02 Full Report
+                    </div>
                     <div className="text-xs text-muted mt-1">
-                      Detailed developer remediation report with all occurrences and code snippets.
+                      Detailed remediation report with occurrences and code
+                      snippets.
+                    </div>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setReportType("evidence_pack")}
+                    className={`rounded-xl border p-3 text-left transition-all ${
+                      reportType === "evidence_pack"
+                        ? "border-primary bg-primary/5 text-ink ring-1 ring-primary"
+                        : "border-line bg-surface text-muted hover:border-line-strong"
+                    }`}
+                  >
+                    <div className="text-sm font-semibold text-ink">
+                      R-03 Evidence Pack
+                    </div>
+                    <div className="text-xs text-muted mt-1">
+                      Full compliance audit trail across scans, manual checks,
+                      and statement.
                     </div>
                   </button>
                 </div>
               </div>
 
-              <div>
-                <label className="block text-xs font-semibold text-ink mb-1.5">
-                  Scan Source
-                </label>
-                <select
-                  className="w-full rounded-xl border border-line bg-surface px-3 py-2 text-sm text-ink focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-                  defaultValue="latest"
-                >
-                  <option value="latest">Latest Scan (Scan #23 · 14 Oct 2026 — Score: 78)</option>
-                  <option value="scan-22">Scan #22 (12 Oct 2026 — Score: 72)</option>
-                  <option value="scan-21">Scan #21 (7 Oct 2026 — Score: 74)</option>
-                </select>
-              </div>
+              {reportType === "evidence_pack" ? (
+                <div>
+                  <label className="block text-xs font-semibold text-ink mb-1.5">
+                    Historical Date Range
+                  </label>
+                  <select
+                    value={dateRangeMonths}
+                    onChange={(e) => setDateRangeMonths(Number(e.target.value))}
+                    className="w-full rounded-xl border border-line bg-surface px-3 py-2 text-sm text-ink focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                  >
+                    <option value={12}>
+                      Past 12 Months (Recommended for compliance audits)
+                    </option>
+                    <option value={6}>Past 6 Months</option>
+                    <option value={3}>Past 3 Months (Quarterly Pack)</option>
+                    <option value={1}>Past 30 Days</option>
+                  </select>
+                </div>
+              ) : (
+                <div>
+                  <label className="block text-xs font-semibold text-ink mb-1.5">
+                    Scan Source
+                  </label>
+                  <select
+                    className="w-full rounded-xl border border-line bg-surface px-3 py-2 text-sm text-ink focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                    defaultValue="latest"
+                  >
+                    <option value="latest">
+                      Latest Scan (Scan #23 · 14 Oct 2026 — Score: 78)
+                    </option>
+                    <option value="scan-22">
+                      Scan #22 (12 Oct 2026 — Score: 72)
+                    </option>
+                    <option value="scan-21">
+                      Scan #21 (7 Oct 2026 — Score: 74)
+                    </option>
+                  </select>
+                </div>
+              )}
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
@@ -503,7 +625,9 @@ export function ReportsTab({
                   </label>
                   <select
                     value={paper}
-                    onChange={(e) => setPaper(e.target.value as "a4" | "letter")}
+                    onChange={(e) =>
+                      setPaper(e.target.value as "a4" | "letter")
+                    }
                     className="w-full rounded-xl border border-line bg-surface px-3 py-2 text-sm text-ink focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
                   >
                     <option value="a4">A4 (ISO standard)</option>
@@ -558,11 +682,15 @@ export function ReportsTab({
           <div className="w-full max-w-lg rounded-2xl border border-line bg-surface p-6 shadow-2xl">
             <div className="flex items-center justify-between pb-4 border-b border-line">
               <div>
-                <h3 id={sendTitleId} className="text-lg font-semibold text-ink m-0">
+                <h3
+                  id={sendTitleId}
+                  className="text-lg font-semibold text-ink m-0"
+                >
                   Email Report to Stakeholders
                 </h3>
                 <p className="text-xs text-muted mt-0.5">
-                  Sends template E-11 with a secure download link (valid for 7 days).
+                  Sends template E-11 with a secure download link (valid for 7
+                  days).
                 </p>
               </div>
               <button
@@ -574,11 +702,20 @@ export function ReportsTab({
               </button>
             </div>
 
-            <form onSubmit={handleSendSubmit} className="mt-4 flex flex-col gap-4">
+            <form
+              onSubmit={handleSendSubmit}
+              className="mt-4 flex flex-col gap-4"
+            >
               <div className="rounded-xl border border-line bg-subtle/40 p-3">
-                <div className="text-xs font-semibold text-muted">REPORT DETAILS</div>
-                <div className="text-sm font-semibold text-ink mt-0.5">{selectedReport.title}</div>
-                <div className="text-xs text-muted">{siteName} · {selectedReport.scanLabel}</div>
+                <div className="text-xs font-semibold text-muted">
+                  REPORT DETAILS
+                </div>
+                <div className="text-sm font-semibold text-ink mt-0.5">
+                  {selectedReport.title}
+                </div>
+                <div className="text-xs text-muted">
+                  {siteName} · {selectedReport.scanLabel}
+                </div>
               </div>
 
               <div>
@@ -593,7 +730,9 @@ export function ReportsTab({
                   onChange={(e) => setRecipients(e.target.value)}
                   className="w-full rounded-xl border border-line bg-surface px-3 py-2 text-sm text-ink placeholder:text-muted/60 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
                 />
-                <span className="text-xs text-muted">Separate multiple emails with commas.</span>
+                <span className="text-xs text-muted">
+                  Separate multiple emails with commas.
+                </span>
               </div>
 
               <div>

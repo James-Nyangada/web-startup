@@ -7,6 +7,8 @@ import { signReportDownloadToken, verifyReportDownloadToken } from '../../src/re
 import { handleReportRender } from '../../src/worker/jobs/report-render.js';
 import { MemoryStorageService } from '../../src/storage/index.js';
 import { renderReportShared } from '../../src/emails/templates/index.js';
+import { renderEvidencePackReportHtml } from '../../src/reports/render.js';
+import type { EvidencePackReportData } from '../../src/reports/templates.js';
 import type { Auth } from '../../src/lib/auth.js';
 
 function createMockAuth() {
@@ -453,5 +455,257 @@ describe('Worker job: handleReportRender', () => {
         action: 'report.generated',
       }),
     );
+  });
+
+  it('renders evidence pack (R-03) with 12-month timeline, manual checks, and statement', async () => {
+    const storage = new MemoryStorageService();
+    const updateStatus = vi.fn().mockResolvedValue({ id: 'rep-ev-1', status: 'ready' });
+    const writeAudit = vi.fn().mockResolvedValue(undefined);
+    const recordEvidence = vi.fn().mockResolvedValue(undefined);
+
+    const repos = {
+      reports: {
+        findRawById: vi.fn().mockResolvedValue({
+          id: 'rep-ev-1',
+          orgId: '11111111-1111-4111-a111-111111111111',
+          siteId: 'site-1',
+          type: 'evidence_pack',
+          status: 'queued',
+          requestedBy: 'user-1',
+        }),
+        updateStatus,
+      },
+      sites: {
+        findRawById: vi.fn().mockResolvedValue({
+          id: 'site-1',
+          name: 'Oakhaus Furniture',
+          rootUrl: 'https://oakhaus.com',
+          score: 82,
+        }),
+      },
+      scans: {
+        listBySite: vi.fn().mockResolvedValue([
+          {
+            id: 'scan-1',
+            score: 82,
+            criticalCount: 1,
+            seriousCount: 2,
+            pagesScanned: 15,
+            status: 'completed',
+            createdAt: new Date().toISOString(),
+          },
+        ]),
+      },
+      issues: {
+        listBySite: vi.fn().mockImplementation((_orgId, _siteId, filter) => {
+          if (filter.status === 'fixed') {
+            return Promise.resolve({
+              items: [
+                {
+                  id: 'iss-fixed-1',
+                  ruleId: 'image-alt',
+                  title: 'Images must have alternate text',
+                  impact: 'critical',
+                  updatedAt: new Date().toISOString(),
+                  occurrenceCount: 3,
+                },
+              ],
+            });
+          }
+          if (filter.status === 'open') {
+            return Promise.resolve({
+              items: [
+                {
+                  id: 'iss-open-1',
+                  ruleId: 'color-contrast',
+                  title: 'Elements must have sufficient color contrast',
+                  impact: 'serious',
+                  assigneeName: 'Daniel Mwangi',
+                  dueDate: '2026-11-01',
+                  occurrenceCount: 2,
+                },
+              ],
+            });
+          }
+          if (filter.status === 'ignored') {
+            return Promise.resolve({
+              items: [
+                {
+                  id: 'iss-ign-1',
+                  ruleId: 'frame-title',
+                  title: 'Frames must have title attribute',
+                  impact: 'minor',
+                  ignoreReason: 'False positive',
+                  ignoreNote: 'Third-party tracking iframe',
+                },
+              ],
+            });
+          }
+          return Promise.resolve({ items: [] });
+        }),
+      },
+      manualChecks: {
+        listBySite: vi.fn().mockResolvedValue({
+          items: [
+            {
+              id: 'mc-1',
+              checkType: 'screen_reader',
+              performedAt: '2026-10-18',
+              performedByName: 'Sarah QA',
+              tool: 'NVDA 2026.2 + Firefox',
+              result: 'pass',
+              notes: 'Full checkout flow tested with screen reader.',
+            },
+          ],
+          total: 1,
+        }),
+      },
+      statements: {
+        findPublishedBySite: vi.fn().mockResolvedValue({
+          id: 'stmt-1',
+          version: 2,
+          publishedAt: new Date('2026-10-15'),
+          data: {
+            targetStandard: 'WCAG 2.2 Level AA',
+            conformanceStatus: 'partially_conformant',
+          },
+        }),
+      },
+      evidenceEvents: {
+        record: recordEvidence,
+      },
+      auditLog: {
+        write: writeAudit,
+      },
+    } as unknown as Repositories;
+
+    await handleReportRender({ reportId: 'rep-ev-1' }, { repos, storage });
+
+    expect(updateStatus).toHaveBeenCalledWith('rep-ev-1', 'rendering');
+    expect(updateStatus).toHaveBeenCalledWith(
+      'rep-ev-1',
+      'ready',
+      expect.objectContaining({
+        fileKey: 'reports/11111111-1111-4111-a111-111111111111/rep-ev-1.pdf',
+      }),
+    );
+
+    const pdf = await storage.getObject(
+      'reports/11111111-1111-4111-a111-111111111111/rep-ev-1.pdf',
+    );
+    expect(pdf).not.toBeNull();
+    expect(pdf?.toString('utf-8')).toContain('%PDF');
+
+    expect(recordEvidence).toHaveBeenCalledWith(
+      '11111111-1111-4111-a111-111111111111',
+      expect.objectContaining({
+        type: 'report_generated',
+        data: expect.objectContaining({
+          type: 'evidence_pack',
+        }),
+      }),
+    );
+  });
+});
+
+describe('Evidence Pack HTML Renderer (R-03)', () => {
+  it('renders all required evidence pack sections with zero placeholder content', () => {
+    const data: EvidencePackReportData = {
+      siteName: 'Oakhaus Furniture',
+      rootUrl: 'https://oakhaus.com',
+      dateRange: {
+        start: '1 Nov 2025',
+        end: '1 Nov 2026',
+      },
+      generatedAt: '2026-11-01T12:00:00.000Z',
+      summary: {
+        scansCount: 24,
+        latestScore: 88,
+        scoreBand: 'Good',
+        totalFixed: 12,
+        openIssuesCount: 4,
+        ignoredIssuesCount: 2,
+        manualChecksCount: 5,
+        statementPublished: true,
+      },
+      scans: [
+        {
+          id: 'scan-24',
+          date: '1 Nov 2026',
+          score: 88,
+          scoreBand: 'Good',
+          critical: 0,
+          serious: 2,
+          pagesScanned: 25,
+          status: 'completed',
+        },
+      ],
+      fixedIssues: [
+        {
+          id: 'f-1',
+          ruleId: 'image-alt',
+          title: 'Missing image alt attribute',
+          impact: 'critical',
+          fixedAt: '15 Oct 2026',
+          occurrences: 4,
+        },
+      ],
+      openIssues: [
+        {
+          id: 'o-1',
+          ruleId: 'color-contrast',
+          title: 'Text contrast below 4.5:1',
+          impact: 'serious',
+          occurrences: 2,
+          assigneeName: 'Daniel Mwangi',
+          dueDate: '10 Nov 2026',
+        },
+      ],
+      ignoredIssues: [
+        {
+          id: 'ig-1',
+          ruleId: 'frame-title',
+          title: 'Frame missing title',
+          impact: 'minor',
+          reason: 'False positive',
+          note: 'Hidden iframe',
+        },
+      ],
+      manualChecks: [
+        {
+          id: 'mc-1',
+          checkType: 'screen_reader',
+          performedAt: '2026-10-20',
+          testerName: 'Sarah QA',
+          tool: 'NVDA + Firefox',
+          result: 'pass',
+          notes: 'Tested primary navigation and checkout flow',
+        },
+      ],
+      publishedStatement: {
+        version: 1,
+        publishedAt: '2026-10-15T10:00:00.000Z',
+        targetStandard: 'WCAG 2.2 Level AA',
+        conformanceStatus: 'partially_conformant',
+        publicUrl: 'http://localhost:3000/s/site-1/accessibility-statement',
+      },
+    };
+
+    const html = renderEvidencePackReportHtml(data);
+
+    expect(html).toContain('Accessibility Evidence Pack');
+    expect(html).toContain('Oakhaus Furniture');
+    expect(html).toContain('1 Nov 2025 – 1 Nov 2026');
+    expect(html).toContain('Accessibility Statement Declaration');
+    expect(html).toContain('http://localhost:3000/s/site-1/accessibility-statement');
+    expect(html).toContain('Automated Scan History');
+    expect(html).toContain('Remediated Issues');
+    expect(html).toContain('Missing image alt attribute');
+    expect(html).toContain('Current Open Backlog');
+    expect(html).toContain('Daniel Mwangi');
+    expect(html).toContain('Ignored Findings &amp; Rationale');
+    expect(html).toContain('Human &amp; Assistive Technology Checks');
+    expect(html).toContain('NVDA + Firefox');
+    expect(html).toContain('What automated testing cannot check');
   });
 });
