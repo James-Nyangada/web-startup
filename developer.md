@@ -1234,7 +1234,7 @@ S-46: add Slack incoming webhook or generic URL, choose events and sites, test b
 
 **P5-08 — Scheduled client reports** · *Depends on:* P4-07, P2-19 · *Size:* M
 Report schedules UI (inside S-30 for agency plans), `report.schedule` job, R-04 Client monthly report, E-12 branded.
-- [ ] Recipients receive the report on the configured day; failures retried and reported.
+- [x] Recipients receive the report on the configured day; failures retried and reported.
 
 **P5-09 — My tasks** · *Depends on:* P2-14 · *Size:* S
 S-49: issues assigned to me across sites, grouped by due date (overdue, this week, later, no date).
