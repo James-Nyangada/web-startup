@@ -18,10 +18,12 @@ import { handlePaddleProcess } from './jobs/paddle-process.js';
 import { handleWeeklyDigest } from './jobs/digest-weekly.js';
 import { handleWebhookDeliver } from './jobs/webhook-deliver.js';
 import { handleReportSchedule } from './jobs/report-schedule.js';
+import { handleRetentionPrune } from './jobs/retention-prune.js';
 import type {
   DigestWeeklyJobPayload,
   PaddleProcessJobPayload,
   ReportRenderJobPayload,
+  RetentionPruneJobPayload,
   WebhookDeliverJobPayload,
 } from './types.js';
 
@@ -37,6 +39,7 @@ export const QUEUE_TRIAL_LIFECYCLE = 'trial.lifecycle';
 export const QUEUE_PADDLE_PROCESS = 'paddle.process';
 export const QUEUE_DIGEST_WEEKLY = 'digest.weekly';
 export const QUEUE_WEBHOOK_DELIVER = 'webhook.deliver';
+export const QUEUE_RETENTION_PRUNE = 'retention.prune';
 
 export const ALL_QUEUES = [
   QUEUE_SCAN_RUN,
@@ -51,6 +54,7 @@ export const ALL_QUEUES = [
   QUEUE_PADDLE_PROCESS,
   QUEUE_DIGEST_WEEKLY,
   QUEUE_WEBHOOK_DELIVER,
+  QUEUE_RETENTION_PRUNE,
 ] as const;
 
 /** pg-boss refuses to send to or schedule on a queue that does not exist. Idempotent. */
@@ -348,6 +352,16 @@ export async function registerWorkers(boss: PgBoss, ctx: WorkerContext): Promise
   await boss.work(QUEUE_REPORT_SCHEDULE, { localConcurrency: 1, batchSize: 1 }, async () => {
     await handleReportSchedule(undefined, ctx);
   });
+
+  // Concurrency 1 for retention.prune cron (Spec Section 9 & P5-10)
+  await boss.work<RetentionPruneJobPayload>(
+    QUEUE_RETENTION_PRUNE,
+    { localConcurrency: 1, batchSize: 1 },
+    async (jobs) => {
+      const job = jobs[0];
+      await handleRetentionPrune(job?.data, ctx);
+    },
+  );
 }
 
 /**
@@ -365,4 +379,14 @@ export async function registerSchedules(boss: PgBoss): Promise<void> {
 
   // report.schedule runs daily at 06:00 UTC (Spec Section 9 & P5-08)
   await boss.schedule(QUEUE_REPORT_SCHEDULE, '0 6 * * *', {});
+
+  // retention.prune runs daily at 02:00 UTC (Spec Section 9 & P5-10)
+  await boss.schedule(QUEUE_RETENTION_PRUNE, '0 2 * * *', {});
+}
+
+export async function enqueueRetentionPrune(
+  boss: PgBoss,
+  payload: RetentionPruneJobPayload = {},
+): Promise<string | null> {
+  return boss.send(QUEUE_RETENTION_PRUNE, payload);
 }

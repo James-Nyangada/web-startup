@@ -711,6 +711,19 @@ export function fakeRepos() {
         }),
       };
     })(),
+    retention: {
+      getPrunableStats: vi.fn().mockResolvedValue({
+        occurrencesCount: 0,
+        pagesCount: 0,
+        rawKeys: [],
+      }),
+      pruneTransientData: vi.fn().mockResolvedValue({
+        occurrencesDeleted: 0,
+        pagesDeleted: 0,
+      }),
+      findPurgeableOrgs: vi.fn().mockResolvedValue([]),
+      purgeOrganization: vi.fn().mockResolvedValue(true),
+    },
   } as unknown as Repositories;
   return { repos, join };
 }

@@ -61,3 +61,28 @@ export interface WebhookDeliverJobPayload {
   event: string;
   payload: Record<string, unknown>;
 }
+
+export interface RetentionPruneJobPayload {
+  orgId?: string;
+  dryRun?: boolean;
+}
+
+export interface RetentionPruneReport {
+  orgsEvaluated: number;
+  occurrencesPruned: number;
+  pagesPruned: number;
+  rawFilesPruned: number;
+  deletedOrgsPurged: number;
+  dryRun: boolean;
+  durationMs: number;
+  details: Array<{
+    orgId: string;
+    orgName: string;
+    plan: string;
+    retentionMonths: number;
+    cutoffDate: string;
+    occurrencesPruned: number;
+    pagesPruned: number;
+    rawFilesPruned: number;
+  }>;
+}

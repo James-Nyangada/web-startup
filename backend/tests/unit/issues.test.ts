@@ -367,6 +367,7 @@ describe('Issues API (Chunk P2-12, Screen S-25, Section 7.5)', () => {
         {
           id: 'issue-1',
           siteId,
+          siteName: 'Oakhaus Furniture',
           ruleId: 'color-contrast',
           title: 'Color contrast',
           impact: 'serious',
