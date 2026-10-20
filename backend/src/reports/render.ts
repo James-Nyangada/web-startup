@@ -11,6 +11,8 @@ import {
   type AgencyOverviewReportData,
   EvidencePackReport,
   type EvidencePackReportData,
+  ClientMonthlyReport,
+  type ClientMonthlyReportData,
 } from './templates.js';
 import type { ReportBranding } from './components.js';
 
@@ -66,6 +68,40 @@ export async function renderReportPdf(scan: ScanResult, options: ReportOptions):
       displayHeaderFooter: true,
       headerTemplate: '<span></span>',
       footerTemplate: footerTemplate(scan.rootUrl, options.branding),
+      margin: { top: '16mm', bottom: '18mm', left: '15mm', right: '15mm' },
+    });
+    return pdf;
+  } finally {
+    await browser.close();
+  }
+}
+
+export function renderClientMonthlyReportHtml(
+  data: ClientMonthlyReportData,
+  branding?: ReportBranding,
+): string {
+  return `<!doctype html>${renderToStaticMarkup(createElement(ClientMonthlyReport, { data, branding }))}`;
+}
+
+export async function renderClientMonthlyReportPdf(
+  data: ClientMonthlyReportData,
+  options: { paper?: Paper; branding?: ReportBranding } = {},
+): Promise<Buffer> {
+  const html = renderClientMonthlyReportHtml(data, options.branding);
+  const browser = await chromium.launch();
+  try {
+    const context = await browser.newContext({ javaScriptEnabled: false });
+    await context.route('**/*', (route) => route.abort());
+    const page = await context.newPage();
+    await page.setContent(html, { waitUntil: 'load' });
+    const pdf = await page.pdf({
+      format: options.paper === 'letter' ? 'Letter' : 'A4',
+      printBackground: true,
+      tagged: true,
+      outline: true,
+      displayHeaderFooter: true,
+      headerTemplate: '<span></span>',
+      footerTemplate: footerTemplate(data.siteName, options.branding),
       margin: { top: '16mm', bottom: '18mm', left: '15mm', right: '15mm' },
     });
     return pdf;

@@ -8,23 +8,30 @@ import type { WebhookDisabledData } from '../../emails/types.js';
 import { EmailSender } from '../../emails/sender.js';
 
 export function formatSlackMessage(event: string, data: Record<string, unknown>): string {
-  const siteName = String(data.siteName ?? data.siteId ?? 'Site');
+  const siteName =
+    typeof data['siteName'] === 'string'
+      ? data['siteName']
+      : typeof data['siteId'] === 'string'
+        ? data['siteId']
+        : 'Site';
   const appUrl = process.env.APP_URL ?? 'https://app.brightline.dev';
 
   switch (event) {
     case 'scan.completed': {
-      const score = data.score !== undefined && data.score !== null ? data.score : '—';
-      const critical = data.criticalCount ?? 0;
-      const serious = data.seriousCount ?? 0;
+      const score = typeof data['score'] === 'number' ? String(data['score']) : '—';
+      const critical =
+        typeof data['criticalCount'] === 'number' ? String(data['criticalCount']) : '0';
+      const serious = typeof data['seriousCount'] === 'number' ? String(data['seriousCount']) : '0';
       return `*Scan completed for ${siteName}*\nScore: *${score}* | Critical: ${critical} | Serious: ${serious}\n<${appUrl}|View scan results>`;
     }
     case 'issue.regressed': {
-      const title = data.issueTitle ?? 'Accessibility issue';
-      const impact = data.impact ?? 'serious';
+      const title =
+        typeof data['issueTitle'] === 'string' ? data['issueTitle'] : 'Accessibility issue';
+      const impact = typeof data['impact'] === 'string' ? data['impact'] : 'serious';
       return `:warning: *Regression detected on ${siteName}*\nIssue: *${title}* (${impact})\n<${appUrl}|View regression>`;
     }
     case 'issues.new_critical': {
-      const count = data.count ?? 10;
+      const count = typeof data['count'] === 'number' ? String(data['count']) : '10';
       return `:rotating_light: *High severity spike on ${siteName}*\n${count} new critical or serious issues discovered in the latest scan.\n<${appUrl}|Review issues>`;
     }
     case 'site.verification_failed': {
@@ -152,7 +159,11 @@ export async function handleWebhookDeliver(
   }
 }
 
-async function notifyAutoDisabled(orgId: OrgId, webhookUrl: string, ctx: WorkerContext): Promise<void> {
+async function notifyAutoDisabled(
+  orgId: OrgId,
+  webhookUrl: string,
+  ctx: WorkerContext,
+): Promise<void> {
   const org = await ctx.repos.organizations.findById(orgId);
   const orgName = org?.name ?? 'your organisation';
   const appUrl = process.env.APP_URL ?? 'https://app.brightline.dev';

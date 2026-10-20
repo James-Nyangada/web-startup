@@ -704,7 +704,54 @@ export const appApi = {
     apiClient<{ deliveries: ApiWebhookDelivery[] }>(`/v1/orgs/${org}/webhooks/${id}/deliveries`).then(
       (r) => r.deliveries,
     ),
+
+  listReportSchedules: (org: string, siteId?: string) =>
+    apiClient<{ schedules: ApiReportSchedule[] }>(
+      `/v1/orgs/${org}/report-schedules${siteId ? `?siteId=${siteId}` : ''}`,
+    ).then((r) => r.schedules),
+
+  createReportSchedule: (
+    org: string,
+    data: { siteId: string; recipients: string[]; dayOfMonth: number; active?: boolean },
+  ) =>
+    apiClient<{ schedule: ApiReportSchedule }>(
+      `/v1/orgs/${org}/report-schedules`,
+      json(data),
+    ).then((r) => r.schedule),
+
+  updateReportSchedule: (org: string, id: string, data: Partial<ApiReportSchedule>) =>
+    apiClient<{ schedule: ApiReportSchedule }>(`/v1/orgs/${org}/report-schedules/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    }).then((r) => r.schedule),
+
+  deleteReportSchedule: (org: string, id: string) =>
+    apiClient<{ ok: boolean }>(`/v1/orgs/${org}/report-schedules/${id}`, {
+      method: 'DELETE',
+    }),
+
+  sendReportScheduleNow: (org: string, id: string) =>
+    apiClient<{ ok: boolean; message: string }>(
+      `/v1/orgs/${org}/report-schedules/${id}/send-now`,
+      { method: 'POST' },
+    ),
 };
+
+export interface ApiReportSchedule {
+  id: string;
+  orgId: string;
+  siteId: string;
+  siteName?: string;
+  clientName?: string | null;
+  recipients: string[];
+  dayOfMonth: number;
+  type: 'client_monthly';
+  active: boolean;
+  lastSentAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
 
 export interface ApiWebhook {
   id: string;

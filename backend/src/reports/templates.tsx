@@ -853,3 +853,207 @@ export function EvidencePackReport({
     </Document>
   );
 }
+
+export interface ClientMonthlyReportData {
+  siteName: string;
+  clientName: string | null;
+  rootUrl: string;
+  reportPeriod: string;
+  currentScore: number | null;
+  previousScore: number | null;
+  scoreDelta: number | null;
+  totalIssues: number;
+  criticalCount: number;
+  seriousCount: number;
+  moderateCount: number;
+  minorCount: number;
+  fixedThisMonthCount: number;
+  fixedIssues: Array<{ title: string; impact: string; fixedAt: string }>;
+  topOpenIssues: Array<{ title: string; impact: string; selector: string; occurrences: number }>;
+  scansCount: number;
+}
+
+/** R-04: Monthly Client Accessibility Report with Agency Branding. */
+export function ClientMonthlyReport({
+  data,
+  branding,
+}: {
+  data: ClientMonthlyReportData;
+  branding?: ReportBranding;
+}) {
+  const title = `Monthly Accessibility Report – ${data.reportPeriod}`;
+  const agencyName = branding?.displayName || 'Agency Studio';
+
+  return (
+    <Document title={`${title} – ${data.siteName}`} branding={branding}>
+      <header className="cover">
+        {branding?.logoUrl && (
+          <div style={{ marginBottom: '12pt' }}>
+            <img
+              src={branding.logoUrl}
+              alt={agencyName}
+              style={{ maxHeight: '40pt', maxWidth: '160pt', objectFit: 'contain' }}
+            />
+          </div>
+        )}
+        <p className="eyebrow">{agencyName} Client Report</p>
+        <h1>{data.siteName}</h1>
+        <p className="subtitle">
+          Accessibility monitoring report for <strong>{data.reportPeriod}</strong>
+          {data.clientName ? ` · Prepared for ${data.clientName}` : ''}
+        </p>
+
+        <dl className="meta-grid">
+          <div>
+            <dt>Target Site</dt>
+            <dd>
+              <a href={data.rootUrl}>{data.rootUrl}</a>
+            </dd>
+          </div>
+          <div>
+            <dt>Report Period</dt>
+            <dd>{data.reportPeriod}</dd>
+          </div>
+          <div>
+            <dt>Scans Run</dt>
+            <dd>{data.scansCount} scans evaluated</dd>
+          </div>
+          <div>
+            <dt>Issues Fixed</dt>
+            <dd>{data.fixedThisMonthCount} resolved</dd>
+          </div>
+        </dl>
+      </header>
+
+      {/* Score Summary */}
+      <section aria-labelledby="score-heading">
+        <h2 id="score-heading">Accessibility Health & Score</h2>
+        <div style={{ display: 'flex', gap: '24pt', alignItems: 'center', margin: '16pt 0' }}>
+          <div
+            style={{
+              padding: '16pt 24pt',
+              borderRadius: '8pt',
+              border: '1pt solid #E5E7EB',
+              background: '#F9FAFB',
+              textAlign: 'center',
+            }}
+          >
+            <div style={{ fontSize: '32pt', fontWeight: 800, color: 'var(--primary)' }}>
+              {data.currentScore !== null ? `${data.currentScore}` : '—'}
+            </div>
+            <div className="small" style={{ color: '#4B5563', marginTop: '4pt' }}>
+              Conformance Score / 100
+            </div>
+            {data.scoreDelta !== null && data.scoreDelta !== 0 && (
+              <div
+                style={{
+                  fontSize: '11pt',
+                  fontWeight: 600,
+                  marginTop: '4pt',
+                  color: data.scoreDelta > 0 ? 'var(--ok)' : 'var(--crit)',
+                }}
+              >
+                {data.scoreDelta > 0 ? `+${data.scoreDelta}` : data.scoreDelta} pts from previous
+                month
+              </div>
+            )}
+          </div>
+
+          <div style={{ flex: 1 }}>
+            <p style={{ margin: '0 0 10pt 0', fontSize: '11pt', lineHeight: 1.5 }}>
+              During {data.reportPeriod}, continuous accessibility monitoring scanned your site
+              pages against WCAG 2.2 AA standards. A total of{' '}
+              <strong>{data.fixedThisMonthCount} issues</strong> were resolved, maintaining a
+              current score of{' '}
+              <strong>{data.currentScore !== null ? `${data.currentScore}/100` : '—'}</strong>.
+            </p>
+            <div style={{ display: 'flex', gap: '12pt', flexWrap: 'wrap' }}>
+              <span className="badge badge-critical">{data.criticalCount} Critical</span>
+              <span className="badge badge-serious">{data.seriousCount} Serious</span>
+              <span className="badge badge-moderate">{data.moderateCount} Moderate</span>
+              <span className="badge badge-minor">{data.minorCount} Minor</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Resolved Issues */}
+      <section aria-labelledby="fixed-heading">
+        <h2 id="fixed-heading">Resolved Issues ({data.fixedThisMonthCount})</h2>
+        {data.fixedIssues.length === 0 ? (
+          <p className="small" style={{ color: '#6B7280' }}>
+            No previously identified issues were marked resolved during this period.
+          </p>
+        ) : (
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">Rule / Description</th>
+                <th scope="col" style={{ width: '80pt' }}>
+                  Impact
+                </th>
+                <th scope="col" style={{ width: '90pt' }}>
+                  Resolved
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {data.fixedIssues.slice(0, 15).map((f, i) => (
+                <tr key={i}>
+                  <td>{f.title}</td>
+                  <td>
+                    <span className={`badge badge-${f.impact}`}>{f.impact}</span>
+                  </td>
+                  <td className="small">{f.fixedAt}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </section>
+
+      {/* Top Open Issues */}
+      <section aria-labelledby="open-heading">
+        <h2 id="open-heading">Priority Items for Upcoming Sprint</h2>
+        {data.topOpenIssues.length === 0 ? (
+          <p className="small" style={{ color: '#16A34A', fontWeight: 600 }}>
+            No high-severity open issues detected on scanned pages.
+          </p>
+        ) : (
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">Issue</th>
+                <th scope="col" style={{ width: '80pt' }}>
+                  Impact
+                </th>
+                <th scope="col">Example Selector</th>
+                <th scope="col" style={{ width: '70pt', textAlign: 'right' }}>
+                  Instances
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {data.topOpenIssues.slice(0, 10).map((issue, i) => (
+                <tr key={i}>
+                  <td>{issue.title}</td>
+                  <td>
+                    <span className={`badge badge-${issue.impact}`}>{issue.impact}</span>
+                  </td>
+                  <td className="small" style={{ fontFamily: 'monospace' }}>
+                    {issue.selector.slice(0, 40)}
+                  </td>
+                  <td style={{ textAlign: 'right' }}>{issue.occurrences}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </section>
+
+      <section aria-labelledby="limits-heading">
+        <Limitations />
+      </section>
+    </Document>
+  );
+}

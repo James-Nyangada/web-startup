@@ -64,7 +64,7 @@ describe('P5-07: Webhooks and Slack integrations', () => {
     });
 
     const ctx: WorkerContext = {
-      repos: repos as never,
+      repos: repos,
       storage: {} as never,
       emailSender,
       scannerPolicy: testGuardPolicy,
@@ -135,7 +135,7 @@ describe('P5-07: Webhooks and Slack integrations', () => {
 
     try {
       const ctx: WorkerContext = {
-        repos: repos as never,
+        repos: repos,
         storage: {} as never,
         emailSender,
         scannerPolicy: testGuardPolicy,
@@ -211,11 +211,13 @@ describe('P5-07: Webhooks and Slack integrations', () => {
     });
 
     const originalFetch = global.fetch;
-    global.fetch = vi.fn().mockResolvedValue(new Response('Internal Server Error', { status: 500 }));
+    global.fetch = vi
+      .fn()
+      .mockResolvedValue(new Response('Internal Server Error', { status: 500 }));
 
     try {
       const ctx: WorkerContext = {
-        repos: repos as never,
+        repos: repos,
         storage: {} as never,
         emailSender,
         scannerPolicy: testGuardPolicy,

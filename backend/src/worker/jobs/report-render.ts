@@ -2,10 +2,15 @@ import {
   renderReportPdf,
   renderAgencyOverviewReportPdf,
   renderEvidencePackReportPdf,
+  renderClientMonthlyReportPdf,
 } from '../../reports/render.js';
 import type { ScanResult } from '../../scanner/scan.js';
 import type { ReportBranding } from '../../reports/components.js';
-import type { AgencyOverviewReportData, EvidencePackReportData } from '../../reports/templates.js';
+import type {
+  AgencyOverviewReportData,
+  EvidencePackReportData,
+  ClientMonthlyReportData,
+} from '../../reports/templates.js';
 import { scoreBand } from '../../scanner/results/score.js';
 import { asOrgId } from '../../db/repositories/org-scope.js';
 import type { ReportRenderJobPayload, WorkerContext } from '../types.js';
@@ -256,12 +261,18 @@ export async function handleReportRender(
         const st = await ctx.repos.statements.findPublishedBySite(site.id);
         if (st && st.publishedAt) {
           const appUrl = process.env.APP_URL || 'http://localhost:3000';
-          const stData = st.data as Record<string, unknown>;
+          const stData = st.data;
           publishedStatement = {
             version: st.version,
             publishedAt: st.publishedAt.toISOString(),
-            targetStandard: String(stData.targetStandard || 'WCAG 2.2 Level AA'),
-            conformanceStatus: String(stData.conformanceStatus || 'partially_conformant'),
+            targetStandard:
+              typeof stData.targetStandard === 'string'
+                ? stData.targetStandard
+                : 'WCAG 2.2 Level AA',
+            conformanceStatus:
+              typeof stData.conformanceStatus === 'string'
+                ? stData.conformanceStatus
+                : 'partially_conformant',
             publicUrl: `${appUrl}/s/${site.id}/accessibility-statement`,
           };
         }
@@ -295,6 +306,89 @@ export async function handleReportRender(
 
       try {
         pdfBuffer = await renderEvidencePackReportPdf(evidenceData, {
+          paper: 'a4',
+          branding: reportBranding,
+        });
+      } catch {
+        pdfBuffer = Buffer.from(
+          `%PDF-1.4\n1 0 obj\n<< /Title (${report.type}) /Author (Plainsight) >>\nendobj\ntrailer\n<< /Root 1 0 R >>\n%%EOF\n`,
+          'utf-8',
+        );
+      }
+    } else if (report.type === 'client_monthly') {
+      const site = report.siteId ? await ctx.repos.sites.findRawById(report.siteId) : null;
+      const siteName = site?.name ?? 'Site';
+      const rootUrl = site?.rootUrl ?? 'https://example.com';
+      const clientName = site?.clientName ?? null;
+
+      const now = new Date();
+      const reportPeriod = now.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
+
+      // Gather site summary and issues
+      const currentScore = site?.score ?? null;
+      let previousScore: number | null = null;
+      let scoreDelta: number | null = null;
+
+      if (site) {
+        const summaries = await ctx.repos.sites.listSummaries(asOrgId(report.orgId), [site.id]);
+        const summary = summaries.get(site.id);
+        previousScore = summary?.previousScore ?? null;
+        if (currentScore !== null && previousScore !== null) {
+          scoreDelta = currentScore - previousScore;
+        }
+      }
+
+      // Severity counts
+      const counts = site
+        ? await ctx.repos.issues.getSeverityCounts(asOrgId(report.orgId), site.id)
+        : { critical: 0, serious: 0, moderate: 0, minor: 0 };
+
+      // Fixed issues
+      const fixedIssuesRaw = site
+        ? await ctx.repos.issues.listBySite(asOrgId(report.orgId), site.id, { status: 'fixed' }, 15)
+        : [];
+      const fixedIssues = fixedIssuesRaw.map((f) => ({
+        title: f.title ?? f.ruleId,
+        impact: f.impact,
+        fixedAt: f.updatedAt ? new Date(f.updatedAt).toLocaleDateString('en-GB') : 'Verified',
+      }));
+
+      // Top open issues
+      const openIssuesRaw = site
+        ? await ctx.repos.issues.listBySite(asOrgId(report.orgId), site.id, { status: 'open' }, 10)
+        : [];
+      const topOpenIssues = openIssuesRaw.map((o) => ({
+        title: o.title ?? o.ruleId,
+        impact: o.impact,
+        selector: o.selector ?? '—',
+        occurrences: o.occurrenceCount ?? 1,
+      }));
+
+      const rawScans = site
+        ? await ctx.repos.scans.listBySite(asOrgId(report.orgId), site.id, 10)
+        : [];
+
+      const monthlyData: ClientMonthlyReportData = {
+        siteName,
+        clientName,
+        rootUrl,
+        reportPeriod,
+        currentScore,
+        previousScore,
+        scoreDelta,
+        totalIssues: counts.critical + counts.serious + counts.moderate + counts.minor,
+        criticalCount: counts.critical,
+        seriousCount: counts.serious,
+        moderateCount: counts.moderate,
+        minorCount: counts.minor,
+        fixedThisMonthCount: fixedIssues.length,
+        fixedIssues,
+        topOpenIssues,
+        scansCount: rawScans.length,
+      };
+
+      try {
+        pdfBuffer = await renderClientMonthlyReportPdf(monthlyData, {
           paper: 'a4',
           branding: reportBranding,
         });

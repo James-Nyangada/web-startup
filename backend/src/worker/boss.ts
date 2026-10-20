@@ -17,6 +17,7 @@ import { handleTrialLifecycle } from './jobs/trial-lifecycle.js';
 import { handlePaddleProcess } from './jobs/paddle-process.js';
 import { handleWeeklyDigest } from './jobs/digest-weekly.js';
 import { handleWebhookDeliver } from './jobs/webhook-deliver.js';
+import { handleReportSchedule } from './jobs/report-schedule.js';
 import type {
   DigestWeeklyJobPayload,
   PaddleProcessJobPayload,
@@ -30,6 +31,7 @@ export const QUEUE_SCAN_SCHEDULE = 'scan.schedule';
 export const QUEUE_ISSUE_RECHECK = 'issue.recheck';
 export const QUEUE_EMAIL_SEND = 'email.send';
 export const QUEUE_REPORT_RENDER = 'report.render';
+export const QUEUE_REPORT_SCHEDULE = 'report.schedule';
 export const QUEUE_FREE_CHECK_RUN = 'free-check.run';
 export const QUEUE_TRIAL_LIFECYCLE = 'trial.lifecycle';
 export const QUEUE_PADDLE_PROCESS = 'paddle.process';
@@ -43,6 +45,7 @@ export const ALL_QUEUES = [
   QUEUE_ISSUE_RECHECK,
   QUEUE_EMAIL_SEND,
   QUEUE_REPORT_RENDER,
+  QUEUE_REPORT_SCHEDULE,
   QUEUE_FREE_CHECK_RUN,
   QUEUE_TRIAL_LIFECYCLE,
   QUEUE_PADDLE_PROCESS,
@@ -340,6 +343,11 @@ export async function registerWorkers(boss: PgBoss, ctx: WorkerContext): Promise
       }
     },
   );
+
+  // Concurrency 1 for report.schedule cron (Spec Section 9 & P5-08)
+  await boss.work(QUEUE_REPORT_SCHEDULE, { localConcurrency: 1, batchSize: 1 }, async () => {
+    await handleReportSchedule(undefined, ctx);
+  });
 }
 
 /**
@@ -354,4 +362,7 @@ export async function registerSchedules(boss: PgBoss): Promise<void> {
 
   // digest.weekly runs hourly to catch Mon 07:00 in each org's time zone (Spec Section 9 & P5-06)
   await boss.schedule(QUEUE_DIGEST_WEEKLY, '0 * * * *', {});
+
+  // report.schedule runs daily at 06:00 UTC (Spec Section 9 & P5-08)
+  await boss.schedule(QUEUE_REPORT_SCHEDULE, '0 6 * * *', {});
 }

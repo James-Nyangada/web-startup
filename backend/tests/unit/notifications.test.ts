@@ -3,10 +3,11 @@ import request from 'supertest';
 import type { Express } from 'express';
 import type { Repositories } from '../../src/db/repositories/index.js';
 import { buildTestApp } from '../helpers/fakes.js';
-import { asOrgId } from '../../src/db/repositories/org-scope.js';
 import { handleScanProcess } from '../../src/worker/jobs/scan-process.js';
 import { MemoryStorageService } from '../../src/storage/index.js';
 import type { Auth } from '../../src/lib/auth.js';
+import type { EmailSender } from '../../src/emails/sender.js';
+import type pg from 'pg';
 
 function createMockAuth(userId: string) {
   const mockUser = {
@@ -279,8 +280,8 @@ describe('Notifications & Preferences API (P5-05)', () => {
       const workerCtx = {
         repos: mockRepos,
         storage,
-        emailSender: emailSender as any,
-        pool: {} as any,
+        emailSender: emailSender as unknown as EmailSender,
+        pool: {} as unknown as pg.Pool,
       };
 
       // Run 1: First time regression is detected -> Sends alert email E-08

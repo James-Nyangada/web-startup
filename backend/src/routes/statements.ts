@@ -357,8 +357,7 @@ export function statementsPublicRouter(repos: Repositories): Router {
 
     const appUrl = process.env.APP_URL || 'http://localhost:3000';
     const publicUrl = `${appUrl}/s/${siteId}/accessibility-statement`;
-    const siteName =
-      (statement.data as unknown as StatementData)?.siteName ?? 'Website';
+    const siteName = (statement.data as unknown as StatementData)?.siteName ?? 'Website';
     const embedSnippet = generateEmbedSnippet(siteId, siteName);
 
     res.status(200).json({

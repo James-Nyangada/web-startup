@@ -46,6 +46,14 @@ export function maskUrl(url: string): string {
   }
 }
 
+function safeDecrypt(encrypted: string, fallback = ''): string {
+  try {
+    return decrypt(encrypted);
+  } catch {
+    return fallback;
+  }
+}
+
 export function webhooksRepository(db: Database) {
   return {
     async create(orgId: OrgId, input: CreateWebhookInput) {
@@ -54,8 +62,7 @@ export function webhooksRepository(db: Database) {
 
       const urlEncrypted = encrypt(input.url);
       const secret =
-        input.secret ??
-        (input.kind === 'generic' ? crypto.randomBytes(24).toString('hex') : null);
+        input.secret ?? (input.kind === 'generic' ? crypto.randomBytes(24).toString('hex') : null);
 
       const [row] = await db
         .insert(webhooks)
@@ -89,12 +96,7 @@ export function webhooksRepository(db: Database) {
         .orderBy(desc(webhooks.createdAt));
 
       return rows.map((r) => {
-        let url = '';
-        try {
-          url = decrypt(r.urlEncrypted);
-        } catch {
-          url = 'https://***';
-        }
+        const url = safeDecrypt(r.urlEncrypted, 'https://***');
         return {
           ...r,
           url,
@@ -112,12 +114,7 @@ export function webhooksRepository(db: Database) {
 
       if (!row) return null;
 
-      let url = '';
-      try {
-        url = decrypt(row.urlEncrypted);
-      } catch {
-        url = 'https://***';
-      }
+      const url = safeDecrypt(row.urlEncrypted, 'https://***');
 
       return {
         ...row,
@@ -129,12 +126,7 @@ export function webhooksRepository(db: Database) {
     async findRawById(id: string): Promise<(WebhookRow & { url: string }) | null> {
       const [row] = await db.select().from(webhooks).where(eq(webhooks.id, id)).limit(1);
       if (!row) return null;
-      let url = '';
-      try {
-        url = decrypt(row.urlEncrypted);
-      } catch {
-        url = '';
-      }
+      const url = safeDecrypt(row.urlEncrypted, '');
       return {
         ...row,
         url,
@@ -176,12 +168,7 @@ export function webhooksRepository(db: Database) {
 
       if (!row) return null;
 
-      let url = '';
-      try {
-        url = decrypt(row.urlEncrypted);
-      } catch {
-        url = 'https://***';
-      }
+      const url = safeDecrypt(row.urlEncrypted, 'https://***');
 
       return {
         ...row,
@@ -298,16 +285,19 @@ export function webhooksRepository(db: Database) {
         .limit(limit);
 
       return rows.map((r) => {
-        const data = (r.data ?? {}) as Record<string, unknown>;
+        const data = r.data ?? {};
         return {
           id: r.id,
           webhookId,
-          event: String(data.event ?? 'unknown'),
-          status: typeof data.status === 'number' ? data.status : null,
-          error: typeof data.error === 'string' ? data.error : null,
-          durationMs: typeof data.durationMs === 'number' ? data.durationMs : 0,
+          event: typeof data['event'] === 'string' ? data['event'] : 'unknown',
+          status: typeof data['status'] === 'number' ? data['status'] : null,
+          error: typeof data['error'] === 'string' ? data['error'] : null,
+          durationMs: typeof data['durationMs'] === 'number' ? data['durationMs'] : 0,
           createdAt: r.createdAt,
-          payload: typeof data.payload === 'object' && data.payload !== null ? (data.payload as Record<string, unknown>) : undefined,
+          payload:
+            typeof data['payload'] === 'object' && data['payload'] !== null
+              ? (data['payload'] as Record<string, unknown>)
+              : undefined,
         };
       });
     },

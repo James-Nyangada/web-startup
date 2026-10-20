@@ -69,7 +69,9 @@ export function orgWebhooksRouter(repos: Repositories, options: WebhookRouterOpt
       const orgId = req.orgId as OrgId;
       const org = await repos.organizations.findById(orgId);
       if (!org) {
-        res.status(404).json({ error: { code: ErrorCode.NOT_FOUND, message: 'Organisation not found' } });
+        res
+          .status(404)
+          .json({ error: { code: ErrorCode.NOT_FOUND, message: 'Organisation not found' } });
         return;
       }
 
@@ -129,7 +131,9 @@ export function orgWebhooksRouter(repos: Repositories, options: WebhookRouterOpt
       const id = String(req.params.id);
       const webhook = await repos.webhooks.findById(orgId, id);
       if (!webhook) {
-        res.status(404).json({ error: { code: ErrorCode.NOT_FOUND, message: 'Webhook not found' } });
+        res
+          .status(404)
+          .json({ error: { code: ErrorCode.NOT_FOUND, message: 'Webhook not found' } });
         return;
       }
       res.json({ webhook });
@@ -159,7 +163,9 @@ export function orgWebhooksRouter(repos: Repositories, options: WebhookRouterOpt
       try {
         const updated = await repos.webhooks.update(orgId, id, parsed.data);
         if (!updated) {
-          res.status(404).json({ error: { code: ErrorCode.NOT_FOUND, message: 'Webhook not found' } });
+          res
+            .status(404)
+            .json({ error: { code: ErrorCode.NOT_FOUND, message: 'Webhook not found' } });
           return;
         }
 
@@ -200,7 +206,9 @@ export function orgWebhooksRouter(repos: Repositories, options: WebhookRouterOpt
 
       const deleted = await repos.webhooks.delete(orgId, id);
       if (!deleted) {
-        res.status(404).json({ error: { code: ErrorCode.NOT_FOUND, message: 'Webhook not found' } });
+        res
+          .status(404)
+          .json({ error: { code: ErrorCode.NOT_FOUND, message: 'Webhook not found' } });
         return;
       }
 
@@ -226,7 +234,9 @@ export function orgWebhooksRouter(repos: Repositories, options: WebhookRouterOpt
 
       const webhook = await repos.webhooks.findById(orgId, id);
       if (!webhook) {
-        res.status(404).json({ error: { code: ErrorCode.NOT_FOUND, message: 'Webhook not found' } });
+        res
+          .status(404)
+          .json({ error: { code: ErrorCode.NOT_FOUND, message: 'Webhook not found' } });
         return;
       }
 
@@ -278,7 +288,9 @@ export function orgWebhooksRouter(repos: Repositories, options: WebhookRouterOpt
 
       const webhook = await repos.webhooks.findById(orgId, id);
       if (!webhook) {
-        res.status(404).json({ error: { code: ErrorCode.NOT_FOUND, message: 'Webhook not found' } });
+        res
+          .status(404)
+          .json({ error: { code: ErrorCode.NOT_FOUND, message: 'Webhook not found' } });
         return;
       }
 

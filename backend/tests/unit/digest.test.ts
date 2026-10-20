@@ -11,12 +11,12 @@ describe('P5-06: Weekly Digest (digest.weekly)', () => {
     const transport = new MockTransport();
     const emailSender = new EmailSender({ transport });
 
-    repos.organizations.listAllActive = vi.fn().mockResolvedValue([
-      { id: 'org-1', name: 'Acme Corp', timeZone: 'America/New_York' },
-    ]);
+    repos.organizations.listAllActive = vi
+      .fn()
+      .mockResolvedValue([{ id: 'org-1', name: 'Acme Corp', timeZone: 'America/New_York' }]);
 
     const ctx: WorkerContext = {
-      repos: repos as never,
+      repos: repos,
       storage: {} as never,
       emailSender,
     };
@@ -99,7 +99,7 @@ describe('P5-06: Weekly Digest (digest.weekly)', () => {
     repos.branding.findByOrgId = vi.fn().mockResolvedValue(null);
 
     const ctx: WorkerContext = {
-      repos: repos as never,
+      repos: repos,
       storage: {} as never,
       emailSender,
     };
@@ -144,7 +144,7 @@ describe('P5-06: Weekly Digest (digest.weekly)', () => {
     repos.auditLog.hasActionWithKey = vi.fn().mockResolvedValue(true);
 
     const ctx: WorkerContext = {
-      repos: repos as never,
+      repos: repos,
       storage: {} as never,
       emailSender,
     };
@@ -167,7 +167,7 @@ describe('P5-06: Weekly Digest (digest.weekly)', () => {
     repos.notifications.listOptedInMembers = vi.fn().mockResolvedValue([]);
 
     const ctx: WorkerContext = {
-      repos: repos as never,
+      repos: repos,
       storage: {} as never,
       emailSender,
     };

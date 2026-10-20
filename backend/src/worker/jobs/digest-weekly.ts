@@ -98,7 +98,9 @@ export async function handleWeeklyDigest(
         siteName: site.name,
         currentScore: site.score,
         scoreDelta:
-          site.score !== null && summary?.previousScore !== null && summary?.previousScore !== undefined
+          site.score !== null &&
+          summary?.previousScore !== null &&
+          summary?.previousScore !== undefined
             ? site.score - summary.previousScore
             : null,
         newIssuesCount: stats.newCount,
@@ -120,7 +122,10 @@ export async function handleWeeklyDigest(
 
     // Send personalized digest to each opted-in member
     for (const member of optedInMembers) {
-      const overdueAssignedCount = await ctx.repos.issues.countOverdueAssigned(orgId, member.userId);
+      const overdueAssignedCount = await ctx.repos.issues.countOverdueAssigned(
+        orgId,
+        member.userId,
+      );
 
       const emailData: WeeklyDigestData = {
         orgName: org.name,

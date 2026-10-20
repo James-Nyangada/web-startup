@@ -17,6 +17,7 @@ import { orgManualChecksRouter, orgManualCheckItemRouter } from './manual-checks
 import { orgStatementsRouter, orgStatementItemRouter } from './statements.js';
 import { orgNotificationsRouter } from './notifications.js';
 import { orgWebhooksRouter } from './webhooks.js';
+import { orgReportSchedulesRouter } from './report-schedules.js';
 import type { PaddleClient } from '../billing/paddle-api.js';
 import { type StorageService, getStorage } from '../storage/index.js';
 import { ErrorCode } from '../shared/errors.js';
@@ -1012,6 +1013,12 @@ export function orgsRouter(
 
   // Mount S-46 Webhooks router under orgScoped (P5-07)
   orgScoped.use('/webhooks', orgWebhooksRouter(repos, { boss: scansOptions?.boss, emailSender }));
+
+  // Mount Section 7.8 Report Schedules router under orgScoped (P5-08)
+  orgScoped.use(
+    '/report-schedules',
+    orgReportSchedulesRouter(repos, { boss: scansOptions?.boss, emailSender }),
+  );
 
   router.use('/:orgId', orgScoped);
 

@@ -22,6 +22,7 @@ import { manualChecksRepository } from './manual-checks.js';
 import { statementsRepository } from './statements.js';
 import { notificationsRepository } from './notifications.js';
 import { webhooksRepository } from './webhooks.js';
+import { reportSchedulesRepository } from './report-schedules.js';
 
 export function createRepositories(db: Database) {
   return {
@@ -48,6 +49,7 @@ export function createRepositories(db: Database) {
     statements: statementsRepository(db),
     notifications: notificationsRepository(db),
     webhooks: webhooksRepository(db),
+    reportSchedules: reportSchedulesRepository(db),
   };
 }
 

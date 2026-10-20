@@ -3,6 +3,7 @@ import { vi } from 'vitest';
 import { createApp } from '../../src/app.js';
 import type { Auth } from '../../src/lib/auth.js';
 import type { Repositories } from '../../src/db/repositories/index.js';
+import type { OrgId } from '../../src/db/repositories/org-scope.js';
 import type { TurnstileVerifier } from '../../src/lib/turnstile.js';
 import type { GuardPolicy } from '../../src/scanner/net/guard.js';
 import { isPublicAddress } from '../../src/scanner/net/ip-ranges.js';
@@ -69,6 +70,7 @@ export function fakeRepos() {
       write: vi.fn().mockResolvedValue(undefined),
       list: vi.fn().mockResolvedValue([]),
       findRecentAction: vi.fn().mockResolvedValue(null),
+      hasActionWithKey: vi.fn().mockResolvedValue(false),
     },
     sites: {
       list: vi.fn().mockResolvedValue([]),
@@ -276,77 +278,70 @@ export function fakeRepos() {
         }),
       ),
     },
-    reports: {
-      create: vi.fn().mockImplementation((orgId, input) =>
-        Promise.resolve({
-          id: 'rep-123',
-          orgId,
-          siteId: input.siteId ?? null,
-          scanId: input.scanId ?? null,
-          type: input.type,
-          status: 'queued',
-          fileKey: null,
-          fileSize: null,
-          branded: input.branded ?? false,
-          requestedBy: input.requestedBy ?? null,
-          expiresAt: input.expiresAt ?? null,
-          createdAt: new Date(),
-          updatedAt: new Date(),
+    reports: (() => {
+      interface FakeReport {
+        id: string;
+        orgId: OrgId;
+        siteId: string | null;
+        scanId: string | null;
+        type: string;
+        status: string;
+        fileKey: string | null;
+        fileSize: number | null;
+        branded: boolean;
+        requestedBy: string | null;
+        expiresAt: Date | null;
+        createdAt: Date;
+        updatedAt: Date;
+      }
+      const reportsStore: FakeReport[] = [];
+      return {
+        create: vi.fn().mockImplementation((orgId: OrgId, input: Record<string, unknown>) => {
+          const item: FakeReport = {
+            id: `rep-${reportsStore.length + 1}`,
+            orgId,
+            siteId: (input.siteId as string) ?? null,
+            scanId: (input.scanId as string) ?? null,
+            type: input.type as string,
+            status: 'queued',
+            fileKey: null,
+            fileSize: null,
+            branded: Boolean(input.branded),
+            requestedBy: (input.requestedBy as string) ?? null,
+            expiresAt: (input.expiresAt as Date) ?? null,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          };
+          reportsStore.push(item);
+          return Promise.resolve(item);
         }),
-      ),
-      findById: vi.fn().mockImplementation((orgId, id) =>
-        Promise.resolve({
-          id,
-          orgId,
-          siteId: 'site-1',
-          scanId: 'scan-1',
-          type: 'scan_summary',
-          status: 'ready',
-          fileKey: `reports/${orgId}/${id}.pdf`,
-          fileSize: 10240,
-          branded: false,
-          requestedBy: 'user-1',
-          expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
-          createdAt: new Date(),
-          updatedAt: new Date(),
-          siteName: 'Oakhaus Furniture',
-          scanScore: 78,
-          requesterName: 'Daniel Mwangi',
+        findById: vi.fn().mockImplementation((_orgId: OrgId, id: string) => {
+          const item = reportsStore.find((r) => r.id === id);
+          return Promise.resolve(item ?? null);
         }),
-      ),
-      findRawById: vi.fn().mockImplementation((id) =>
-        Promise.resolve({
-          id,
-          orgId: 'org-1',
-          siteId: 'site-1',
-          scanId: 'scan-1',
-          type: 'scan_summary',
-          status: 'ready',
-          fileKey: `reports/org-1/${id}.pdf`,
-          fileSize: 10240,
-          branded: false,
-          requestedBy: 'user-1',
-          expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
-          createdAt: new Date(),
-          updatedAt: new Date(),
-          siteName: 'Oakhaus Furniture',
-          scanScore: 78,
-          requesterName: 'Daniel Mwangi',
+        findRawById: vi.fn().mockImplementation((id: string) => {
+          const item = reportsStore.find((r) => r.id === id);
+          return Promise.resolve(item ?? null);
         }),
-      ),
-      listByOrg: vi.fn().mockResolvedValue({
-        reports: [],
-        total: 0,
-      }),
-      updateStatus: vi.fn().mockImplementation((id, status, fields) =>
-        Promise.resolve({
-          id,
-          status,
-          ...fields,
-        }),
-      ),
-      delete: vi.fn().mockResolvedValue(true),
-    },
+        listByOrg: vi.fn().mockImplementation((orgId: OrgId) =>
+          Promise.resolve({
+            reports: reportsStore.filter((r) => r.orgId === orgId),
+            total: reportsStore.length,
+          }),
+        ),
+        updateStatus: vi
+          .fn()
+          .mockImplementation((id: string, status: string, fields: Record<string, unknown>) => {
+            const item = reportsStore.find((r) => r.id === id);
+            if (item) {
+              item.status = status;
+              Object.assign(item, fields);
+            }
+            return Promise.resolve(item ?? { id, status, ...fields });
+          }),
+        delete: vi.fn().mockResolvedValue(true),
+      };
+    })(),
     freeChecks: {
       create: vi.fn().mockImplementation((data) =>
         Promise.resolve({
@@ -611,6 +606,111 @@ export function fakeRepos() {
       logDelivery: vi.fn().mockResolvedValue(undefined),
       listDeliveries: vi.fn().mockResolvedValue([]),
     },
+    reportSchedules: (() => {
+      interface FakeSchedule {
+        id: string;
+        orgId: OrgId;
+        siteId: string;
+        recipients: string[];
+        dayOfMonth: number;
+        type: 'client_monthly';
+        active: boolean;
+        lastSentAt: Date | null;
+        createdAt: Date;
+        updatedAt: Date;
+      }
+      const schedulesStore: FakeSchedule[] = [];
+      return {
+        create: vi.fn().mockImplementation((orgId: OrgId, input: Record<string, unknown>) => {
+          const item: FakeSchedule = {
+            id: `018f0000-0000-7000-8000-${String(schedulesStore.length + 1).padStart(12, '0')}`,
+            orgId,
+            siteId: input.siteId as string,
+            recipients: input.recipients as string[],
+            dayOfMonth: input.dayOfMonth as number,
+            type: 'client_monthly',
+            active: (input.active as boolean) ?? true,
+            lastSentAt: null,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          };
+          schedulesStore.push(item);
+          return Promise.resolve(item);
+        }),
+        listByOrg: vi
+          .fn()
+          .mockImplementation((orgId: OrgId) =>
+            Promise.resolve(schedulesStore.filter((s) => s.orgId === orgId)),
+          ),
+        listBySite: vi
+          .fn()
+          .mockImplementation((orgId: OrgId, siteId: string) =>
+            Promise.resolve(schedulesStore.filter((s) => s.orgId === orgId && s.siteId === siteId)),
+          ),
+        findById: vi
+          .fn()
+          .mockImplementation((orgId: OrgId, id: string) =>
+            Promise.resolve(schedulesStore.find((s) => s.orgId === orgId && s.id === id) || null),
+          ),
+        update: vi
+          .fn()
+          .mockImplementation((orgId: OrgId, id: string, input: Record<string, unknown>) => {
+            const idx = schedulesStore.findIndex((s) => s.orgId === orgId && s.id === id);
+            if (idx === -1) return Promise.resolve(null);
+            schedulesStore[idx] = { ...schedulesStore[idx]!, ...input, updatedAt: new Date() };
+            return Promise.resolve(schedulesStore[idx]);
+          }),
+        delete: vi.fn().mockImplementation((orgId: OrgId, id: string) => {
+          const idx = schedulesStore.findIndex((s) => s.orgId === orgId && s.id === id);
+          if (idx === -1) return Promise.resolve(false);
+          schedulesStore.splice(idx, 1);
+          return Promise.resolve(true);
+        }),
+        findDueSchedules: vi.fn().mockImplementation(async (dayOfMonth: number) => {
+          const matches = schedulesStore.filter(
+            (s) => s.active && (dayOfMonth === 0 || s.dayOfMonth === dayOfMonth),
+          );
+          const results = [];
+          for (const s of matches) {
+            const org = (await repos.organizations.findById(s.orgId)) || {
+              id: s.orgId,
+              name: 'Default Org',
+              plan: 'agency',
+              billingStatus: 'active',
+              publicId: 'default-org',
+              slug: 'default-org',
+              type: 'agency',
+              timeZone: 'UTC',
+              createdAt: new Date(),
+              updatedAt: new Date(),
+              deletedAt: null,
+              trialEndsAt: null,
+              paddleCustomerId: null,
+              paddleSubscriptionId: null,
+            };
+            const site = (await repos.sites.findById(s.orgId, s.siteId)) || {
+              id: s.siteId,
+              orgId: s.orgId,
+              name: 'Default Site',
+              url: 'https://example.com',
+              publicId: 'default-site',
+              score: 85,
+              clientName: null,
+              createdAt: new Date(),
+              updatedAt: new Date(),
+              deletedAt: null,
+            };
+            results.push({ schedule: s, org, site });
+          }
+          return results;
+        }),
+        updateLastSent: vi.fn().mockImplementation((id: string, date: Date) => {
+          const item = schedulesStore.find((s) => s.id === id);
+          if (item) item.lastSentAt = date;
+          return Promise.resolve(undefined);
+        }),
+      };
+    })(),
   } as unknown as Repositories;
   return { repos, join };
 }
