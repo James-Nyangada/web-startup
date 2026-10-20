@@ -10,6 +10,7 @@ import { ScansTab, type ScanHistoryItem } from "./scans-tab";
 import { PagesTab } from "./pages-tab";
 import { ReportsTab } from "./reports-tab";
 import { EvidenceTab } from "./evidence-tab";
+import { ManualChecksTab } from "./manual-checks-tab";
 import { SettingsTab } from "./settings-tab";
 import { IssueDrawer } from "./issue-drawer";
 import { IgnoreDialog } from "./ignore-dialog";
@@ -36,7 +37,11 @@ export interface SiteWorkspaceProps {
 }
 
 /** S-24 Site overview · S-25 Issues · S-26 Issue drawer — interactive flow F-04 (triage and fix). */
-export function SiteWorkspace({ startTab = 0, orgSlug, siteId }: SiteWorkspaceProps) {
+export function SiteWorkspace({
+  startTab = 0,
+  orgSlug,
+  siteId,
+}: SiteWorkspaceProps) {
   const router = useRouter();
   const [tab, setTab] = useState(startTab);
   const [detail, setDetail] = useState<ApiSiteDetail | null>(null);
@@ -52,7 +57,9 @@ export function SiteWorkspace({ startTab = 0, orgSlug, siteId }: SiteWorkspacePr
   const [startingScan, setStartingScan] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const returnTo = useRef<HTMLElement | null>(null);
-  const toastTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const toastTimer = useRef<ReturnType<typeof setTimeout> | undefined>(
+    undefined,
+  );
   const tabRefs = useRef<(HTMLButtonElement | null)[]>([]);
   const ignoreOpen = ignoreTargets !== null;
 
@@ -100,12 +107,18 @@ export function SiteWorkspace({ startTab = 0, orgSlug, siteId }: SiteWorkspacePr
   }, [orgSlug, siteId, refreshKey]);
 
   useEffect(() => {
-    appApi.listMembers(orgSlug).then(setMembers).catch(() => setMembers([]));
+    appApi
+      .listMembers(orgSlug)
+      .then(setMembers)
+      .catch(() => setMembers([]));
   }, [orgSlug]);
 
   useEffect(() => {
     if (tab !== 2) return;
-    appApi.listScans(orgSlug, siteId).then(setScans).catch(() => setScans([]));
+    appApi
+      .listScans(orgSlug, siteId)
+      .then(setScans)
+      .catch(() => setScans([]));
   }, [orgSlug, siteId, tab, refreshKey]);
 
   // Drawer content
@@ -156,7 +169,9 @@ export function SiteWorkspace({ startTab = 0, orgSlug, siteId }: SiteWorkspacePr
 
   /** Queues issue.recheck jobs and waits for the worker to record each outcome (P2-14). */
   const recheckIssues = async (ids: string[]) => {
-    showToast(`Rechecking ${ids.length === 1 ? "this issue" : `${ids.length} issues`}…`);
+    showToast(
+      `Rechecking ${ids.length === 1 ? "this issue" : `${ids.length} issues`}…`,
+    );
     try {
       const outcomes = await recheckAndWait(orgSlug, ids);
       showToast(recheckMessage(outcomes, ids.length));
@@ -174,7 +189,12 @@ export function SiteWorkspace({ startTab = 0, orgSlug, siteId }: SiteWorkspacePr
   };
 
   const focusInDrawer = (sel: string) =>
-    requestAnimationFrame(() => (document.querySelector<HTMLElement>(sel) ?? document.getElementById("drawer-title"))?.focus());
+    requestAnimationFrame(() =>
+      (
+        document.querySelector<HTMLElement>(sel) ??
+        document.getElementById("drawer-title")
+      )?.focus(),
+    );
   const closeIgnore = () => {
     setIgnoreTargets(null);
     if (openId) focusInDrawer("[data-ignore-btn]");
@@ -183,8 +203,14 @@ export function SiteWorkspace({ startTab = 0, orgSlug, siteId }: SiteWorkspacePr
     const targets = ignoreTargets ?? [];
     setIgnoreTargets(null);
     try {
-      if (targets.length === 1) await appApi.ignore(orgSlug, targets[0]!, reason, note);
-      else await appApi.bulk(orgSlug, { issueIds: targets, action: "ignore", data: { reason, note } });
+      if (targets.length === 1)
+        await appApi.ignore(orgSlug, targets[0]!, reason, note);
+      else
+        await appApi.bulk(orgSlug, {
+          issueIds: targets,
+          action: "ignore",
+          data: { reason, note },
+        });
       setSelected((s) => s.filter((id) => !targets.includes(id)));
       showToast(
         targets.length === 1
@@ -243,9 +269,17 @@ export function SiteWorkspace({ startTab = 0, orgSlug, siteId }: SiteWorkspacePr
     }
     try {
       const data =
-        request.action === "assign" ? { assigneeId: request.assigneeId } : { dueDate: request.dueDate };
-      await appApi.bulk(orgSlug, { issueIds: ids, action: request.action, data });
-      showToast(`Updated ${ids.length} ${ids.length === 1 ? "issue" : "issues"}.`);
+        request.action === "assign"
+          ? { assigneeId: request.assigneeId }
+          : { dueDate: request.dueDate };
+      await appApi.bulk(orgSlug, {
+        issueIds: ids,
+        action: request.action,
+        data,
+      });
+      showToast(
+        `Updated ${ids.length} ${ids.length === 1 ? "issue" : "issues"}.`,
+      );
       setSelected([]);
       refresh();
     } catch (err) {
@@ -276,8 +310,17 @@ export function SiteWorkspace({ startTab = 0, orgSlug, siteId }: SiteWorkspacePr
 
   if (loadError && !detail) {
     return (
-      <AppShell active="sites" crumbs={[{ label: "Sites", href: `/${orgSlug}/sites` }, { label: "Site" }]}>
-        <div role="alert" className="rounded-2xl border border-line bg-surface px-6 py-12 text-center">
+      <AppShell
+        active="sites"
+        crumbs={[
+          { label: "Sites", href: `/${orgSlug}/sites` },
+          { label: "Site" },
+        ]}
+      >
+        <div
+          role="alert"
+          className="rounded-2xl border border-line bg-surface px-6 py-12 text-center"
+        >
           <h1 className="m-0 text-xl font-semibold">{loadError}</h1>
           <button
             type="button"
@@ -293,8 +336,17 @@ export function SiteWorkspace({ startTab = 0, orgSlug, siteId }: SiteWorkspacePr
 
   if (!detail || !site) {
     return (
-      <AppShell active="sites" crumbs={[{ label: "Sites", href: `/${orgSlug}/sites` }, { label: "Loading…" }]}>
-        <div role="status" className="px-6 py-12 text-center text-sm text-muted">
+      <AppShell
+        active="sites"
+        crumbs={[
+          { label: "Sites", href: `/${orgSlug}/sites` },
+          { label: "Loading…" },
+        ]}
+      >
+        <div
+          role="status"
+          className="px-6 py-12 text-center text-sm text-muted"
+        >
           Loading site…
         </div>
       </AppShell>
@@ -306,7 +358,9 @@ export function SiteWorkspace({ startTab = 0, orgSlug, siteId }: SiteWorkspacePr
   const rootHost = rootUrl.replace(/^https?:\/\//, "").replace(/\/$/, "");
   const isVerified = site.status !== "pending_verification";
   const topIssues = detail.topIssues.map((i) => toIssue(i));
-  const recentlyFixed = detail.recentlyFixed.map((f) => [f.title, formatDay(f.fixedAt)] as [string, string]);
+  const recentlyFixed = detail.recentlyFixed.map(
+    (f) => [f.title, formatDay(f.fixedAt)] as [string, string],
+  );
   const lastScanText = detail.latestScanSummary
     ? `Last scan ${formatDayTime(detail.latestScanSummary.finishedAt ?? site.updatedAt)}`
     : "Not scanned yet";
@@ -326,7 +380,12 @@ export function SiteWorkspace({ startTab = 0, orgSlug, siteId }: SiteWorkspacePr
             {displayName}
           </h1>
           <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm leading-5 text-muted">
-            <a href={rootUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1">
+            <a
+              href={rootUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center gap-1"
+            >
               {rootHost}
               <Icon d={I.external} size={14} />
               <span className="sr-only">(opens in new tab)</span>
@@ -344,7 +403,10 @@ export function SiteWorkspace({ startTab = 0, orgSlug, siteId }: SiteWorkspacePr
                 Verified
               </span>
             ) : (
-              <a href={`${siteHref}/verify`} className="inline-flex items-center gap-1 font-medium text-mod">
+              <a
+                href={`${siteHref}/verify`}
+                className="inline-flex items-center gap-1 font-medium text-mod"
+              >
                 <Icon d={I.moderate} />
                 Verify to enable monitoring
               </a>
@@ -368,7 +430,11 @@ export function SiteWorkspace({ startTab = 0, orgSlug, siteId }: SiteWorkspacePr
             className="ease-ui flex h-10 items-center gap-2 rounded-full border-0 bg-primary px-4 text-sm font-semibold text-on-primary hover:bg-primary-hover disabled:opacity-70 disabled:cursor-not-allowed"
           >
             <Icon d={I.refresh} strokeWidth={2} />
-            {startingScan ? "Starting…" : site.status === "paused" ? "Paused" : "Scan now"}
+            {startingScan
+              ? "Starting…"
+              : site.status === "paused"
+                ? "Paused"
+                : "Scan now"}
           </button>
         </div>
       </div>
@@ -381,7 +447,9 @@ export function SiteWorkspace({ startTab = 0, orgSlug, siteId }: SiteWorkspacePr
           <div className="flex items-center gap-3">
             <span className="text-warn font-bold">⚠</span>
             <span className="text-sm font-medium">
-              This site is paused due to a plan downgrade. Automated scans and rechecks are inactive, but all historical data, scans, and reports remain safe and accessible.
+              This site is paused due to a plan downgrade. Automated scans and
+              rechecks are inactive, but all historical data, scans, and reports
+              remain safe and accessible.
             </span>
           </div>
           <a
@@ -395,7 +463,10 @@ export function SiteWorkspace({ startTab = 0, orgSlug, siteId }: SiteWorkspacePr
 
       {/* Mobile: site tabs become a "Site menu" select (spec 7.1). */}
       <div className="mt-6 mb-6 md:hidden">
-        <label htmlFor="site-menu" className="mb-1.5 block text-sm font-semibold">
+        <label
+          htmlFor="site-menu"
+          className="mb-1.5 block text-sm font-semibold"
+        >
           Site menu
         </label>
         <select
@@ -456,7 +527,9 @@ export function SiteWorkspace({ startTab = 0, orgSlug, siteId }: SiteWorkspacePr
             diffSummary={detail.diffSummary}
             severityCounts={detail.severityCounts}
             coverage={detail.coverage}
-            verificationStatus={isVerified ? "Verified" : "Pending verification"}
+            verificationStatus={
+              isVerified ? "Verified" : "Pending verification"
+            }
             onOpen={openIssue}
             goIssues={() => setTab(1)}
           />
@@ -508,6 +581,14 @@ export function SiteWorkspace({ startTab = 0, orgSlug, siteId }: SiteWorkspacePr
             onToast={showToast}
           />
         )}
+        {tab === 6 && (
+          <ManualChecksTab
+            orgSlug={orgSlug}
+            siteId={siteId}
+            siteName={displayName}
+            onToast={showToast}
+          />
+        )}
         {tab === 8 && (
           <SettingsTab
             orgSlug={orgSlug}
@@ -517,11 +598,18 @@ export function SiteWorkspace({ startTab = 0, orgSlug, siteId }: SiteWorkspacePr
             onToast={showToast}
           />
         )}
-        {tab > 2 && tab !== 3 && tab !== 4 && tab !== 5 && tab !== 8 && (
-          <div className="rounded-lg border border-dashed border-line-strong px-6 py-12 text-center text-sm text-muted">
-            {SITE_TABS[tab]} is not part of this design pass. Overview, Issues, Scans, Pages, Reports, Evidence, and Settings are interactive.
-          </div>
-        )}
+        {tab > 2 &&
+          tab !== 3 &&
+          tab !== 4 &&
+          tab !== 5 &&
+          tab !== 6 &&
+          tab !== 8 && (
+            <div className="rounded-lg border border-dashed border-line-strong px-6 py-12 text-center text-sm text-muted">
+              {SITE_TABS[tab]} is not part of this design pass. Overview,
+              Issues, Scans, Pages, Reports, Evidence, and Settings are
+              interactive.
+            </div>
+          )}
       </div>
 
       <IssueDrawer
@@ -540,7 +628,9 @@ export function SiteWorkspace({ startTab = 0, orgSlug, siteId }: SiteWorkspacePr
         onAssign={assign}
         onSetDue={setDue}
       />
-      {ignoreOpen && <IgnoreDialog onCancel={closeIgnore} onConfirm={confirmIgnore} />}
+      {ignoreOpen && (
+        <IgnoreDialog onCancel={closeIgnore} onConfirm={confirmIgnore} />
+      )}
       <Toast
         message={toast}
         onClose={() => setToast(null)}

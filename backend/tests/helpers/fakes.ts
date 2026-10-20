@@ -516,6 +516,23 @@ export function fakeRepos() {
       list: vi.fn().mockResolvedValue([]),
       count: vi.fn().mockResolvedValue(0),
     },
+    manualChecks: {
+      create: vi.fn().mockImplementation((orgId, entry) =>
+        Promise.resolve({
+          id: '018f0000-0000-7000-8000-000000000101',
+          orgId,
+          ...entry,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        }),
+      ),
+      findById: vi.fn().mockResolvedValue(null),
+      findRawById: vi.fn().mockResolvedValue(null),
+      listBySite: vi.fn().mockResolvedValue([]),
+      countBySite: vi.fn().mockResolvedValue(0),
+      update: vi.fn().mockResolvedValue(null),
+      delete: vi.fn().mockResolvedValue(true),
+    },
   } as unknown as Repositories;
   return { repos, join };
 }

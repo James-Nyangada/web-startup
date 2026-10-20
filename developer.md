@@ -1210,7 +1210,7 @@ Write every event type in 5.4 at its source; S-31 timeline with filters and date
 
 **P5-02 — Manual checks** · *Depends on:* P5-01 · *Size:* M
 S-32: log a check (type, date, tester name, tools, result, notes, optional attachment), list, edit, delete (audited); built-in guidance for each check type (what to test, how long it takes).
-- [ ] Attachments scanned for type and size; served via signed URLs.
+- [x] Attachments scanned for type and size; served via signed URLs.
 
 **P5-03 — Accessibility statement generator** · *Depends on:* P5-01 · *Size:* L
 S-33 multi-step form (organisation, scope, standard targeted, measures taken, known limitations — pre-filled from open issues the user selects, feedback contact, enforcement procedure note for EU sites, date), live preview, versioning, publish to a public URL with the org's branding, embed snippet. Clear "template, not legal advice" notice.

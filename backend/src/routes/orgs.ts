@@ -13,6 +13,7 @@ import { orgReportsRouter } from './reports.js';
 import { orgBillingRouter, orgInvoicesRouter } from './billing.js';
 import { orgBrandingRouter } from './branding.js';
 import { orgEvidenceRouter } from './evidence.js';
+import { orgManualChecksRouter, orgManualCheckItemRouter } from './manual-checks.js';
 import type { PaddleClient } from '../billing/paddle-api.js';
 import { type StorageService, getStorage } from '../storage/index.js';
 import { ErrorCode } from '../shared/errors.js';
@@ -970,9 +971,13 @@ export function orgsRouter(
     },
   );
 
+  const resolvedStorage = storage ?? getStorage();
+
   // Mount Section 7.3 Sites router under orgScoped
   orgScoped.use('/sites', orgSitesRouter(repos));
   orgScoped.use('/sites', orgEvidenceRouter(repos));
+  orgScoped.use('/sites', orgManualChecksRouter(repos, resolvedStorage));
+  orgScoped.use('/manual-checks', orgManualCheckItemRouter(repos, resolvedStorage));
 
   // Mount Section 7.4 Scans router under orgScoped
   orgScoped.use(orgScansRouter(repos, scansOptions));
@@ -997,7 +1002,6 @@ export function orgsRouter(
   orgScoped.use('/invoices', orgInvoicesRouter(repos));
 
   // Mount S-43 Branding router under orgScoped
-  const resolvedStorage = storage ?? getStorage();
   orgScoped.use('/branding', orgBrandingRouter(repos, resolvedStorage));
 
   router.use('/:orgId', orgScoped);
