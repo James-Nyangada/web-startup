@@ -15,6 +15,7 @@ import { orgBrandingRouter } from './branding.js';
 import { orgEvidenceRouter } from './evidence.js';
 import { orgManualChecksRouter, orgManualCheckItemRouter } from './manual-checks.js';
 import { orgStatementsRouter, orgStatementItemRouter } from './statements.js';
+import { orgNotificationsRouter } from './notifications.js';
 import type { PaddleClient } from '../billing/paddle-api.js';
 import { type StorageService, getStorage } from '../storage/index.js';
 import { ErrorCode } from '../shared/errors.js';
@@ -981,6 +982,7 @@ export function orgsRouter(
   orgScoped.use('/manual-checks', orgManualCheckItemRouter(repos, resolvedStorage));
   orgScoped.use('/sites', orgStatementsRouter(repos));
   orgScoped.use('/statements', orgStatementItemRouter(repos));
+  orgScoped.use(orgNotificationsRouter(repos));
 
   // Mount Section 7.4 Scans router under orgScoped
   orgScoped.use(orgScansRouter(repos, scansOptions));

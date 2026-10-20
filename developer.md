@@ -1222,7 +1222,7 @@ R-03 PDF: cover, summary, scan history table and trend, issues fixed with dates,
 
 **P5-05 — Alerts and notification centre** · *Depends on:* P2-18 · *Size:* M
 Regression and new-critical detection in `scan.process`; E-08; in-app notifications (S-50 bell + panel, mark read, link to item); per-user preferences (S-45); "issue assigned to you" notification.
-- [ ] No duplicate alerts for the same regression across scans.
+- [x] No duplicate alerts for the same regression across scans.
 
 **P5-06 — Weekly digest** · *Depends on:* P5-05 · *Size:* S
 E-10 summarising each site's score change, new/fixed counts and overdue assigned issues.

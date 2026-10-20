@@ -1,4 +1,4 @@
-import { and, desc, eq } from 'drizzle-orm';
+import { and, desc, eq, sql } from 'drizzle-orm';
 import type { Database } from '../client.js';
 import { auditLog, type ActorType } from '../schema/index.js';
 import type { OrgId } from './org-scope.js';
@@ -38,6 +38,21 @@ export function auditLogRepository(db: Database) {
         .orderBy(desc(auditLog.createdAt))
         .limit(1);
       return row ?? null;
+    },
+
+    async hasActionWithKey(orgId: OrgId, action: string, idempotencyKey: string): Promise<boolean> {
+      const [row] = await db
+        .select({ id: auditLog.id })
+        .from(auditLog)
+        .where(
+          and(
+            eq(auditLog.orgId, orgId),
+            eq(auditLog.action, action),
+            sql`${auditLog.data}->>'idempotencyKey' = ${idempotencyKey}`,
+          ),
+        )
+        .limit(1);
+      return Boolean(row);
     },
   };
 }

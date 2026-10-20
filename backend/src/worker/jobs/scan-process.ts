@@ -155,4 +155,120 @@ export async function handleScanProcess(job: ScanJobPayload, ctx: WorkerContext)
       });
     }
   }
+
+  // 10. Alert and notification dispatch (P5-05)
+  const newCriticalOrSerious = diff.created.filter(
+    (i) => i.impact === 'critical' || i.impact === 'serious',
+  ).length;
+
+  const hasRegressions = regressedCount > 0;
+  const hasSpike = newCriticalOrSerious >= 10;
+
+  if (hasRegressions || hasSpike) {
+    const eligibleRegressions: Array<{
+      id: string;
+      ruleId?: string;
+      regressionCount?: number;
+    }> = [];
+
+    if (hasRegressions) {
+      for (const reg of regressedIssues as Array<{
+        id: string;
+        ruleId?: string;
+        regressionCount?: number;
+      }>) {
+        const key = `regression:${reg.id}:${reg.regressionCount ?? 1}`;
+        const alreadyAlerted = await ctx.repos.auditLog.hasActionWithKey?.(
+          orgId,
+          'alert.regression',
+          key,
+        );
+        if (!alreadyAlerted) {
+          eligibleRegressions.push(reg);
+        }
+      }
+    }
+
+    const shouldAlert = eligibleRegressions.length > 0 || hasSpike;
+
+    if (shouldAlert) {
+      const site = await ctx.repos.sites.findRawById(scan.siteId);
+      const siteName = site?.name ?? 'Site';
+      const appUrl = process.env.APP_URL || 'http://localhost:3000';
+      const viewUrl = `${appUrl}/sites/${scan.siteId}/issues?status=open`;
+
+      const optedMembers = ctx.repos.notifications
+        ? await ctx.repos.notifications.listOptedInMembers(orgId, 'regressions')
+        : [];
+
+      const alertTitle = hasRegressions
+        ? `Regression detected on ${siteName}`
+        : `10+ new critical issues on ${siteName}`;
+
+      const alertBody = hasRegressions
+        ? `${regressedCount} previously fixed issue${regressedCount === 1 ? '' : 's'} reappeared in scan #${scan.id.slice(0, 8)}.`
+        : `${newCriticalOrSerious} new critical or serious accessibility issues found.`;
+
+      if (ctx.repos.notifications && optedMembers.length > 0) {
+        await ctx.repos.notifications.createInAppBatch(
+          orgId,
+          optedMembers.map((m) => m.userId),
+          {
+            type: 'regression_alert',
+            title: alertTitle,
+            body: alertBody,
+            link: `/sites/${scan.siteId}/issues?status=open`,
+          },
+        );
+      }
+
+      if (ctx.emailSender) {
+        const alertItems = hasRegressions
+          ? eligibleRegressions.map((r) => ({
+              title: r.ruleId ?? 'Accessibility violation',
+              impact: 'critical',
+            }))
+          : diff.created
+              .filter((i) => i.impact === 'critical' || i.impact === 'serious')
+              .slice(0, 10)
+              .map((i) => ({
+                title: i.ruleId,
+                impact: i.impact,
+              }));
+
+        for (const member of optedMembers) {
+          await ctx.emailSender
+            .send({
+              to: member.email,
+              templateId: 'E-08',
+              data: {
+                siteName,
+                regressedCount: eligibleRegressions.length,
+                newCriticalCount: newCriticalOrSerious,
+                items: alertItems,
+                viewUrl,
+              },
+            })
+            .catch((err) => {
+              console.error('[scan-process] Failed to send E-08 alert email:', err);
+            });
+        }
+      }
+
+      for (const reg of eligibleRegressions) {
+        const key = `regression:${reg.id}:${reg.regressionCount ?? 1}`;
+        await ctx.repos.auditLog.write(orgId, {
+          actorType: 'system',
+          action: 'alert.regression',
+          targetType: 'issue',
+          targetId: reg.id,
+          data: {
+            idempotencyKey: key,
+            regressionCount: reg.regressionCount ?? 1,
+            scanId: scan.id,
+          },
+        });
+      }
+    }
+  }
 }

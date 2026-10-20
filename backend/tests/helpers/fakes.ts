@@ -550,6 +550,38 @@ export function fakeRepos() {
       getNextVersion: vi.fn().mockResolvedValue(1),
       update: vi.fn().mockResolvedValue(null),
     },
+    notifications: {
+      createInApp: vi.fn().mockImplementation((orgId, userId, data) =>
+        Promise.resolve({
+          id: '018f0000-0000-7000-8000-000000000301',
+          orgId,
+          userId,
+          ...data,
+          readAt: null,
+          createdAt: new Date(),
+        }),
+      ),
+      createInAppBatch: vi.fn().mockResolvedValue(undefined),
+      listInAppByUser: vi.fn().mockResolvedValue([]),
+      countUnreadInApp: vi.fn().mockResolvedValue(0),
+      markInAppRead: vi.fn().mockResolvedValue(true),
+      markAllInAppRead: vi.fn().mockResolvedValue(1),
+      getPreferences: vi.fn().mockResolvedValue({
+        scanCompleted: 'all',
+        regressions: true,
+        weeklyDigest: true,
+        billing: true,
+      }),
+      updatePreferences: vi.fn().mockImplementation((_orgId, _userId, prefs) =>
+        Promise.resolve({
+          scanCompleted: prefs.scanCompleted ?? 'all',
+          regressions: prefs.regressions ?? true,
+          weeklyDigest: prefs.weeklyDigest ?? true,
+          billing: prefs.billing ?? true,
+        }),
+      ),
+      listOptedInMembers: vi.fn().mockResolvedValue([]),
+    },
   } as unknown as Repositories;
   return { repos, join };
 }

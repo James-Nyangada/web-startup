@@ -6,14 +6,18 @@ export type EmailTemplateId =
   | 'E-05' // Welcome + next steps
   | 'E-06' // First scan ready
   | 'E-07' // Scan completed summary
+  | 'E-08' // Regression alert
+  | 'E-10' // Weekly digest
   | 'E-11' // Report ready / report shared
+  | 'E-12' // Monthly client report
   | 'E-13' // Free check report
   | 'E-14' // Trial ending (day 10, day 13)
   | 'E-15' // Trial ended, read-only
   | 'E-17' // Payment failed / past due
   | 'E-18' // Subscription canceled / will end
   | 'E-19' // Plan changed
-  | 'E-20'; // Data deletion warning (7 days, 1 day)
+  | 'E-20' // Data deletion warning (7 days, 1 day)
+  | 'E-21'; // Webhook disabled after failures
 
 export interface EmailRenderOutput {
   subject: string;
@@ -143,6 +147,47 @@ export interface PlanChangedData {
   billingUrl: string;
 }
 
+export interface RegressionAlertData {
+  siteName: string;
+  regressedCount: number;
+  newCriticalCount: number;
+  items: Array<{ title: string; impact: string; url?: string }>;
+  viewUrl: string;
+  unsubscribeUrl?: string;
+}
+
+export interface WeeklyDigestSite {
+  siteName: string;
+  currentScore: number | null;
+  scoreDelta: number | null;
+  newIssuesCount: number;
+  fixedIssuesCount: number;
+  regressedCount: number;
+}
+
+export interface WeeklyDigestData {
+  orgName: string;
+  sites: WeeklyDigestSite[];
+  overdueAssignedCount: number;
+  viewUrl: string;
+  unsubscribeUrl?: string;
+}
+
+export interface MonthlyClientReportData {
+  clientName?: string | null;
+  siteName: string;
+  reportPeriod: string;
+  downloadUrl: string;
+  score: number | null;
+}
+
+export interface WebhookDisabledData {
+  orgName: string;
+  webhookUrl: string;
+  failureCount: number;
+  settingsUrl: string;
+}
+
 export type TemplateDataMap = {
   'E-01': VerifyEmailData;
   'E-02': MagicLinkData;
@@ -151,7 +196,10 @@ export type TemplateDataMap = {
   'E-05': WelcomeEmailData;
   'E-06': FirstScanReadyData;
   'E-07': ScanSummaryData;
+  'E-08': RegressionAlertData;
+  'E-10': WeeklyDigestData;
   'E-11': ReportSharedData;
+  'E-12': MonthlyClientReportData;
   'E-13': FreeCheckReportData;
   'E-14': TrialEndingData;
   'E-15': TrialEndedData;
@@ -159,4 +207,5 @@ export type TemplateDataMap = {
   'E-18': SubscriptionCanceledData;
   'E-19': PlanChangedData;
   'E-20': DataDeletionWarningData;
+  'E-21': WebhookDisabledData;
 };

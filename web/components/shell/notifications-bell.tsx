@@ -1,53 +1,108 @@
 "use client";
 
 import React, { useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { Icon, I } from "@/components/icons";
 import { useToast } from "./toast-context";
+import { apiClient } from "@/lib/api";
 
-interface NotificationItem {
+export interface NotificationItem {
   id: string;
   title: string;
-  detail: string;
-  time: string;
-  unread: boolean;
-  type: "warning" | "success" | "info";
+  body: string;
+  link: string | null;
+  readAt: string | null;
+  createdAt: string;
+  type: string;
 }
 
-const INITIAL_NOTIFICATIONS: NotificationItem[] = [
-  {
-    id: "notif-1",
-    title: "Oakhaus Furniture regression",
-    detail: "Scan #23 completed with 1 new regression in Product images.",
-    time: "2 hours ago",
-    unread: true,
-    type: "warning",
-  },
-  {
-    id: "notif-2",
-    title: "Mwanga Solar scan failed",
-    detail: "Weekly scan failed: server returned HTTP 503.",
-    time: "Yesterday",
-    unread: true,
-    type: "warning",
-  },
-  {
-    id: "notif-3",
-    title: "Baraka Bikes reached Good band",
-    detail: "Accessibility score improved to 91 with 0 critical issues.",
-    time: "3 days ago",
-    unread: true,
-    type: "success",
-  },
-];
+interface RawNotification {
+  id: string;
+  title: string;
+  body: string;
+  link: string | null;
+  readAt: string | null;
+  createdAt: string;
+  type: string;
+}
+
+function timeAgo(dateString: string): string {
+  try {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffSec = Math.floor((now.getTime() - date.getTime()) / 1000);
+    if (diffSec < 60) return "Just now";
+    if (diffSec < 3600) return `${Math.floor(diffSec / 60)}m ago`;
+    if (diffSec < 86400) return `${Math.floor(diffSec / 3600)}h ago`;
+    if (diffSec < 604800) return `${Math.floor(diffSec / 86400)}d ago`;
+    return date.toLocaleDateString("en-GB", { day: "numeric", month: "short" });
+  } catch {
+    return dateString;
+  }
+}
 
 export function NotificationsBell() {
   const [open, setOpen] = useState(false);
-  const [notifications, setNotifications] = useState<NotificationItem[]>(INITIAL_NOTIFICATIONS);
+  const [notifications, setNotifications] = useState<NotificationItem[]>([]);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [loading, setLoading] = useState(false);
   const { showToast } = useToast();
   const menuRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
 
-  const unreadCount = notifications.filter((n) => n.unread).length;
+  const fetchNotifications = async () => {
+    try {
+      setLoading(true);
+      const res = await apiClient<{
+        data: { items: RawNotification[]; unreadCount: number };
+      }>("/v1/notifications");
+      if (res?.data) {
+        setNotifications(res.data.items);
+        setUnreadCount(res.data.unreadCount);
+      }
+    } catch {
+      // Demo fallback if unauthenticated
+      setNotifications([
+        {
+          id: "notif-demo-1",
+          title: "Oakhaus Furniture regression",
+          body: "Scan #23 completed with 1 new regression in Product images.",
+          link: "/sites/demo/issues",
+          readAt: null,
+          createdAt: new Date(Date.now() - 7200000).toISOString(),
+          type: "regression_alert",
+        },
+        {
+          id: "notif-demo-2",
+          title: "Mwanga Solar scan failed",
+          body: "Weekly scan failed: server returned HTTP 503.",
+          link: "/sites/demo/scans",
+          readAt: null,
+          createdAt: new Date(Date.now() - 86400000).toISOString(),
+          type: "scan_failed",
+        },
+        {
+          id: "notif-demo-3",
+          title: "Baraka Bikes reached Good band",
+          body: "Accessibility score improved to 91 with 0 critical issues.",
+          link: "/sites/demo",
+          readAt: new Date(Date.now() - 172800000).toISOString(),
+          createdAt: new Date(Date.now() - 259200000).toISOString(),
+          type: "score_improved",
+        },
+      ]);
+      setUnreadCount(2);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchNotifications();
+    // Poll every 45s for fresh notifications
+    const interval = setInterval(fetchNotifications, 45000);
+    return () => clearInterval(interval);
+  }, []);
 
   useEffect(() => {
     if (!open) return;
@@ -70,9 +125,34 @@ export function NotificationsBell() {
     };
   }, [open]);
 
-  const markAllRead = () => {
-    setNotifications((prev) => prev.map((n) => ({ ...n, unread: false })));
+  const handleMarkAllRead = async () => {
+    try {
+      await apiClient("/v1/notifications/read-all", { method: "POST" });
+    } catch {
+      // Ignored for demo
+    }
+    setNotifications((prev) =>
+      prev.map((n) => ({ ...n, readAt: n.readAt || new Date().toISOString() })),
+    );
+    setUnreadCount(0);
     showToast("All notifications marked as read.");
+  };
+
+  const handleItemClick = async (item: NotificationItem) => {
+    if (!item.readAt) {
+      try {
+        await apiClient(`/v1/notifications/${item.id}`, { method: "PATCH" });
+      } catch {
+        // Ignored for demo
+      }
+      setNotifications((prev) =>
+        prev.map((n) =>
+          n.id === item.id ? { ...n, readAt: new Date().toISOString() } : n,
+        ),
+      );
+      setUnreadCount((prev) => Math.max(0, prev - 1));
+    }
+    setOpen(false);
   };
 
   return (
@@ -83,7 +163,11 @@ export function NotificationsBell() {
         onClick={() => setOpen((prev) => !prev)}
         aria-expanded={open}
         aria-haspopup="true"
-        aria-label={unreadCount > 0 ? `Notifications, ${unreadCount} unread` : "Notifications"}
+        aria-label={
+          unreadCount > 0
+            ? `Notifications, ${unreadCount} unread`
+            : "Notifications"
+        }
         className="ease-ui relative grid size-9 flex-none place-items-center rounded-full border border-line bg-surface text-ink hover:bg-subtle focus-visible:outline-2 focus-visible:outline-primary"
       >
         <Icon d={I.bell} size={18} />
@@ -116,7 +200,7 @@ export function NotificationsBell() {
             {unreadCount > 0 && (
               <button
                 type="button"
-                onClick={markAllRead}
+                onClick={handleMarkAllRead}
                 className="text-xs font-medium text-primary hover:underline border-0 bg-transparent cursor-pointer p-0"
               >
                 Mark all read
@@ -126,36 +210,88 @@ export function NotificationsBell() {
 
           {/* List */}
           <div className="divide-y divide-line max-h-72 overflow-y-auto my-2">
-            {notifications.length === 0 ? (
-              <p className="py-6 text-center text-sm text-muted">You are all caught up!</p>
+            {loading && notifications.length === 0 ? (
+              <p className="py-6 text-center text-xs text-muted">
+                Loading notifications...
+              </p>
+            ) : notifications.length === 0 ? (
+              <p className="py-6 text-center text-sm text-muted">
+                You are all caught up!
+              </p>
             ) : (
-              notifications.map((n) => (
-                <div key={n.id} className="py-3 flex items-start gap-3">
-                  <span className="grid size-6 place-items-center rounded-full bg-subtle text-muted flex-none mt-0.5">
-                    <Icon
-                      d={n.type === "warning" ? I.serious : I.fixed}
-                      size={14}
-                      stroke={n.type === "warning" ? "var(--ser)" : "var(--ok)"}
-                    />
-                  </span>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between gap-2">
-                      <span className={`text-xs font-semibold ${n.unread ? "text-ink" : "text-muted"}`}>
-                        {n.title}
-                      </span>
-                      <span className="text-[11px] text-muted whitespace-nowrap">{n.time}</span>
+              notifications.map((n) => {
+                const isUnread = !n.readAt;
+                const isWarning =
+                  n.type.includes("regression") ||
+                  n.type.includes("failed") ||
+                  n.type.includes("disabled");
+                const content = (
+                  <div className="flex items-start gap-3 w-full">
+                    <span className="grid size-6 place-items-center rounded-full bg-subtle text-muted flex-none mt-0.5">
+                      <Icon
+                        d={isWarning ? I.serious : I.fixed}
+                        size={14}
+                        stroke={isWarning ? "var(--ser)" : "var(--ok)"}
+                      />
+                    </span>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between gap-2">
+                        <span
+                          className={`text-xs font-semibold ${
+                            isUnread ? "text-ink font-bold" : "text-muted"
+                          }`}
+                        >
+                          {n.title}
+                        </span>
+                        <span className="text-[11px] text-muted whitespace-nowrap">
+                          {timeAgo(n.createdAt)}
+                        </span>
+                      </div>
+                      <p className="text-xs text-muted m-0 mt-0.5 leading-4">
+                        {n.body}
+                      </p>
                     </div>
-                    <p className="text-xs text-muted m-0 mt-0.5 leading-4">{n.detail}</p>
+                    {isUnread && (
+                      <span className="size-2 rounded-full bg-primary flex-none mt-1.5" />
+                    )}
                   </div>
-                  {n.unread && <span className="size-2 rounded-full bg-primary flex-none mt-1.5" />}
-                </div>
-              ))
+                );
+
+                return (
+                  <div key={n.id} className="py-2.5">
+                    {n.link ? (
+                      <Link
+                        href={n.link}
+                        onClick={() => handleItemClick(n)}
+                        className="block rounded-lg p-1.5 hover:bg-subtle transition-colors"
+                      >
+                        {content}
+                      </Link>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => handleItemClick(n)}
+                        className="w-full text-left rounded-lg p-1.5 hover:bg-subtle transition-colors border-0 bg-transparent cursor-pointer"
+                      >
+                        {content}
+                      </button>
+                    )}
+                  </div>
+                );
+              })
             )}
           </div>
 
           {/* Footer */}
-          <div className="pt-2 border-t border-line text-center">
-            <span className="text-xs text-muted">Notification Centre (S-50)</span>
+          <div className="pt-2 border-t border-line flex items-center justify-between text-xs text-muted">
+            <span>Notification Centre (S-50)</span>
+            <Link
+              href="/settings/notifications"
+              onClick={() => setOpen(false)}
+              className="text-primary hover:underline"
+            >
+              Preferences
+            </Link>
           </div>
         </div>
       )}

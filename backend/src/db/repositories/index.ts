@@ -20,6 +20,7 @@ import { clientAccessRepository } from './client-access.js';
 import { evidenceEventsRepository } from './evidence-events.js';
 import { manualChecksRepository } from './manual-checks.js';
 import { statementsRepository } from './statements.js';
+import { notificationsRepository } from './notifications.js';
 
 export function createRepositories(db: Database) {
   return {
@@ -44,6 +45,7 @@ export function createRepositories(db: Database) {
     evidenceEvents: evidenceEventsRepository(db),
     manualChecks: manualChecksRepository(db),
     statements: statementsRepository(db),
+    notifications: notificationsRepository(db),
   };
 }
 

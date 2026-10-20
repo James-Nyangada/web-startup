@@ -148,7 +148,8 @@ export function issuesRepository(db: Database) {
         let fixedCount = 0;
         let regressedCount = 0;
         const fixedIssues: Array<{ id: string; ruleId?: string }> = [];
-        const regressedIssues: Array<{ id: string; ruleId?: string }> = [];
+        const regressedIssues: Array<{ id: string; ruleId?: string; regressionCount?: number }> =
+          [];
 
         // issues.rule_id references rules; axe can report rules the catalog doesn't list yet.
         const ruleIds = [...new Set(allFoundIssues.map((issue) => issue.ruleId))];
@@ -299,7 +300,11 @@ export function issuesRepository(db: Database) {
 
           if (updated) {
             regressedCount++;
-            regressedIssues.push({ id: updated.id, ruleId: updated.ruleId });
+            regressedIssues.push({
+              id: updated.id,
+              ruleId: updated.ruleId,
+              regressionCount: updated.regressionCount,
+            });
             await tx.insert(issueEvents).values({
               orgId,
               issueId: updated.id,

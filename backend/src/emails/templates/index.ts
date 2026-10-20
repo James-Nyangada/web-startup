@@ -17,6 +17,10 @@ import type {
   PaymentFailedData,
   SubscriptionCanceledData,
   PlanChangedData,
+  RegressionAlertData,
+  WeeklyDigestData,
+  MonthlyClientReportData,
+  WebhookDisabledData,
 } from '../types.js';
 
 // E-01: Verify your email
@@ -809,6 +813,204 @@ View your account details:
 ${data.billingUrl}
 
 — The ${brandName} Team`;
+
+  return { subject, html, text };
+}
+
+// E-08: Regression alert
+export function renderRegressionAlert(
+  data: RegressionAlertData,
+  branding?: EmailBranding,
+): EmailRenderOutput {
+  const isRegression = data.regressedCount > 0;
+  const subject = isRegression
+    ? `Accessibility regression detected on ${data.siteName}`
+    : `New critical accessibility issues detected on ${data.siteName}`;
+
+  const summaryText = isRegression
+    ? `${data.regressedCount} previously fixed issue${data.regressedCount === 1 ? '' : 's'} reappeared in the latest scan.`
+    : `${data.newCriticalCount} new critical or serious accessibility problems were discovered in the latest scan.`;
+
+  const itemsHtml = data.items
+    .slice(0, 8)
+    .map(
+      (item) => `
+    <li style="margin-bottom: 6px;">
+      <strong style="color: ${item.impact === 'critical' ? '#DC2626' : '#D97706'};">[${item.impact.toUpperCase()}]</strong>
+      ${item.title}
+    </li>
+  `,
+    )
+    .join('');
+
+  const contentHtml = `
+    <p style="margin: 0 0 16px 0;">
+      A scan on <strong>${data.siteName}</strong> detected accessibility regressions requiring developer attention.
+    </p>
+    <div style="background-color: #FEF2F2; border: 1px solid #FCA5A5; border-radius: 8px; padding: 16px; margin-bottom: 20px;">
+      <p style="margin: 0 0 8px 0; font-weight: 600; color: #991B1B;">
+        ${summaryText}
+      </p>
+      <ul style="margin: 0; padding-left: 20px; font-size: 14px; color: #7F1D1D;">
+        ${itemsHtml}
+      </ul>
+    </div>
+  `;
+
+  const html = renderEmailLayout({
+    preheader: summaryText,
+    title: subject,
+    contentHtml,
+    buttonLabel: 'View issues',
+    buttonUrl: data.viewUrl,
+    branding,
+    unsubscribeUrl: data.unsubscribeUrl,
+  });
+
+  const text = `${subject}\n\n${summaryText}\n\n${data.items.map((i) => `- [${i.impact}] ${i.title}`).join('\n')}\n\nView issues:\n${data.viewUrl}\n`;
+
+  return { subject, html, text };
+}
+
+// E-10: Weekly digest
+export function renderWeeklyDigest(
+  data: WeeklyDigestData,
+  branding?: EmailBranding,
+): EmailRenderOutput {
+  const subject = `Weekly accessibility digest for ${data.orgName}`;
+
+  const siteRows = data.sites
+    .map(
+      (s) => `
+      <tr style="border-bottom: 1px solid #E5E7EB;">
+        <td style="padding: 10px 8px; font-size: 14px; font-weight: 600; color: #111827;">${s.siteName}</td>
+        <td style="padding: 10px 8px; font-size: 14px; text-align: center;">
+          ${s.currentScore !== null ? `<strong>${s.currentScore}</strong>` : '—'}
+          ${s.scoreDelta !== null && s.scoreDelta !== 0 ? `<span style="font-size: 12px; color: ${s.scoreDelta > 0 ? '#16A34A' : '#DC2626'};"> (${s.scoreDelta > 0 ? '+' : ''}${s.scoreDelta})</span>` : ''}
+        </td>
+        <td style="padding: 10px 8px; font-size: 14px; text-align: center; color: #16A34A;">${s.fixedIssuesCount}</td>
+        <td style="padding: 10px 8px; font-size: 14px; text-align: center; color: ${s.regressedCount > 0 ? '#DC2626' : '#6B7280'}; font-weight: ${s.regressedCount > 0 ? '700' : 'normal'};">${s.regressedCount}</td>
+      </tr>
+    `,
+    )
+    .join('');
+
+  const contentHtml = `
+    <p style="margin: 0 0 16px 0;">
+      Here is your weekly summary of accessibility health across all sites in <strong>${data.orgName}</strong>.
+    </p>
+    <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%" style="border-collapse: collapse; margin-bottom: 20px;">
+      <thead>
+        <tr style="border-bottom: 2px solid #E5E7EB; background-color: #F9FAFB;">
+          <th align="left" style="padding: 8px; font-size: 12px; font-weight: 600; color: #6B7280; text-transform: uppercase;">Site</th>
+          <th align="center" style="padding: 8px; font-size: 12px; font-weight: 600; color: #6B7280; text-transform: uppercase;">Score</th>
+          <th align="center" style="padding: 8px; font-size: 12px; font-weight: 600; color: #6B7280; text-transform: uppercase;">Fixed</th>
+          <th align="center" style="padding: 8px; font-size: 12px; font-weight: 600; color: #6B7280; text-transform: uppercase;">Regressed</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${siteRows}
+      </tbody>
+    </table>
+    ${
+      data.overdueAssignedCount > 0
+        ? `
+      <div style="background-color: #FFFBEB; border: 1px solid #FDE68A; border-radius: 8px; padding: 12px 16px; margin-bottom: 20px;">
+        <p style="margin: 0; font-size: 13px; color: #B45309;">
+          <strong>Attention:</strong> You have ${data.overdueAssignedCount} overdue accessibility task${data.overdueAssignedCount === 1 ? '' : 's'} assigned to you.
+        </p>
+      </div>
+    `
+        : ''
+    }
+  `;
+
+  const html = renderEmailLayout({
+    preheader: `Weekly accessibility digest for ${data.orgName}: ${data.sites.length} sites checked.`,
+    title: subject,
+    contentHtml,
+    buttonLabel: 'Open Dashboard',
+    buttonUrl: data.viewUrl,
+    branding,
+    unsubscribeUrl: data.unsubscribeUrl,
+  });
+
+  const text = `${subject}\n\nWeekly accessibility summary for ${data.orgName}:\n${data.sites.map((s) => `- ${s.siteName}: Score ${s.currentScore ?? '—'}, Fixed ${s.fixedIssuesCount}, Regressed ${s.regressedCount}`).join('\n')}\n\nDashboard: ${data.viewUrl}\n`;
+
+  return { subject, html, text };
+}
+
+// E-12: Monthly client report
+export function renderMonthlyClientReport(
+  data: MonthlyClientReportData,
+  branding?: EmailBranding,
+): EmailRenderOutput {
+  const brandName = branding?.displayName || 'Accessibility Audit';
+  const subject = `${brandName} monthly accessibility report: ${data.siteName} (${data.reportPeriod})`;
+
+  const contentHtml = `
+    <p style="margin: 0 0 16px 0;">
+      ${data.clientName ? `Hello ${data.clientName},` : 'Hello,'}
+    </p>
+    <p style="margin: 0 0 16px 0;">
+      Your monthly accessibility compliance report for <strong>${data.siteName}</strong> (${data.reportPeriod}) is now available.
+    </p>
+    ${
+      data.score !== null
+        ? `
+      <div style="background-color: #F8F7F4; border: 1px solid #E4E0D8; border-radius: 8px; padding: 16px; margin-bottom: 20px; text-align: center;">
+        <p style="margin: 0 0 4px 0; font-size: 13px; color: #635F59;">Current Accessibility Score</p>
+        <p style="margin: 0; font-size: 28px; font-weight: 700; color: #1A1816;">${data.score} / 100</p>
+      </div>
+    `
+        : ''
+    }
+  `;
+
+  const html = renderEmailLayout({
+    preheader: `Monthly accessibility report for ${data.siteName} (${data.reportPeriod})`,
+    title: `Monthly Accessibility Report: ${data.siteName}`,
+    contentHtml,
+    buttonLabel: 'Download Report (PDF)',
+    buttonUrl: data.downloadUrl,
+    branding,
+  });
+
+  const text = `${subject}\n\nYour monthly accessibility compliance report for ${data.siteName} (${data.reportPeriod}) is available.\n\nDownload Report:\n${data.downloadUrl}\n`;
+
+  return { subject, html, text };
+}
+
+// E-21: Webhook disabled after failures
+export function renderWebhookDisabled(
+  data: WebhookDisabledData,
+  branding?: EmailBranding,
+): EmailRenderOutput {
+  const subject = `Action required: Webhook auto-disabled for ${data.orgName}`;
+
+  const contentHtml = `
+    <p style="margin: 0 0 16px 0;">
+      A webhook configured for <strong>${data.orgName}</strong> failed 10 consecutive delivery attempts and has been automatically disabled to prevent further delivery errors.
+    </p>
+    <div style="background-color: #FEF2F2; border: 1px solid #FCA5A5; border-radius: 8px; padding: 16px; margin-bottom: 20px;">
+      <p style="margin: 0 0 6px 0; font-size: 13px; color: #991B1B;"><strong>Endpoint:</strong> ${data.webhookUrl}</p>
+      <p style="margin: 0; font-size: 13px; color: #991B1B;"><strong>Consecutive Failures:</strong> ${data.failureCount}</p>
+    </div>
+    <p style="margin: 0 0 16px 0;">
+      Please inspect your endpoint server logs, verify your HTTPS SSL certificates and firewall settings, and re-enable the webhook in Integrations settings once resolved.
+    </p>
+  `;
+
+  const html = renderEmailLayout({
+    preheader: `Webhook auto-disabled for ${data.orgName} after ${data.failureCount} consecutive failures.`,
+    title: 'Webhook Disabled',
+    contentHtml,
+    buttonLabel: 'Manage Webhooks',
+    buttonUrl: data.settingsUrl,
+    branding,
+  });
+
+  const text = `${subject}\n\nWebhook ${data.webhookUrl} failed ${data.failureCount} times and was disabled.\n\nManage Integrations:\n${data.settingsUrl}\n`;
 
   return { subject, html, text };
 }

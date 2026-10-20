@@ -14,6 +14,10 @@ import {
   renderPaymentFailed,
   renderSubscriptionCanceled,
   renderPlanChanged,
+  renderRegressionAlert,
+  renderWeeklyDigest,
+  renderMonthlyClientReport,
+  renderWebhookDisabled,
 } from './templates/index.js';
 import type {
   EmailBranding,
@@ -35,6 +39,10 @@ import type {
   PaymentFailedData,
   SubscriptionCanceledData,
   PlanChangedData,
+  RegressionAlertData,
+  WeeklyDigestData,
+  MonthlyClientReportData,
+  WebhookDisabledData,
 } from './types.js';
 
 export function renderEmail<T extends EmailTemplateId>(
@@ -57,8 +65,14 @@ export function renderEmail<T extends EmailTemplateId>(
       return renderFirstScanReady(data as FirstScanReadyData, branding);
     case 'E-07':
       return renderScanSummary(data as ScanSummaryData, branding);
+    case 'E-08':
+      return renderRegressionAlert(data as RegressionAlertData, branding);
+    case 'E-10':
+      return renderWeeklyDigest(data as WeeklyDigestData, branding);
     case 'E-11':
       return renderReportShared(data as ReportSharedData, branding);
+    case 'E-12':
+      return renderMonthlyClientReport(data as MonthlyClientReportData, branding);
     case 'E-13':
       return renderFreeCheckReport(data as FreeCheckReportData, branding);
     case 'E-14':
@@ -73,6 +87,8 @@ export function renderEmail<T extends EmailTemplateId>(
       return renderPlanChanged(data as PlanChangedData, branding);
     case 'E-20':
       return renderDataDeletionWarning(data as DataDeletionWarningData, branding);
+    case 'E-21':
+      return renderWebhookDisabled(data as WebhookDisabledData, branding);
     default:
       throw new Error(`Unsupported email template: ${templateId}`);
   }

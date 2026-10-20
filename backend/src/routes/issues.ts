@@ -922,6 +922,20 @@ export function orgIssuesRouter(repos: Repositories, options?: IssuesRouterOptio
 
     const updated = await repos.issues.assign(req.orgId!, issueId, req.auth!.user.id, assigneeId);
 
+    if (assigneeId && assigneeId !== req.auth!.user.id && repos.notifications) {
+      const orgSlug = req.org?.slug || req.orgId!;
+      repos.notifications
+        .createInApp(req.orgId!, assigneeId, {
+          type: 'issue_assigned',
+          title: 'Issue assigned to you',
+          body: `You were assigned to: ${issue.title}`,
+          link: `/${orgSlug}/sites/${issue.siteId}/issues?openId=${issue.id}`,
+        })
+        .catch((err) => {
+          console.error('[notifications] Failed to create issue_assigned notification:', err);
+        });
+    }
+
     res.status(200).json({
       data: { issue: updated },
     });
