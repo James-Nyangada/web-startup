@@ -2,8 +2,23 @@
 // Needs the API on API_URL (default http://localhost:4000) and the web app on WEB_URL
 // (default http://localhost:3000). Creates a throwaway user, organisation and site,
 // then audits each screen. Exits 1 when any violation is found.
+import { execFileSync } from "node:child_process";
+import { createHmac } from "node:crypto";
 import { chromium } from "playwright";
 import { AxeBuilder } from "@axe-core/playwright";
+
+/** RFC 6238 code for the staff second factor (P6-01). */
+function totp(secret) {
+  const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
+  let bits = "";
+  for (const c of secret.replace(/=+$/, "")) bits += alphabet.indexOf(c).toString(2).padStart(5, "0");
+  const key = Buffer.from(bits.match(/.{8}/g).map((b) => parseInt(b, 2)));
+  const msg = Buffer.alloc(8);
+  msg.writeBigUInt64BE(BigInt(Math.floor(Date.now() / 30000)));
+  const h = createHmac("sha1", key).update(msg).digest();
+  const o = h[h.length - 1] & 15;
+  return String((h.readUInt32BE(o) & 0x7fffffff) % 1e6).padStart(6, "0");
+}
 
 const WEB = process.env.WEB_URL ?? "http://localhost:3000";
 const API = process.env.API_URL ?? "http://localhost:4000";
@@ -75,6 +90,14 @@ const screens = {
   "S-43 Branding": "/settings/branding",
   "S-44 Billing": "/settings/billing",
   "S-48 Account": "/settings/account",
+  "S-40 General": "/settings/general",
+  "S-47 API keys": "/settings/api-keys",
+  "S-51 Audit log": "/settings/audit-log",
+  "Help centre": "/help",
+  "Help article": "/help/verify-site-ownership",
+  "API reference": "/developers/api",
+  "S-80 Not found": "/this-page-does-not-exist",
+  "S-80 Maintenance": "/maintenance",
   "S-60 Portal Home": "/portal",
   "S-61 Portal Site": `/portal/sites/${site.id}`,
   "Public Statement": `/s/${site.id}/accessibility-statement`,
@@ -112,6 +135,40 @@ await page.waitForSelector('[role="dialog"][aria-label="Notification Centre"]');
     console.log(
       `  ${v.id} [${v.impact}] x${v.nodes.length}: ${v.nodes[0].html.slice(0, 200)}`,
     );
+  }
+}
+
+// S-70 – S-75 staff screens and the impersonation banner (P6-01 – P6-05). Needs psql to mark
+// the throwaway user as staff; skipped (not failed) where it is not available.
+let staffReady = false;
+try {
+  execFileSync("psql", [process.env.DATABASE_URL, "-c", `update users set is_staff = true where email = '${email}'`], {
+    stdio: "ignore",
+  });
+  staffReady = true;
+} catch {
+  console.log("SKIP staff screens: psql or DATABASE_URL not available");
+}
+if (staffReady) {
+  const enrol = await api("/v1/staff/totp/enroll", {});
+  const confirmed = await api("/v1/staff/totp/confirm", { code: totp(enrol.body.data.secret) });
+  if (confirmed.status >= 400) throw new Error(`Staff TOTP failed: ${JSON.stringify(confirmed.body)}`);
+  const staffScreens = {
+    "S-70 Staff orgs": "/staff/orgs",
+    "S-71 Staff org detail": `/staff/orgs/${org.id}`,
+    "S-72 Staff queues": "/staff/queues",
+    "S-73 Staff leads": "/staff/leads",
+    "S-74 Staff content": "/staff/content",
+    "S-75 Staff flags": "/staff/flags",
+  };
+  for (const [name, path] of Object.entries(staffScreens)) {
+    await page.goto(WEB + path, { waitUntil: "load" });
+    await page.waitForTimeout(2000);
+    const { violations } = await new AxeBuilder({ page }).withTags(TAGS).analyze();
+    console.log(`${violations.length ? "FAIL" : "PASS"} ${name} (${path})`);
+    failures += violations.length;
+    for (const v of violations)
+      console.log(`  ${v.id} [${v.impact}] x${v.nodes.length}: ${v.nodes[0].html.slice(0, 200)}`);
   }
 }
 

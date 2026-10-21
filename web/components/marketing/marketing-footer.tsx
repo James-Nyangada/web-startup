@@ -14,7 +14,7 @@ export function MarketingFooter() {
             </p>
             <div className="flex items-center gap-2 text-xs text-muted">
               <span className="inline-block size-2 rounded-full bg-ok" aria-hidden="true" />
-              <span>No tracking cookies · Privacy-first analytics · WCAG 2.2 AA compliant</span>
+              <span>No tracking cookies · Privacy-first analytics · Built to WCAG 2.2 AA</span>
             </div>
           </div>
 
@@ -93,6 +93,28 @@ export function MarketingFooter() {
           <div className="flex flex-col gap-3">
             <span className="text-xs font-bold tracking-wider uppercase text-muted">Resources</span>
             <ul className="m-0 list-none flex flex-col gap-2 p-0 text-sm">
+              <li>
+                <Link href="/help" className="text-muted no-underline hover:text-ink">
+                  Help centre
+                </Link>
+              </li>
+              <li>
+                <Link href="/developers/api" className="text-muted no-underline hover:text-ink">
+                  API reference
+                </Link>
+              </li>
+              {process.env.NEXT_PUBLIC_STATUS_URL && (
+                <li>
+                  <a href={process.env.NEXT_PUBLIC_STATUS_URL} className="text-muted no-underline hover:text-ink">
+                    System status
+                  </a>
+                </li>
+              )}
+              <li>
+                <a href="mailto:support@plainsight.io" className="text-muted no-underline hover:text-ink">
+                  support@plainsight.io
+                </a>
+              </li>
               <li>
                 <Link href="/blog" className="text-muted no-underline hover:text-ink">
                   Engineering Blog

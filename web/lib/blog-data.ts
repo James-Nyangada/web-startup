@@ -115,7 +115,7 @@ export const BLOG_POSTS: BlogPost[] = [
     slug: "shopify-accessibility-best-practices",
     title: "Shopify Accessibility Best Practices: Liquid Theme Fixes",
     summary:
-      "Common accessibility pitfalls in modern Shopify Online Store 2.0 themes, and the exact Liquid code changes needed to ensure your cart drawers and product cards are WCAG compliant.",
+      "Common accessibility pitfalls in modern Shopify Online Store 2.0 themes, and the exact Liquid code changes needed so your cart drawers and product cards meet WCAG 2.2 AA.",
     date: "September 24, 2026",
     readingTime: "5 min read",
     author: {
