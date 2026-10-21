@@ -37,13 +37,20 @@ export async function startWorker() {
     console.log(`[worker] Re-enqueued ${recovered} interrupted scan(s).`);
   }
 
-  console.log('[worker] Registering job workers...');
-  await registerWorkers(boss, ctx);
+  // MAINTENANCE_MODE (P6-12): stay connected but take no jobs; they wait in the queue.
+  if (process.env.MAINTENANCE_MODE === 'true' || process.env.MAINTENANCE_MODE === '1') {
+    console.log(
+      '[worker] MAINTENANCE_MODE is on: not processing jobs. Unset it and restart to resume.',
+    );
+  } else {
+    console.log('[worker] Registering job workers...');
+    await registerWorkers(boss, ctx);
 
-  console.log('[worker] Registering recurring cron schedules...');
-  await registerSchedules(boss);
+    console.log('[worker] Registering recurring cron schedules...');
+    await registerSchedules(boss);
 
-  console.log('[worker] Background worker is active and listening for jobs.');
+    console.log('[worker] Background worker is active and listening for jobs.');
+  }
 
   // Graceful shutdown handling
   let isShuttingDown = false;

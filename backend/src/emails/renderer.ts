@@ -19,6 +19,8 @@ import {
   renderMonthlyClientReport,
   renderWebhookDisabled,
   renderSiteVerificationFailing,
+  renderDataExportReady,
+  renderSecurityNotice,
 } from './templates/index.js';
 import type {
   EmailBranding,
@@ -45,6 +47,8 @@ import type {
   MonthlyClientReportData,
   WebhookDisabledData,
   SiteVerificationFailingData,
+  DataExportReadyData,
+  SecurityNoticeData,
 } from './types.js';
 
 export function renderEmail<T extends EmailTemplateId>(
@@ -93,6 +97,10 @@ export function renderEmail<T extends EmailTemplateId>(
       return renderSiteVerificationFailing(data as SiteVerificationFailingData, branding);
     case 'E-21':
       return renderWebhookDisabled(data as WebhookDisabledData, branding);
+    case 'E-22':
+      return renderDataExportReady(data as DataExportReadyData, branding);
+    case 'E-23':
+      return renderSecurityNotice(data as SecurityNoticeData, branding);
     default:
       throw new Error(`Unsupported email template: ${templateId}`);
   }
@@ -224,6 +232,22 @@ export function getSampleTemplateData(templateId: EmailTemplateId): unknown {
         failureCount: 3,
         reason: 'The plainsight-verify meta tag was not found on the home page.',
         verifyUrl: 'http://localhost:3000/sites/oakhaus/verify',
+      };
+    case 'E-22':
+      return {
+        name: 'Alex Johnson',
+        downloadUrl: 'http://localhost:3000/settings/account?export=sample',
+        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+        sizeLabel: '184 KB',
+      };
+    case 'E-23':
+      return {
+        kind: 'password_changed',
+        name: 'Alex Johnson',
+        when: new Date().toISOString(),
+        ip: '102.134.12.1',
+        userAgent: 'Firefox on macOS',
+        accountUrl: 'http://localhost:3000/settings/account',
       };
   }
 }

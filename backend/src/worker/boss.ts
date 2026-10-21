@@ -20,7 +20,9 @@ import { handleWebhookDeliver } from './jobs/webhook-deliver.js';
 import { handleReportSchedule } from './jobs/report-schedule.js';
 import { handleRetentionPrune } from './jobs/retention-prune.js';
 import { handleSiteReverify, handleSiteReverifySweep } from './jobs/site-reverify.js';
+import { handleDataExport } from './jobs/data-export.js';
 import type {
+  DataExportJobPayload,
   DigestWeeklyJobPayload,
   PaddleProcessJobPayload,
   ReportRenderJobPayload,
@@ -44,6 +46,7 @@ export const QUEUE_WEBHOOK_DELIVER = 'webhook.deliver';
 export const QUEUE_RETENTION_PRUNE = 'retention.prune';
 export const QUEUE_SITE_REVERIFY = 'site.reverify';
 export const QUEUE_SITE_REVERIFY_SWEEP = 'site.reverify.sweep';
+export const QUEUE_PRIVACY_EXPORT = 'privacy.export';
 
 export const ALL_QUEUES = [
   QUEUE_SCAN_RUN,
@@ -61,6 +64,7 @@ export const ALL_QUEUES = [
   QUEUE_RETENTION_PRUNE,
   QUEUE_SITE_REVERIFY,
   QUEUE_SITE_REVERIFY_SWEEP,
+  QUEUE_PRIVACY_EXPORT,
 ] as const;
 
 /** pg-boss refuses to send to or schedule on a queue that does not exist. Idempotent. */
@@ -371,6 +375,15 @@ export async function registerWorkers(boss: PgBoss, ctx: WorkerContext): Promise
     await handleSiteReverifySweep(ctx, (siteId) => enqueueSiteReverify(boss, siteId));
   });
 
+  // privacy.export (P6-09): one at a time, exports are rare and memory-bound
+  await boss.work<DataExportJobPayload>(
+    QUEUE_PRIVACY_EXPORT,
+    { localConcurrency: 1, batchSize: 1 },
+    async ([job]) => {
+      if (job?.data?.exportId) await handleDataExport(job.data, ctx);
+    },
+  );
+
   // Concurrency 1 for retention.prune cron (Spec Section 9 & P5-10)
   await boss.work<RetentionPruneJobPayload>(
     QUEUE_RETENTION_PRUNE,
@@ -429,4 +442,13 @@ export async function enqueueRetentionPrune(
   payload: RetentionPruneJobPayload = {},
 ): Promise<string | null> {
   return boss.send(QUEUE_RETENTION_PRUNE, payload);
+}
+
+/** privacy.export (P6-09): Timeout 5 min, Retries 2. */
+export async function enqueueDataExport(boss: PgBoss, exportId: string): Promise<string | null> {
+  return boss.send(QUEUE_PRIVACY_EXPORT, { exportId } satisfies DataExportJobPayload, {
+    expireInSeconds: 5 * 60,
+    retryLimit: 2,
+    retryDelay: 60,
+  });
 }

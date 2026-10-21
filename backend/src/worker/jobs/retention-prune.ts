@@ -115,6 +115,19 @@ export async function handleRetentionPrune(
       ? 0
       : await ctx.repos.webhooks.pruneDeliveries(deliveryCutoff);
 
+  // Personal data exports (P6-09): the file goes once its download link expires.
+  let dataExportsExpired = 0;
+  if (!dryRun && !payload.orgId && ctx.repos.privacy?.listExpiredExports) {
+    for (const row of await ctx.repos.privacy.listExpiredExports()) {
+      if (!row.fileKey) continue;
+      await ctx.storage.deleteObject(row.fileKey).catch((err: unknown) => {
+        console.warn(`[retention.prune] Failed to delete export ${row.id}:`, err);
+      });
+      await ctx.repos.privacy.clearExportFile(row.id);
+      dataExportsExpired++;
+    }
+  }
+
   const durationMs = Date.now() - startTime;
   const report: RetentionPruneReport = {
     orgsEvaluated,
@@ -124,6 +137,7 @@ export async function handleRetentionPrune(
     deletedOrgsPurged,
     purgeFailures,
     webhookDeliveriesPruned,
+    dataExportsExpired,
     dryRun,
     durationMs,
     details,

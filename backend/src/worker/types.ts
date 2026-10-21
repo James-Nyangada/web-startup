@@ -69,6 +69,10 @@ export interface WebhookDeliverJobPayload {
   payload: Record<string, unknown>;
 }
 
+export interface DataExportJobPayload {
+  exportId: string;
+}
+
 export interface RetentionPruneJobPayload {
   orgId?: string;
   dryRun?: boolean;
@@ -83,6 +87,7 @@ export interface RetentionPruneReport {
   /** Soft-deleted orgs whose hard delete failed; they are retried on the next run. */
   purgeFailures: string[];
   webhookDeliveriesPruned: number;
+  dataExportsExpired: number;
   dryRun: boolean;
   durationMs: number;
   details: Array<{

@@ -18,7 +18,9 @@ export type EmailTemplateId =
   | 'E-18' // Subscription canceled / will end
   | 'E-19' // Plan changed
   | 'E-20' // Data deletion warning (7 days, 1 day)
-  | 'E-21'; // Webhook disabled after failures
+  | 'E-21' // Webhook disabled after failures
+  | 'E-22' // Personal data export ready
+  | 'E-23'; // Security notice: password changed / new sign-in
 
 export interface EmailRenderOutput {
   subject: string;
@@ -126,6 +128,22 @@ export interface DataDeletionWarningData {
   deletionDate: string | Date;
 }
 
+export interface SecurityNoticeData {
+  kind: 'password_changed' | 'new_sign_in';
+  name?: string | null;
+  when: string | Date;
+  ip?: string | null;
+  userAgent?: string | null;
+  accountUrl: string;
+}
+
+export interface DataExportReadyData {
+  name?: string | null;
+  downloadUrl: string;
+  expiresAt: string | Date;
+  sizeLabel?: string;
+}
+
 export interface PaymentFailedData {
   orgName: string;
   updateBillingUrl: string;
@@ -221,4 +239,6 @@ export type TemplateDataMap = {
   'E-20': DataDeletionWarningData;
   'E-09': SiteVerificationFailingData;
   'E-21': WebhookDisabledData;
+  'E-22': DataExportReadyData;
+  'E-23': SecurityNoticeData;
 };

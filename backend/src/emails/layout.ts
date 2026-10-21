@@ -139,7 +139,7 @@ export function renderEmailLayout(options: LayoutOptions): string {
           <tr>
             <td align="left" style="padding: 24px 16px 0 16px;">
               <p style="margin: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 12px; line-height: 18px; color: #76716B;">
-                Sent by ${brandName} · Automated web accessibility auditing &amp; continuous compliance.
+                Sent by ${brandName} · Automated web accessibility checks &amp; continuous monitoring.
               </p>
               ${unsubscribeHtml}
             </td>

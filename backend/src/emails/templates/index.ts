@@ -21,6 +21,8 @@ import type {
   WeeklyDigestData,
   MonthlyClientReportData,
   WebhookDisabledData,
+  DataExportReadyData,
+  SecurityNoticeData,
   SiteVerificationFailingData,
 } from '../types.js';
 
@@ -634,7 +636,7 @@ export function renderDataDeletionWarning(
       Your organization has been inactive in read-only mode for over 3 weeks. Under our data retention policy, all historical scan records, issue logs, and audit files are scheduled for permanent deletion in <strong>${data.daysUntilDeletion} day${data.daysUntilDeletion === 1 ? '' : 's'}</strong> on <strong>${new Date(data.deletionDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</strong>.
     </p>
     <p style="margin: 0 0 16px 0;">
-      To keep your compliance history, you can either reactivate your subscription or export your complete data before this date.
+      To keep your accessibility history, you can either reactivate your subscription or export your complete data before this date.
     </p>
     <p style="margin: 0;">
       <a href="${data.exportUrl}" style="color: #635F59; text-decoration: underline;">Download complete data export</a>
@@ -642,7 +644,7 @@ export function renderDataDeletionWarning(
   `;
 
   const html = renderEmailLayout({
-    preheader: `Your compliance data will be deleted in ${data.daysUntilDeletion} days`,
+    preheader: `Your accessibility data will be deleted in ${data.daysUntilDeletion} days`,
     title: 'Data deletion notice',
     contentHtml,
     buttonLabel: 'Reactivate subscription',
@@ -742,7 +744,7 @@ export function renderSubscriptionCanceled(
       }
     </p>
     <p style="margin: 0 0 16px 0; color: #635F59; font-size: 14px;">
-      Under our retention policy, your scan data and reports will be preserved for 30 days. You can reactivate anytime to resume automated compliance checks.
+      Under our retention policy, your scan data and reports will be preserved for 30 days. You can reactivate anytime to resume automated accessibility checks.
     </p>
   `;
 
@@ -954,7 +956,7 @@ export function renderMonthlyClientReport(
       ${data.clientName ? `Hello ${data.clientName},` : 'Hello,'}
     </p>
     <p style="margin: 0 0 16px 0;">
-      Your monthly accessibility compliance report for <strong>${data.siteName}</strong> (${data.reportPeriod}) is now available.
+      Your monthly accessibility report for <strong>${data.siteName}</strong> (${data.reportPeriod}) is now available.
     </p>
     ${
       data.score !== null
@@ -977,7 +979,7 @@ export function renderMonthlyClientReport(
     branding,
   });
 
-  const text = `${subject}\n\nYour monthly accessibility compliance report for ${data.siteName} (${data.reportPeriod}) is available.\n\nDownload Report:\n${data.downloadUrl}\n`;
+  const text = `${subject}\n\nYour monthly accessibility report for ${data.siteName} (${data.reportPeriod}) is available.\n\nDownload Report:\n${data.downloadUrl}\n`;
 
   return { subject, html, text };
 }
@@ -1012,6 +1014,90 @@ export function renderWebhookDisabled(
   });
 
   const text = `${subject}\n\nWebhook ${data.webhookUrl} failed ${data.failureCount} times and was disabled.\n\nManage Integrations:\n${data.settingsUrl}\n`;
+
+  return { subject, html, text };
+}
+
+// E-22: Personal data export ready
+export function renderDataExportReady(
+  data: DataExportReadyData,
+  branding?: EmailBranding,
+): EmailRenderOutput {
+  const subject = 'Your personal data export is ready';
+  const expires = new Date(data.expiresAt).toLocaleDateString('en-GB', {
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+    timeZone: 'UTC',
+  });
+  const greeting = data.name ? `Hi ${escapeHtml(data.name)},` : 'Hi,';
+
+  const contentHtml = `
+    <p style="margin: 0 0 16px 0;">${greeting}</p>
+    <p style="margin: 0 0 16px 0;">
+      The copy of your personal data you asked for is ready${data.sizeLabel ? ` (${escapeHtml(data.sizeLabel)})` : ''}. It is a zip file with your profile, roles, sign-in history, notification settings, notes you wrote and files you uploaded, in JSON.
+    </p>
+    <p style="margin: 0 0 16px 0;">
+      You need to be signed in to download it. The link works until <strong>${expires}</strong>, then the file is deleted.
+    </p>
+    <p style="margin: 0 0 16px 0; font-size: 14px; color: #4A4640;">
+      If you did not ask for this, sign in and change your password, then reply to this email.
+    </p>
+  `;
+
+  const html = renderEmailLayout({
+    preheader: `Your data export is ready to download until ${expires}.`,
+    title: 'Your data export is ready',
+    contentHtml,
+    buttonLabel: 'Download your data',
+    buttonUrl: data.downloadUrl,
+    branding,
+  });
+
+  const text = `${subject}\n\nThe copy of your personal data you asked for is ready. Sign in to download it before ${expires}:\n${data.downloadUrl}\n\nIf you did not ask for this, sign in and change your password.\n`;
+
+  return { subject, html, text };
+}
+
+// E-23: Security notice (password changed / new sign-in). Essential mail: no unsubscribe.
+export function renderSecurityNotice(
+  data: SecurityNoticeData,
+  branding?: EmailBranding,
+): EmailRenderOutput {
+  const changed = data.kind === 'password_changed';
+  const subject = changed
+    ? 'Your Plainsight password was changed'
+    : 'New sign-in to your Plainsight account';
+  const when = new Date(data.when).toUTCString();
+  const greeting = data.name ? `Hi ${escapeHtml(data.name)},` : 'Hi,';
+  const where = [data.ip, data.userAgent]
+    .filter(Boolean)
+    .map((v) => escapeHtml(String(v)))
+    .join(' · ');
+
+  const contentHtml = `
+    <p style="margin: 0 0 16px 0;">${greeting}</p>
+    <p style="margin: 0 0 16px 0;">
+      ${changed ? 'The password for your account was changed' : 'Your account was signed in to'} on <strong>${escapeHtml(when)}</strong>${where ? ` (${where})` : ''}.
+    </p>
+    <p style="margin: 0 0 16px 0;">If this was you, there is nothing to do.</p>
+    <p style="margin: 0 0 16px 0;">
+      If it was not you, reset your password now and sign out of every other session from your account settings, then reply to this email so we can help.
+    </p>
+  `;
+
+  const html = renderEmailLayout({
+    preheader: changed
+      ? 'Your password was just changed.'
+      : 'Someone just signed in to your account.',
+    title: changed ? 'Password changed' : 'New sign-in',
+    contentHtml,
+    buttonLabel: 'Review account security',
+    buttonUrl: data.accountUrl,
+    branding,
+  });
+
+  const text = `${subject}\n\n${changed ? 'Your password was changed' : 'Your account was signed in to'} on ${when}${where ? ` (${where})` : ''}.\n\nIf this was not you, reset your password and sign out of other sessions:\n${data.accountUrl}\n`;
 
   return { subject, html, text };
 }

@@ -1,11 +1,30 @@
 import { Router, type Request, type Response } from 'express';
 import { z } from 'zod';
 import type { Repositories } from '../db/repositories/index.js';
+import { asOrgId } from '../db/repositories/org-scope.js';
 import type { Auth } from '../lib/auth.js';
 import { validatePassword } from '../lib/passwords.js';
 import { requireAuth } from '../middleware/auth.js';
 import { ErrorCode } from '../shared/errors.js';
 import { copyResponseHeaders } from './auth.js';
+import type { PgBoss } from 'pg-boss';
+import { AppError } from '../lib/app-error.js';
+import { isStaffVerified } from '../db/repositories/staff.js';
+import type { StorageService } from '../storage/index.js';
+import type { EmailSender } from '../emails/sender.js';
+import { enqueueDataExport } from '../worker/boss.js';
+
+export interface MeRouterOptions {
+  boss?: PgBoss;
+  /** Sends E-23 after a password change (spec 10, ASVS 2.2.3). */
+  emailSender?: EmailSender;
+  storage?: StorageService;
+  /** Test hook: runs instead of enqueueing privacy.export. */
+  enqueueExport?: (exportId: string) => Promise<void>;
+}
+
+/** One export a day is plenty; it stops the endpoint being used to load the worker. */
+const EXPORT_COOLDOWN_MS = 24 * 60 * 60 * 1000;
 
 const patchMeSchema = z.object({
   name: z.string().min(1).max(100).optional(),
@@ -19,7 +38,7 @@ const changePasswordSchema = z.object({
   newPassword: z.string(),
 });
 
-export function meRouter(auth: Auth, repos: Repositories): Router {
+export function meRouter(auth: Auth, repos: Repositories, options: MeRouterOptions = {}): Router {
   const router = Router();
   router.use(requireAuth(auth));
 
@@ -54,6 +73,16 @@ export function meRouter(auth: Auth, repos: Repositories): Router {
       activeOrg = memberships[0]?.org ?? null;
     }
 
+    // Staff: which org (if any) this session is viewing read-only, for the S-80 banner.
+    let impersonation: { org: { id: string; slug: string | null; name: string } } | null = null;
+    if (user.isStaff && repos.staff) {
+      const state = await repos.staff.getSessionState(req.auth!.session.id);
+      if (state?.impersonatingOrgId && isStaffVerified(state)) {
+        const org = await repos.organizations.findById(state.impersonatingOrgId);
+        if (org) impersonation = { org: { id: org.id, slug: org.slug, name: org.name } };
+      }
+    }
+
     res.status(200).json({
       data: {
         user: {
@@ -70,6 +99,7 @@ export function meRouter(auth: Auth, repos: Repositories): Router {
         memberships,
         clientAccess,
         activeOrg,
+        impersonation,
       },
     });
   });
@@ -138,6 +168,24 @@ export function meRouter(auth: Auth, repos: Repositories): Router {
       }
 
       copyResponseHeaders(webRes, res);
+      // E-23: tell the account owner, in case it was not them. Never block the response on it.
+      if (options.emailSender) {
+        const appUrl = (process.env.APP_URL ?? 'http://localhost:3000').replace(/\/$/, '');
+        void options.emailSender
+          .send({
+            to: req.auth!.user.email,
+            templateId: 'E-23',
+            data: {
+              kind: 'password_changed',
+              name: req.auth!.user.name,
+              when: new Date(),
+              ip: req.ip ?? null,
+              userAgent: req.get('user-agent') ?? null,
+              accountUrl: `${appUrl}/settings/account`,
+            },
+          })
+          .catch(() => undefined);
+      }
       res.status(200).json({
         data: { success: true, message: 'Password changed successfully.' },
       });
@@ -173,39 +221,145 @@ export function meRouter(auth: Auth, repos: Repositories): Router {
     }
   });
 
-  // POST /v1/me/export
-  router.post('/export', (_req: Request, res: Response): void => {
-    res.status(200).json({
+  // POST /v1/me/export - Request a personal data export (GDPR, P6-09) → E-22 when ready
+  router.post('/export', async (req: Request, res: Response): Promise<void> => {
+    const userId = req.auth!.user.id;
+    const [latest] = await repos.privacy.listExports(userId, 1);
+    if (
+      latest &&
+      (latest.status === 'queued' || Date.now() - latest.createdAt.getTime() < EXPORT_COOLDOWN_MS)
+    ) {
+      throw new AppError(
+        429,
+        ErrorCode.RATE_LIMITED,
+        latest.status === 'queued'
+          ? 'Your export is already being prepared. We will email you when it is ready.'
+          : 'You can request one export a day. Use the download link from your last export.',
+        { exportId: latest.id, status: latest.status },
+      );
+    }
+
+    const row = await repos.privacy.createExport(userId);
+    if (options.enqueueExport) await options.enqueueExport(row.id);
+    else if (options.boss) await enqueueDataExport(options.boss, row.id);
+
+    await repos.auditLog.write(null, {
+      actorId: userId,
+      actorType: 'user',
+      action: 'privacy.export_requested',
+      targetType: 'data_export',
+      targetId: row.id,
+      ip: req.ip ?? null,
+      userAgent: req.get('user-agent') ?? null,
+    });
+
+    res.status(202).json({
       data: {
+        export: { id: row.id, status: row.status, createdAt: row.createdAt },
         message:
-          'Your personal data export request has been received. You will receive an email once it is prepared.',
+          'We are preparing your data. You will get an email with a download link, usually within a few minutes.',
       },
     });
   });
 
-  // DELETE /v1/me
+  // GET /v1/me/exports - Recent export requests and their status
+  router.get('/exports', async (req: Request, res: Response): Promise<void> => {
+    const rows = await repos.privacy.listExports(req.auth!.user.id, 5);
+    res.json({
+      data: {
+        exports: rows.map((r) => ({
+          id: r.id,
+          status: r.status,
+          fileSize: r.fileSize,
+          createdAt: r.createdAt,
+          expiresAt: r.expiresAt,
+          downloadable:
+            r.status === 'ready' &&
+            Boolean(r.fileKey) &&
+            (!r.expiresAt || r.expiresAt > new Date()),
+        })),
+      },
+    });
+  });
+
+  // GET /v1/me/exports/:id/download - The zip; only for the signed-in owner of the export
+  router.get('/exports/:id/download', async (req: Request, res: Response): Promise<void> => {
+    const id = z.uuid().safeParse(req.params.id);
+    const row = id.success ? await repos.privacy.findExport(req.auth!.user.id, id.data) : null;
+    if (!row || row.status !== 'ready' || !row.fileKey)
+      throw AppError.notFound('Export not found.');
+    if (row.expiresAt && row.expiresAt <= new Date()) {
+      throw new AppError(
+        410,
+        ErrorCode.TOKEN_EXPIRED,
+        'This export has expired. Request a new one.',
+      );
+    }
+    const file = options.storage ? await options.storage.getObject(row.fileKey) : null;
+    if (!file) throw AppError.notFound('Export not found.');
+    res.setHeader('Content-Type', 'application/zip');
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename="plainsight-personal-data-${row.createdAt.toISOString().slice(0, 10)}.zip"`,
+    );
+    res.setHeader('Cache-Control', 'no-store');
+    res.status(200).send(file);
+  });
+
+  // DELETE /v1/me - Delete account (spec 7.1, P6-09)
   router.delete('/', async (req: Request, res: Response): Promise<void> => {
     const userId = req.auth!.user.id;
-    const isBlocked = await repos.users.isSoleOwnerOfActiveOrg(userId);
+    const check = await repos.privacy.checkAccountDeletion(userId);
 
-    if (isBlocked) {
+    if (!check.allowed) {
+      const paying = check.blockers.filter((b) => b.reason === 'active_subscription');
       res.status(422).json({
         error: {
           code: ErrorCode.ACCOUNT_DELETION_BLOCKED,
-          message:
-            'You cannot delete your account while you are the sole owner of an organisation with an active subscription. Please transfer ownership or cancel your subscription first.',
-          details: {},
+          message: paying.length
+            ? `You own ${paying.map((b) => b.orgName).join(', ')}, which has an active subscription. Cancel it or transfer ownership first.`
+            : `You own ${check.blockers.map((b) => b.orgName).join(', ')}, which has other members. Transfer ownership to one of them first.`,
+          details: { blockers: check.blockers },
         },
       });
       return;
     }
 
-    await repos.users.softDelete(userId);
-    const webRes = await auth.api.signOut({ headers: req.headers, asResponse: true });
-    copyResponseHeaders(webRes, res);
+    // Export files hold personal data: remove them with the account.
+    const exports = await repos.privacy.listExports(userId, 100);
+    for (const e of exports) {
+      if (e.fileKey) await options.storage?.deleteObject(e.fileKey).catch(() => undefined);
+    }
+
+    await repos.auditLog.write(null, {
+      actorId: userId,
+      actorType: 'user',
+      action: 'account.deleted',
+      targetType: 'user',
+      targetId: userId,
+      ip: req.ip ?? null,
+      userAgent: req.get('user-agent') ?? null,
+      data: { soloOrgsDeleted: check.soloOrgIds },
+    });
+    for (const orgId of check.soloOrgIds) {
+      await repos.auditLog.write(asOrgId(orgId), {
+        actorId: userId,
+        actorType: 'user',
+        action: 'org.deleted',
+        targetType: 'organization',
+        targetId: orgId,
+        data: { reason: 'owner_account_deleted' },
+      });
+    }
+
+    const webRes = await auth.api
+      .signOut({ headers: req.headers, asResponse: true })
+      .catch(() => null);
+    await repos.privacy.deleteAccount(userId, check.soloOrgIds);
+    if (webRes) copyResponseHeaders(webRes, res);
 
     res.status(200).json({
-      data: { success: true, message: 'Account deleted.' },
+      data: { success: true, message: 'Your account has been deleted.' },
     });
   });
 

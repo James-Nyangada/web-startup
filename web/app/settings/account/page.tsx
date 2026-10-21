@@ -1,8 +1,9 @@
 "use client";
 
-import React, { useEffect, useRef, useState } from "react";
+import React, { Suspense, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { SettingsLayout } from "@/components/settings/settings-layout";
+import { DataExportCard } from "@/components/settings/data-export-card";
 import { useToast } from "@/components/shell/toast-context";
 import { Icon, I } from "@/components/icons";
 import { ThemePreferenceRadio } from "@/components/theme";
@@ -85,8 +86,6 @@ export default function AccountSettingsPage() {
   const [sessions, setSessions] = useState<SessionItem[]>(DEFAULT_SESSIONS);
   const [revokingSessionId, setRevokingSessionId] = useState<string | null>(null);
 
-  // Personal data export
-  const [exportingData, setExportingData] = useState(false);
 
   // Delete account modal state
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -236,19 +235,6 @@ export default function AccountSettingsPage() {
     }
   };
 
-  // Handle Data Export
-  const handleDataExport = async () => {
-    setExportingData(true);
-    try {
-      const res = await authClient.requestDataExport();
-      showToast(res.message || "Your personal data export request has been received.");
-    } catch (err: any) {
-      showToast("Data export request sent. You will receive an email shortly.");
-    } finally {
-      setExportingData(false);
-    }
-  };
-
   // Handle Account Deletion
   const handleDeleteAccount = async () => {
     if (deleteConfirmationText !== "DELETE") {
@@ -263,13 +249,12 @@ export default function AccountSettingsPage() {
       showToast("Account deleted successfully.");
       router.push("/sign-in");
     } catch (err: any) {
-      if (err instanceof ApiException && err.code === "ACCOUNT_DELETION_BLOCKED") {
-        setDeleteError(
-          "Account deletion blocked: You are the sole owner of an organisation with an active subscription. Please transfer ownership or delete the organisation first."
-        );
-      } else {
-        setDeleteError(err.message || "Failed to delete account. Please try again.");
-      }
+      // The API names the organisations that block deletion and what to do about them.
+      setDeleteError(
+        err instanceof ApiException && err.code === "ACCOUNT_DELETION_BLOCKED"
+          ? err.message
+          : err.message || "Failed to delete account. Please try again.",
+      );
     } finally {
       setDeletingAccount(false);
     }
@@ -603,26 +588,10 @@ export default function AccountSettingsPage() {
           </div>
         </div>
 
-        {/* Data & Privacy Export Card */}
-        <div className="flex flex-col gap-4 rounded-2xl border border-line bg-surface p-6 shadow-card">
-          <div className="flex flex-wrap items-center justify-between gap-4">
-            <div>
-              <h2 className="text-base font-semibold m-0 text-ink">Personal Data Archive</h2>
-              <p className="m-0 mt-0.5 text-xs text-muted">
-                Download a machine-readable JSON archive of your personal account, activity records, and audit events.
-              </p>
-            </div>
-            <button
-              type="button"
-              onClick={handleDataExport}
-              disabled={exportingData}
-              className="ease-ui flex items-center gap-2 rounded-full border border-line bg-surface px-4 py-2 text-xs font-semibold text-ink hover:bg-subtle"
-            >
-              <Icon d={I.download} size={15} />
-              <span>{exportingData ? "Requesting export..." : "Export personal data"}</span>
-            </button>
-          </div>
-        </div>
+        {/* Personal data export (P6-09) */}
+        <Suspense fallback={null}>
+          <DataExportCard />
+        </Suspense>
 
         {/* Danger Zone: Delete Account */}
         <div className="flex flex-col gap-4 rounded-2xl border border-crit/40 bg-crit-soft/20 p-6 shadow-card">
@@ -683,8 +652,9 @@ export default function AccountSettingsPage() {
                 <li>All your active user sessions will be immediately terminated.</li>
                 <li>Your personal activity logs and profile preferences will be permanently erased.</li>
                 <li>
-                  <strong>Organisation owners:</strong> If you are the sole owner of an organisation with an active subscription, account deletion will be blocked until ownership is transferred or the organisation is deleted.
+                  <strong>Organisation owners:</strong> transfer ownership of any organisation that has other members, and cancel any active subscription, first. Organisations you own alone are deleted with your account and erased after 30 days.
                 </li>
+                <li>Download your data first if you want to keep a copy.</li>
               </ul>
             </div>
 

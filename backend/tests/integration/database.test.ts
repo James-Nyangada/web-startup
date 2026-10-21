@@ -22,6 +22,8 @@ import { runMigrations } from '../../src/db/scripts/migrate.js';
 import { dropAppObjects } from '../../src/db/scripts/reset.js';
 import { seed } from '../../src/db/scripts/seed.js';
 import { testConfig } from '../helpers/fakes.js';
+import { MemoryStorageService } from '../../src/storage/index.js';
+import { handleRetentionPrune } from '../../src/worker/jobs/retention-prune.js';
 
 /**
  * Runs against a real, disposable Postgres. Set TEST_DATABASE_URL to enable.
@@ -67,6 +69,8 @@ const ALL_APP_TABLES = [
   'statements',
   'webhooks',
   'webhook_deliveries',
+  'api_keys',
+  'data_exports',
 ];
 
 describe.skipIf(!url)('database (integration)', () => {
@@ -435,6 +439,92 @@ describe.skipIf(!url)('database (integration)', () => {
     await expect(db.delete(evidenceEvents)).rejects.toMatchObject({
       cause: expect.objectContaining({ message: expect.stringMatching(/append-only/) }),
     });
+  });
+
+  it('purges every row and stored file of an org deleted over 30 days ago (P6-09)', async () => {
+    const repos = createRepositories(db);
+    const storage = new MemoryStorageService();
+    const [owner] = await db.insert(users).values({ email: 'purge-owner@example.com' }).returning();
+    const [org] = await db
+      .insert(organizations)
+      .values({ name: 'Purge Everything', slug: 'purge-everything', plan: 'agency_pro' })
+      .returning();
+    const orgId = asOrgId(org!.id);
+    await db.insert(memberships).values({ orgId, userId: owner!.id, role: 'owner' });
+    const [site] = await db
+      .insert(sites)
+      .values({ orgId, name: 'S', rootUrl: 'https://purge-all.example.com', verifyToken: 't' })
+      .returning();
+    const [scan] = await db
+      .insert(scans)
+      .values({ orgId, siteId: site!.id, trigger: 'manual', rawKey: `scans/${orgId}/raw.json.gz` })
+      .returning();
+    await storage.putObject(`scans/${orgId}/raw.json.gz`, 'raw');
+    const [page] = await db
+      .insert(pages)
+      .values({
+        orgId,
+        siteId: site!.id,
+        url: 'https://purge-all.example.com/',
+        urlHash: 'h',
+        templateKey: 'home',
+      })
+      .returning();
+    const [rule] = await db.select().from(rules).limit(1);
+    const [issue] = await db
+      .insert(issues)
+      .values({
+        orgId,
+        siteId: site!.id,
+        fingerprint: 'fp-purge',
+        ruleId: rule!.ruleId,
+        impact: 'serious',
+        wcagLevel: 'A',
+        templateKey: 'home',
+        selector: 'img',
+        status: 'open',
+        firstSeenScanId: scan!.id,
+        lastSeenScanId: scan!.id,
+      })
+      .returning();
+    await db.execute(sql`insert into issue_occurrences (id, org_id, scan_id, issue_id, page_id, target)
+      values (gen_random_uuid(), ${orgId}, ${scan!.id}, ${issue!.id}, ${page!.id}, 'img')`);
+    await repos.evidenceEvents.record(orgId, { siteId: site!.id, type: 'site_added', data: {} });
+    await repos.auditLog.write(orgId, {
+      actorType: 'user',
+      actorId: owner!.id,
+      action: 'org.created',
+    });
+    await repos.apiKeys.create(orgId, { name: 'k', scopes: ['read'], createdBy: owner!.id });
+    await repos.branding.upsert(orgId, { logoLightKey: `branding/${orgId}/logo.png` });
+    await storage.putObject(`branding/${orgId}/logo.png`, 'png');
+
+    await db
+      .update(organizations)
+      .set({ deletedAt: new Date(Date.now() - 31 * 24 * 60 * 60 * 1000) })
+      .where(eq(organizations.id, orgId));
+
+    const report = await handleRetentionPrune({}, { repos, storage });
+    expect(report.purgeFailures).toEqual([]);
+
+    // Every table with an org_id column: no rows left for the org.
+    const { rows: tables } = await pool.query<{ table_name: string }>(
+      `select table_name from information_schema.columns
+        where table_schema = 'public' and column_name = 'org_id'`,
+    );
+    expect(tables.length).toBeGreaterThan(15);
+    for (const { table_name } of tables) {
+      const { rows } = await pool.query<{ n: number }>(
+        `select count(*)::int as n from "${table_name}" where org_id = $1`,
+        [orgId],
+      );
+      expect(rows[0]!.n, table_name).toBe(0);
+    }
+    expect(await db.select().from(organizations).where(eq(organizations.id, orgId))).toHaveLength(
+      0,
+    );
+    expect(await storage.getObject(`scans/${orgId}/raw.json.gz`)).toBeNull();
+    expect(await storage.getObject(`branding/${orgId}/logo.png`)).toBeNull();
   });
 
   it('enables row-level security on every app table', async () => {

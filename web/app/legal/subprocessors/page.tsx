@@ -31,6 +31,14 @@ const SUBPROCESSORS = [
     purpose: "Primary database storage, scan runner workers, and core API application execution.",
   },
   {
+    name: "Supabase, Inc.",
+    entity: "Supabase, Inc. (USA)",
+    service: "Managed PostgreSQL database",
+    location: "European Union region (eu-central / eu-west)",
+    transfer: "Standard Contractual Clauses (SCCs), EU-US Data Privacy Framework",
+    purpose: "Hosted PostgreSQL that stores account, organisation, scan and issue data. Encrypted at rest; row-level security blocks Supabase's public data API.",
+  },
+  {
     name: "Resend, Inc.",
     entity: "Resend, Inc. (USA)",
     service: "Transactional Email Infrastructure",

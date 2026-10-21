@@ -65,6 +65,8 @@ function createMockAuth() {
     avatarUrl: null,
     timeZone: 'UTC',
     isStaff: false,
+    totpSecretEncrypted: null,
+    totpEnabledAt: null,
     lastActiveOrgId: null,
     createdAt: new Date(),
     updatedAt: new Date(),
@@ -523,9 +525,13 @@ describe('profile (/v1/me) endpoints', () => {
     expect(mockAuth.api.revokeSession).toHaveBeenCalled();
   });
 
-  it('DELETE /v1/me blocks if user is sole owner of an active org', async () => {
+  it('DELETE /v1/me blocks while the user owns a paying org', async () => {
     const { app, repos } = buildTestApp({ auth: mockAuth });
-    vi.mocked(repos.users.isSoleOwnerOfActiveOrg).mockResolvedValueOnce(true);
+    vi.mocked(repos.privacy.checkAccountDeletion).mockResolvedValueOnce({
+      allowed: false,
+      blockers: [{ orgId: 'org-1', orgName: 'Brightline', reason: 'active_subscription' }],
+      soloOrgIds: [],
+    });
 
     const res = await request(app)
       .delete('/v1/me')
@@ -533,12 +539,12 @@ describe('profile (/v1/me) endpoints', () => {
       .expect(422);
 
     expect(res.body.error.code).toBe(ErrorCode.ACCOUNT_DELETION_BLOCKED);
-    expect(res.body.error.message).toContain('sole owner');
+    expect(res.body.error.message).toContain('active subscription');
+    expect(repos.privacy.deleteAccount).not.toHaveBeenCalled();
   });
 
-  it('DELETE /v1/me soft deletes account if not sole owner', async () => {
+  it('DELETE /v1/me deletes the account when nothing blocks it', async () => {
     const { app, repos } = buildTestApp({ auth: mockAuth });
-    vi.mocked(repos.users.isSoleOwnerOfActiveOrg).mockResolvedValueOnce(false);
 
     const res = await request(app)
       .delete('/v1/me')
@@ -546,6 +552,6 @@ describe('profile (/v1/me) endpoints', () => {
       .expect(200);
 
     expect(res.body.data.success).toBe(true);
-    expect(repos.users.softDelete).toHaveBeenCalledWith(mockAuth.mockUser.id);
+    expect(repos.privacy.deleteAccount).toHaveBeenCalledWith(mockAuth.mockUser.id, []);
   });
 });
