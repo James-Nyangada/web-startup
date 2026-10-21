@@ -40,7 +40,7 @@ export function usersRepository(db: Database) {
     },
 
     async listMemberships(userId: string) {
-      return db
+      const rows = await db
         .select({
           id: memberships.id,
           orgId: memberships.orgId,
@@ -52,6 +52,8 @@ export function usersRepository(db: Database) {
             slug: organizations.slug,
             type: organizations.type,
             plan: organizations.plan,
+            planOverride: organizations.planOverride,
+            planOverrideExpiresAt: organizations.planOverrideExpiresAt,
             billingStatus: organizations.billingStatus,
             timeZone: organizations.timeZone,
             trialEndsAt: organizations.trialEndsAt,
@@ -62,6 +64,18 @@ export function usersRepository(db: Database) {
         .innerJoin(organizations, eq(organizations.id, memberships.orgId))
         .where(and(eq(memberships.userId, userId), isNull(organizations.deletedAt)))
         .orderBy(memberships.createdAt);
+      // Report the plan the org actually gets, including a live staff override (P6-02).
+      const now = Date.now();
+      return rows.map(({ org: { planOverride, planOverrideExpiresAt, ...org }, ...m }) => ({
+        ...m,
+        org: {
+          ...org,
+          plan:
+            planOverride && (!planOverrideExpiresAt || planOverrideExpiresAt.getTime() > now)
+              ? planOverride
+              : org.plan,
+        },
+      }));
     },
 
     async listClientAccess(userId: string) {

@@ -10,6 +10,7 @@ import { isPublicAddress } from '../../src/scanner/net/ip-ranges.js';
 import type { FreeChecksRouterOptions } from '../../src/routes/public/free-checks.js';
 import { MemoryStorageService, type StorageService } from '../../src/storage/index.js';
 import type { PaddleClient } from '../../src/billing/paddle-api.js';
+import type { QueueAdmin } from '../../src/staff/queue-admin.js';
 
 export const testConfig = {
   APP_URL: 'http://localhost:3000',
@@ -69,6 +70,9 @@ export function fakeRepos() {
     auditLog: {
       write: vi.fn().mockResolvedValue(undefined),
       list: vi.fn().mockResolvedValue([]),
+      search: vi.fn().mockResolvedValue({ items: [], nextCursor: null }),
+      exportRows: vi.fn().mockResolvedValue([]),
+      listActions: vi.fn().mockResolvedValue([]),
       findRecentAction: vi.fn().mockResolvedValue(null),
       hasActionWithKey: vi.fn().mockResolvedValue(false),
     },
@@ -468,6 +472,8 @@ export function fakeRepos() {
     },
     branding: {
       findByOrgId: vi.fn().mockResolvedValue(null),
+      findByCustomDomain: vi.fn().mockResolvedValue(null),
+      findVerifiedDomain: vi.fn().mockResolvedValue(null),
       upsert: vi.fn().mockImplementation((orgId, data) =>
         Promise.resolve({
           id: 'brand-1',
@@ -480,8 +486,8 @@ export function fakeRepos() {
           reportFooter: data.reportFooter ?? null,
           hideProductBrand: data.hideProductBrand ?? false,
           customDomain: data.customDomain ?? null,
-          customDomainVerifiedAt: null,
-          customDomainVerifyToken: null,
+          customDomainVerifiedAt: data.customDomainVerifiedAt ?? null,
+          customDomainVerifyToken: data.customDomainVerifyToken ?? null,
           createdAt: new Date(),
           updatedAt: new Date(),
         }),
@@ -733,6 +739,64 @@ export function fakeRepos() {
       purgeOrganization: vi.fn().mockResolvedValue(true),
       listOrgFileKeys: vi.fn().mockResolvedValue([]),
     },
+    staff: {
+      getSessionState: vi.fn().mockResolvedValue(null),
+      setTotpSecret: vi.fn().mockResolvedValue(undefined),
+      enableTotp: vi.fn().mockResolvedValue(undefined),
+      markSessionVerified: vi.fn().mockResolvedValue(undefined),
+      setImpersonation: vi.fn().mockResolvedValue(undefined),
+      listOrgs: vi.fn().mockResolvedValue({ items: [], nextOffset: null }),
+      getOrgDetail: vi.fn().mockResolvedValue(null),
+      extendTrial: vi.fn().mockResolvedValue(null),
+      setPlanOverride: vi.fn().mockResolvedValue(null),
+      getMetrics: vi.fn().mockResolvedValue({
+        scans: { total: 0, failed: 0, completed: 0, failureRate: 0, avgDurationMs: null },
+        scansPerDay: [],
+        freeChecksPerDay: [],
+        trialConversion: { trialsStarted: 0, converted: 0 },
+        mrrCents: 0,
+      }),
+      listFreeCheckLeads: vi.fn().mockResolvedValue({ items: [], nextOffset: null }),
+      listWaitlist: vi.fn().mockResolvedValue({ items: [], nextOffset: null }),
+      listConsentedLeads: vi.fn().mockResolvedValue([]),
+      listFlaggedSuggestions: vi.fn().mockResolvedValue([]),
+      findSuggestion: vi.fn().mockResolvedValue(null),
+      approveSuggestion: vi.fn().mockResolvedValue(null),
+      deleteSuggestion: vi.fn().mockResolvedValue(true),
+      promoteSuggestionToDraft: vi.fn().mockResolvedValue(null),
+    },
+    featureFlags: {
+      list: vi.fn().mockResolvedValue([]),
+      find: vi.fn().mockResolvedValue(null),
+      upsert: vi
+        .fn()
+        .mockImplementation((key: string, data: Record<string, unknown>) =>
+          Promise.resolve({ key, ...data, createdAt: new Date(), updatedAt: new Date() }),
+        ),
+      delete: vi.fn().mockResolvedValue(true),
+    },
+    apiKeys: {
+      create: vi.fn().mockResolvedValue(null),
+      listByOrg: vi.fn().mockResolvedValue([]),
+      countActive: vi.fn().mockResolvedValue(0),
+      revoke: vi.fn().mockResolvedValue(null),
+      findActiveBySecret: vi.fn().mockResolvedValue(null),
+      touchLastUsed: vi.fn().mockResolvedValue(undefined),
+    },
+    privacy: {
+      createExport: vi.fn().mockResolvedValue(null),
+      findExport: vi.fn().mockResolvedValue(null),
+      findExportById: vi.fn().mockResolvedValue(null),
+      listExports: vi.fn().mockResolvedValue([]),
+      updateExport: vi.fn().mockResolvedValue(undefined),
+      listExpiredExports: vi.fn().mockResolvedValue([]),
+      clearExportFile: vi.fn().mockResolvedValue(undefined),
+      collectPersonalData: vi.fn().mockResolvedValue(null),
+      checkAccountDeletion: vi
+        .fn()
+        .mockResolvedValue({ allowed: true, blockers: [], soloOrgIds: [] }),
+      deleteAccount: vi.fn().mockResolvedValue(undefined),
+    },
   } as unknown as Repositories;
   return { repos, join };
 }
@@ -757,6 +821,7 @@ export function buildTestApp(
     storage?: StorageService;
     freeChecksOptions?: FreeChecksRouterOptions;
     paddleClient?: PaddleClient;
+    queueAdmin?: QueueAdmin;
   } = {},
 ) {
   const defaultRepos = fakeRepos();
@@ -776,6 +841,56 @@ export function buildTestApp(
     storage,
     freeChecksOptions,
     paddleClient: options.paddleClient,
+    queueAdmin: options.queueAdmin,
   });
   return { app, join: defaultRepos.join, repos, storage };
+}
+
+/**
+ * A Better Auth stand-in: a request whose cookie contains `token-<userId>` is signed in as
+ * that user, with session id `session-<userId>`.
+ */
+export function mockAuth(userId: string, overrides: Record<string, unknown> = {}) {
+  const mockUser = {
+    id: userId,
+    email: `${userId}@example.com`,
+    name: 'Test User',
+    emailVerified: true,
+    emailVerifiedAt: new Date(),
+    avatarUrl: null,
+    timeZone: 'UTC',
+    isStaff: false,
+    lastActiveOrgId: null,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+    ...overrides,
+  };
+  const mockSession = {
+    id: `session-${userId}`,
+    userId,
+    token: `token-${userId}`,
+    expiresAt: new Date(Date.now() + 86_400_000),
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  };
+  const api = {
+    getSession: vi.fn().mockImplementation(({ headers }: { headers?: Record<string, unknown> }) => {
+      const cookie = typeof headers?.cookie === 'string' ? headers.cookie : '';
+      return Promise.resolve(
+        cookie.includes(`token-${userId}`) ? { user: mockUser, session: mockSession } : null,
+      );
+    }),
+    signOut: vi.fn().mockResolvedValue(new Response(null, { status: 200 })),
+  };
+  return {
+    api,
+    mockUser,
+    mockSession,
+    cookie: `better-auth.session_token=token-${userId}`,
+  } as unknown as Auth & {
+    api: typeof api;
+    mockUser: typeof mockUser;
+    mockSession: typeof mockSession;
+    cookie: string;
+  };
 }

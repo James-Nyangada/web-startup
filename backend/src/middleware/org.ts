@@ -1,7 +1,8 @@
 import type { NextFunction, Request, Response } from 'express';
 import type { Repositories } from '../db/repositories/index.js';
 import { asOrgId, type OrgId } from '../db/repositories/org-scope.js';
-import type { memberships, organizations, OrgRole } from '../db/schema/index.js';
+import type { memberships, organizations, OrgRole, Plan } from '../db/schema/index.js';
+import { isStaffVerified } from '../db/repositories/staff.js';
 import { ErrorCode } from '../shared/errors.js';
 
 export type AnyOrgRole = OrgRole | 'client_viewer';
@@ -21,7 +22,10 @@ declare global {
   // eslint-disable-next-line @typescript-eslint/no-namespace
   namespace Express {
     interface Request {
-      org?: typeof organizations.$inferSelect;
+      /** `basePlan` is the billed plan when a staff override replaces `plan` (P6-02). */
+      org?: typeof organizations.$inferSelect & { basePlan?: Plan };
+      /** Set when a staff user is viewing this org read-only (P6-02). */
+      impersonation?: boolean;
       orgId?: OrgId;
       membership?: ResolvedMembership;
       clientSiteIds?: string[];
@@ -38,8 +42,8 @@ const ROLE_RANKS: Record<AnyOrgRole, number> = {
 
 /**
  * Resolves the organisation from :orgId parameter (which can be either a UUID or a slug),
- * verifies that the authenticated user is a member of the organisation,
- * and attaches `req.org`, `req.orgId`, and `req.membership`.
+ * verifies that the authenticated user is a member, a client viewer, or a staff user
+ * impersonating it, and attaches `req.org`, `req.orgId`, and `req.membership`.
  *
  * SPEC REQUIREMENT (Section 7):
  * "All org-scoped routes are under `/orgs/:orgId/…`; the API checks membership and role
@@ -84,7 +88,6 @@ export function resolveOrgContext(repos: Repositories) {
     }
 
     const userId = req.auth.user.id;
-    const isStaff = Boolean(req.auth.user.isStaff);
 
     let membership: ResolvedMembership | null = await repos.memberships.find(
       asOrgId(org.id),
@@ -92,7 +95,7 @@ export function resolveOrgContext(repos: Repositories) {
     );
     let clientSiteIds: string[] | undefined = undefined;
 
-    if (!membership && !isStaff && repos.clientAccess) {
+    if (!membership && repos.clientAccess) {
       const accesses = await repos.clientAccess.listByUserAndOrg(userId, asOrgId(org.id));
       if (accesses.length > 0) {
         clientSiteIds = accesses.map((a) => a.siteId);
@@ -107,8 +110,26 @@ export function resolveOrgContext(repos: Repositories) {
       }
     }
 
-    // Cross-org check: if the user is neither a member nor client_viewer nor staff, return 404 (NEVER 403).
-    if (!membership && !isStaff) {
+    // Staff see a customer org only while impersonating it from a TOTP-verified session
+    // (spec 7.12). The view is read-only: anything but a safe method is refused.
+    let impersonation = false;
+    if (!membership && repos.staff) {
+      const state = await repos.staff.getSessionState(req.auth.session.id);
+      if (isStaffVerified(state) && state?.impersonatingOrgId === org.id) {
+        impersonation = true;
+        membership = {
+          id: `staff-${userId}-${org.id}`,
+          orgId: org.id,
+          userId,
+          role: 'owner',
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        };
+      }
+    }
+
+    // Cross-org check: neither a member, a client viewer nor an impersonating staff user.
+    if (!membership) {
       res.status(404).json({
         error: {
           code: ErrorCode.NOT_FOUND,
@@ -119,17 +140,22 @@ export function resolveOrgContext(repos: Repositories) {
       return;
     }
 
+    if (impersonation && !['GET', 'HEAD', 'OPTIONS'].includes(req.method)) {
+      res.status(403).json({
+        error: {
+          code: ErrorCode.IMPERSONATION_READ_ONLY,
+          message: 'Staff impersonation is read-only.',
+          details: {},
+        },
+      });
+      return;
+    }
+
     req.org = org;
     req.orgId = asOrgId(org.id);
-    req.membership = membership ?? {
-      id: 'staff-session',
-      orgId: org.id,
-      userId,
-      role: 'owner',
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    };
+    req.membership = membership;
     req.clientSiteIds = clientSiteIds;
+    req.impersonation = impersonation;
 
     next();
   };
@@ -151,11 +177,6 @@ export function requireOrgRole(minRole: AnyOrgRole) {
           details: {},
         },
       });
-      return;
-    }
-
-    if (req.auth?.user.isStaff) {
-      next();
       return;
     }
 

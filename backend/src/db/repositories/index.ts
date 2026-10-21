@@ -24,6 +24,10 @@ import { notificationsRepository } from './notifications.js';
 import { webhooksRepository } from './webhooks.js';
 import { reportSchedulesRepository } from './report-schedules.js';
 import { retentionRepository } from './retention.js';
+import { staffRepository } from './staff.js';
+import { featureFlagsRepository } from './feature-flags.js';
+import { apiKeysRepository } from './api-keys.js';
+import { privacyRepository } from './privacy.js';
 
 export function createRepositories(db: Database) {
   return {
@@ -52,6 +56,10 @@ export function createRepositories(db: Database) {
     webhooks: webhooksRepository(db),
     reportSchedules: reportSchedulesRepository(db),
     retention: retentionRepository(db),
+    staff: staffRepository(db),
+    featureFlags: featureFlagsRepository(db),
+    apiKeys: apiKeysRepository(db),
+    privacy: privacyRepository(db),
   };
 }
 

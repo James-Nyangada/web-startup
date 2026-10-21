@@ -45,6 +45,8 @@ export interface MeResponse {
   memberships: Membership[];
   clientAccess: ClientAccess[];
   activeOrg: OrganizationSummary | null;
+  /** Set while a staff user views a customer org read-only (P6-02). */
+  impersonation?: { org: { id: string; slug: string | null; name: string } } | null;
 }
 
 export interface SignUpParams {

@@ -212,7 +212,8 @@ export function orgBillingRouter(
       effectiveNow,
     } = parse.data;
 
-    const currentPlan = req.org?.plan ?? 'trial';
+    // A staff override changes limits, not what the customer is billed for.
+    const currentPlan = req.org?.basePlan ?? req.org?.plan ?? 'trial';
     const sub = await repos.subscriptions.findByOrgId(req.orgId!);
     const currentInterval = (sub?.interval as 'month' | 'year' | undefined) ?? 'month';
 

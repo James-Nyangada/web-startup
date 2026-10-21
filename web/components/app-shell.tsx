@@ -6,13 +6,14 @@ import { Icon, I } from "./icons";
 import { ThemeIconToggle } from "./theme";
 import { gsap, useGSAP, MOTION, prefersReducedMotion } from "@/lib/gsap";
 import { useFocusTrap } from "./use-focus-trap";
-import { ToastProvider } from "./shell/toast-context";
 import { GlobalBannersRegion, type GlobalBannerData } from "./shell/global-banners";
 import { CommandPalette } from "./shell/command-palette";
 import { OrgSwitcher } from "./shell/org-switcher";
 import { UserMenu } from "./shell/user-menu";
 import { NotificationsBell } from "./shell/notifications-bell";
-import { useCurrentUser } from "@/lib/use-current-user";
+import { resetCurrentUser, useCurrentUser } from "@/lib/use-current-user";
+import { staffApi } from "@/lib/admin-api";
+import { useRouter } from "next/navigation";
 
 export type NavKey = "overview" | "sites" | "tasks" | "reports" | "settings";
 
@@ -76,15 +77,13 @@ function SidebarContent({
       <div className="flex flex-col gap-1">
         {item("settings", "Settings", "/settings/general", I.settings)}
         <a
-          href="https://plainsight.example.com/docs"
-          target="_blank"
-          rel="noreferrer"
+          href="/help"
           title={collapsed ? "Help & docs" : undefined}
           className={`ease-ui flex items-center gap-3 rounded-full py-2 text-sm leading-5 font-medium text-ink no-underline hover:bg-surface hover:text-ink ${
             collapsed ? "justify-center px-2" : "px-3.5"
           }`}
         >
-          <Icon d={I.external} size={18} className="flex-none text-muted" />
+          <Icon d={I.review} size={18} className="flex-none text-muted" />
           {!collapsed && <span>Help &amp; docs</span>}
         </a>
       </div>
@@ -228,12 +227,31 @@ export function AppShell({ active, crumbs = [], banners, children }: AppShellPro
   }, []);
   const userContext = useCurrentUser();
   const activeOrg = userContext.me?.activeOrg;
+  const impersonation = userContext.me?.impersonation;
+  const router = useRouter();
 
   const derivedBanners = React.useMemo(() => {
     if (banners) return banners;
-    if (!activeOrg) return [];
-
     const result: GlobalBannerData[] = [];
+
+    // Staff impersonation always shows first and cannot be dismissed (spec 11.1).
+    if (impersonation) {
+      result.push({
+        kind: "impersonation",
+        id: `impersonation-${impersonation.org.id}`,
+        orgName: impersonation.org.name,
+        onAction: () => {
+          void staffApi
+            .stopImpersonation()
+            .catch(() => undefined)
+            .finally(() => {
+              resetCurrentUser();
+              router.push(`/staff/orgs/${impersonation.org.id}`);
+            });
+        },
+      });
+    }
+    if (!activeOrg) return result;
 
     if (activeOrg.billingStatus === "read_only") {
       result.push({
@@ -271,7 +289,7 @@ export function AppShell({ active, crumbs = [], banners, children }: AppShellPro
     }
 
     return result;
-  }, [banners, activeOrg]);
+  }, [banners, activeOrg, impersonation, router]);
 
   const handleCloseDrawer = () => {
     setDrawerOpen(false);
@@ -279,7 +297,7 @@ export function AppShell({ active, crumbs = [], banners, children }: AppShellPro
   };
 
   return (
-    <ToastProvider>
+    <>
       <div className="flex min-h-screen bg-page text-ink antialiased">
         {/* Skip to main content link (WCAG 2.4.1) */}
         <a
@@ -408,6 +426,6 @@ export function AppShell({ active, crumbs = [], banners, children }: AppShellPro
           </main>
         </div>
       </div>
-    </ToastProvider>
+    </>
   );
 }

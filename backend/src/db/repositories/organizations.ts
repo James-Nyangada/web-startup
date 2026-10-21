@@ -22,6 +22,23 @@ export interface CreateOrgData {
   trialEndsAt?: Date | null;
 }
 
+type OrgRow = typeof organizations.$inferSelect;
+
+/**
+ * A staff plan override (P6-02) replaces `plan` everywhere limits are read, until it
+ * expires. `basePlan` keeps the billed plan for screens that need both.
+ */
+export function withEffectivePlan<T extends OrgRow>(
+  row: T,
+  now = new Date(),
+): T & { basePlan?: Plan } {
+  const active =
+    row.planOverride !== null &&
+    row.planOverride !== undefined &&
+    (!row.planOverrideExpiresAt || row.planOverrideExpiresAt.getTime() > now.getTime());
+  return { ...row, plan: active ? row.planOverride! : row.plan, basePlan: row.plan };
+}
+
 export function organizationsRepository(db: Database) {
   return {
     async create(data: CreateOrgData) {
@@ -48,7 +65,7 @@ export function organizationsRepository(db: Database) {
         .where(and(eq(organizations.id, id), isNull(organizations.deletedAt)))
         .limit(1);
 
-      return row ?? null;
+      return row ? withEffectivePlan(row) : null;
     },
 
     async findBySlug(slug: string) {
@@ -58,7 +75,7 @@ export function organizationsRepository(db: Database) {
         .where(and(eq(organizations.slug, slug), isNull(organizations.deletedAt)))
         .limit(1);
 
-      return row ?? null;
+      return row ? withEffectivePlan(row) : null;
     },
 
     async findByIdOrSlug(idOrSlug: string) {
@@ -194,7 +211,7 @@ export function organizationsRepository(db: Database) {
     },
 
     async listAllActive() {
-      return db
+      const rows = await db
         .select()
         .from(organizations)
         .where(
@@ -203,6 +220,7 @@ export function organizationsRepository(db: Database) {
             notInArray(organizations.billingStatus, ['read_only', 'canceled']),
           ),
         );
+      return rows.map((row) => withEffectivePlan(row));
     },
   };
 }
