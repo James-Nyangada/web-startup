@@ -10,7 +10,7 @@ import { assertWithinPlan } from '../shared/plans.js';
 import { getZonedParts, zonedWallClockToUtc } from '../lib/schedule.js';
 import { getScanFailureHint } from '../shared/scan-hints.js';
 
-const createScanSchema = z.object({
+export const createScanSchema = z.object({
   trigger: z.enum(['manual', 'onboarding']).default('manual'),
   standard: z.enum(STANDARDS as unknown as [Standard, ...Standard[]]).optional(),
   pagesPlanned: z.number().int().min(1).max(100).optional(),
@@ -101,7 +101,9 @@ export function orgScansRouter(repos: Repositories, options?: ScansRouterOptions
         return;
       }
 
-      const { trigger, standard, pagesPlanned } = parse.data;
+      const { standard, pagesPlanned } = parse.data;
+      // Scans started with an API key (P6-06) are recorded as such, never as onboarding.
+      const trigger = req.apiKey ? 'api' : parse.data.trigger;
 
       // Ownership verification check:
       // Spec Section 6.9: "Unverified sites: user may run one onboarding scan limited to 10 pages
@@ -148,8 +150,8 @@ export function orgScansRouter(repos: Repositories, options?: ScansRouterOptions
 
       const org = await repos.organizations.findById(req.orgId!);
 
-      // Enforce daily manual scan limit per site based on org plan
-      if (trigger === 'manual') {
+      // Enforce daily manual scan limit per site based on org plan (API scans count too)
+      if (trigger === 'manual' || trigger === 'api') {
         const timeZone = org?.timeZone ?? 'UTC';
 
         const currentParts = getZonedParts(new Date(), timeZone);
@@ -183,7 +185,7 @@ export function orgScansRouter(repos: Repositories, options?: ScansRouterOptions
         trigger,
         standard: standard ?? site.standard,
         pagesPlanned: effectivePagesPlanned,
-        requestedBy: req.auth!.user.id,
+        requestedBy: req.apiKey ? null : req.auth!.user.id,
       });
 
       if (!scan) {
@@ -199,12 +201,17 @@ export function orgScansRouter(repos: Repositories, options?: ScansRouterOptions
 
       // Audit log
       await repos.auditLog.write(req.orgId!, {
-        actorId: req.auth!.user.id,
-        actorType: 'user',
+        actorId: req.apiKey ? null : req.auth!.user.id,
+        actorType: req.apiKey ? 'api_key' : 'user',
         action: 'scan.triggered',
         targetId: scan.id,
         targetType: 'scan',
-        data: { siteId, trigger, pagesPlanned: effectivePagesPlanned },
+        data: {
+          siteId,
+          trigger,
+          pagesPlanned: effectivePagesPlanned,
+          ...(req.apiKey ? { apiKeyId: req.apiKey.id, apiKeyPrefix: req.apiKey.prefix } : {}),
+        },
         ip: req.ip ?? null,
         userAgent: req.get('user-agent') ?? null,
       });

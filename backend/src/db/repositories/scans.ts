@@ -183,7 +183,8 @@ export function scansRepository(db: Database) {
           and(
             eq(scans.orgId, orgId),
             eq(scans.siteId, siteId),
-            eq(scans.trigger, 'manual'),
+            // API-triggered scans share the manual daily allowance (P6-06).
+            inArray(scans.trigger, ['manual', 'api']),
             gte(scans.queuedAt, sinceDate),
             ne(scans.status, 'canceled'),
           ),

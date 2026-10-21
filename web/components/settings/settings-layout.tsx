@@ -4,6 +4,7 @@ import React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { AppShell } from "@/components/app-shell";
+import { useActiveOrg } from "@/lib/use-active-org";
 
 const SETTINGS_NAV = [
   { href: "/settings/general", label: "General" },
@@ -12,6 +13,7 @@ const SETTINGS_NAV = [
   { href: "/settings/branding", label: "Branding" },
   { href: "/settings/notifications", label: "Notifications" },
   { href: "/settings/integrations", label: "Integrations" },
+  { href: "/settings/api-keys", label: "API Keys" },
   { href: "/settings/audit-log", label: "Audit Log" },
   { href: "/settings/account", label: "Account" },
 ];
@@ -26,12 +28,13 @@ export function SettingsLayout({
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
+  const { org } = useActiveOrg();
 
   return (
     <AppShell
       active="settings"
       crumbs={[
-        { label: "Brightline Studio", href: "/overview" },
+        { label: org?.name ?? "Organisation", href: "/overview" },
         { label: "Settings", href: "/settings/general" },
         { label: title },
       ]}
