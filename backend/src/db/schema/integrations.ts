@@ -10,7 +10,7 @@ import {
   uuid,
 } from 'drizzle-orm/pg-core';
 import { id, inList, timestamps } from './columns.js';
-import { organizations } from './identity.js';
+import { organizations, users } from './identity.js';
 
 export const WEBHOOK_KINDS = ['slack', 'generic'] as const;
 export type WebhookKind = (typeof WEBHOOK_KINDS)[number];
@@ -71,3 +71,29 @@ export const webhookDeliveries = pgTable(
 );
 
 export type WebhookDeliveryRow = typeof webhookDeliveries.$inferSelect;
+
+export const API_KEY_SCOPES = ['read', 'scan:write'] as const;
+export type ApiKeyScope = (typeof API_KEY_SCOPES)[number];
+
+/** Public REST API keys (Agency Pro, P6-06). Only the SHA-256 hash of the secret is stored. */
+export const apiKeys = pgTable(
+  'api_keys',
+  {
+    id: id(),
+    orgId: uuid('org_id')
+      .notNull()
+      .references(() => organizations.id, { onDelete: 'cascade' }),
+    name: text('name').notNull(),
+    /** First characters of the secret, shown in the UI so keys can be told apart. */
+    prefix: text('prefix').notNull(),
+    keyHash: text('key_hash').notNull().unique(),
+    scopes: text('scopes').array().$type<ApiKeyScope[]>().notNull(),
+    lastUsedAt: timestamp('last_used_at', { withTimezone: true }),
+    revokedAt: timestamp('revoked_at', { withTimezone: true }),
+    createdBy: uuid('created_by').references(() => users.id, { onDelete: 'set null' }),
+    ...timestamps(),
+  },
+  (t) => [index('api_keys_org_id_idx').on(t.orgId)],
+);
+
+export type ApiKeyRow = typeof apiKeys.$inferSelect;

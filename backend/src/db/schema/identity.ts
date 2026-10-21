@@ -42,6 +42,10 @@ export const users = pgTable('users', {
   avatarUrl: text('avatar_url'),
   timeZone: text('time_zone').notNull().default('UTC'),
   isStaff: boolean('is_staff').notNull().default(false),
+  /** Staff TOTP secret (P6-01), AES-GCM encrypted (lib/encryption). Null until enrolment starts. */
+  totpSecretEncrypted: text('totp_secret_encrypted'),
+  /** Set once the first code is confirmed; staff sessions require a code from then on. */
+  totpEnabledAt: timestamp('totp_enabled_at', { withTimezone: true }),
   lastActiveOrgId: uuid('last_active_org_id').references((): AnyPgColumn => organizations.id, {
     onDelete: 'set null',
   }),
@@ -63,6 +67,10 @@ export const organizations = pgTable(
     paddleCustomerId: text('paddle_customer_id').unique(),
     /** Start of the current past-due spell; the 7-day grace period (P4-06) counts from here. */
     pastDueSince: timestamp('past_due_since', { withTimezone: true }),
+    /** Staff plan override (P6-02): replaces `plan` for limits until it expires. */
+    planOverride: text('plan_override').$type<Plan>(),
+    planOverrideExpiresAt: timestamp('plan_override_expires_at', { withTimezone: true }),
+    planOverrideReason: text('plan_override_reason'),
     timeZone: text('time_zone').notNull().default('UTC'),
     deletedAt: timestamp('deleted_at', { withTimezone: true }),
     ...timestamps(),
@@ -70,6 +78,10 @@ export const organizations = pgTable(
   (t) => [
     check('organizations_plan_check', sql`${t.plan} in (${inList(PLANS)})`),
     check('organizations_type_check', sql`${t.type} in (${inList(ORG_TYPES)})`),
+    check(
+      'organizations_plan_override_check',
+      sql`${t.planOverride} is null or ${t.planOverride} in (${inList(PLANS)})`,
+    ),
     check(
       'organizations_billing_status_check',
       sql`${t.billingStatus} in (${inList(BILLING_STATUSES)})`,
@@ -180,6 +192,12 @@ export const sessions = pgTable(
     expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
     ipAddress: text('ip_address'),
     userAgent: text('user_agent'),
+    /** When a staff user passed the TOTP check for this session (P6-01). */
+    staffVerifiedAt: timestamp('staff_verified_at', { withTimezone: true }),
+    /** Org a staff user is viewing read-only (P6-02). Null when not impersonating. */
+    impersonatingOrgId: uuid('impersonating_org_id').references(() => organizations.id, {
+      onDelete: 'set null',
+    }),
     ...timestamps(),
   },
   (t) => [index('sessions_user_id_idx').on(t.userId)],

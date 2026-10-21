@@ -32,6 +32,9 @@ describe('Chunk P4-06: Payment Problems (Past-Due, 7-Day Grace Period, E-17, E-1
     trialEndsAt: null,
     paddleCustomerId: 'ctm_123',
     pastDueSince: null,
+    planOverride: null,
+    planOverrideExpiresAt: null,
+    planOverrideReason: null,
     timeZone: 'UTC',
     createdAt: new Date(),
     updatedAt: new Date(),
@@ -416,6 +419,9 @@ describe('Chunk P4-06: Payment Problems (Past-Due, 7-Day Grace Period, E-17, E-1
         ...sampleOrg,
         billingStatus: 'past_due' as const,
         pastDueSince: new Date('2026-10-10T08:00:00.000Z'),
+        planOverride: null,
+        planOverrideExpiresAt: null,
+        planOverrideReason: null,
       });
 
       await processPaddleEvent(pastDuePayload('evt_pd_again', '2026-10-12T08:00:00.000Z'), repos);
@@ -431,6 +437,9 @@ describe('Chunk P4-06: Payment Problems (Past-Due, 7-Day Grace Period, E-17, E-1
         ...sampleOrg,
         billingStatus: 'past_due' as const,
         pastDueSince: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000),
+        planOverride: null,
+        planOverrideExpiresAt: null,
+        planOverrideReason: null,
       });
 
       await processPaddleEvent(
@@ -461,6 +470,9 @@ describe('Chunk P4-06: Payment Problems (Past-Due, 7-Day Grace Period, E-17, E-1
           ...sampleOrg,
           billingStatus: 'past_due' as const,
           pastDueSince: new Date(Date.now() - 8 * 24 * 60 * 60 * 1000),
+          planOverride: null,
+          planOverrideExpiresAt: null,
+          planOverrideReason: null,
           updatedAt: new Date(),
         },
       ]);

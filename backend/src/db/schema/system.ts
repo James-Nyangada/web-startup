@@ -1,5 +1,16 @@
 import { sql } from 'drizzle-orm';
-import { boolean, check, index, inet, jsonb, pgTable, text, uuid } from 'drizzle-orm/pg-core';
+import {
+  boolean,
+  check,
+  index,
+  inet,
+  integer,
+  jsonb,
+  pgTable,
+  text,
+  timestamp,
+  uuid,
+} from 'drizzle-orm/pg-core';
 import { citext, createdAt, id, timestamps } from './columns.js';
 import { organizations, users } from './identity.js';
 
@@ -24,6 +35,10 @@ export const auditLog = pgTable(
   },
   (t) => [
     index('audit_log_org_created_idx').on(t.orgId, t.createdAt.desc()),
+    // Actor filter on S-51 and personal data export (P6-08, P6-09).
+    index('audit_log_actor_created_idx')
+      .on(t.actorId, t.createdAt.desc())
+      .where(sql`${t.actorId} is not null`),
     check(
       'audit_log_actor_type_check',
       sql`${t.actorType} in ('user', 'staff', 'system', 'api_key')`,
@@ -99,5 +114,31 @@ export const freeChecks = pgTable(
   (t) => [
     index('free_checks_ip_hash_created_idx').on(t.ipHash, t.createdAt.desc()),
     index('free_checks_domain_created_idx').on(t.domain, t.createdAt.desc()),
+    // Global daily cap and the staff leads list (P6-04, P6-11).
+    index('free_checks_created_idx').on(t.createdAt.desc()),
+  ],
+);
+
+export const DATA_EXPORT_STATUSES = ['queued', 'ready', 'failed'] as const;
+export type DataExportStatus = (typeof DATA_EXPORT_STATUSES)[number];
+
+/** Personal data exports (P6-09, `/me/export`). The zip lives in storage until `expires_at`. */
+export const dataExports = pgTable(
+  'data_exports',
+  {
+    id: id(),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    status: text('status').$type<DataExportStatus>().notNull().default('queued'),
+    fileKey: text('file_key'),
+    fileSize: integer('file_size'),
+    error: text('error'),
+    expiresAt: timestamp('expires_at', { withTimezone: true }),
+    ...timestamps(),
+  },
+  (t) => [
+    index('data_exports_user_created_idx').on(t.userId, t.createdAt.desc()),
+    check('data_exports_status_check', sql`${t.status} in ('queued', 'ready', 'failed')`),
   ],
 );

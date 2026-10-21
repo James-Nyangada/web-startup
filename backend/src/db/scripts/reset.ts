@@ -11,6 +11,17 @@ import { seed } from './seed.js';
 export async function dropAppObjects(db: Database): Promise<void> {
   await db.execute(sql`
     DROP TABLE IF EXISTS
+      api_keys,
+      data_exports,
+      webhook_deliveries,
+      webhooks,
+      statements,
+      manual_checks,
+      evidence_events,
+      report_schedules,
+      invoices,
+      paddle_events,
+      subscriptions,
       ai_suggestions,
       ai_usage,
       free_checks,

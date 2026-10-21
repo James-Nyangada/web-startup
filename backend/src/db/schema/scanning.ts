@@ -114,6 +114,12 @@ export const sites = pgTable(
       .on(t.orgId, t.rootUrl)
       .where(sql`${t.deletedAt} is null`),
     index('sites_org_id_idx').on(t.orgId),
+    // scan.schedule runs every 10 minutes and orders due sites by next_scan_at (P6-11).
+    index('sites_due_scan_idx')
+      .on(t.nextScanAt)
+      .where(
+        sql`${t.status} = 'active' and ${t.deletedAt} is null and ${t.nextScanAt} is not null`,
+      ),
     check('sites_platform_check', sql`${t.platform} in (${inList(PLATFORMS)})`),
     check('sites_status_check', sql`${t.status} in (${inList(SITE_STATUSES)})`),
     check(
@@ -158,7 +164,10 @@ export const scans = pgTable(
   },
   (t) => [
     index('scans_site_queued_idx').on(t.siteId, t.queuedAt.desc()),
-    index('scans_org_id_idx').on(t.orgId),
+    // Org-wide scan history, retention cutoffs and staff "last activity" (P6-11).
+    index('scans_org_queued_idx').on(t.orgId, t.queuedAt.desc()),
+    // Staff metrics over all scans in a time window.
+    index('scans_queued_at_idx').on(t.queuedAt),
     check('scans_trigger_check', sql`${t.trigger} in (${inList(SCAN_TRIGGERS)})`),
     check('scans_status_check', sql`${t.status} in (${inList(SCAN_STATUSES)})`),
     check('scans_standard_check', sql`${t.standard} in (${inList(STANDARDS)})`),
@@ -221,7 +230,8 @@ export const pageResults = pgTable(
   },
   (t) => [
     uniqueIndex('page_results_scan_page_unique').on(t.scanId, t.pageId),
-    index('page_results_org_id_idx').on(t.orgId),
+    // Retention prunes by org and age (spec 5.8).
+    index('page_results_org_created_idx').on(t.orgId, t.createdAt),
     index('page_results_page_id_idx').on(t.pageId),
     check('page_results_status_check', sql`${t.status} in (${inList(PAGE_RESULT_STATUSES)})`),
   ],
@@ -306,7 +316,8 @@ export const issueOccurrences = pgTable(
   },
   (t) => [
     index('issue_occurrences_issue_scan_idx').on(t.issueId, t.scanId),
-    index('issue_occurrences_org_id_idx').on(t.orgId),
+    // Retention prunes by org and age (spec 5.8).
+    index('issue_occurrences_org_created_idx').on(t.orgId, t.createdAt),
     index('issue_occurrences_scan_id_idx').on(t.scanId),
     index('issue_occurrences_page_id_idx').on(t.pageId),
   ],
