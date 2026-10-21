@@ -1,91 +1,277 @@
 "use client";
 
-import React from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { SettingsLayout } from "@/components/settings/settings-layout";
-import { useToast } from "@/components/shell/toast-context";
+import { apiBaseUrl, ApiException } from "@/lib/api";
+import { useActiveOrg } from "@/lib/use-active-org";
+import { orgSettingsApi, type AuditEntry, type AuditFilters } from "@/lib/admin-api";
 
-interface AuditEntry {
-  id: string;
-  action: string;
-  actor: string;
-  target: string;
-  timestamp: string;
-  ip: string;
+const field =
+  "w-full rounded-xl border border-line bg-surface px-3 py-2 text-sm text-ink focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary";
+
+const ACTOR_LABEL: Record<AuditEntry["actorType"], string> = {
+  user: "Person",
+  staff: "Plainsight staff",
+  system: "System",
+  api_key: "API key",
+};
+
+function actorOf(e: AuditEntry): string {
+  if (e.actorType === "api_key") return `API key ${String(e.data?.apiKeyPrefix ?? "")}`.trim();
+  if (e.actorType === "system") return "System";
+  return e.actorName || e.actorEmail || ACTOR_LABEL[e.actorType];
 }
 
-const AUDIT_LOGS: AuditEntry[] = [
-  {
-    id: "a-1",
-    action: "member.invited",
-    actor: "Daniel Mwangi",
-    target: "mark@brightline.studio",
-    timestamp: "14 Oct 2026, 14:22",
-    ip: "102.134.12.1",
-  },
-  {
-    id: "a-2",
-    action: "site.created",
-    actor: "Daniel Mwangi",
-    target: "oakhaus.com",
-    timestamp: "12 Aug 2026, 09:15",
-    ip: "102.134.12.1",
-  },
-  {
-    id: "a-3",
-    action: "org.created",
-    actor: "Daniel Mwangi",
-    target: "Brightline Studio",
-    timestamp: "1 Aug 2026, 11:00",
-    ip: "102.134.12.1",
-  },
-];
+function targetOf(e: AuditEntry): string {
+  const d = e.data ?? {};
+  const named = d.name ?? d.email ?? d.domain ?? d.key;
+  if (typeof named === "string") return named;
+  return e.targetType ? `${e.targetType}${e.targetId ? ` ${e.targetId.slice(0, 8)}` : ""}` : "—";
+}
 
+/** S-51: searchable, filterable audit log for owners and admins, with CSV export (P6-08). */
 export default function AuditLogSettingsPage() {
-  const { showToast } = useToast();
+  const { slug } = useActiveOrg();
+  const [filters, setFilters] = useState<AuditFilters>({});
+  const [q, setQ] = useState("");
+  const [actions, setActions] = useState<string[]>([]);
+  const [entries, setEntries] = useState<AuditEntry[]>([]);
+  const [cursor, setCursor] = useState<string | null>(null);
+  const [state, setState] = useState<"loading" | "ready" | "forbidden" | "error">("loading");
+
+  const load = useCallback(
+    async (append: string | null = null) => {
+      if (!slug) return;
+      setState("loading");
+      try {
+        const res = await orgSettingsApi.auditLog(slug, filters, append);
+        setEntries((prev) => (append ? [...prev, ...res.data.entries] : res.data.entries));
+        setCursor(res.nextCursor);
+        setState("ready");
+      } catch (err) {
+        setState(err instanceof ApiException && err.status === 403 ? "forbidden" : "error");
+      }
+    },
+    [slug, filters],
+  );
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  useEffect(() => {
+    if (slug) orgSettingsApi.auditActions(slug).then(setActions).catch(() => setActions([]));
+  }, [slug]);
+
+  // Debounce free-text search into the filters.
+  useEffect(() => {
+    const t = setTimeout(() => setFilters((f) => ({ ...f, q: q.trim() || undefined })), 300);
+    return () => clearTimeout(t);
+  }, [q]);
+
+  const set = (patch: Partial<AuditFilters>) => setFilters((f) => ({ ...f, ...patch }));
+  const exportHref = slug ? `${apiBaseUrl()}${orgSettingsApi.auditCsvPath(slug, filters)}` : undefined;
+  const filtered = Object.values(filters).some(Boolean);
 
   return (
     <SettingsLayout
       title="Audit Log"
-      description="Immutable record of security and administrative actions within this organisation."
+      description="A permanent record of security and administrative actions in this organisation. Entries cannot be changed or deleted."
     >
-      <div className="flex flex-col gap-6 max-w-4xl">
-        <div className="flex items-center justify-between">
-          <span className="text-xs text-muted">Showing last 30 days of activity</span>
-          <button
-            type="button"
-            onClick={() => showToast("Exporting audit log as CSV...")}
-            className="ease-ui rounded-full border border-line px-3.5 py-1.5 text-xs font-semibold text-ink hover:bg-subtle"
-          >
-            Export CSV
-          </button>
-        </div>
+      <div className="flex max-w-6xl flex-col gap-4">
+        {state === "forbidden" ? (
+          <p className="m-0 rounded-xl border border-line bg-subtle px-4 py-3 text-sm">
+            Only owners and admins can see the audit log.
+          </p>
+        ) : (
+          <>
+            <form
+              role="search"
+              aria-label="Filter the audit log"
+              onSubmit={(e) => e.preventDefault()}
+              className="grid gap-3 rounded-2xl border border-line bg-surface p-4 shadow-card sm:grid-cols-2 lg:grid-cols-[2fr_1.4fr_1fr_1fr_1fr]"
+            >
+              <div>
+                <label htmlFor="audit-q" className="mb-1 block text-xs font-semibold text-muted">
+                  Search
+                </label>
+                <input
+                  id="audit-q"
+                  type="search"
+                  value={q}
+                  onChange={(e) => setQ(e.target.value)}
+                  placeholder="Person, email, action or target"
+                  className={field}
+                />
+              </div>
+              <div>
+                <label htmlFor="audit-action" className="mb-1 block text-xs font-semibold text-muted">
+                  Action
+                </label>
+                <select
+                  id="audit-action"
+                  value={filters.action ?? ""}
+                  onChange={(e) => set({ action: e.target.value || undefined })}
+                  className={field}
+                >
+                  <option value="">All actions</option>
+                  {[...new Set(actions.map((a) => `${a.split(".")[0]}.`))].map((group) => (
+                    <optgroup key={group} label={group.slice(0, -1)}>
+                      <option value={group}>All {group.slice(0, -1)} actions</option>
+                      {actions
+                        .filter((a) => a.startsWith(group))
+                        .map((a) => (
+                          <option key={a} value={a}>
+                            {a}
+                          </option>
+                        ))}
+                    </optgroup>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label htmlFor="audit-actor" className="mb-1 block text-xs font-semibold text-muted">
+                  Done by
+                </label>
+                <select
+                  id="audit-actor"
+                  value={filters.actorType ?? ""}
+                  onChange={(e) => set({ actorType: e.target.value || undefined })}
+                  className={field}
+                >
+                  <option value="">Anyone</option>
+                  {Object.entries(ACTOR_LABEL).map(([v, l]) => (
+                    <option key={v} value={v}>
+                      {l}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label htmlFor="audit-from" className="mb-1 block text-xs font-semibold text-muted">
+                  From
+                </label>
+                <input
+                  id="audit-from"
+                  type="date"
+                  value={filters.from ?? ""}
+                  onChange={(e) => set({ from: e.target.value || undefined })}
+                  className={field}
+                />
+              </div>
+              <div>
+                <label htmlFor="audit-to" className="mb-1 block text-xs font-semibold text-muted">
+                  Until
+                </label>
+                <input
+                  id="audit-to"
+                  type="date"
+                  value={filters.to ?? ""}
+                  onChange={(e) => set({ to: e.target.value || undefined })}
+                  className={field}
+                />
+              </div>
+            </form>
 
-        <div className="overflow-hidden rounded-2xl border border-line bg-surface shadow-card">
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm border-collapse">
-              <thead>
-                <tr className="border-b border-line bg-subtle text-xs font-semibold text-muted">
-                  <th className="px-4 py-3">Timestamp</th>
-                  <th className="px-4 py-3">Action</th>
-                  <th className="px-4 py-3">Actor</th>
-                  <th className="px-4 py-3">Target</th>
-                  <th className="px-4 py-3 text-right">IP Address</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-line text-xs">
-                {AUDIT_LOGS.map((entry) => (
-                  <tr key={entry.id} className="hover:bg-subtle/50 transition-colors">
-                    <td className="px-4 py-3 text-muted">{entry.timestamp}</td>
-                    <td className="px-4 py-3 font-mono font-semibold text-ink">{entry.action}</td>
-                    <td className="px-4 py-3 text-ink">{entry.actor}</td>
-                    <td className="px-4 py-3 text-muted">{entry.target}</td>
-                    <td className="px-4 py-3 text-right text-muted font-mono">{entry.ip}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <p role="status" className="m-0 text-xs text-muted">
+                {state === "loading"
+                  ? "Loading…"
+                  : `${entries.length}${cursor ? "+" : ""} entr${entries.length === 1 ? "y" : "ies"}${filtered ? " match your filters" : ""}`}
+              </p>
+              <div className="flex gap-2">
+                {filtered && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setQ("");
+                      setFilters({});
+                    }}
+                    className="ease-ui rounded-full border border-line px-3.5 py-1.5 text-xs font-semibold text-ink hover:bg-subtle"
+                  >
+                    Clear filters
+                  </button>
+                )}
+                <a
+                  href={exportHref}
+                  className="ease-ui rounded-full border border-line px-3.5 py-1.5 text-xs font-semibold text-ink no-underline hover:bg-subtle"
+                >
+                  Export CSV
+                </a>
+              </div>
+            </div>
+
+            <div className="overflow-hidden rounded-2xl border border-line bg-surface shadow-card">
+              <div className="overflow-x-auto">
+                <table className="w-full border-collapse text-left text-sm">
+                  <caption className="sr-only">Audit log entries, newest first</caption>
+                  <thead>
+                    <tr className="border-b border-line bg-subtle text-xs font-semibold text-muted">
+                      <th scope="col" className="px-4 py-3">Time</th>
+                      <th scope="col" className="px-4 py-3">Action</th>
+                      <th scope="col" className="px-4 py-3">Done by</th>
+                      <th scope="col" className="px-4 py-3">Target</th>
+                      <th scope="col" className="px-4 py-3 text-right">IP address</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-line text-xs">
+                    {entries.map((e) => (
+                      <tr key={e.id} className="hover:bg-subtle/50">
+                        <td className="whitespace-nowrap px-4 py-3 text-muted">
+                          <time dateTime={e.createdAt}>
+                            {new Intl.DateTimeFormat("en-GB", {
+                              day: "numeric",
+                              month: "short",
+                              year: "numeric",
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            }).format(new Date(e.createdAt))}
+                          </time>
+                        </td>
+                        <td className="px-4 py-3 font-mono font-semibold text-ink">{e.action}</td>
+                        <td className="px-4 py-3 text-ink">
+                          {actorOf(e)}
+                          {e.actorType === "staff" && (
+                            <span className="ml-1 rounded-full bg-ser-soft px-1.5 py-0.5 text-[11px] font-semibold text-ser">staff</span>
+                          )}
+                          {typeof e.data?.reason === "string" && <span className="block text-muted">“{e.data.reason}”</span>}
+                        </td>
+                        <td className="px-4 py-3 text-muted">{targetOf(e)}</td>
+                        <td className="px-4 py-3 text-right font-mono text-muted">{e.ip ?? "—"}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              {state === "ready" && entries.length === 0 && (
+                <p className="m-0 p-6 text-center text-sm text-muted">
+                  {filtered ? "No entries match these filters." : "Nothing has been recorded yet."}
+                </p>
+              )}
+              {state === "error" && (
+                <p role="alert" className="m-0 p-6 text-center text-sm text-crit">
+                  The audit log could not load.{" "}
+                  <button type="button" className="font-semibold text-ptext underline" onClick={() => void load()}>
+                    Try again
+                  </button>
+                </p>
+              )}
+            </div>
+
+            {cursor && (
+              <div className="flex justify-center">
+                <button
+                  type="button"
+                  onClick={() => void load(cursor)}
+                  disabled={state === "loading"}
+                  className="ease-ui rounded-full border border-line bg-surface px-4 py-2 text-sm font-semibold text-ink hover:bg-subtle disabled:opacity-50"
+                >
+                  Load older entries
+                </button>
+              </div>
+            )}
+          </>
+        )}
       </div>
     </SettingsLayout>
   );

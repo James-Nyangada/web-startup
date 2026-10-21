@@ -3,7 +3,7 @@ import { z } from 'zod';
 import type { Repositories } from '../db/repositories/index.js';
 import { asOrgId } from '../db/repositories/org-scope.js';
 import type { Auth } from '../lib/auth.js';
-import { slugify } from '../lib/slugs.js';
+import { isReservedSlug, slugify } from '../lib/slugs.js';
 import { requireAuth } from '../middleware/auth.js';
 import { enforceReadOnlyOrg, requireOrgRole, resolveOrgContext } from '../middleware/org.js';
 import { orgSitesRouter } from './sites.js';
@@ -18,9 +18,13 @@ import { orgStatementsRouter, orgStatementItemRouter } from './statements.js';
 import { orgNotificationsRouter } from './notifications.js';
 import { orgWebhooksRouter } from './webhooks.js';
 import { orgReportSchedulesRouter } from './report-schedules.js';
-import type { PaddleClient } from '../billing/paddle-api.js';
+import { orgApiKeysRouter } from './api-keys.js';
+import { defaultPaddleClient, type PaddleClient } from '../billing/paddle-api.js';
 import { type StorageService, getStorage } from '../storage/index.js';
 import { ErrorCode } from '../shared/errors.js';
+import { ACTOR_TYPES } from '../db/schema/index.js';
+import { decodeAuditCursor } from '../db/repositories/audit-log.js';
+import { sendCsv, toCsv } from '../lib/csv.js';
 import { assertWithinPlan, getPlanDefinition, getPlanLimits } from '../shared/plans.js';
 
 const createOrgSchema = z.object({
@@ -82,7 +86,10 @@ export function orgsRouter(
     let candidateSlug = baseSlug;
     let suffix = 2;
 
-    while (!(await repos.organizations.isSlugAvailable(candidateSlug))) {
+    while (
+      isReservedSlug(candidateSlug) ||
+      !(await repos.organizations.isSlugAvailable(candidateSlug))
+    ) {
       candidateSlug = `${baseSlug}-${suffix}`;
       suffix++;
     }
@@ -269,6 +276,17 @@ export function orgsRouter(
 
       const { name, timeZone, slug } = parse.data;
 
+      if (slug && isReservedSlug(slug)) {
+        res.status(409).json({
+          error: {
+            code: ErrorCode.CONFLICT,
+            message: 'That address is reserved. Choose another slug.',
+            details: { slug },
+          },
+        });
+        return;
+      }
+
       if (slug) {
         const isAvailable = await repos.organizations.isSlugAvailable(slug, req.org!.id);
         if (!isAvailable) {
@@ -325,8 +343,21 @@ export function orgsRouter(
         return;
       }
 
+      // Spec 7.2: deleting cancels the subscription at period end; data is purged after
+      // 30 days by retention.prune (spec 5.8).
+      const sub = await repos.subscriptions.findByOrgId(req.orgId!);
+      let subscriptionCanceled = false;
+      if (sub?.paddleSubscriptionId && !sub.cancelAtPeriodEnd && sub.status !== 'canceled') {
+        await (paddleClient ?? defaultPaddleClient).cancelSubscription(sub.paddleSubscriptionId, {
+          effectiveFrom: 'next_billing_period',
+        });
+        await repos.subscriptions.setCancelAtPeriodEnd(req.orgId!, true);
+        subscriptionCanceled = true;
+      }
+
       await repos.organizations.softDelete(req.orgId!);
 
+      const purgeAfter = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
       await repos.auditLog.write(req.orgId!, {
         actorId: req.auth!.user.id,
         actorType: 'user',
@@ -335,11 +366,16 @@ export function orgsRouter(
         targetId: req.org!.id,
         ip: req.ip,
         userAgent: req.headers['user-agent'],
-        data: { name: req.org!.name },
+        data: { name: req.org!.name, subscriptionCanceled, purgeAfter },
       });
 
       res.status(200).json({
-        data: { success: true, message: 'Organisation has been deleted.' },
+        data: {
+          success: true,
+          message:
+            'Organisation has been deleted. All of its data is permanently removed after 30 days.',
+          purgeAfter,
+        },
       });
     },
   );
@@ -380,6 +416,18 @@ export function orgsRouter(
             code: ErrorCode.NOT_FOUND,
             message: 'Target user is not a member of this organisation.',
             details: {},
+          },
+        });
+        return;
+      }
+
+      // Spec 7.2: ownership goes to an existing admin.
+      if (targetMembership.role !== 'admin') {
+        res.status(422).json({
+          error: {
+            code: ErrorCode.VALIDATION_ERROR,
+            message: 'Make this person an admin first, then transfer ownership to them.',
+            details: { role: targetMembership.role },
           },
         });
         return;
@@ -964,14 +1012,89 @@ export function orgsRouter(
     },
   );
 
-  // GET /v1/orgs/:orgId/audit-log - List audit log (O A)
+  const auditFiltersSchema = z.object({
+    limit: z.coerce.number().int().min(1).max(200).default(50),
+    cursor: z.string().max(200).optional(),
+    action: z.string().trim().max(100).optional(),
+    actorType: z.enum(ACTOR_TYPES).optional(),
+    actorId: z.uuid().optional(),
+    from: z.coerce.date().optional(),
+    // A bare date means "up to the end of that day".
+    to: z
+      .string()
+      .optional()
+      .transform((v) =>
+        v === undefined
+          ? undefined
+          : /^\d{4}-\d{2}-\d{2}$/.test(v)
+            ? new Date(Date.parse(`${v}T00:00:00Z`) + 86_400_000)
+            : new Date(v),
+      )
+      .refine((d) => d === undefined || !Number.isNaN(d.getTime()), 'Invalid date'),
+    q: z.string().trim().max(200).optional(),
+  });
+
+  // GET /v1/orgs/:orgId/audit-log - Filtered, cursor-paginated audit log (O A, S-51)
   orgScoped.get(
     '/audit-log',
     requireOrgRole('admin'),
     async (req: Request, res: Response): Promise<void> => {
-      const limit = Math.min(200, Math.max(1, Number(req.query.limit || 50)));
-      const entries = await repos.auditLog.list(req.orgId!, limit);
-      res.status(200).json({ data: { entries } });
+      const { limit, cursor, ...filters } = auditFiltersSchema.parse(req.query);
+      const page = await repos.auditLog.search(
+        req.orgId!,
+        filters,
+        limit,
+        decodeAuditCursor(cursor),
+      );
+      res.status(200).json({
+        data: { entries: page.items },
+        nextCursor: page.nextCursor,
+      });
+    },
+  );
+
+  // GET /v1/orgs/:orgId/audit-log/actions - Distinct actions for the S-51 filter (O A)
+  orgScoped.get(
+    '/audit-log/actions',
+    requireOrgRole('admin'),
+    async (req: Request, res: Response): Promise<void> => {
+      res.status(200).json({ data: { actions: await repos.auditLog.listActions(req.orgId!) } });
+    },
+  );
+
+  // GET /v1/orgs/:orgId/audit-log/export.csv - CSV of the filtered log (O A, S-51)
+  orgScoped.get(
+    '/audit-log/export.csv',
+    requireOrgRole('admin'),
+    async (req: Request, res: Response): Promise<void> => {
+      const filters = auditFiltersSchema.omit({ limit: true, cursor: true }).parse(req.query);
+      const rows = await repos.auditLog.exportRows(req.orgId!, filters);
+      const csv = toCsv(
+        [
+          'Time (UTC)',
+          'Action',
+          'Actor type',
+          'Actor',
+          'Actor email',
+          'Target type',
+          'Target',
+          'IP address',
+          'Details',
+        ],
+        rows.map((r) => [
+          r.createdAt,
+          r.action,
+          r.actorType,
+          r.actorName ?? '',
+          r.actorEmail ?? '',
+          r.targetType ?? '',
+          r.targetId ?? '',
+          r.ip ?? '',
+          Object.keys(r.data ?? {}).length ? JSON.stringify(r.data) : '',
+        ]),
+      );
+      const slug = (req.org!.slug ?? 'org').replace(/[^a-z0-9-]/gi, '');
+      sendCsv(res, `audit-log-${slug}-${new Date().toISOString().slice(0, 10)}.csv`, csv);
     },
   );
 
@@ -1019,6 +1142,9 @@ export function orgsRouter(
     '/report-schedules',
     orgReportSchedulesRouter(repos, { boss: scansOptions?.boss, emailSender }),
   );
+
+  // Mount S-47 API keys router under orgScoped (P6-06)
+  orgScoped.use('/api-keys', orgApiKeysRouter(repos));
 
   router.use('/:orgId', orgScoped);
 

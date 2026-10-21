@@ -30,6 +30,8 @@ function createMockAuth(userId = 'user-owner', isStaff = false) {
     avatarUrl: null,
     timeZone: 'UTC',
     isStaff,
+    totpSecretEncrypted: null,
+    totpEnabledAt: null,
     lastActiveOrgId: null,
     createdAt: new Date(),
     updatedAt: new Date(),
@@ -87,6 +89,9 @@ describe('organisations router and authorization core', () => {
     trialEndsAt: new Date(Date.now() + 14 * 86400000),
     paddleCustomerId: null,
     pastDueSince: null,
+    planOverride: null,
+    planOverrideExpiresAt: null,
+    planOverrideReason: null,
     timeZone: 'UTC',
     deletedAt: null,
     createdAt: new Date(),
@@ -254,10 +259,50 @@ describe('organisations router and authorization core', () => {
       });
     });
 
-    it('allows staff users cross-org access', async () => {
+    const staffState = (
+      impersonatingOrgId: string | null,
+      verifiedAt: Date | null = new Date(),
+    ) => ({
+      sessionId: 'session-user-staff',
+      userId: 'user-staff',
+      email: 'user-staff@example.com',
+      isStaff: true,
+      totpSecretEncrypted: 'enc',
+      totpEnabledAt: new Date(),
+      staffVerifiedAt: verifiedAt,
+      impersonatingOrgId,
+    });
+
+    it('gives staff no access to an org they are not impersonating (404)', async () => {
       const { app, repos } = buildTestApp({ auth: staffAuth });
       vi.mocked(repos.organizations.findByIdOrSlug).mockResolvedValue(orgA);
       vi.mocked(repos.memberships.find).mockResolvedValue(null);
+      vi.mocked(repos.staff.getSessionState).mockResolvedValue(staffState(null));
+
+      await assertCrossOrg404(app, {
+        method: 'get',
+        path: `/v1/orgs/${orgA.id}`,
+        sessionCookie: 'better-auth.session_token=token-user-staff',
+      });
+    });
+
+    it('refuses impersonation from a session that has not passed TOTP', async () => {
+      const { app, repos } = buildTestApp({ auth: staffAuth });
+      vi.mocked(repos.organizations.findByIdOrSlug).mockResolvedValue(orgA);
+      vi.mocked(repos.memberships.find).mockResolvedValue(null);
+      vi.mocked(repos.staff.getSessionState).mockResolvedValue(staffState(orgA.id, null));
+
+      await request(app)
+        .get(`/v1/orgs/${orgA.id}`)
+        .set('Cookie', 'better-auth.session_token=token-user-staff')
+        .expect(404);
+    });
+
+    it('lets an impersonating, verified staff session read the org', async () => {
+      const { app, repos } = buildTestApp({ auth: staffAuth });
+      vi.mocked(repos.organizations.findByIdOrSlug).mockResolvedValue(orgA);
+      vi.mocked(repos.memberships.find).mockResolvedValue(null);
+      vi.mocked(repos.staff.getSessionState).mockResolvedValue(staffState(orgA.id));
 
       const res = await request(app)
         .get(`/v1/orgs/${orgA.id}`)
@@ -265,6 +310,22 @@ describe('organisations router and authorization core', () => {
         .expect(200);
 
       expect(res.body.data.org.id).toBe(orgA.id);
+    });
+
+    it('keeps impersonation read-only: writes return 403', async () => {
+      const { app, repos } = buildTestApp({ auth: staffAuth });
+      vi.mocked(repos.organizations.findByIdOrSlug).mockResolvedValue(orgA);
+      vi.mocked(repos.memberships.find).mockResolvedValue(null);
+      vi.mocked(repos.staff.getSessionState).mockResolvedValue(staffState(orgA.id));
+
+      const res = await request(app)
+        .patch(`/v1/orgs/${orgA.id}`)
+        .set('Cookie', 'better-auth.session_token=token-user-staff')
+        .send({ name: 'Renamed' })
+        .expect(403);
+
+      expect(res.body.error.code).toBe(ErrorCode.IMPERSONATION_READ_ONLY);
+      expect(repos.organizations.update).not.toHaveBeenCalled();
     });
 
     it('resolves organisation by slug or by UUID', async () => {
@@ -506,6 +567,28 @@ describe('organisations router and authorization core', () => {
         'owner',
       );
     });
+
+    it('refuses to transfer ownership to someone who is not an admin (spec 7.2)', async () => {
+      const { app, repos } = buildTestApp({ auth: ownerAuth });
+      vi.mocked(repos.organizations.findByIdOrSlug).mockResolvedValue(orgA);
+      vi.mocked(repos.memberships.find).mockImplementation((_orgId, userId) =>
+        Promise.resolve({
+          id: `mem-${userId}`,
+          orgId: orgA.id,
+          userId,
+          role: userId === ownerAuth.mockUser.id ? 'owner' : 'member',
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        }),
+      );
+
+      await request(app)
+        .post(`/v1/orgs/${orgA.id}/transfer-ownership`)
+        .set('Cookie', 'better-auth.session_token=token-user-owner')
+        .send({ newOwnerId: '00000000-0000-4000-a000-000000000003' })
+        .expect(422);
+      expect(repos.memberships.updateRole).not.toHaveBeenCalled();
+    });
   });
 
   describe('members management', () => {
@@ -616,41 +699,135 @@ describe('organisations router and authorization core', () => {
     });
   });
 
-  describe('GET /v1/orgs/:orgId/audit-log', () => {
-    it('returns audit log entries for the organisation', async () => {
-      const { app, repos } = buildTestApp({ auth: ownerAuth });
+  describe('S-51 audit log (P6-08)', () => {
+    const asRole = (repos: ReturnType<typeof buildTestApp>['repos'], role: 'owner' | 'member') => {
       vi.mocked(repos.organizations.findByIdOrSlug).mockResolvedValue(orgA);
       vi.mocked(repos.memberships.find).mockResolvedValue({
         id: 'mem-1',
         orgId: orgA.id,
-        userId: ownerAuth.mockUser.id,
-        role: 'owner',
+        userId: role === 'owner' ? ownerAuth.mockUser.id : memberAuth.mockUser.id,
+        role,
         createdAt: new Date(),
         updatedAt: new Date(),
       });
-      vi.mocked(repos.auditLog.list).mockResolvedValue([
-        {
-          id: 'log-1',
-          orgId: orgA.id,
-          actorId: ownerAuth.mockUser.id,
-          actorType: 'user',
-          action: 'org.created',
-          targetType: 'organization',
-          targetId: orgA.id,
-          ip: null,
-          userAgent: null,
-          data: {},
-          createdAt: new Date(),
-        },
-      ]);
+    };
+    const entry = {
+      id: 'log-1',
+      actorId: 'user-owner',
+      actorType: 'user' as const,
+      actorName: 'Daniel Mwangi',
+      actorEmail: 'daniel@example.com',
+      action: 'org.created',
+      targetType: 'organization',
+      targetId: 'org-1',
+      ip: '102.134.12.1',
+      userAgent: null,
+      data: { name: 'Brightline' },
+      createdAt: new Date('2026-10-14T14:22:00Z'),
+    };
+
+    it('returns entries with a cursor and passes filters to the repository', async () => {
+      const { app, repos } = buildTestApp({ auth: ownerAuth });
+      asRole(repos, 'owner');
+      vi.mocked(repos.auditLog.search).mockResolvedValue({
+        items: [entry],
+        nextCursor: 'abc',
+      });
 
       const res = await request(app)
-        .get(`/v1/orgs/${orgA.id}/audit-log`)
+        .get(
+          `/v1/orgs/${orgA.id}/audit-log?action=billing.&actorType=staff&q=plan&from=2026-10-01&limit=25`,
+        )
         .set('Cookie', 'better-auth.session_token=token-user-owner')
         .expect(200);
 
-      expect(res.body.data.entries).toHaveLength(1);
       expect(res.body.data.entries[0].action).toBe('org.created');
+      expect(res.body.nextCursor).toBe('abc');
+      expect(repos.auditLog.search).toHaveBeenCalledWith(
+        orgA.id,
+        expect.objectContaining({
+          action: 'billing.',
+          actorType: 'staff',
+          q: 'plan',
+          from: new Date('2026-10-01'),
+        }),
+        25,
+        null,
+      );
     });
+
+    it('is for owners and admins only', async () => {
+      const { app, repos } = buildTestApp({ auth: memberAuth });
+      asRole(repos, 'member');
+      await request(app)
+        .get(`/v1/orgs/${orgA.id}/audit-log`)
+        .set('Cookie', 'better-auth.session_token=token-user-member')
+        .expect(403);
+    });
+
+    it('returns 404 to users of another org', async () => {
+      const { app, repos } = buildTestApp({ auth: otherOrgUserAuth });
+      vi.mocked(repos.organizations.findByIdOrSlug).mockResolvedValue(orgA);
+      vi.mocked(repos.memberships.find).mockResolvedValue(null);
+      await assertCrossOrg404(app, {
+        method: 'get',
+        path: `/v1/orgs/${orgA.id}/audit-log/export.csv`,
+        sessionCookie: 'better-auth.session_token=token-user-other-org',
+      });
+    });
+
+    it('exports the filtered log as CSV', async () => {
+      const { app, repos } = buildTestApp({ auth: ownerAuth });
+      asRole(repos, 'owner');
+      vi.mocked(repos.auditLog.exportRows).mockResolvedValue([entry] as never);
+
+      const res = await request(app)
+        .get(`/v1/orgs/${orgA.id}/audit-log/export.csv?action=org.created`)
+        .set('Cookie', 'better-auth.session_token=token-user-owner')
+        .expect(200);
+
+      expect(res.headers['content-type']).toContain('text/csv');
+      expect(res.headers['content-disposition']).toMatch(/audit-log-.*\.csv/);
+      expect(res.text).toContain('2026-10-14T14:22:00.000Z,org.created,user,Daniel Mwangi');
+      expect(res.text).toContain('"{""name"":""Brightline""}"');
+      expect(repos.auditLog.exportRows).toHaveBeenCalledWith(orgA.id, { action: 'org.created' });
+    });
+
+    it('rejects an invalid actor type', async () => {
+      const { app, repos } = buildTestApp({ auth: ownerAuth });
+      asRole(repos, 'owner');
+      await request(app)
+        .get(`/v1/orgs/${orgA.id}/audit-log?actorType=robot`)
+        .set('Cookie', 'better-auth.session_token=token-user-owner')
+        .expect(400);
+    });
+  });
+});
+
+describe('audit log cursor', () => {
+  it('round-trips and rejects garbage', async () => {
+    const { encodeAuditCursor, decodeAuditCursor } =
+      await import('../../src/db/repositories/audit-log.js');
+    const c = {
+      createdAt: new Date('2026-10-14T14:22:00Z'),
+      id: '018f0000-0000-7000-8000-000000000001',
+    };
+    expect(decodeAuditCursor(encodeAuditCursor(c))).toEqual(c);
+    expect(decodeAuditCursor('not-a-cursor')).toBeNull();
+    expect(decodeAuditCursor(undefined)).toBeNull();
+  });
+});
+
+describe('reserved org slugs', () => {
+  it('covers every top-level web route', async () => {
+    const { readdirSync } = await import('node:fs');
+    const { isReservedSlug } = await import('../../src/lib/slugs.js');
+    const routes = readdirSync(new URL('../../../web/app/', import.meta.url), {
+      withFileTypes: true,
+    })
+      .filter((d) => d.isDirectory() && !d.name.startsWith('[') && !d.name.startsWith('('))
+      .map((d) => d.name);
+    expect(routes.length).toBeGreaterThan(10);
+    expect(routes.filter((r) => !isReservedSlug(r))).toEqual([]);
   });
 });
