@@ -82,6 +82,7 @@ describe('Scans API & Onboarding Scans (Section 7.4 & Chunk P2-05)', () => {
     verifyMethod: 'meta' as const,
     verifyToken: 'ps_test_token',
     verifiedAt: new Date(),
+    verifyFailureCount: 0,
     scanFrequency: 'weekly' as const,
     scanDay: 1,
     scanHour: 2,

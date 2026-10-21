@@ -495,6 +495,21 @@ export interface EvidencePackPublishedStatement {
   publicUrl: string;
 }
 
+export interface EvidencePackTrendPoint {
+  /** ISO date of the scan. */
+  date: string;
+  score: number;
+}
+
+/** Rows left out of a table because it hit its row limit; the totals stay in the summary. */
+export interface EvidencePackOmitted {
+  scans: number;
+  fixedIssues: number;
+  openIssues: number;
+  ignoredIssues: number;
+  manualChecks: number;
+}
+
 export interface EvidencePackReportData {
   siteName: string;
   rootUrl: string;
@@ -503,6 +518,11 @@ export interface EvidencePackReportData {
     end: string;
   };
   generatedAt: string;
+  /** Scored scans in the period, oldest first, for the trend chart. */
+  trend?: EvidencePackTrendPoint[];
+  /** Plain-language description of the trend (also the chart's text alternative). */
+  trendSummary?: string;
+  omitted?: EvidencePackOmitted;
   summary: {
     scansCount: number;
     latestScore: number | null;
@@ -519,6 +539,80 @@ export interface EvidencePackReportData {
   ignoredIssues: EvidencePackIgnoredIssue[];
   manualChecks: EvidencePackManualCheck[];
   publishedStatement?: EvidencePackPublishedStatement | null;
+}
+
+function MoreRows({ count, noun }: { count: number | undefined; noun: string }) {
+  if (!count) return null;
+  return (
+    <p className="muted small" style={{ marginTop: '4pt' }}>
+      + {count} more {noun} not shown. The full list is available in the app.
+    </p>
+  );
+}
+
+/** Score-over-time line chart as static SVG (the PDF is printed with JavaScript off). */
+export function ScoreTrendChart({
+  points,
+  summary,
+}: {
+  points: EvidencePackTrendPoint[];
+  summary: string;
+}) {
+  const width = 520;
+  const height = 140;
+  const pad = { top: 10, right: 12, bottom: 22, left: 30 };
+  const plotW = width - pad.left - pad.right;
+  const plotH = height - pad.top - pad.bottom;
+  const times = points.map((p) => new Date(`${p.date}T00:00:00Z`).getTime());
+  const minT = Math.min(...times);
+  const spanT = Math.max(...times) - minT || 1;
+  const x = (t: number) =>
+    pad.left + (points.length === 1 ? plotW / 2 : ((t - minT) / spanT) * plotW);
+  const y = (score: number) => pad.top + plotH - (Math.max(0, Math.min(100, score)) / 100) * plotH;
+  const path = points
+    .map((p, i) => `${x(times[i]!).toFixed(1)},${y(p.score).toFixed(1)}`)
+    .join(' ');
+  const label = (iso: string) =>
+    new Date(`${iso}T00:00:00Z`).toLocaleDateString('en-GB', {
+      month: 'short',
+      year: 'numeric',
+      timeZone: 'UTC',
+    });
+
+  return (
+    <figure style={{ margin: '6pt 0 10pt', breakInside: 'avoid' }}>
+      <svg
+        viewBox={`0 0 ${width} ${height}`}
+        width="100%"
+        role="img"
+        aria-labelledby="trend-caption"
+        style={{ maxWidth: '520px' }}
+      >
+        {[0, 25, 50, 75, 100].map((v) => (
+          <g key={v}>
+            <line x1={pad.left} x2={width - pad.right} y1={y(v)} y2={y(v)} stroke="#ede5db" />
+            <text x={pad.left - 6} y={y(v) + 3} fontSize="8" textAnchor="end" fill="#476788">
+              {v}
+            </text>
+          </g>
+        ))}
+        <polyline points={path} fill="none" stroke="var(--primary)" strokeWidth="2" />
+        {points.length <= 60 &&
+          points.map((p, i) => (
+            <circle key={i} cx={x(times[i]!)} cy={y(p.score)} r="2.5" fill="var(--primary)" />
+          ))}
+        <text x={pad.left} y={height - 6} fontSize="8" fill="#476788">
+          {label(points[0]!.date)}
+        </text>
+        <text x={width - pad.right} y={height - 6} fontSize="8" textAnchor="end" fill="#476788">
+          {label(points[points.length - 1]!.date)}
+        </text>
+      </svg>
+      <figcaption id="trend-caption" className="muted small">
+        <strong>Trend:</strong> {summary}
+      </figcaption>
+    </figure>
+  );
 }
 
 /** R-03: Complete Accessibility Evidence Pack across automated and manual testing. */
@@ -619,7 +713,10 @@ export function EvidencePackReport({
 
       {/* Scan History & Trend Table */}
       <section aria-labelledby="scans-heading">
-        <h2 id="scans-heading">Automated Scan History ({data.scans.length})</h2>
+        <h2 id="scans-heading">Automated Scan History ({data.summary.scansCount})</h2>
+        {data.trend && data.trend.length > 0 && (
+          <ScoreTrendChart points={data.trend} summary={data.trendSummary ?? ''} />
+        )}
         {data.scans.length === 0 ? (
           <p className="muted small">No automated scans recorded in this period.</p>
         ) : (
@@ -669,11 +766,12 @@ export function EvidencePackReport({
             </tbody>
           </table>
         )}
+        <MoreRows count={data.omitted?.scans} noun="older scans" />
       </section>
 
       {/* Remediated / Fixed Issues Table */}
       <section aria-labelledby="fixed-heading">
-        <h2 id="fixed-heading">Remediated Issues ({data.fixedIssues.length})</h2>
+        <h2 id="fixed-heading">Remediated Issues ({data.summary.totalFixed})</h2>
         <p className="muted small" style={{ marginBottom: '6pt' }}>
           Documented evidence of verified fixes confirmed by automated scans during this period.
         </p>
@@ -709,11 +807,12 @@ export function EvidencePackReport({
             </tbody>
           </table>
         )}
+        <MoreRows count={data.omitted?.fixedIssues} noun="remediated issues" />
       </section>
 
       {/* Open Issues Backlog */}
       <section aria-labelledby="open-heading">
-        <h2 id="open-heading">Current Open Backlog ({data.openIssues.length})</h2>
+        <h2 id="open-heading">Current Open Backlog ({data.summary.openIssuesCount})</h2>
         {data.openIssues.length === 0 ? (
           <p className="muted small">No open automated issues found.</p>
         ) : (
@@ -748,11 +847,14 @@ export function EvidencePackReport({
             </tbody>
           </table>
         )}
+        <MoreRows count={data.omitted?.openIssues} noun="open issues" />
       </section>
 
       {/* Ignored Issues with Justification */}
       <section aria-labelledby="ignored-heading">
-        <h2 id="ignored-heading">Ignored Findings &amp; Rationale ({data.ignoredIssues.length})</h2>
+        <h2 id="ignored-heading">
+          Ignored Findings &amp; Rationale ({data.summary.ignoredIssuesCount})
+        </h2>
         {data.ignoredIssues.length === 0 ? (
           <p className="muted small">No issues were marked as ignored or false positive.</p>
         ) : (
@@ -784,12 +886,13 @@ export function EvidencePackReport({
             </tbody>
           </table>
         )}
+        <MoreRows count={data.omitted?.ignoredIssues} noun="ignored issues" />
       </section>
 
       {/* Manual Assistive Technology Audit Log */}
       <section aria-labelledby="manual-heading">
         <h2 id="manual-heading">
-          Human &amp; Assistive Technology Checks ({data.manualChecks.length})
+          Human &amp; Assistive Technology Checks ({data.summary.manualChecksCount})
         </h2>
         <p className="muted small" style={{ marginBottom: '6pt' }}>
           Manual verification conducted with screen readers, keyboard navigation, and zoom tools.
@@ -844,6 +947,7 @@ export function EvidencePackReport({
             </tbody>
           </table>
         )}
+        <MoreRows count={data.omitted?.manualChecks} noun="manual checks" />
       </section>
 
       {/* Methodology & Limitations */}

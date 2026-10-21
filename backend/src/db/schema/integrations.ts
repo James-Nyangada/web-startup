@@ -1,5 +1,14 @@
 import { sql } from 'drizzle-orm';
-import { boolean, check, index, integer, pgTable, text, uuid } from 'drizzle-orm/pg-core';
+import {
+  boolean,
+  check,
+  index,
+  integer,
+  pgTable,
+  text,
+  timestamp,
+  uuid,
+} from 'drizzle-orm/pg-core';
 import { id, inList, timestamps } from './columns.js';
 import { organizations } from './identity.js';
 
@@ -24,6 +33,7 @@ export const webhooks = pgTable(
     lastStatus: integer('last_status'),
     lastError: text('last_error'),
     failureCount: integer('failure_count').notNull().default(0),
+    /** HMAC signing secret for generic webhooks, AES-GCM encrypted (lib/encryption). */
     secret: text('secret'),
     ...timestamps(),
   },
@@ -36,3 +46,28 @@ export const webhooks = pgTable(
 
 export type WebhookRow = typeof webhooks.$inferSelect;
 export type NewWebhookRow = typeof webhooks.$inferInsert;
+
+/** Delivery log behind S-46's "last 20 deliveries"; pruned after 30 days by retention.prune. */
+export const webhookDeliveries = pgTable(
+  'webhook_deliveries',
+  {
+    id: id(),
+    orgId: uuid('org_id')
+      .notNull()
+      .references(() => organizations.id, { onDelete: 'cascade' }),
+    webhookId: uuid('webhook_id')
+      .notNull()
+      .references(() => webhooks.id, { onDelete: 'cascade' }),
+    event: text('event').notNull(),
+    status: integer('status'),
+    error: text('error'),
+    durationMs: integer('duration_ms').notNull().default(0),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    index('webhook_deliveries_webhook_created_idx').on(t.webhookId, t.createdAt.desc()),
+    index('webhook_deliveries_created_idx').on(t.createdAt),
+  ],
+);
+
+export type WebhookDeliveryRow = typeof webhookDeliveries.$inferSelect;

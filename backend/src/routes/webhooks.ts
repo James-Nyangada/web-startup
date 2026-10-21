@@ -53,7 +53,7 @@ export function orgWebhooksRouter(repos: Repositories, options: WebhookRouterOpt
   const router = Router({ mergeParams: true });
 
   // List webhooks
-  router.get('/', requireOrgRole('member'), async (req, res, next) => {
+  router.get('/', requireOrgRole('admin'), async (req, res, next) => {
     try {
       const orgId = req.orgId as OrgId;
       const webhooks = await repos.webhooks.listByOrg(orgId);
@@ -125,7 +125,7 @@ export function orgWebhooksRouter(repos: Repositories, options: WebhookRouterOpt
   });
 
   // Get webhook
-  router.get('/:id', requireOrgRole('member'), async (req, res, next) => {
+  router.get('/:id', requireOrgRole('admin'), async (req, res, next) => {
     try {
       const orgId = req.orgId as OrgId;
       const id = String(req.params.id);
@@ -281,7 +281,7 @@ export function orgWebhooksRouter(repos: Repositories, options: WebhookRouterOpt
   });
 
   // Deliveries log (GET /orgs/:orgId/webhooks/:id/deliveries)
-  router.get('/:id/deliveries', requireOrgRole('member'), async (req, res, next) => {
+  router.get('/:id/deliveries', requireOrgRole('admin'), async (req, res, next) => {
     try {
       const orgId = req.orgId as OrgId;
       const id = String(req.params.id);

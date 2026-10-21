@@ -19,11 +19,13 @@ import { handleWeeklyDigest } from './jobs/digest-weekly.js';
 import { handleWebhookDeliver } from './jobs/webhook-deliver.js';
 import { handleReportSchedule } from './jobs/report-schedule.js';
 import { handleRetentionPrune } from './jobs/retention-prune.js';
+import { handleSiteReverify, handleSiteReverifySweep } from './jobs/site-reverify.js';
 import type {
   DigestWeeklyJobPayload,
   PaddleProcessJobPayload,
   ReportRenderJobPayload,
   RetentionPruneJobPayload,
+  SiteReverifyJobPayload,
   WebhookDeliverJobPayload,
 } from './types.js';
 
@@ -40,6 +42,8 @@ export const QUEUE_PADDLE_PROCESS = 'paddle.process';
 export const QUEUE_DIGEST_WEEKLY = 'digest.weekly';
 export const QUEUE_WEBHOOK_DELIVER = 'webhook.deliver';
 export const QUEUE_RETENTION_PRUNE = 'retention.prune';
+export const QUEUE_SITE_REVERIFY = 'site.reverify';
+export const QUEUE_SITE_REVERIFY_SWEEP = 'site.reverify.sweep';
 
 export const ALL_QUEUES = [
   QUEUE_SCAN_RUN,
@@ -55,6 +59,8 @@ export const ALL_QUEUES = [
   QUEUE_DIGEST_WEEKLY,
   QUEUE_WEBHOOK_DELIVER,
   QUEUE_RETENTION_PRUNE,
+  QUEUE_SITE_REVERIFY,
+  QUEUE_SITE_REVERIFY_SWEEP,
 ] as const;
 
 /** pg-boss refuses to send to or schedule on a queue that does not exist. Idempotent. */
@@ -353,6 +359,18 @@ export async function registerWorkers(boss: PgBoss, ctx: WorkerContext): Promise
     await handleReportSchedule(undefined, ctx);
   });
 
+  // site.reverify: concurrency 4 (Spec Section 9); weekly sweep fans out one job per site
+  await boss.work<SiteReverifyJobPayload>(
+    QUEUE_SITE_REVERIFY,
+    { localConcurrency: 4, batchSize: 1 },
+    async ([job]) => {
+      if (job?.data?.siteId) await handleSiteReverify(job.data, ctx);
+    },
+  );
+  await boss.work(QUEUE_SITE_REVERIFY_SWEEP, { localConcurrency: 1, batchSize: 1 }, async () => {
+    await handleSiteReverifySweep(ctx, (siteId) => enqueueSiteReverify(boss, siteId));
+  });
+
   // Concurrency 1 for retention.prune cron (Spec Section 9 & P5-10)
   await boss.work<RetentionPruneJobPayload>(
     QUEUE_RETENTION_PRUNE,
@@ -362,6 +380,19 @@ export async function registerWorkers(boss: PgBoss, ctx: WorkerContext): Promise
       await handleRetentionPrune(job?.data, ctx);
     },
   );
+}
+
+/**
+ * Enqueue a site.reverify job with Section 9 parameters:
+ * Concurrency: 4, Timeout: 1 min, Retries: 2.
+ */
+export async function enqueueSiteReverify(boss: PgBoss, siteId: string): Promise<string | null> {
+  return boss.send(QUEUE_SITE_REVERIFY, { siteId } satisfies SiteReverifyJobPayload, {
+    expireInSeconds: 60,
+    retryLimit: 2,
+    retryDelay: 300,
+    singletonKey: `site.reverify:${siteId}`,
+  });
 }
 
 /**
@@ -377,8 +408,17 @@ export async function registerSchedules(boss: PgBoss): Promise<void> {
   // digest.weekly runs hourly to catch Mon 07:00 in each org's time zone (Spec Section 9 & P5-06)
   await boss.schedule(QUEUE_DIGEST_WEEKLY, '0 * * * *', {});
 
-  // report.schedule runs daily at 06:00 UTC (Spec Section 9 & P5-08)
-  await boss.schedule(QUEUE_REPORT_SCHEDULE, '0 6 * * *', {});
+  // report.schedule runs daily at 06:00 UTC (Spec Section 9 & P5-08). The job throws when a
+  // schedule fails, so retry it; already-sent schedules are skipped on retry.
+  await boss.schedule(
+    QUEUE_REPORT_SCHEDULE,
+    '0 6 * * *',
+    {},
+    { retryLimit: 3, retryDelay: 15 * 60, retryBackoff: true },
+  );
+
+  // site.reverify sweep runs weekly, Monday 03:00 UTC (Spec Section 9)
+  await boss.schedule(QUEUE_SITE_REVERIFY_SWEEP, '0 3 * * 1', {});
 
   // retention.prune runs daily at 02:00 UTC (Spec Section 9 & P5-10)
   await boss.schedule(QUEUE_RETENTION_PRUNE, '0 2 * * *', {});

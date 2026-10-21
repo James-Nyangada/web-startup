@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { handleWebhookDeliver, formatSlackMessage } from '../../src/worker/jobs/webhook-deliver.js';
+import { toPublicWebhook } from '../../src/db/repositories/webhooks.js';
 import { fakeRepos, testGuardPolicy } from '../helpers/fakes.js';
 import type { WorkerContext } from '../../src/worker/types.js';
 import { EmailSender, MockTransport } from '../../src/emails/sender.js';
@@ -126,19 +127,19 @@ describe('P5-07: Webhooks and Slack integrations', () => {
     let capturedHeaders: Record<string, string> | undefined;
     let capturedBody: string | undefined;
 
-    const originalFetch = global.fetch;
-    global.fetch = vi.fn().mockImplementation((url, init) => {
-      capturedHeaders = init?.headers;
-      capturedBody = init?.body;
-      return Promise.resolve(new Response(JSON.stringify({ ok: true }), { status: 200 }));
+    const webhookTransport = vi.fn().mockImplementation((_target, init) => {
+      capturedHeaders = init.headers;
+      capturedBody = init.body;
+      return Promise.resolve({ status: 200, ok: true, text: '{"ok":true}' });
     });
 
-    try {
+    {
       const ctx: WorkerContext = {
         repos: repos,
         storage: {} as never,
         emailSender,
         scannerPolicy: testGuardPolicy,
+        webhookTransport,
       };
 
       const result = await handleWebhookDeliver(
@@ -162,8 +163,6 @@ describe('P5-07: Webhooks and Slack integrations', () => {
 
       // Verify delivery logged with success
       expect(repos.webhooks.recordDeliveryResult).toHaveBeenCalledWith(webhookId, 200, null, true);
-    } finally {
-      global.fetch = originalFetch;
     }
   });
 
@@ -210,17 +209,17 @@ describe('P5-07: Webhooks and Slack integrations', () => {
       autoDisabled: true,
     });
 
-    const originalFetch = global.fetch;
-    global.fetch = vi
+    const webhookTransport = vi
       .fn()
-      .mockResolvedValue(new Response('Internal Server Error', { status: 500 }));
+      .mockResolvedValue({ status: 500, ok: false, text: 'Internal Server Error' });
 
-    try {
+    {
       const ctx: WorkerContext = {
         repos: repos,
         storage: {} as never,
         emailSender,
         scannerPolicy: testGuardPolicy,
+        webhookTransport,
       };
 
       await expect(
@@ -240,8 +239,90 @@ describe('P5-07: Webhooks and Slack integrations', () => {
       expect(email?.to).toBe('owner@acme.com');
       expect(email?.subject).toContain('Action required: Webhook auto-disabled for Acme Org');
       expect(email?.html).toContain('failed 10 consecutive delivery attempts');
-    } finally {
-      global.fetch = originalFetch;
     }
+  });
+
+  it('does not follow redirects, so a 3xx cannot bounce delivery to a private host', async () => {
+    const { repos } = fakeRepos();
+    const webhookId = '22222222-2222-4222-8222-222222222222';
+    repos.webhooks.findRawById = vi.fn().mockResolvedValue({
+      id: webhookId,
+      orgId: '11111111-1111-4111-8111-111111111111',
+      kind: 'generic',
+      url: 'https://example.com/hook',
+      events: ['scan.completed'],
+      siteIds: [],
+      active: true,
+      failureCount: 0,
+      secret: 's',
+    });
+    const webhookTransport = vi.fn().mockResolvedValue({ status: 302, ok: false, text: '' });
+
+    await expect(
+      handleWebhookDeliver(
+        { webhookId, event: 'scan.completed', payload: {} },
+        {
+          repos,
+          storage: {} as never,
+          scannerPolicy: testGuardPolicy,
+          webhookTransport,
+        },
+      ),
+    ).rejects.toThrow('status 302');
+
+    expect(webhookTransport).toHaveBeenCalledTimes(1);
+    expect(repos.webhooks.recordDeliveryResult).toHaveBeenCalledWith(
+      webhookId,
+      302,
+      expect.stringContaining('redirects are not followed'),
+      false,
+    );
+  });
+
+  it('formats regression payloads from scan.process and escapes Slack control characters', () => {
+    process.env.APP_URL = 'https://app.test';
+    const msg = formatSlackMessage('issue.regressed', {
+      siteId: 'site-1',
+      siteName: 'Tom & Jerry <Shop>',
+      regressedCount: 2,
+      issues: [{ ruleId: 'image-alt' }, { ruleId: 'link-name' }],
+    });
+    expect(msg).toContain('Tom &amp; Jerry &lt;Shop&gt;');
+    expect(msg).toContain('2 previously fixed issues came back: image-alt, link-name.');
+    expect(msg).toContain('<https://app.test/sites/site-1/issues?status=open|View regression>');
+
+    const verification = formatSlackMessage('site.verification_failed', {
+      siteId: 'site-1',
+      siteName: 'Shop',
+      reason: 'No TXT record found.',
+    });
+    expect(verification).toContain('could not be confirmed: No TXT record found.');
+    expect(verification).toContain('https://app.test/sites/site-1/verify');
+    delete process.env.APP_URL;
+  });
+
+  it('never exposes the full URL or the signing secret in API responses', () => {
+    const publicWebhook = toPublicWebhook({
+      id: 'wh-1',
+      orgId: 'org-1',
+      kind: 'slack',
+      urlEncrypted: encrypt('https://hooks.slack.com/services/T000/B000/SECRETPATH'),
+      events: ['scan.completed'],
+      siteIds: [],
+      active: true,
+      lastStatus: null,
+      lastError: null,
+      failureCount: 0,
+      secret: encrypt('hmac-secret'),
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+    const json = JSON.stringify(publicWebhook);
+    expect(json).not.toContain('SECRETPATH');
+    expect(json).not.toContain('hmac-secret');
+    expect(publicWebhook).not.toHaveProperty('secret');
+    expect(publicWebhook).not.toHaveProperty('urlEncrypted');
+    expect(publicWebhook.hasSecret).toBe(true);
+    expect(publicWebhook.urlMasked).toMatch(/^https:\/\/hooks\.slack\.com/);
   });
 });

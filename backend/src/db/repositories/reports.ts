@@ -18,6 +18,9 @@ export interface CreateReportInput {
   branded?: boolean;
   requestedBy?: string | null;
   expiresAt?: Date | null;
+  /** Period covered, YYYY-MM-DD (evidence packs). */
+  dateFrom?: string | null;
+  dateTo?: string | null;
 }
 
 export interface ListReportsOptions {
@@ -45,6 +48,8 @@ export function reportsRepository(db: Database) {
           branded: input.branded ?? false,
           requestedBy: input.requestedBy ?? null,
           expiresAt: input.expiresAt ?? null,
+          dateFrom: input.dateFrom ?? null,
+          dateTo: input.dateTo ?? null,
           status: 'queued',
         })
         .returning();

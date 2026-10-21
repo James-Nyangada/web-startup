@@ -84,6 +84,27 @@ export function manualChecksRepository(db: Database) {
         .offset(offset);
     },
 
+    /** Every check performed in [from, to] (YYYY-MM-DD), uncapped, for the evidence pack. */
+    async listForEvidencePack(
+      orgId: OrgId,
+      siteId: string,
+      from: string,
+      to: string,
+    ): Promise<ManualCheckRow[]> {
+      return db
+        .select()
+        .from(manualChecks)
+        .where(
+          and(
+            eq(manualChecks.orgId, orgId),
+            eq(manualChecks.siteId, siteId),
+            gte(manualChecks.performedAt, from),
+            lte(manualChecks.performedAt, to),
+          ),
+        )
+        .orderBy(desc(manualChecks.performedAt), desc(manualChecks.createdAt));
+    },
+
     async countBySite(
       orgId: OrgId,
       siteId: string,

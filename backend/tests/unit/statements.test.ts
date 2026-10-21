@@ -160,6 +160,21 @@ describe('Accessibility Statement Generator (P5-03)', () => {
       // Ensure forbidden words like "compliant" are NOT used
       expect(html.toLowerCase()).not.toContain('compliant');
     });
+
+    it('never renders javascript: or data: URLs as links, even from stored data', () => {
+      const html = renderAccessibilityStatementHtml(
+        {
+          ...sampleStatementData,
+          siteUrl: 'javascript:alert(1)',
+          enforcementProcedure: {
+            bodyName: 'Authority',
+            contactUrl: 'data:text/html,<script>alert(1)</script>',
+          },
+        },
+        { displayName: 'Acme Corp' },
+      );
+      expect(html).not.toMatch(/href="(javascript|data):/i);
+    });
   });
 
   describe('GET /v1/orgs/:orgId/sites/:siteId/statements', () => {
@@ -253,6 +268,22 @@ describe('Accessibility Statement Generator (P5-03)', () => {
         .post(`/v1/orgs/${orgId}/sites/${siteId}/statements`)
         .set('Cookie', [`token-${userId}=active`])
         .send({ data: invalidData });
+
+      expect(res.status).toBe(400);
+      expect(res.body.error.code).toBe(ErrorCode.VALIDATION_ERROR);
+    });
+
+    it.each([
+      ['siteUrl', { siteUrl: 'javascript:alert(document.cookie)' }],
+      [
+        'enforcementProcedure.contactUrl',
+        { enforcementProcedure: { bodyName: 'X', contactUrl: 'javascript:alert(1)' } },
+      ],
+    ])('rejects a non-http(s) %s with 400', async (_field, override) => {
+      const res = await request(app)
+        .post(`/v1/orgs/${orgId}/sites/${siteId}/statements`)
+        .set('Cookie', [`token-${userId}=active`])
+        .send({ data: { ...sampleStatementData, ...override } });
 
       expect(res.status).toBe(400);
       expect(res.body.error.code).toBe(ErrorCode.VALIDATION_ERROR);
@@ -392,6 +423,11 @@ describe('Accessibility Statement Generator (P5-03)', () => {
       expect(res.status).toBe(200);
       expect(res.body.data.statement.id).toBe(statementId);
       expect(res.body.data.embedSnippet).toContain('Accessibility Statement');
+      // Public response carries no org, author or internal fields
+      const statement = res.body.data.statement as Record<string, unknown>;
+      expect(Object.keys(statement).sort()).toEqual(
+        ['data', 'id', 'publishedAt', 'renderedHtml', 'siteId', 'version'].sort(),
+      );
     });
 
     it('serves rendered HTML directly when Accept header is text/html', async () => {

@@ -95,6 +95,7 @@ export function fakeRepos() {
       findById: vi.fn().mockResolvedValue(null),
       update: vi.fn().mockResolvedValue(null),
       listBySite: vi.fn().mockResolvedValue([]),
+      listForEvidencePack: vi.fn().mockResolvedValue([]),
       countBySite: vi.fn().mockResolvedValue(0),
       findRunningScanForSite: vi.fn().mockResolvedValue(null),
       countOnboardingScansForSite: vi.fn().mockResolvedValue(0),
@@ -133,6 +134,7 @@ export function fakeRepos() {
         .fn()
         .mockResolvedValue({ createdCount: 0, fixedCount: 0, regressedCount: 0 }),
       listBySite: vi.fn().mockResolvedValue([]),
+      listForEvidencePack: vi.fn().mockResolvedValue({ fixed: [], open: [], ignored: [] }),
       countBySite: vi.fn().mockResolvedValue(0),
       findById: vi.fn().mockResolvedValue(null),
       listTopIssues: vi.fn().mockResolvedValue([]),
@@ -291,6 +293,8 @@ export function fakeRepos() {
         branded: boolean;
         requestedBy: string | null;
         expiresAt: Date | null;
+        dateFrom: string | null;
+        dateTo: string | null;
         createdAt: Date;
         updatedAt: Date;
       }
@@ -309,6 +313,8 @@ export function fakeRepos() {
             branded: Boolean(input.branded),
             requestedBy: (input.requestedBy as string) ?? null,
             expiresAt: (input.expiresAt as Date) ?? null,
+            dateFrom: (input.dateFrom as string) ?? null,
+            dateTo: (input.dateTo as string) ?? null,
             createdAt: new Date(),
             updatedAt: new Date(),
           };
@@ -527,6 +533,7 @@ export function fakeRepos() {
       findById: vi.fn().mockResolvedValue(null),
       findRawById: vi.fn().mockResolvedValue(null),
       listBySite: vi.fn().mockResolvedValue([]),
+      listForEvidencePack: vi.fn().mockResolvedValue([]),
       countBySite: vi.fn().mockResolvedValue(0),
       update: vi.fn().mockResolvedValue(null),
       delete: vi.fn().mockResolvedValue(true),
@@ -602,6 +609,7 @@ export function fakeRepos() {
       update: vi.fn().mockResolvedValue(null),
       delete: vi.fn().mockResolvedValue(true),
       recordDeliveryResult: vi.fn().mockResolvedValue({ webhook: {}, autoDisabled: false }),
+      pruneDeliveries: vi.fn().mockResolvedValue(0),
       findActiveByEvent: vi.fn().mockResolvedValue([]),
       logDelivery: vi.fn().mockResolvedValue(undefined),
       listDeliveries: vi.fn().mockResolvedValue([]),
@@ -668,7 +676,7 @@ export function fakeRepos() {
         }),
         findDueSchedules: vi.fn().mockImplementation(async (dayOfMonth: number) => {
           const matches = schedulesStore.filter(
-            (s) => s.active && (dayOfMonth === 0 || s.dayOfMonth === dayOfMonth),
+            (s) => s.active && (dayOfMonth === 0 || s.dayOfMonth <= dayOfMonth),
           );
           const results = [];
           for (const s of matches) {
@@ -723,6 +731,7 @@ export function fakeRepos() {
       }),
       findPurgeableOrgs: vi.fn().mockResolvedValue([]),
       purgeOrganization: vi.fn().mockResolvedValue(true),
+      listOrgFileKeys: vi.fn().mockResolvedValue([]),
     },
   } as unknown as Repositories;
   return { repos, join };

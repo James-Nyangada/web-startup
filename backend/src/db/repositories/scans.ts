@@ -1,4 +1,4 @@
-import { and, desc, eq, gte, isNull, ne, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, gte, inArray, isNull, ne, sql } from 'drizzle-orm';
 import type { Database } from '../client.js';
 import type { Standard } from '../../scanner/types.js';
 import { scans, sites, type ScanStatus, type ScanTrigger } from '../schema/index.js';
@@ -89,6 +89,31 @@ export function scansRepository(db: Database) {
         .orderBy(desc(scans.queuedAt))
         .limit(limit)
         .offset(offset);
+    },
+
+    /** Finished scans whose finish (or queue) time falls in [start, end], oldest first. */
+    async listForEvidencePack(orgId: OrgId, siteId: string, start: Date, end: Date) {
+      const at = sql<Date>`coalesce(${scans.finishedAt}, ${scans.queuedAt})`;
+      return db
+        .select({
+          id: scans.id,
+          status: scans.status,
+          score: scans.score,
+          counts: scans.counts,
+          pagesScanned: scans.pagesScanned,
+          finishedAt: scans.finishedAt,
+          queuedAt: scans.queuedAt,
+        })
+        .from(scans)
+        .where(
+          and(
+            eq(scans.orgId, orgId),
+            eq(scans.siteId, siteId),
+            inArray(scans.status, ['completed', 'partial', 'failed']),
+            sql`${at} between ${start} and ${end}`,
+          ),
+        )
+        .orderBy(asc(at), asc(scans.id));
     },
 
     async listTrendScans(orgId: OrgId, siteId: string, limit = 12) {

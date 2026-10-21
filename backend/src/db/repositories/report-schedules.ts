@@ -1,4 +1,4 @@
-import { and, desc, eq, isNull, notInArray } from 'drizzle-orm';
+import { and, desc, eq, isNull, lte, notInArray } from 'drizzle-orm';
 import type { Database } from '../client.js';
 import { organizations, reportSchedules, sites, type ReportScheduleRow } from '../schema/index.js';
 import type { OrgId } from './org-scope.js';
@@ -153,6 +153,7 @@ export function reportSchedulesRepository(db: Database) {
       return Boolean(row);
     },
 
+    /** Active schedules whose day is on or before `dayOfMonth`; the job filters by lastSentAt. */
     async findDueSchedules(dayOfMonth: number) {
       return db
         .select({
@@ -166,7 +167,7 @@ export function reportSchedulesRepository(db: Database) {
         .where(
           and(
             eq(reportSchedules.active, true),
-            eq(reportSchedules.dayOfMonth, dayOfMonth),
+            lte(reportSchedules.dayOfMonth, dayOfMonth),
             isNull(organizations.deletedAt),
             isNull(sites.deletedAt),
             notInArray(organizations.billingStatus, ['read_only', 'canceled']),

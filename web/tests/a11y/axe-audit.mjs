@@ -69,6 +69,9 @@ const screens = {
   "S-33 Statement": `${siteBase}/statement`,
   "S-34 Site settings": `${siteBase}/settings`,
   "S-41 Members": "/settings/members",
+  "S-45 Notification preferences": "/settings/notifications",
+  "S-46 Integrations": "/settings/integrations",
+  "S-49 My tasks": "/tasks",
   "S-43 Branding": "/settings/branding",
   "S-44 Billing": "/settings/billing",
   "S-48 Account": "/settings/account",
@@ -85,6 +88,25 @@ for (const [name, path] of Object.entries(screens)) {
     .withTags(TAGS)
     .analyze();
   console.log(`${violations.length ? "FAIL" : "PASS"} ${name} (${path})`);
+  for (const v of violations) {
+    failures += 1;
+    console.log(
+      `  ${v.id} [${v.impact}] x${v.nodes.length}: ${v.nodes[0].html.slice(0, 200)}`,
+    );
+  }
+}
+
+// S-50: the notification panel only exists once opened from the bell.
+await page.goto(WEB + `/${org.slug}`, { waitUntil: "load" });
+await page.waitForTimeout(1000);
+await page.locator("button[aria-expanded][aria-label*='otification']").first().click();
+await page.waitForSelector('[role="dialog"][aria-label="Notification Centre"]');
+{
+  const { violations } = await new AxeBuilder({ page })
+    .include('[role="dialog"][aria-label="Notification Centre"]')
+    .withTags(TAGS)
+    .analyze();
+  console.log(`${violations.length ? "FAIL" : "PASS"} S-50 Notification panel`);
   for (const v of violations) {
     failures += 1;
     console.log(

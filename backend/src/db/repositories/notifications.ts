@@ -38,6 +38,8 @@ export interface OptedInMember {
   userId: string;
   email: string;
   name: string | null;
+  /** Set when listing for 'scanCompleted': 'all' or 'issues_only' (default 'all'). */
+  scanCompleted?: ScanCompletedPref;
 }
 
 export function notificationsRepository(db: Database) {
@@ -252,6 +254,9 @@ export function notificationsRepository(db: Database) {
           userId: r.userId,
           email: r.email,
           name: r.name,
+          ...(pref === 'scanCompleted'
+            ? { scanCompleted: (r.prefValue as ScanCompletedPref | null) ?? 'all' }
+            : {}),
         }));
     },
   };

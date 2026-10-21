@@ -47,6 +47,12 @@ export function escapeHtml(str: string): string {
     .replace(/'/g, '&#039;');
 }
 
+/** Escaped href for http(s) URLs only; anything else (javascript:, data:, ...) becomes '#'. */
+export function safeHref(url: string | null | undefined): string {
+  const value = (url ?? '').trim();
+  return /^https?:\/\//i.test(value) ? escapeHtml(value) : '#';
+}
+
 export function getConformanceLabel(status: StatementData['conformanceStatus']): string {
   switch (status) {
     case 'fully_conformant':
@@ -86,7 +92,7 @@ export function renderAccessibilityStatementHtml(
   const primaryColor = branding?.primaryColor || '#0F3D3E';
   const orgName = escapeHtml(data.orgName || branding?.displayName || 'Organisation');
   const siteName = escapeHtml(data.siteName || 'Website');
-  const siteUrl = escapeHtml(data.siteUrl || '#');
+  const siteUrl = safeHref(data.siteUrl);
   const scope = escapeHtml(
     data.scope || `This accessibility statement applies to ${data.siteName}.`,
   );
@@ -148,7 +154,7 @@ export function renderAccessibilityStatementHtml(
           <h2 id="enforcement-heading">Enforcement Procedure</h2>
           <p>${data.enforcementProcedure.description ? escapeHtml(data.enforcementProcedure.description) : 'If you have contacted us regarding accessibility and are not satisfied with our response, you may reach out to the relevant supervisory authority.'}</p>
           ${data.enforcementProcedure.bodyName ? `<p><strong>Authority:</strong> ${escapeHtml(data.enforcementProcedure.bodyName)}</p>` : ''}
-          ${data.enforcementProcedure.contactUrl ? `<p><a href="${escapeHtml(data.enforcementProcedure.contactUrl)}" target="_blank" rel="noopener noreferrer">Contact the enforcement body (opens in new tab)</a></p>` : ''}
+          ${data.enforcementProcedure.contactUrl ? `<p><a href="${safeHref(data.enforcementProcedure.contactUrl)}" target="_blank" rel="noopener noreferrer">Contact the enforcement body (opens in new tab)</a></p>` : ''}
         </section>`
       : '';
 

@@ -18,6 +18,7 @@ import {
   renderWeeklyDigest,
   renderMonthlyClientReport,
   renderWebhookDisabled,
+  renderSiteVerificationFailing,
 } from './templates/index.js';
 import type {
   EmailBranding,
@@ -43,6 +44,7 @@ import type {
   WeeklyDigestData,
   MonthlyClientReportData,
   WebhookDisabledData,
+  SiteVerificationFailingData,
 } from './types.js';
 
 export function renderEmail<T extends EmailTemplateId>(
@@ -87,6 +89,8 @@ export function renderEmail<T extends EmailTemplateId>(
       return renderPlanChanged(data as PlanChangedData, branding);
     case 'E-20':
       return renderDataDeletionWarning(data as DataDeletionWarningData, branding);
+    case 'E-09':
+      return renderSiteVerificationFailing(data as SiteVerificationFailingData, branding);
     case 'E-21':
       return renderWebhookDisabled(data as WebhookDisabledData, branding);
     default:
@@ -211,6 +215,15 @@ export function getSampleTemplateData(templateId: EmailTemplateId): unknown {
         reactivateUrl: 'http://localhost:3000/settings/billing',
         exportUrl: 'http://localhost:3000/settings/account#export',
         deletionDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+      };
+    case 'E-09':
+      return {
+        siteName: 'Oakhaus Furniture',
+        rootUrl: 'https://oakhaus.com',
+        method: 'meta',
+        failureCount: 3,
+        reason: 'The plainsight-verify meta tag was not found on the home page.',
+        verifyUrl: 'http://localhost:3000/sites/oakhaus/verify',
       };
   }
 }

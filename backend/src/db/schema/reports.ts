@@ -2,6 +2,7 @@ import { sql } from 'drizzle-orm';
 import {
   boolean,
   check,
+  date,
   index,
   integer,
   pgTable,
@@ -41,10 +42,17 @@ export const reports = pgTable(
     branded: boolean('branded').notNull().default(false),
     requestedBy: uuid('requested_by').references(() => users.id, { onDelete: 'set null' }),
     expiresAt: timestamp('expires_at', { withTimezone: true }),
+    /** Period covered (inclusive, YYYY-MM-DD). Set for evidence packs (R-03). */
+    dateFrom: date('date_from'),
+    dateTo: date('date_to'),
     ...timestamps(),
   },
   (t) => [
     index('reports_org_created_idx').on(t.orgId, t.createdAt.desc()),
+    check(
+      'reports_date_range_check',
+      sql`${t.dateFrom} is null or ${t.dateTo} is null or ${t.dateFrom} <= ${t.dateTo}`,
+    ),
     index('reports_site_id_idx').on(t.siteId),
     check('reports_type_check', sql`${t.type} in (${inList(REPORT_TYPES)})`),
     check('reports_status_check', sql`${t.status} in (${inList(REPORT_STATUSES)})`),

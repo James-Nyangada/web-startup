@@ -1,47 +1,69 @@
 import crypto from 'node:crypto';
 import type { WebhookDeliverJobPayload, WorkerContext } from '../types.js';
 import type { OrgId } from '../../db/repositories/org-scope.js';
-import { assertPublicUrl } from '../../scanner/net/guard.js';
+import { assertPublicUrl, type PublicTarget } from '../../scanner/net/guard.js';
+import { pinnedPost } from '../../scanner/net/guarded-fetch.js';
 import { signHmacSha256 } from '../../lib/encryption.js';
-import { enqueueEmailSend } from '../boss.js';
 import type { WebhookDisabledData } from '../../emails/types.js';
-import { EmailSender } from '../../emails/sender.js';
+import { listOrgAdmins, notifyInApp, sendEmail } from '../notify.js';
+
+/** Slack mrkdwn treats &, < and > as control characters. */
+function slackEscape(value: string): string {
+  return value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+function str(data: Record<string, unknown>, key: string): string | undefined {
+  return typeof data[key] === 'string' ? data[key] : undefined;
+}
+
+function num(data: Record<string, unknown>, key: string): number | undefined {
+  return typeof data[key] === 'number' ? data[key] : undefined;
+}
 
 export function formatSlackMessage(event: string, data: Record<string, unknown>): string {
-  const siteName =
-    typeof data['siteName'] === 'string'
-      ? data['siteName']
-      : typeof data['siteId'] === 'string'
-        ? data['siteId']
-        : 'Site';
+  const siteName = slackEscape(str(data, 'siteName') ?? str(data, 'siteId') ?? 'Site');
   const appUrl = process.env.APP_URL ?? 'https://app.brightline.dev';
+  const siteId = str(data, 'siteId');
+  const sitePath = (path: string) => (siteId ? `${appUrl}/sites/${siteId}${path}` : appUrl);
 
   switch (event) {
     case 'scan.completed': {
-      const score = typeof data['score'] === 'number' ? String(data['score']) : '—';
-      const critical =
-        typeof data['criticalCount'] === 'number' ? String(data['criticalCount']) : '0';
-      const serious = typeof data['seriousCount'] === 'number' ? String(data['seriousCount']) : '0';
-      return `*Scan completed for ${siteName}*\nScore: *${score}* | Critical: ${critical} | Serious: ${serious}\n<${appUrl}|View scan results>`;
+      const score = num(data, 'score') ?? '—';
+      const critical = num(data, 'criticalCount') ?? 0;
+      const serious = num(data, 'seriousCount') ?? 0;
+      const scanId = str(data, 'scanId');
+      return `*Scan completed for ${siteName}*\nScore: *${score}* | Critical: ${critical} | Serious: ${serious}\n<${sitePath(scanId ? `/scans/${scanId}` : '')}|View scan results>`;
     }
     case 'issue.regressed': {
-      const title =
-        typeof data['issueTitle'] === 'string' ? data['issueTitle'] : 'Accessibility issue';
-      const impact = typeof data['impact'] === 'string' ? data['impact'] : 'serious';
-      return `:warning: *Regression detected on ${siteName}*\nIssue: *${title}* (${impact})\n<${appUrl}|View regression>`;
+      const issues = Array.isArray(data['issues'])
+        ? (data['issues'] as Array<{ ruleId?: unknown }>)
+            .map((i) => (typeof i.ruleId === 'string' ? i.ruleId : null))
+            .filter((r): r is string => Boolean(r))
+        : [];
+      const count = num(data, 'regressedCount') ?? (issues.length || 1);
+      const single = str(data, 'issueTitle');
+      const detail = single
+        ? `Issue: *${slackEscape(single)}* (${slackEscape(str(data, 'impact') ?? 'serious')})`
+        : `${count} previously fixed issue${count === 1 ? '' : 's'} came back${
+            issues.length ? `: ${issues.slice(0, 5).map(slackEscape).join(', ')}` : ''
+          }${issues.length > 5 ? ` and ${issues.length - 5} more` : ''}.`;
+      return `:warning: *Regression detected on ${siteName}*\n${detail}\n<${sitePath('/issues?status=open')}|View regression>`;
     }
     case 'issues.new_critical': {
-      const count = typeof data['count'] === 'number' ? String(data['count']) : '10';
-      return `:rotating_light: *High severity spike on ${siteName}*\n${count} new critical or serious issues discovered in the latest scan.\n<${appUrl}|Review issues>`;
+      const count = num(data, 'count') ?? 10;
+      return `:rotating_light: *High severity spike on ${siteName}*\n${count} new critical or serious issues discovered in the latest scan.\n<${sitePath('/issues?status=open')}|Review issues>`;
     }
     case 'site.verification_failed': {
-      return `:x: *Site verification failed for ${siteName}*\nOwnership verification could not be confirmed.\n<${appUrl}|Check verification settings>`;
+      const reason = str(data, 'reason');
+      return `:x: *Site verification failed for ${siteName}*\nOwnership verification could not be confirmed${
+        reason ? `: ${slackEscape(reason)}` : '.'
+      }\n<${sitePath('/verify')}|Check verification settings>`;
     }
     case 'test': {
       return `:white_check_mark: *Plainsight Webhook Test*\nWebhook connection successfully received test event.`;
     }
     default:
-      return `*Plainsight Event: ${event}* on ${siteName}\n<${appUrl}|Open dashboard>`;
+      return `*Plainsight Event: ${slackEscape(event)}* on ${siteName}\n<${appUrl}|Open dashboard>`;
   }
 }
 
@@ -57,9 +79,11 @@ export async function handleWebhookDeliver(
   const orgId = webhook.orgId as OrgId;
   const start = Date.now();
 
-  // Re-validate against SSRF guard right before delivery (Spec §11.2)
+  // Re-validate against SSRF guard right before delivery (Spec §11.2). The connection is
+  // then pinned to the validated address and redirects are not followed.
+  let target: PublicTarget;
   try {
-    await assertPublicUrl(webhook.url, ctx.scannerPolicy);
+    target = await assertPublicUrl(webhook.url, ctx.scannerPolicy);
   } catch (err: unknown) {
     const errorMsg = `SSRF Guard blocked delivery: ${err instanceof Error ? err.message : String(err)}`;
     await ctx.repos.webhooks.logDelivery(orgId, webhook.id, {
@@ -102,12 +126,8 @@ export async function handleWebhookDeliver(
   let isSuccess = false;
 
   try {
-    const res = await fetch(webhook.url, {
-      method: 'POST',
-      headers,
-      body,
-      signal: AbortSignal.timeout(10_000), // 10s timeout per spec Section 9
-    });
+    const post = ctx.webhookTransport ?? pinnedPost;
+    const res = await post(target, { headers, body, timeoutMs: 10_000 }); // 10s per spec Section 9
 
     status = res.status;
     const durationMs = Date.now() - start;
@@ -125,8 +145,10 @@ export async function handleWebhookDeliver(
       await ctx.repos.webhooks.recordDeliveryResult(webhook.id, status, null, true);
       return { ok: true, status };
     } else {
-      const responseText = await res.text().catch(() => '');
-      errorMsg = `HTTP ${status}: ${responseText.slice(0, 300)}`;
+      errorMsg =
+        status >= 300 && status < 400
+          ? `HTTP ${status}: redirects are not followed for webhooks`
+          : `HTTP ${status}: ${res.text.slice(0, 300)}`;
       throw new Error(`Webhook delivery failed with status ${status}`);
     }
   } catch (err: unknown) {
@@ -167,36 +189,30 @@ async function notifyAutoDisabled(
   const org = await ctx.repos.organizations.findById(orgId);
   const orgName = org?.name ?? 'your organisation';
   const appUrl = process.env.APP_URL ?? 'https://app.brightline.dev';
+  const admins = await listOrgAdmins(ctx, orgId);
 
-  const members = await ctx.repos.memberships.list(orgId);
-  const admins = members.filter((m) => m.role === 'owner' || m.role === 'admin');
-
+  const emailData: WebhookDisabledData = {
+    orgName,
+    webhookUrl,
+    failureCount: 10,
+    settingsUrl: `${appUrl}/settings/integrations`,
+  };
   for (const admin of admins) {
-    const user = await ctx.repos.users.findById(admin.userId);
-    if (!user?.email) continue;
-
-    const emailData: WebhookDisabledData = {
-      orgName,
-      webhookUrl,
-      failureCount: 10,
-      settingsUrl: `${appUrl}/settings/integrations`,
-    };
-
-    if (ctx.boss) {
-      await enqueueEmailSend(ctx.boss, {
-        to: user.email,
-        templateId: 'E-21',
-        data: emailData as unknown as Record<string, unknown>,
-      });
-    } else {
-      const sender = ctx.emailSender ?? new EmailSender();
-      await sender.send({
-        to: user.email,
-        templateId: 'E-21',
-        data: emailData,
-      });
-    }
+    await sendEmail(ctx, admin.email, 'E-21', emailData);
   }
+
+  // In-app mirror of E-21 (P5-05)
+  await notifyInApp(
+    ctx,
+    orgId,
+    admins.map((a) => a.userId),
+    {
+      type: 'webhook_disabled',
+      title: 'A webhook was turned off',
+      body: `Deliveries to ${new URL(webhookUrl).host} failed 10 times in a row, so the webhook was disabled.`,
+      link: '/settings/integrations',
+    },
+  );
 }
 
 /**

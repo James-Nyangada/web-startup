@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, ilike, inArray, isNull, lt, or, sql } from 'drizzle-orm';
+import { and, asc, between, desc, eq, ilike, inArray, isNull, lt, or, sql } from 'drizzle-orm';
 import type { Database } from '../client.js';
 import type { PreviousIssue, ScanDiff } from '../../scanner/results/diff.js';
 import type { FoundIssue } from '../../scanner/results/issues.js';
@@ -613,6 +613,52 @@ export function issuesRepository(db: Database) {
         ...r,
         title: r.title ?? r.ruleId,
       }));
+    },
+
+    /**
+     * Evidence pack (R-03) issue sections in one query, uncapped: issues fixed or ignored
+     * within [start, end], plus every issue open now, most severe first.
+     */
+    async listForEvidencePack(orgId: OrgId, siteId: string, start: Date, end: Date) {
+      const impactRank = sql`CASE ${issues.impact}
+        WHEN 'critical' THEN 4 WHEN 'serious' THEN 3 WHEN 'moderate' THEN 2 ELSE 1 END`;
+      const rows = await db
+        .select({
+          id: issues.id,
+          ruleId: issues.ruleId,
+          title: rules.title,
+          impact: issues.impact,
+          status: issues.status,
+          occurrenceCount: issues.occurrenceCount,
+          fixedAt: issues.fixedAt,
+          ignoredAt: issues.ignoredAt,
+          ignoredReason: issues.ignoredReason,
+          ignoredNote: issues.ignoredNote,
+          assigneeName: users.name,
+          dueDate: issues.dueDate,
+        })
+        .from(issues)
+        .leftJoin(rules, eq(issues.ruleId, rules.ruleId))
+        .leftJoin(users, eq(issues.assigneeId, users.id))
+        .where(
+          and(
+            eq(issues.orgId, orgId),
+            eq(issues.siteId, siteId),
+            or(
+              eq(issues.status, 'open'),
+              and(eq(issues.status, 'fixed'), between(issues.fixedAt, start, end)),
+              and(eq(issues.status, 'ignored'), between(issues.ignoredAt, start, end)),
+            ),
+          ),
+        )
+        .orderBy(desc(impactRank), desc(issues.occurrenceCount), issues.id);
+
+      const items = rows.map((r) => ({ ...r, title: r.title ?? r.ruleId }));
+      return {
+        fixed: items.filter((i) => i.status === 'fixed'),
+        open: items.filter((i) => i.status === 'open'),
+        ignored: items.filter((i) => i.status === 'ignored'),
+      };
     },
 
     async countBySite(orgId: OrgId, siteId: string, filters: IssueListFilters = {}) {

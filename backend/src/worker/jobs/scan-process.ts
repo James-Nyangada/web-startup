@@ -5,6 +5,8 @@ import { asOrgId } from '../../db/repositories/index.js';
 import type { ScanJobPayload, WorkerContext } from '../types.js';
 import { publishScanProgress } from '../progress.js';
 import { dispatchWebhooks } from './webhook-deliver.js';
+import { notifyInApp, sendEmail } from '../notify.js';
+import type { OrgId } from '../../db/repositories/org-scope.js';
 
 export async function handleScanProcess(job: ScanJobPayload, ctx: WorkerContext): Promise<void> {
   const scan = await ctx.repos.scans.findRawById(job.scanId);
@@ -223,37 +225,29 @@ export async function handleScanProcess(job: ScanJobPayload, ctx: WorkerContext)
         );
       }
 
-      if (ctx.emailSender) {
-        const alertItems = hasRegressions
-          ? eligibleRegressions.map((r) => ({
-              title: r.ruleId ?? 'Accessibility violation',
-              impact: 'critical',
-            }))
-          : diff.created
-              .filter((i) => i.impact === 'critical' || i.impact === 'serious')
-              .slice(0, 10)
-              .map((i) => ({
-                title: i.ruleId,
-                impact: i.impact,
-              }));
+      const alertItems = hasRegressions
+        ? eligibleRegressions.map((r) => ({
+            title: r.ruleId ?? 'Accessibility violation',
+            impact: 'critical',
+          }))
+        : diff.created
+            .filter((i) => i.impact === 'critical' || i.impact === 'serious')
+            .slice(0, 10)
+            .map((i) => ({
+              title: i.ruleId,
+              impact: i.impact,
+            }));
 
-        for (const member of optedMembers) {
-          await ctx.emailSender
-            .send({
-              to: member.email,
-              templateId: 'E-08',
-              data: {
-                siteName,
-                regressedCount: eligibleRegressions.length,
-                newCriticalCount: newCriticalOrSerious,
-                items: alertItems,
-                viewUrl,
-              },
-            })
-            .catch((err) => {
-              console.error('[scan-process] Failed to send E-08 alert email:', err);
-            });
-        }
+      for (const member of optedMembers) {
+        await sendEmail(ctx, member.email, 'E-08', {
+          siteName,
+          regressedCount: eligibleRegressions.length,
+          newCriticalCount: newCriticalOrSerious,
+          items: alertItems,
+          viewUrl,
+        }).catch((err: unknown) => {
+          console.error('[scan-process] Failed to send E-08 alert email:', err);
+        });
       }
 
       for (const reg of eligibleRegressions) {
@@ -305,25 +299,114 @@ export async function handleScanProcess(job: ScanJobPayload, ctx: WorkerContext)
         }
       }
     }
-
-    // 11. Webhook event: scan.completed (P5-07)
-    if (ctx.repos.webhooks) {
-      const site = await ctx.repos.sites.findRawById(scan.siteId);
-      const siteName = site?.name ?? 'Site';
-      await dispatchWebhooks(
-        orgId,
-        'scan.completed',
-        scan.siteId,
-        {
-          scanId: scan.id,
-          siteId: scan.siteId,
-          siteName,
-          score: scanResult.score,
-          criticalCount: counts.critical,
-          seriousCount: counts.serious,
-        },
-        ctx,
-      );
-    }
   }
+
+  // 11. Scan finished notifications: E-06 for the onboarding scan's requester, E-07 for
+  // members by preference ('issues_only' = only when the scan found new or regressed issues)
+  if ((finalStatus === 'completed' || finalStatus === 'partial') && scanResult.score !== null) {
+    await notifyScanFinished(ctx, orgId, scan, {
+      score: scanResult.score,
+      counts,
+      createdCount,
+      fixedCount,
+      regressedCount,
+    }).catch((err: unknown) => {
+      console.error('[scan-process] Failed to send scan notifications:', err);
+    });
+  }
+
+  // 12. Webhook event: scan.completed (P5-07), sent for every finished scan
+  if (ctx.repos.webhooks && (finalStatus === 'completed' || finalStatus === 'partial')) {
+    const site = await ctx.repos.sites.findRawById(scan.siteId);
+    const siteName = site?.name ?? 'Site';
+    await dispatchWebhooks(
+      orgId,
+      'scan.completed',
+      scan.siteId,
+      {
+        scanId: scan.id,
+        siteId: scan.siteId,
+        siteName,
+        score: scanResult.score,
+        criticalCount: counts.critical,
+        seriousCount: counts.serious,
+      },
+      ctx,
+    );
+  }
+}
+
+async function notifyScanFinished(
+  ctx: WorkerContext,
+  orgId: OrgId,
+  scan: { id: string; siteId: string; trigger: string; requestedBy: string | null },
+  result: {
+    score: number;
+    counts: { critical: number; serious: number; moderate: number; minor: number };
+    createdCount: number;
+    fixedCount: number;
+    regressedCount: number;
+  },
+): Promise<void> {
+  const site = await ctx.repos.sites.findRawById(scan.siteId);
+  const siteName = site?.name ?? 'Site';
+  const appUrl = process.env.APP_URL || 'http://localhost:3000';
+  const scanPath = `/sites/${scan.siteId}/scans/${scan.id}`;
+  const isOnboarding = scan.trigger === 'onboarding' && Boolean(scan.requestedBy);
+
+  if (isOnboarding) {
+    const requester = await ctx.repos.users.findById(scan.requestedBy!);
+    if (requester?.email) {
+      await sendEmail(ctx, requester.email, 'E-06', {
+        siteName,
+        rootUrl: site?.rootUrl ?? '',
+        score: result.score,
+        criticalCount: result.counts.critical,
+        seriousCount: result.counts.serious,
+        moderateCount: result.counts.moderate,
+        reportUrl: `${appUrl}/sites/${scan.siteId}`,
+      });
+    }
+    await notifyInApp(ctx, orgId, [scan.requestedBy!], {
+      type: 'first_scan_ready',
+      title: `First scan of ${siteName} is ready`,
+      body: `Score ${result.score}, with ${result.counts.critical} critical and ${result.counts.serious} serious issues to review.`,
+      link: `/sites/${scan.siteId}`,
+    });
+  }
+
+  if (!ctx.repos.notifications) return;
+  const foundIssues = result.createdCount > 0 || result.regressedCount > 0;
+  const members = (await ctx.repos.notifications.listOptedInMembers(orgId, 'scanCompleted'))
+    .filter((m) => m.scanCompleted !== 'issues_only' || foundIssues)
+    // The onboarding requester already got E-06 for this scan
+    .filter((m) => !(isOnboarding && m.userId === scan.requestedBy));
+  if (members.length === 0) return;
+
+  const [, previous] = await ctx.repos.scans.listBySite(orgId, scan.siteId, 2);
+  for (const member of members) {
+    await sendEmail(ctx, member.email, 'E-07', {
+      siteName,
+      score: result.score,
+      previousScore: previous?.score ?? null,
+      newCount: result.createdCount,
+      fixedCount: result.fixedCount,
+      regressedCount: result.regressedCount,
+      scanUrl: `${appUrl}${scanPath}`,
+      unsubscribeUrl: `${appUrl}/settings/notifications`,
+    }).catch((err: unknown) => {
+      console.error('[scan-process] Failed to send E-07 email:', err);
+    });
+  }
+  await notifyInApp(
+    ctx,
+    orgId,
+    members.map((m) => m.userId),
+    {
+      type: 'scan_completed',
+      title: `Scan of ${siteName} finished`,
+      body: `Score ${result.score}: ${result.createdCount} new, ${result.fixedCount} fixed, ${result.regressedCount} regressed.`,
+      link: scanPath,
+    },
+  );
 }

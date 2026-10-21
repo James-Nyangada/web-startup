@@ -192,6 +192,8 @@ describe('P4-10: Agency Overview & Cross-Site Views (S-20, R-05)', () => {
         branded: true,
         requestedBy: memberId,
         expiresAt: null,
+        dateFrom: null,
+        dateTo: null,
         createdAt: new Date(),
         updatedAt: new Date(),
       });

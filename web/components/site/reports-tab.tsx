@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useId } from "react";
 import Link from "next/link";
 import { Icon, I } from "@/components/icons";
-import { apiClient } from "@/lib/api";
+import { apiClient, ApiException } from "@/lib/api";
 import { appApi, type ApiReportSchedule } from "@/lib/app-api";
 
 export interface ReportItem {
@@ -25,6 +25,48 @@ export interface ReportsTabProps {
   siteName?: string;
   onToast: (msg: string) => void;
 }
+
+const REPORT_TITLES: Record<ReportItem["type"], string> = {
+  scan_summary: "Accessibility Scan Summary (R-01)",
+  full: "Full Accessibility Audit Report (R-02)",
+  evidence_pack: "Accessibility Evidence Pack (R-03)",
+  client_monthly: "Client Monthly Report (R-04)",
+};
+
+type RangePreset = "12" | "6" | "3" | "1" | "custom";
+
+function isoDay(date: Date): string {
+  return date.toISOString().slice(0, 10);
+}
+
+function formatDay(iso: string): string {
+  return new Date(`${iso}T00:00:00Z`).toLocaleDateString("en-GB", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    timeZone: "UTC",
+  });
+}
+
+/** The evidence pack period sent to the API (inclusive days, UTC). */
+function periodFor(
+  preset: RangePreset,
+  customStart: string,
+  customEnd: string,
+): { start: string; end: string } {
+  if (preset === "custom") return { start: customStart, end: customEnd };
+  const end = new Date();
+  const start = new Date(end);
+  start.setUTCMonth(start.getUTCMonth() - Number(preset));
+  return { start: isoDay(start), end: isoDay(end) };
+}
+
+function periodLabel(from?: string | null, to?: string | null): string {
+  return from && to ? `${formatDay(from)} – ${formatDay(to)}` : "Past 12 months";
+}
+
+const REPORT_POLL_MS = 3000;
+const REPORT_POLL_LIMIT = 100; // ~5 minutes
 
 const DEMO_REPORTS: ReportItem[] = [
   {
@@ -99,7 +141,10 @@ export function ReportsTab({
   const [reportType, setReportType] = useState<
     "scan_summary" | "full" | "evidence_pack"
   >("scan_summary");
-  const [dateRangeMonths, setDateRangeMonths] = useState<number>(12);
+  const [rangePreset, setRangePreset] = useState<RangePreset>("12");
+  const [customStart, setCustomStart] = useState("");
+  const [customEnd, setCustomEnd] = useState("");
+  const [generateError, setGenerateError] = useState<string | null>(null);
   const [paper, setPaper] = useState<"a4" | "letter">("a4");
   const [branded, setBranded] = useState(false);
   const [generating, setGenerating] = useState(false);
@@ -122,7 +167,9 @@ export function ReportsTab({
       const list = await appApi.listReportSchedules(orgSlug, siteId);
       setSchedules(list);
     } catch (err: any) {
-      if (
+      if (err?.code === "FORBIDDEN") {
+        setSchedulesError("Only owners and admins can manage report schedules.");
+      } else if (
         err?.code === "PLAN_LIMIT_EXCEEDED" ||
         err?.status === 403 ||
         String(err?.message || "").includes("Agency")
@@ -157,15 +204,13 @@ export function ReportsTab({
             id: r.id,
             type: r.type,
             status: r.status,
-            title:
-              r.type === "scan_summary"
-                ? "Accessibility Scan Summary"
-                : r.type === "full"
-                  ? "Full Accessibility Audit Report"
-                  : "Accessibility Report",
-            scanLabel: r.scanScore
-              ? `Scan Score: ${r.scanScore}/100`
-              : "Latest scan",
+            title: REPORT_TITLES[r.type as ReportItem["type"]] ?? "Accessibility Report",
+            scanLabel:
+              r.type === "evidence_pack"
+                ? periodLabel(r.dateFrom, r.dateTo)
+                : r.scanScore
+                  ? `Scan Score: ${r.scanScore}/100`
+                  : "Latest scan",
             scanScore: r.scanScore,
             fileSize: r.fileSize,
             createdAt: new Date(r.createdAt).toLocaleDateString("en-GB", {
@@ -211,82 +256,93 @@ export function ReportsTab({
     }
   };
 
+  // Poll a queued report until the worker marks it ready or failed
+  const pollReport = async (id: string) => {
+    for (let attempt = 0; attempt < REPORT_POLL_LIMIT; attempt++) {
+      await new Promise((resolve) => setTimeout(resolve, REPORT_POLL_MS));
+      try {
+        const res = await apiClient<{
+          data: { status: ReportItem["status"]; fileSize: number | null };
+        }>(`/v1/orgs/${orgSlug}/reports/${id}`);
+        const { status, fileSize } = res.data;
+        setReports((prev) =>
+          prev.map((r) => (r.id === id ? { ...r, status, fileSize } : r)),
+        );
+        if (status === "ready") {
+          onToast("Your report is ready to download.");
+          return;
+        }
+        if (status === "failed") {
+          onToast("The report could not be generated. Please try again.");
+          return;
+        }
+      } catch {
+        // Transient error: keep polling
+      }
+    }
+  };
+
   // Handle Generate Report submission
   const handleGenerateSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setGenerateError(null);
+    const dateRange =
+      reportType === "evidence_pack"
+        ? periodFor(rangePreset, customStart, customEnd)
+        : undefined;
+    if (dateRange && (!dateRange.start || !dateRange.end)) {
+      setGenerateError("Choose both a start date and an end date.");
+      return;
+    }
+    if (dateRange && dateRange.start > dateRange.end) {
+      setGenerateError("The start date must be on or before the end date.");
+      return;
+    }
+
     setGenerating(true);
     try {
-      const startDate = new Date();
-      startDate.setMonth(startDate.getMonth() - dateRangeMonths);
-      const dateRange =
-        reportType === "evidence_pack"
-          ? {
-              start: startDate.toISOString().split("T")[0],
-              end: new Date().toISOString().split("T")[0],
-            }
-          : undefined;
+      const res = await apiClient<{
+        data: {
+          id: string;
+          status: ReportItem["status"];
+          dateFrom?: string | null;
+          dateTo?: string | null;
+        };
+      }>(`/v1/orgs/${orgSlug}/reports`, {
+        method: "POST",
+        body: JSON.stringify({
+          type: reportType,
+          siteId: siteId || undefined,
+          branded,
+          dateRange,
+        }),
+      });
 
-      const res = await apiClient<{ data: { id: string } }>(
-        `/v1/orgs/${orgSlug}/reports`,
-        {
-          method: "POST",
-          body: JSON.stringify({
-            type: reportType,
-            siteId: siteId || undefined,
-            branded,
-            dateRange,
-          }),
-        },
-      );
-
-      const newId = res?.data?.id || `rep-${Date.now()}`;
+      const created = res.data;
       const newReport: ReportItem = {
-        id: newId,
+        id: created.id,
         type: reportType,
-        status: "rendering",
-        title:
-          reportType === "scan_summary"
-            ? "Accessibility Scan Summary (R-01)"
-            : reportType === "full"
-              ? "Full Accessibility Audit Report (R-02)"
-              : "Accessibility Evidence Pack (R-03)",
+        status: created.status,
+        title: REPORT_TITLES[reportType],
         scanLabel:
           reportType === "evidence_pack"
-            ? `Past ${dateRangeMonths} Months History`
-            : "Scan #23 · 14 Oct 2026",
-        scanScore: 78,
+            ? periodLabel(created.dateFrom, created.dateTo)
+            : "Latest scan",
         fileSize: null,
         createdAt: "Just now",
       };
 
       setReports((prev) => [newReport, ...prev]);
       setIsGenerateOpen(false);
-      onToast(
-        `Generating ${newReport.title}. It will be ready in under a minute.`,
-      );
-
-      // Simulate completion in UI
-      setTimeout(() => {
-        setReports((prev) =>
-          prev.map((r) =>
-            r.id === newId
-              ? {
-                  ...r,
-                  status: "ready",
-                  fileSize:
-                    reportType === "scan_summary"
-                      ? 512000
-                      : reportType === "full"
-                        ? 1920000
-                        : 2450000,
-                }
-              : r,
-          ),
-        );
-        onToast(`${newReport.title} is ready to download.`);
-      }, 4000);
-    } catch {
-      // Demo fallback
+      onToast(`Generating ${newReport.title}. We'll let you know when it's ready.`);
+      void pollReport(created.id);
+    } catch (err) {
+      if (err instanceof ApiException) {
+        // The API rejected the request (for example an invalid period): show why.
+        setGenerateError(err.message);
+        return;
+      }
+      // Demo mode (no backend reachable): keep the simulated flow.
       const newId = `rep-${Date.now()}`;
       const newReport: ReportItem = {
         id: newId,
@@ -300,7 +356,7 @@ export function ReportsTab({
               : "Accessibility Evidence Pack (R-03)",
         scanLabel:
           reportType === "evidence_pack"
-            ? `Past ${dateRangeMonths} Months History`
+            ? periodLabel(dateRange?.start, dateRange?.end)
             : "Scan #23 · 14 Oct 2026",
         scanScore: 78,
         fileSize:
@@ -498,7 +554,10 @@ export function ReportsTab({
             </div>
             <button
               type="button"
-              onClick={() => setIsGenerateOpen(true)}
+              onClick={() => {
+                setGenerateError(null);
+                setIsGenerateOpen(true);
+              }}
               className="ease-ui flex items-center gap-2 rounded-full bg-primary px-4 py-2 text-sm font-semibold text-on-primary hover:bg-primary-hover shadow-sm"
             >
               <Icon d={I.plus} size={16} />
@@ -528,7 +587,10 @@ export function ReportsTab({
                 </p>
                 <button
                   type="button"
-                  onClick={() => setIsGenerateOpen(true)}
+                  onClick={() => {
+                setGenerateError(null);
+                setIsGenerateOpen(true);
+              }}
                   className="ease-ui mt-4 inline-flex items-center gap-2 rounded-full bg-primary px-4 py-2 text-sm font-semibold text-on-primary hover:bg-primary-hover"
                 >
                   <Icon d={I.plus} size={16} />
@@ -1001,21 +1063,66 @@ export function ReportsTab({
 
               {reportType === "evidence_pack" ? (
                 <div>
-                  <label className="block text-xs font-semibold text-ink mb-1.5">
-                    Historical Date Range
+                  <label
+                    htmlFor={`${generateTitleId}-period`}
+                    className="block text-xs font-semibold text-ink mb-1.5"
+                  >
+                    Period covered
                   </label>
                   <select
-                    value={dateRangeMonths}
-                    onChange={(e) => setDateRangeMonths(Number(e.target.value))}
+                    id={`${generateTitleId}-period`}
+                    value={rangePreset}
+                    onChange={(e) => setRangePreset(e.target.value as RangePreset)}
                     className="w-full rounded-xl border border-line bg-surface px-3 py-2 text-sm text-ink focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
                   >
-                    <option value={12}>
-                      Past 12 Months (Recommended for compliance audits)
-                    </option>
-                    <option value={6}>Past 6 Months</option>
-                    <option value={3}>Past 3 Months (Quarterly Pack)</option>
-                    <option value={1}>Past 30 Days</option>
+                    <option value="12">Past 12 months (recommended)</option>
+                    <option value="6">Past 6 months</option>
+                    <option value="3">Past 3 months (quarterly pack)</option>
+                    <option value="1">Past month</option>
+                    <option value="custom">Custom range…</option>
                   </select>
+                  {rangePreset === "custom" && (
+                    <div className="mt-3 grid grid-cols-2 gap-3">
+                      <div>
+                        <label
+                          htmlFor={`${generateTitleId}-start`}
+                          className="block text-xs font-semibold text-ink mb-1.5"
+                        >
+                          Start date
+                        </label>
+                        <input
+                          id={`${generateTitleId}-start`}
+                          type="date"
+                          required
+                          value={customStart}
+                          max={customEnd || new Date().toISOString().slice(0, 10)}
+                          onChange={(e) => setCustomStart(e.target.value)}
+                          className="w-full rounded-xl border border-line bg-surface px-3 py-2 text-sm text-ink focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                        />
+                      </div>
+                      <div>
+                        <label
+                          htmlFor={`${generateTitleId}-end`}
+                          className="block text-xs font-semibold text-ink mb-1.5"
+                        >
+                          End date
+                        </label>
+                        <input
+                          id={`${generateTitleId}-end`}
+                          type="date"
+                          required
+                          value={customEnd}
+                          min={customStart || undefined}
+                          max={new Date().toISOString().slice(0, 10)}
+                          onChange={(e) => setCustomEnd(e.target.value)}
+                          className="w-full rounded-xl border border-line bg-surface px-3 py-2 text-sm text-ink focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                        />
+                      </div>
+                      <p className="col-span-2 m-0 text-xs text-muted">
+                        Up to 36 months. Open issues always show the current backlog.
+                      </p>
+                    </div>
+                  )}
                 </div>
               ) : (
                 <div>
@@ -1070,6 +1177,15 @@ export function ReportsTab({
                   </label>
                 </div>
               </div>
+
+              {generateError && (
+                <p
+                  role="alert"
+                  className="m-0 rounded-xl border border-crit/30 bg-crit-soft px-3 py-2 text-sm text-crit"
+                >
+                  {generateError}
+                </p>
+              )}
 
               <div className="mt-4 flex items-center justify-end gap-3 pt-4 border-t border-line">
                 <button

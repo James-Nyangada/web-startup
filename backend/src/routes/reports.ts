@@ -8,6 +8,11 @@ import { requireOrgRole } from '../middleware/org.js';
 import { ErrorCode } from '../shared/errors.js';
 import { assertWithinPlan, PlanLimitError } from '../shared/plans.js';
 import { signReportDownloadToken, verifyReportDownloadToken } from '../reports/token.js';
+import {
+  DateRangeError,
+  resolveReportDateRange,
+  type ReportDateRange,
+} from '../reports/date-range.js';
 import { enqueueReportRender } from '../worker/boss.js';
 import { handleReportRender } from '../worker/jobs/report-render.js';
 
@@ -127,12 +132,31 @@ export function orgReportsRouter(repos: Repositories, options?: ReportsRouterOpt
       }
     }
 
+    let range: ReportDateRange | null = null;
+    if (type === 'evidence_pack') {
+      try {
+        range = resolveReportDateRange(parse.data.dateRange);
+      } catch (err) {
+        if (!(err instanceof DateRangeError)) throw err;
+        res.status(400).json({
+          error: {
+            code: ErrorCode.VALIDATION_ERROR,
+            message: err.message,
+            details: { field: 'dateRange' },
+          },
+        });
+        return;
+      }
+    }
+
     const report = await repos.reports.create(orgId, {
       siteId: siteId ?? null,
       scanId: scanId ?? null,
       type,
       branded,
       requestedBy: req.auth?.user?.id ?? null,
+      dateFrom: range?.from ?? null,
+      dateTo: range?.to ?? null,
     });
 
     // Enqueue worker job or execute handler

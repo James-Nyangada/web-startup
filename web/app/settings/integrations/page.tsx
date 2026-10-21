@@ -56,6 +56,8 @@ export default function IntegrationsSettingsPage() {
   const [formSecret, setFormSecret] = useState("");
   const [formSubmitting, setFormSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
+  // Signing secret returned once on create; never retrievable afterwards
+  const [revealedSecret, setRevealedSecret] = useState<string | null>(null);
 
   // Deliveries log drawer
   const [selectedWebhook, setSelectedWebhook] = useState<ApiWebhook | null>(null);
@@ -134,6 +136,7 @@ export default function IntegrationsSettingsPage() {
       });
 
       setWebhooks((prev) => [created, ...prev]);
+      if (created.secret) setRevealedSecret(created.secret);
       setShowAddModal(false);
       setFormUrl("");
       setFormEvents(["scan.completed", "issue.regressed"]);
@@ -219,6 +222,41 @@ export default function IntegrationsSettingsPage() {
       description="Connect Slack and custom webhook endpoints to receive instant alerts when scans complete or issues regress."
     >
       <div className="flex flex-col gap-6 max-w-4xl">
+        {revealedSecret && (
+          <div
+            role="status"
+            className="rounded-2xl border border-line bg-surface p-5 shadow-card flex flex-col gap-3"
+          >
+            <span className="font-semibold text-ink text-base">Copy your signing secret now</span>
+            <p className="text-xs text-muted m-0 leading-5">
+              Use it to check the <code>X-Signature</code> header (HMAC-SHA256 of the request
+              body). For security it won&apos;t be shown again.
+            </p>
+            <code className="block break-all rounded-xl bg-subtle px-3 py-2 text-sm text-ink">
+              {revealedSecret}
+            </code>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  void navigator.clipboard?.writeText(revealedSecret);
+                  showToast("Signing secret copied.");
+                }}
+                className="ease-ui rounded-full bg-primary px-4 py-2 text-xs font-semibold text-on-primary hover:bg-primary-hover"
+              >
+                Copy secret
+              </button>
+              <button
+                type="button"
+                onClick={() => setRevealedSecret(null)}
+                className="rounded-full border border-line px-4 py-2 text-xs font-semibold text-ink hover:bg-subtle"
+              >
+                I&apos;ve saved it
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Plan Upgrade Banner if not allowed */}
         {!loading && !canUseWebhooks && (
           <div className="rounded-2xl border border-line bg-surface p-5 shadow-card flex flex-col sm:flex-row sm:items-center justify-between gap-4">

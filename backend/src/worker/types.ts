@@ -4,6 +4,7 @@ import type { Repositories } from '../db/repositories/index.js';
 import type { StorageService } from '../storage/index.js';
 import type { ScanLogger } from '../scanner/types.js';
 import type { GuardPolicy } from '../scanner/net/guard.js';
+import type { GuardedPostTransport } from '../scanner/net/guarded-fetch.js';
 
 import type { EmailSender } from '../emails/sender.js';
 import type { EmailBranding, EmailTemplateId } from '../emails/types.js';
@@ -22,6 +23,8 @@ export interface WorkerContext {
   emailSender?: EmailSender;
   /** SSRF policy override for the scanner; tests use it to reach the local fixture server. */
   scannerPolicy?: GuardPolicy;
+  /** HTTP transport for webhook delivery; defaults to the pinned, no-redirect pinnedPost. */
+  webhookTransport?: GuardedPostTransport;
 }
 
 export interface ScanJobPayload {
@@ -56,6 +59,10 @@ export interface DigestWeeklyJobPayload {
   force?: boolean;
 }
 
+export interface SiteReverifyJobPayload {
+  siteId: string;
+}
+
 export interface WebhookDeliverJobPayload {
   webhookId: string;
   event: string;
@@ -73,6 +80,9 @@ export interface RetentionPruneReport {
   pagesPruned: number;
   rawFilesPruned: number;
   deletedOrgsPurged: number;
+  /** Soft-deleted orgs whose hard delete failed; they are retried on the next run. */
+  purgeFailures: string[];
+  webhookDeliveriesPruned: number;
   dryRun: boolean;
   durationMs: number;
   details: Array<{

@@ -391,6 +391,61 @@ describe('Evidence Timeline & Compliance Events (P5-01)', () => {
       );
     });
 
+    it('dispatches the scan.completed webhook for a scan with no regressions', async () => {
+      const scanId = 'scan-proc-clean';
+      vi.mocked(repos.scans.findRawById).mockResolvedValue({
+        id: scanId,
+        orgId,
+        siteId,
+        status: 'running',
+        requestedBy: userId,
+        rawKey: 'scans/raw.json',
+      } as never);
+      vi.mocked(repos.issues.listForDiff).mockResolvedValue([]);
+      vi.mocked(repos.pages.listBySite).mockResolvedValue([]);
+      vi.mocked(repos.issues.applyScanDiff).mockResolvedValue({
+        createdCount: 0,
+        fixedCount: 0,
+        regressedCount: 0,
+        fixedIssues: [],
+        regressedIssues: [],
+      });
+      vi.spyOn(await import('../../src/scanner/results/diff.js'), 'diffScans').mockReturnValue({
+        created: [],
+        fixed: [],
+        regressed: [],
+        stillOpen: [],
+        ignoredSeen: [],
+        unchecked: [],
+        partial: false,
+      });
+
+      const rawResult = {
+        status: 'completed',
+        score: 100,
+        pagesScanned: 1,
+        pagesPlanned: 1,
+        pages: [{ url: 'https://acme.example.com', templateKey: 'home', status: 'ok' }],
+        issues: [],
+      };
+      const workerCtx = {
+        repos,
+        storage: {
+          getObject: vi.fn().mockResolvedValue(Buffer.from(JSON.stringify(rawResult))),
+          putObject: vi.fn(),
+        },
+        pool: { query: vi.fn() },
+      } as unknown as WorkerContext;
+
+      await handleScanProcess({ scanId }, workerCtx);
+
+      expect(repos.webhooks.findActiveByEvent).toHaveBeenCalledWith(
+        orgId,
+        'scan.completed',
+        siteId,
+      );
+    });
+
     it('records report_generated in handleReportRender', async () => {
       const reportId = 'report-1';
       vi.mocked(repos.reports.findRawById).mockResolvedValue({

@@ -40,7 +40,7 @@ export function orgReportSchedulesRouter(
   const router = Router({ mergeParams: true });
 
   // List schedules
-  router.get('/', requireOrgRole('member'), async (req, res, next) => {
+  router.get('/', requireOrgRole('admin'), async (req, res, next) => {
     try {
       const orgId = req.orgId as OrgId;
       const siteId = req.query.siteId as string | undefined;
@@ -116,7 +116,7 @@ export function orgReportSchedulesRouter(
   });
 
   // Get schedule
-  router.get('/:id', requireOrgRole('member'), async (req, res, next) => {
+  router.get('/:id', requireOrgRole('admin'), async (req, res, next) => {
     try {
       const orgId = req.orgId as OrgId;
       const id = String(req.params.id);

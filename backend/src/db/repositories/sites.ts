@@ -4,6 +4,7 @@ import {
   desc,
   eq,
   ilike,
+  inArray,
   isNotNull,
   isNull,
   lte,
@@ -375,11 +376,44 @@ export function sitesRepository(db: Database) {
           status: 'active',
           verifyMethod: method,
           verifiedAt: new Date(),
+          verifyFailureCount: 0,
           updatedAt: new Date(),
         })
         .where(and(eq(sites.orgId, orgId), eq(sites.id, siteId), isNull(sites.deletedAt)))
         .returning();
       return row ?? null;
+    },
+
+    /** Verified, active sites of live orgs: the weekly re-verification set. */
+    async listForReverify() {
+      return db
+        .select({ id: sites.id })
+        .from(sites)
+        .innerJoin(organizations, eq(sites.orgId, organizations.id))
+        .where(
+          and(
+            eq(sites.status, 'active'),
+            isNull(sites.deletedAt),
+            isNotNull(sites.verifiedAt),
+            inArray(sites.verifyMethod, ['meta', 'dns', 'file']),
+            isNull(organizations.deletedAt),
+            notInArray(organizations.billingStatus, ['read_only', 'paused', 'canceled']),
+          ),
+        );
+    },
+
+    /** Records a re-verification outcome; returns the consecutive failure count. */
+    async recordReverifyResult(siteId: string, ok: boolean): Promise<number> {
+      const [row] = await db
+        .update(sites)
+        .set({
+          verifyFailureCount: ok ? 0 : sql`${sites.verifyFailureCount} + 1`,
+          ...(ok ? { verifiedAt: new Date() } : {}),
+          updatedAt: new Date(),
+        })
+        .where(eq(sites.id, siteId))
+        .returning({ verifyFailureCount: sites.verifyFailureCount });
+      return row?.verifyFailureCount ?? 0;
     },
 
     async findRawById(siteId: string) {

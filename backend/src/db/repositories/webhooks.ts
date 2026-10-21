@@ -1,7 +1,7 @@
 import crypto from 'node:crypto';
-import { and, desc, eq, sql } from 'drizzle-orm';
+import { and, desc, eq, lt, sql } from 'drizzle-orm';
 import type { Database } from '../client.js';
-import { auditLog, webhooks, type WebhookKind, type WebhookRow } from '../schema/index.js';
+import { webhookDeliveries, webhooks, type WebhookKind, type WebhookRow } from '../schema/index.js';
 import type { OrgId } from './org-scope.js';
 import { encrypt, decrypt } from '../../lib/encryption.js';
 import { assertPublicUrl } from '../../scanner/net/guard.js';
@@ -30,7 +30,6 @@ export interface WebhookDeliveryRecord {
   error: string | null;
   durationMs: number;
   createdAt: Date;
-  payload?: Record<string, unknown>;
 }
 
 export function maskUrl(url: string): string {
@@ -45,6 +44,21 @@ export function maskUrl(url: string): string {
     return 'https://***';
   }
 }
+
+/** What the API returns: never the full URL (a Slack URL is a credential) or the secret. */
+export type PublicWebhook = Omit<WebhookRow, 'urlEncrypted' | 'secret'> & {
+  urlMasked: string;
+  hasSecret: boolean;
+};
+
+export function toPublicWebhook(row: WebhookRow & { url?: string }): PublicWebhook {
+  const { urlEncrypted, secret, ...rest } = row;
+  delete rest.url;
+  const url = row.url ?? safeDecrypt(urlEncrypted, 'https://***');
+  return { ...rest, urlMasked: maskUrl(url), hasSecret: Boolean(secret) };
+}
+
+const ENCRYPTED_FORMAT = /^[0-9a-f]{24}:[0-9a-f]{32}:[0-9a-f]*$/;
 
 function safeDecrypt(encrypted: string, fallback = ''): string {
   try {
@@ -73,7 +87,7 @@ export function webhooksRepository(db: Database) {
           events: input.events,
           siteIds: input.siteIds ?? [],
           active: true,
-          secret,
+          secret: secret ? encrypt(secret) : null,
         })
         .returning();
 
@@ -81,11 +95,8 @@ export function webhooksRepository(db: Database) {
         throw new Error('Failed to create webhook');
       }
 
-      return {
-        ...row,
-        url: input.url,
-        urlMasked: maskUrl(input.url),
-      };
+      // The signing secret is returned this once so the user can copy it.
+      return { ...toPublicWebhook({ ...row, url: input.url }), secret };
     },
 
     async listByOrg(orgId: OrgId) {
@@ -95,14 +106,7 @@ export function webhooksRepository(db: Database) {
         .where(eq(webhooks.orgId, orgId))
         .orderBy(desc(webhooks.createdAt));
 
-      return rows.map((r) => {
-        const url = safeDecrypt(r.urlEncrypted, 'https://***');
-        return {
-          ...r,
-          url,
-          urlMasked: maskUrl(url),
-        };
-      });
+      return rows.map((r) => toPublicWebhook(r));
     },
 
     async findById(orgId: OrgId, id: string) {
@@ -112,25 +116,25 @@ export function webhooksRepository(db: Database) {
         .where(and(eq(webhooks.orgId, orgId), eq(webhooks.id, id)))
         .limit(1);
 
-      if (!row) return null;
-
-      const url = safeDecrypt(row.urlEncrypted, 'https://***');
-
-      return {
-        ...row,
-        url,
-        urlMasked: maskUrl(url),
-      };
+      return row ? toPublicWebhook(row) : null;
     },
 
+    /** Internal (delivery job): decrypted URL and secret. */
     async findRawById(id: string): Promise<(WebhookRow & { url: string }) | null> {
       const [row] = await db.select().from(webhooks).where(eq(webhooks.id, id)).limit(1);
       if (!row) return null;
       const url = safeDecrypt(row.urlEncrypted, '');
-      return {
-        ...row,
-        url,
-      };
+      let secret = row.secret;
+      if (secret && ENCRYPTED_FORMAT.test(secret)) {
+        secret = safeDecrypt(secret, '') || null;
+      } else if (secret) {
+        // Stored before secrets were encrypted: encrypt it now, keep using the value.
+        await db
+          .update(webhooks)
+          .set({ secret: encrypt(secret) })
+          .where(eq(webhooks.id, id));
+      }
+      return { ...row, url, secret };
     },
 
     async update(orgId: OrgId, id: string, patch: UpdateWebhookInput) {
@@ -157,7 +161,7 @@ export function webhooksRepository(db: Database) {
         }
       }
       if (patch.secret !== undefined) {
-        updateData.secret = patch.secret;
+        updateData.secret = patch.secret ? encrypt(patch.secret) : null;
       }
 
       const [row] = await db
@@ -166,15 +170,7 @@ export function webhooksRepository(db: Database) {
         .where(and(eq(webhooks.orgId, orgId), eq(webhooks.id, id)))
         .returning();
 
-      if (!row) return null;
-
-      const url = safeDecrypt(row.urlEncrypted, 'https://***');
-
-      return {
-        ...row,
-        url,
-        urlMasked: maskUrl(url),
-      };
+      return row ? toPublicWebhook(row) : null;
     },
 
     async delete(orgId: OrgId, id: string): Promise<boolean> {
@@ -255,13 +251,14 @@ export function webhooksRepository(db: Database) {
         payload?: Record<string, unknown>;
       },
     ) {
-      await db.insert(auditLog).values({
+      // The payload is not stored: it can hold site data and is rebuilt from the event.
+      await db.insert(webhookDeliveries).values({
         orgId,
-        actorType: 'system',
-        action: 'webhook.delivery',
-        targetType: 'webhook',
-        targetId: webhookId,
-        data: delivery,
+        webhookId,
+        event: delivery.event,
+        status: delivery.status,
+        error: delivery.error?.slice(0, 1000) ?? null,
+        durationMs: Math.round(delivery.durationMs),
       });
     },
 
@@ -270,36 +267,29 @@ export function webhooksRepository(db: Database) {
       webhookId: string,
       limit = 20,
     ): Promise<WebhookDeliveryRecord[]> {
-      const rows = await db
-        .select()
-        .from(auditLog)
-        .where(
-          and(
-            eq(auditLog.orgId, orgId),
-            eq(auditLog.targetType, 'webhook'),
-            eq(auditLog.targetId, webhookId),
-            eq(auditLog.action, 'webhook.delivery'),
-          ),
-        )
-        .orderBy(desc(auditLog.createdAt))
+      return db
+        .select({
+          id: webhookDeliveries.id,
+          webhookId: webhookDeliveries.webhookId,
+          event: webhookDeliveries.event,
+          status: webhookDeliveries.status,
+          error: webhookDeliveries.error,
+          durationMs: webhookDeliveries.durationMs,
+          createdAt: webhookDeliveries.createdAt,
+        })
+        .from(webhookDeliveries)
+        .where(and(eq(webhookDeliveries.orgId, orgId), eq(webhookDeliveries.webhookId, webhookId)))
+        .orderBy(desc(webhookDeliveries.createdAt))
         .limit(limit);
+    },
 
-      return rows.map((r) => {
-        const data = r.data ?? {};
-        return {
-          id: r.id,
-          webhookId,
-          event: typeof data['event'] === 'string' ? data['event'] : 'unknown',
-          status: typeof data['status'] === 'number' ? data['status'] : null,
-          error: typeof data['error'] === 'string' ? data['error'] : null,
-          durationMs: typeof data['durationMs'] === 'number' ? data['durationMs'] : 0,
-          createdAt: r.createdAt,
-          payload:
-            typeof data['payload'] === 'object' && data['payload'] !== null
-              ? (data['payload'] as Record<string, unknown>)
-              : undefined,
-        };
-      });
+    /** retention.prune: delivery log entries older than `cutoff`. */
+    async pruneDeliveries(cutoff: Date): Promise<number> {
+      const rows = await db
+        .delete(webhookDeliveries)
+        .where(lt(webhookDeliveries.createdAt, cutoff))
+        .returning({ id: webhookDeliveries.id });
+      return rows.length;
     },
   };
 }

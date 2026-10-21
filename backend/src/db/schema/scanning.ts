@@ -85,6 +85,8 @@ export const sites = pgTable(
     verifyMethod: text('verify_method').$type<VerifyMethod>(),
     verifyToken: text('verify_token').notNull(),
     verifiedAt: timestamp('verified_at', { withTimezone: true }),
+    /** Consecutive failed weekly re-verifications (site.reverify); E-09 at 3. */
+    verifyFailureCount: integer('verify_failure_count').notNull().default(0),
     scanFrequency: text('scan_frequency').$type<ScanFrequency>().notNull().default('weekly'),
     scanDay: smallint('scan_day').notNull().default(1),
     scanHour: smallint('scan_hour').notNull().default(2),

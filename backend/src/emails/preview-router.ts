@@ -10,6 +10,7 @@ const VALID_TEMPLATES: EmailTemplateId[] = [
   'E-05',
   'E-06',
   'E-07',
+  'E-09',
   'E-11',
   'E-13',
   'E-14',

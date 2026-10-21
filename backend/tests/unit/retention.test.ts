@@ -39,15 +39,10 @@ describe('P5-10: Data Retention (retention.prune)', () => {
     expect(deleteObjectMock).not.toHaveBeenCalled();
     expect(repos.retention.pruneTransientData).not.toHaveBeenCalled();
 
-    // Staff report written to audit log
-    expect(repos.auditLog.write).toHaveBeenCalledWith(
-      orgId,
-      expect.objectContaining({
-        action: 'retention.prune',
-        actorType: 'system',
-        targetType: 'system',
-      }),
-    );
+    // The staff report is a system log line, never a row in a customer's audit log
+    expect(repos.auditLog.write).not.toHaveBeenCalled();
+    // Dry run deletes nothing, including the webhook delivery log
+    expect(repos.webhooks.pruneDeliveries).not.toHaveBeenCalled();
   });
 
   it('prunes transient occurrences, page results, and R2 raw files per plan retention window in live mode', async () => {
@@ -133,5 +128,43 @@ describe('P5-10: Data Retention (retention.prune)', () => {
     const report = await handleRetentionPrune({ dryRun: false }, ctx);
     expect(report.deletedOrgsPurged).toBe(1);
     expect(repos.retention.purgeOrganization).toHaveBeenCalledWith(deletedOrgId);
+  });
+
+  it("deletes a purged org's stored files and reports purges that fail", async () => {
+    const { repos } = fakeRepos();
+    const goneOrg = '99999999-9999-4999-8999-999999999999' as OrgId;
+    const stuckOrg = '88888888-8888-4888-8888-888888888888' as OrgId;
+
+    repos.organizations.listAllActive = vi.fn().mockResolvedValue([]);
+    repos.retention.findPurgeableOrgs = vi.fn().mockResolvedValue([
+      { id: goneOrg, name: 'Gone' },
+      { id: stuckOrg, name: 'Stuck' },
+    ]);
+    repos.retention.listOrgFileKeys = vi
+      .fn()
+      .mockImplementation((orgId: string) =>
+        Promise.resolve(
+          orgId === goneOrg ? [`scans/${goneOrg}/s1/raw.json`, `reports/${goneOrg}/r1.pdf`] : [],
+        ),
+      );
+    repos.retention.purgeOrganization = vi
+      .fn()
+      .mockImplementation((orgId: string) =>
+        orgId === stuckOrg
+          ? Promise.reject(new Error('evidence_events is append-only'))
+          : Promise.resolve(true),
+      );
+
+    const deleteObject = vi.fn().mockResolvedValue(undefined);
+    const ctx: WorkerContext = { repos, storage: { deleteObject } as never };
+
+    const report = await handleRetentionPrune({ dryRun: false }, ctx);
+
+    expect(deleteObject).toHaveBeenCalledWith(`scans/${goneOrg}/s1/raw.json`);
+    expect(deleteObject).toHaveBeenCalledWith(`reports/${goneOrg}/r1.pdf`);
+    expect(report.deletedOrgsPurged).toBe(1);
+    expect(report.purgeFailures).toEqual([stuckOrg]);
+    // Webhook delivery log is trimmed to 30 days
+    expect(repos.webhooks.pruneDeliveries).toHaveBeenCalledWith(expect.any(Date));
   });
 });

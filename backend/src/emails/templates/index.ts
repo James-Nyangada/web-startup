@@ -21,6 +21,7 @@ import type {
   WeeklyDigestData,
   MonthlyClientReportData,
   WebhookDisabledData,
+  SiteVerificationFailingData,
 } from '../types.js';
 
 // E-01: Verify your email
@@ -1011,6 +1012,53 @@ export function renderWebhookDisabled(
   });
 
   const text = `${subject}\n\nWebhook ${data.webhookUrl} failed ${data.failureCount} times and was disabled.\n\nManage Integrations:\n${data.settingsUrl}\n`;
+
+  return { subject, html, text };
+}
+
+const escapeHtml = (value: string): string =>
+  value.replace(
+    /[&<>"']/g,
+    (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!,
+  );
+
+const VERIFY_METHOD_LABELS: Record<string, string> = {
+  meta: 'meta tag',
+  dns: 'DNS TXT record',
+  file: 'verification file',
+};
+
+// E-09: Site verification failing (3 failed weekly re-verifications)
+export function renderSiteVerificationFailing(
+  data: SiteVerificationFailingData,
+  branding?: EmailBranding,
+): EmailRenderOutput {
+  const subject = `Action needed: we can no longer verify ${data.siteName}`;
+  const method = VERIFY_METHOD_LABELS[data.method] ?? data.method;
+  const siteName = escapeHtml(data.siteName);
+
+  const contentHtml = `
+    <p style="margin: 0 0 16px 0;">
+      We checked that you still own <strong>${siteName}</strong> (${escapeHtml(data.rootUrl)}) and the ${escapeHtml(method)} could not be confirmed ${data.failureCount} times in a row.
+    </p>
+    <div style="background-color: #FEF2F2; border: 1px solid #FCA5A5; border-radius: 8px; padding: 16px; margin-bottom: 20px;">
+      <p style="margin: 0; font-size: 14px; color: #991B1B;"><strong>Last check:</strong> ${escapeHtml(data.reason)}</p>
+    </div>
+    <p style="margin: 0 0 16px 0;">
+      This usually happens after a theme change, a site migration or a DNS update removed the ${escapeHtml(method)}. Add it back, then run the check again from the verification page.
+    </p>
+  `;
+
+  const html = renderEmailLayout({
+    preheader: `The ${method} for ${data.siteName} could not be confirmed ${data.failureCount} times in a row.`,
+    title: 'Site verification failing',
+    contentHtml,
+    buttonLabel: 'Check verification',
+    buttonUrl: data.verifyUrl,
+    branding,
+  });
+
+  const text = `${subject}\n\nThe ${method} for ${data.siteName} (${data.rootUrl}) could not be confirmed ${data.failureCount} times in a row.\nLast check: ${data.reason}\n\nAdd it back, then run the check again:\n${data.verifyUrl}\n`;
 
   return { subject, html, text };
 }

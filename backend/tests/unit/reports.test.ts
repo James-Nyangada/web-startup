@@ -240,6 +240,87 @@ describe('Reports API Endpoints (Chunk P2-19)', () => {
 
       expect(res.status).toBe(404);
     });
+
+    describe('evidence_pack date range (P5-04)', () => {
+      const siteId = '55555555-5555-4555-a555-555555555555';
+
+      beforeEach(() => {
+        vi.mocked(repos.sites.findById).mockResolvedValue({
+          id: siteId,
+          orgId,
+          name: 'Oakhaus Furniture',
+        } as never);
+      });
+
+      it('stores the requested period on the report', async () => {
+        const res = await request(app)
+          .post(`/v1/orgs/${orgId}/reports`)
+          .set('Cookie', [memberCookie])
+          .send({
+            type: 'evidence_pack',
+            siteId,
+            dateRange: { start: '2026-01-01', end: '2026-06-30' },
+          });
+
+        expect(res.status).toBe(201);
+        expect(repos.reports.create).toHaveBeenCalledWith(
+          orgId,
+          expect.objectContaining({ dateFrom: '2026-01-01', dateTo: '2026-06-30' }),
+        );
+      });
+
+      it('defaults to the 12 months up to today', async () => {
+        const today = new Date().toISOString().slice(0, 10);
+        const yearAgo = new Date();
+        yearAgo.setUTCMonth(yearAgo.getUTCMonth() - 12);
+
+        const res = await request(app)
+          .post(`/v1/orgs/${orgId}/reports`)
+          .set('Cookie', [memberCookie])
+          .send({ type: 'evidence_pack', siteId });
+
+        expect(res.status).toBe(201);
+        expect(repos.reports.create).toHaveBeenCalledWith(
+          orgId,
+          expect.objectContaining({ dateFrom: yearAgo.toISOString().slice(0, 10), dateTo: today }),
+        );
+      });
+
+      it('does not store a period on other report types', async () => {
+        vi.mocked(repos.scans.findById).mockResolvedValueOnce({
+          id: '33333333-3333-4333-a333-333333333333',
+          orgId,
+          siteId,
+        } as never);
+        await request(app)
+          .post(`/v1/orgs/${orgId}/reports`)
+          .set('Cookie', [memberCookie])
+          .send({ type: 'scan_summary', scanId: '33333333-3333-4333-a333-333333333333' });
+
+        expect(repos.reports.create).toHaveBeenCalledWith(
+          orgId,
+          expect.objectContaining({ dateFrom: null, dateTo: null }),
+        );
+      });
+
+      it.each([
+        ['end in the future', { start: '2026-01-01', end: '2999-01-01' }, /future/],
+        ['start after end', { start: '2026-06-01', end: '2026-01-01' }, /on or before/],
+        ['longer than 36 months', { start: '2020-01-01', end: '2026-01-01' }, /36 months/],
+        ['an impossible date', { start: '2026-02-30', end: '2026-06-01' }, /valid date/],
+        ['a non-ISO date', { start: '01/02/2026', end: '2026-06-01' }, /valid date/],
+      ])('returns 400 for %s', async (_label, dateRange, message) => {
+        const res = await request(app)
+          .post(`/v1/orgs/${orgId}/reports`)
+          .set('Cookie', [memberCookie])
+          .send({ type: 'evidence_pack', siteId, dateRange });
+
+        expect(res.status).toBe(400);
+        expect(res.body.error.code).toBe('VALIDATION_ERROR');
+        expect(res.body.error.message).toMatch(message);
+        expect(repos.reports.create).not.toHaveBeenCalled();
+      });
+    });
   });
 
   describe('GET /v1/orgs/:orgId/reports', () => {
@@ -258,6 +339,8 @@ describe('Reports API Endpoints (Chunk P2-19)', () => {
             branded: false,
             requestedBy: memberId,
             expiresAt: null,
+            dateFrom: null,
+            dateTo: null,
             createdAt: new Date(),
             updatedAt: new Date(),
             siteName: 'Oakhaus Furniture',
@@ -288,6 +371,8 @@ describe('Reports API Endpoints (Chunk P2-19)', () => {
         branded: false,
         requestedBy: memberId,
         expiresAt: null,
+        dateFrom: null,
+        dateTo: null,
         createdAt: new Date(),
         updatedAt: new Date(),
       });
@@ -314,6 +399,8 @@ describe('Reports API Endpoints (Chunk P2-19)', () => {
         branded: false,
         requestedBy: memberId,
         expiresAt: null,
+        dateFrom: null,
+        dateTo: null,
         createdAt: new Date(),
         updatedAt: new Date(),
       });
@@ -352,6 +439,8 @@ describe('Reports API Endpoints (Chunk P2-19)', () => {
         branded: false,
         requestedBy: memberId,
         expiresAt: null,
+        dateFrom: null,
+        dateTo: null,
         createdAt: new Date(),
         updatedAt: new Date(),
       });
@@ -453,156 +542,6 @@ describe('Worker job: handleReportRender', () => {
       '11111111-1111-4111-a111-111111111111',
       expect.objectContaining({
         action: 'report.generated',
-      }),
-    );
-  });
-
-  it('renders evidence pack (R-03) with 12-month timeline, manual checks, and statement', async () => {
-    const storage = new MemoryStorageService();
-    const updateStatus = vi.fn().mockResolvedValue({ id: 'rep-ev-1', status: 'ready' });
-    const writeAudit = vi.fn().mockResolvedValue(undefined);
-    const recordEvidence = vi.fn().mockResolvedValue(undefined);
-
-    const repos = {
-      reports: {
-        findRawById: vi.fn().mockResolvedValue({
-          id: 'rep-ev-1',
-          orgId: '11111111-1111-4111-a111-111111111111',
-          siteId: 'site-1',
-          type: 'evidence_pack',
-          status: 'queued',
-          requestedBy: 'user-1',
-        }),
-        updateStatus,
-      },
-      sites: {
-        findRawById: vi.fn().mockResolvedValue({
-          id: 'site-1',
-          name: 'Oakhaus Furniture',
-          rootUrl: 'https://oakhaus.com',
-          score: 82,
-        }),
-      },
-      scans: {
-        listBySite: vi.fn().mockResolvedValue([
-          {
-            id: 'scan-1',
-            score: 82,
-            criticalCount: 1,
-            seriousCount: 2,
-            pagesScanned: 15,
-            status: 'completed',
-            createdAt: new Date().toISOString(),
-          },
-        ]),
-      },
-      issues: {
-        listBySite: vi.fn().mockImplementation((_orgId, _siteId, filter) => {
-          if (filter.status === 'fixed') {
-            return Promise.resolve({
-              items: [
-                {
-                  id: 'iss-fixed-1',
-                  ruleId: 'image-alt',
-                  title: 'Images must have alternate text',
-                  impact: 'critical',
-                  updatedAt: new Date().toISOString(),
-                  occurrenceCount: 3,
-                },
-              ],
-            });
-          }
-          if (filter.status === 'open') {
-            return Promise.resolve({
-              items: [
-                {
-                  id: 'iss-open-1',
-                  ruleId: 'color-contrast',
-                  title: 'Elements must have sufficient color contrast',
-                  impact: 'serious',
-                  assigneeName: 'Daniel Mwangi',
-                  dueDate: '2026-11-01',
-                  occurrenceCount: 2,
-                },
-              ],
-            });
-          }
-          if (filter.status === 'ignored') {
-            return Promise.resolve({
-              items: [
-                {
-                  id: 'iss-ign-1',
-                  ruleId: 'frame-title',
-                  title: 'Frames must have title attribute',
-                  impact: 'minor',
-                  ignoreReason: 'False positive',
-                  ignoreNote: 'Third-party tracking iframe',
-                },
-              ],
-            });
-          }
-          return Promise.resolve({ items: [] });
-        }),
-      },
-      manualChecks: {
-        listBySite: vi.fn().mockResolvedValue({
-          items: [
-            {
-              id: 'mc-1',
-              checkType: 'screen_reader',
-              performedAt: '2026-10-18',
-              performedByName: 'Sarah QA',
-              tool: 'NVDA 2026.2 + Firefox',
-              result: 'pass',
-              notes: 'Full checkout flow tested with screen reader.',
-            },
-          ],
-          total: 1,
-        }),
-      },
-      statements: {
-        findPublishedBySite: vi.fn().mockResolvedValue({
-          id: 'stmt-1',
-          version: 2,
-          publishedAt: new Date('2026-10-15'),
-          data: {
-            targetStandard: 'WCAG 2.2 Level AA',
-            conformanceStatus: 'partially_conformant',
-          },
-        }),
-      },
-      evidenceEvents: {
-        record: recordEvidence,
-      },
-      auditLog: {
-        write: writeAudit,
-      },
-    } as unknown as Repositories;
-
-    await handleReportRender({ reportId: 'rep-ev-1' }, { repos, storage });
-
-    expect(updateStatus).toHaveBeenCalledWith('rep-ev-1', 'rendering');
-    expect(updateStatus).toHaveBeenCalledWith(
-      'rep-ev-1',
-      'ready',
-      expect.objectContaining({
-        fileKey: 'reports/11111111-1111-4111-a111-111111111111/rep-ev-1.pdf',
-      }),
-    );
-
-    const pdf = await storage.getObject(
-      'reports/11111111-1111-4111-a111-111111111111/rep-ev-1.pdf',
-    );
-    expect(pdf).not.toBeNull();
-    expect(pdf?.toString('utf-8')).toContain('%PDF');
-
-    expect(recordEvidence).toHaveBeenCalledWith(
-      '11111111-1111-4111-a111-111111111111',
-      expect.objectContaining({
-        type: 'report_generated',
-        data: expect.objectContaining({
-          type: 'evidence_pack',
-        }),
       }),
     );
   });

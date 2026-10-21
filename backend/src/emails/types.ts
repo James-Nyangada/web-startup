@@ -7,6 +7,7 @@ export type EmailTemplateId =
   | 'E-06' // First scan ready
   | 'E-07' // Scan completed summary
   | 'E-08' // Regression alert
+  | 'E-09' // Site verification failing
   | 'E-10' // Weekly digest
   | 'E-11' // Report ready / report shared
   | 'E-12' // Monthly client report
@@ -181,6 +182,17 @@ export interface MonthlyClientReportData {
   score: number | null;
 }
 
+export interface SiteVerificationFailingData {
+  siteName: string;
+  rootUrl: string;
+  /** Verification method that stopped passing: meta, dns or file. */
+  method: string;
+  failureCount: number;
+  /** What the last check found, e.g. "The meta tag was not found on the home page." */
+  reason: string;
+  verifyUrl: string;
+}
+
 export interface WebhookDisabledData {
   orgName: string;
   webhookUrl: string;
@@ -207,5 +219,6 @@ export type TemplateDataMap = {
   'E-18': SubscriptionCanceledData;
   'E-19': PlanChangedData;
   'E-20': DataDeletionWarningData;
+  'E-09': SiteVerificationFailingData;
   'E-21': WebhookDisabledData;
 };

@@ -86,6 +86,7 @@ describe('Scheduling and Manual Scans (Chunk P2-09)', () => {
     verifyMethod: 'meta' as const,
     verifyToken: 'ps_test_token',
     verifiedAt: new Date(),
+    verifyFailureCount: 0,
     scanFrequency: 'weekly' as const,
     scanDay: 1, // Monday
     scanHour: 2, // 02:00

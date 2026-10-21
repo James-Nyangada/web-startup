@@ -253,7 +253,13 @@ describe('Notifications & Preferences API (P5-05)', () => {
         notifications: {
           listOptedInMembers: vi
             .fn()
-            .mockResolvedValue([{ userId, email: 'dev@example.com', name: 'Developer' }]),
+            .mockImplementation((_orgId: string, pref: string) =>
+              Promise.resolve(
+                pref === 'regressions'
+                  ? [{ userId, email: 'dev@example.com', name: 'Developer' }]
+                  : [],
+              ),
+            ),
           createInAppBatch: vi.fn().mockResolvedValue(undefined),
         },
         auditLog: {

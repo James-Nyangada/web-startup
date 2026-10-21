@@ -1,3 +1,4 @@
+import { logger } from '../../lib/logger.js';
 import type { WorkerContext, RetentionPruneJobPayload, RetentionPruneReport } from '../types.js';
 import type { OrgId } from '../../db/repositories/org-scope.js';
 import { PLAN_DEFINITIONS, type PlanType } from '../../shared/plans.js';
@@ -14,6 +15,7 @@ export async function handleRetentionPrune(
   let totalPagesPruned = 0;
   let totalRawFilesPruned = 0;
   let deletedOrgsPurged = 0;
+  const purgeFailures: string[] = [];
   const details: RetentionPruneReport['details'] = [];
 
   // Determine orgs to evaluate
@@ -89,13 +91,29 @@ export async function handleRetentionPrune(
     if (!dryRun) {
       for (const org of purgeableOrgs) {
         try {
+          // Collect file keys first: the rows that point to them go with the org.
+          const fileKeys = await ctx.repos.retention.listOrgFileKeys(org.id);
           await ctx.repos.retention.purgeOrganization(org.id);
+          for (const key of fileKeys) {
+            await ctx.storage.deleteObject(key).catch((err: unknown) => {
+              console.warn(`[retention.prune] Failed to delete file ${key} of org ${org.id}:`, err);
+            });
+          }
         } catch (err) {
-          console.warn(`[retention.prune] Failed to purge deleted org ${org.id}:`, err);
+          purgeFailures.push(org.id);
+          console.error(`[retention.prune] Failed to purge deleted org ${org.id}:`, err);
         }
       }
+      deletedOrgsPurged -= purgeFailures.length;
     }
   }
+
+  // Webhook delivery log (S-46 shows the last 20): keep 30 days
+  const deliveryCutoff = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+  const webhookDeliveriesPruned =
+    dryRun || payload.orgId || !ctx.repos.webhooks?.pruneDeliveries
+      ? 0
+      : await ctx.repos.webhooks.pruneDeliveries(deliveryCutoff);
 
   const durationMs = Date.now() - startTime;
   const report: RetentionPruneReport = {
@@ -104,29 +122,19 @@ export async function handleRetentionPrune(
     pagesPruned: totalPagesPruned,
     rawFilesPruned: totalRawFilesPruned,
     deletedOrgsPurged,
+    purgeFailures,
+    webhookDeliveriesPruned,
     dryRun,
     durationMs,
     details,
   };
 
-  // Write staff audit report
-  if (targetOrgs.length > 0) {
-    const primaryOrgId = targetOrgs[0]!.id as OrgId;
-    await ctx.repos.auditLog.write(primaryOrgId, {
-      actorType: 'system',
-      action: 'retention.prune',
-      targetType: 'system',
-      data: {
-        orgsEvaluated: report.orgsEvaluated,
-        occurrencesPruned: report.occurrencesPruned,
-        pagesPruned: report.pagesPruned,
-        rawFilesPruned: report.rawFilesPruned,
-        deletedOrgsPurged: report.deletedOrgsPurged,
-        dryRun: report.dryRun,
-        durationMs: report.durationMs,
-      },
-    });
-  }
+  // Staff report: a structured system log line (and the job's return value in pg-boss).
+  // Not written to any org's audit log, which customers can read.
+  logger.info(
+    { job: 'retention.prune', ...report, details: undefined },
+    'retention.prune finished',
+  );
 
   return report;
 }

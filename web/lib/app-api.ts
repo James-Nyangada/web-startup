@@ -778,14 +778,15 @@ export interface ApiWebhook {
   id: string;
   orgId: string;
   kind: 'slack' | 'generic';
-  url: string;
   urlMasked: string;
+  hasSecret?: boolean;
   events: string[];
   siteIds: string[];
   active: boolean;
   lastStatus: number | null;
   lastError: string | null;
   failureCount: number;
+  /** Only present in the create response, shown to the user once. */
   secret?: string | null;
   createdAt: string;
   updatedAt: string;

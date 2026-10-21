@@ -1,7 +1,13 @@
 import { gunzipSync } from 'node:zlib';
 import { Readable } from 'node:stream';
 import { Agent, fetch as undiciFetch, type Dispatcher } from 'undici';
-import { assertPublicUrl, BlockedUrlError, strictPolicy, type GuardPolicy } from './guard.js';
+import {
+  assertPublicUrl,
+  BlockedUrlError,
+  strictPolicy,
+  type GuardPolicy,
+  type PublicTarget,
+} from './guard.js';
 
 /*
  * This module is the ONLY place the scanner makes HTTP requests (spec P1-02).
@@ -64,6 +70,47 @@ async function readCapped(
   }
   return { body: Buffer.concat(chunks), truncated: false };
 }
+
+export interface GuardedPostResult {
+  status: number;
+  ok: boolean;
+  /** First `maxBytes` of the response body, for error logs. */
+  text: string;
+}
+
+/** Sends a POST to an already-validated target. Injectable so tests need no network. */
+export type GuardedPostTransport = (
+  target: PublicTarget,
+  init: { headers: Record<string, string>; body: string; timeoutMs: number },
+) => Promise<GuardedPostResult>;
+
+/**
+ * POST to a target that passed assertPublicUrl (webhooks, spec 11.2). The connection is
+ * pinned to the validated address (no DNS rebinding) and redirects are never followed:
+ * a 3xx is returned as a non-ok status so it cannot bounce the request to a private host.
+ */
+export const pinnedPost: GuardedPostTransport = async (target, init) => {
+  const dispatcher = pinnedAgent(target.addresses[0]!, init.timeoutMs);
+  try {
+    const response = await undiciFetch(target.url, {
+      dispatcher,
+      method: 'POST',
+      redirect: 'manual',
+      signal: AbortSignal.timeout(init.timeoutMs),
+      headers: init.headers,
+      body: init.body,
+    });
+    const stream = response.body ? Readable.fromWeb(response.body) : Readable.from([]);
+    const { body } = await readCapped(stream, 4096);
+    return {
+      status: response.status,
+      ok: response.status >= 200 && response.status < 300,
+      text: body.toString('utf8'),
+    };
+  } finally {
+    void dispatcher.close();
+  }
+};
 
 export function createGuardedFetch(options: GuardedFetchOptions): GuardedFetch {
   const policy = options.policy ?? strictPolicy;

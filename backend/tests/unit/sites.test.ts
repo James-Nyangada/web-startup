@@ -89,6 +89,7 @@ describe('Sites API (Chunk P2-06 & Section 7.3)', () => {
     verifyMethod: null,
     verifyToken: 'ps_test_token',
     verifiedAt: new Date(),
+    verifyFailureCount: 0,
     scanFrequency: 'weekly' as const,
     scanDay: 1,
     scanHour: 2,
@@ -534,6 +535,7 @@ describe('Sites API (Chunk P2-06 & Section 7.3)', () => {
         status: 'active',
         verifyMethod: 'meta',
         verifiedAt: new Date(),
+        verifyFailureCount: 0,
       });
 
       const res = await request(app)

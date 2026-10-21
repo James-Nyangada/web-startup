@@ -1,6 +1,14 @@
 import { and, eq, isNotNull, lt, sql } from 'drizzle-orm';
 import type { Database } from '../client.js';
-import { issueOccurrences, organizations, pageResults, scans } from '../schema/index.js';
+import {
+  branding,
+  issueOccurrences,
+  manualChecks,
+  organizations,
+  pageResults,
+  reports,
+  scans,
+} from '../schema/index.js';
 import type { OrgId } from './org-scope.js';
 
 export interface PruneStats {
@@ -70,13 +78,43 @@ export function retentionRepository(db: Database) {
       return rows.map((r) => ({ id: r.id as OrgId, name: r.name }));
     },
 
-    async purgeOrganization(orgId: OrgId): Promise<boolean> {
-      const [row] = await db
-        .delete(organizations)
-        .where(eq(organizations.id, orgId))
-        .returning({ id: organizations.id });
+    /** Every storage object an org owns (scan results, reports, logos, attachments). */
+    async listOrgFileKeys(orgId: OrgId): Promise<string[]> {
+      const [scanRows, reportRows, brandRows, checkRows] = await Promise.all([
+        db.select({ key: scans.rawKey }).from(scans).where(eq(scans.orgId, orgId)),
+        db.select({ key: reports.fileKey }).from(reports).where(eq(reports.orgId, orgId)),
+        db
+          .select({ light: branding.logoLightKey, dark: branding.logoDarkKey })
+          .from(branding)
+          .where(eq(branding.orgId, orgId)),
+        db
+          .select({ key: manualChecks.attachmentKey })
+          .from(manualChecks)
+          .where(eq(manualChecks.orgId, orgId)),
+      ]);
+      const keys = [
+        ...scanRows.map((r) => r.key),
+        ...reportRows.map((r) => r.key),
+        ...brandRows.flatMap((r) => [r.light, r.dark]),
+        ...checkRows.map((r) => r.key),
+      ];
+      return [...new Set(keys.filter((k): k is string => Boolean(k)))];
+    },
 
-      return Boolean(row);
+    /**
+     * Hard-deletes an org and everything that cascades from it (spec 5.8). The cascade
+     * reaches the append-only tables (evidence_events, audit_log), so the trigger guard is
+     * lifted for this transaction only.
+     */
+    async purgeOrganization(orgId: OrgId): Promise<boolean> {
+      return db.transaction(async (tx) => {
+        await tx.execute(sql`select set_config('app.allow_append_only_write', 'on', true)`);
+        const [row] = await tx
+          .delete(organizations)
+          .where(eq(organizations.id, orgId))
+          .returning({ id: organizations.id });
+        return Boolean(row);
+      });
     },
   };
 }

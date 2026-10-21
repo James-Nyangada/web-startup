@@ -1,7 +1,7 @@
 import crypto from 'node:crypto';
 import type { PgBoss } from 'pg-boss';
 import type { Repositories } from '../db/repositories/index.js';
-import { asOrgId } from '../db/repositories/org-scope.js';
+import { asOrgId, type OrgId } from '../db/repositories/org-scope.js';
 import { getPlanDefinition, getPlanForPriceId, type PlanType } from '../shared/plans.js';
 import { logger } from '../lib/logger.js';
 import { enqueueEmailSend } from '../worker/boss.js';
@@ -130,6 +130,25 @@ export interface ProcessPaddleEventOptions {
   boss?: PgBoss;
   emailSender?: EmailSender;
   appUrl?: string;
+}
+
+/** In-app mirror of E-17 for the owner (P5-05); never fails webhook processing. */
+async function notifyPaymentFailedInApp(
+  repos: Repositories,
+  orgId: OrgId,
+  ownerUserId: string,
+  orgName: string,
+): Promise<void> {
+  await repos.notifications
+    ?.createInApp(orgId, ownerUserId, {
+      type: 'payment_failed',
+      title: 'Payment failed',
+      body: `We couldn't take the latest payment for ${orgName}. Update your billing details to keep monitoring running.`,
+      link: '/settings/billing',
+    })
+    .catch((err: unknown) => {
+      console.error('[paddle] Failed to create payment-failed notification:', err);
+    });
 }
 
 async function dispatchEmail<T extends EmailTemplateId>(
@@ -480,6 +499,7 @@ export async function processPaddleEvent(
                 updateBillingUrl: `${appUrl}/settings/billing`,
                 daysRemaining: 7,
               });
+              await notifyPaymentFailedInApp(repos, orgIdScoped, owner.userId, org.name);
               await repos.auditLog.write(orgIdScoped, {
                 actorType: 'system',
                 action: 'payment.warning_e17',
@@ -614,6 +634,7 @@ export async function processPaddleEvent(
                 daysRemaining: 7,
                 amountFormatted: formattedAmount,
               });
+              await notifyPaymentFailedInApp(repos, orgIdScoped, owner.userId, org.name);
               await repos.auditLog.write(orgIdScoped, {
                 actorType: 'system',
                 action: 'payment.warning_e17',

@@ -9,10 +9,19 @@ import {
   type StatementData,
 } from '../statements/render.js';
 
+// z.url() alone accepts javascript: and data: URLs, which become live links on the public page.
+const httpUrl = (message: string) =>
+  z
+    .string()
+    .trim()
+    .max(500)
+    .url(message)
+    .refine((value) => /^https?:\/\//i.test(value), message);
+
 const statementDataSchema = z.object({
   orgName: z.string().trim().min(1, 'Organisation name is required.').max(200),
   siteName: z.string().trim().min(1, 'Site name is required.').max(200),
-  siteUrl: z.string().trim().url('A valid website URL is required.').max(500),
+  siteUrl: httpUrl('A valid http(s) website URL is required.'),
   scope: z.string().trim().max(2000).default(''),
   targetStandard: z.string().trim().min(1).default('WCAG 2.2 Level AA'),
   conformanceStatus: z
@@ -38,7 +47,7 @@ const statementDataSchema = z.object({
   enforcementProcedure: z
     .object({
       bodyName: z.string().trim().optional(),
-      contactUrl: z.string().trim().optional(),
+      contactUrl: httpUrl('Enforcement contact must be a valid http(s) URL.').optional(),
       description: z.string().trim().optional(),
     })
     .optional(),
@@ -360,9 +369,17 @@ export function statementsPublicRouter(repos: Repositories): Router {
     const siteName = (statement.data as unknown as StatementData)?.siteName ?? 'Website';
     const embedSnippet = generateEmbedSnippet(siteId, siteName);
 
+    // Public endpoint: only what the published page shows (no org, author or draft data).
     res.status(200).json({
       data: {
-        statement,
+        statement: {
+          id: statement.id,
+          siteId: statement.siteId,
+          version: statement.version,
+          publishedAt: statement.publishedAt,
+          data: statement.data,
+          renderedHtml: statement.renderedHtml,
+        },
         publicUrl,
         embedSnippet,
       },

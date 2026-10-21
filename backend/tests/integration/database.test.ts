@@ -66,6 +66,7 @@ const ALL_APP_TABLES = [
   'manual_checks',
   'statements',
   'webhooks',
+  'webhook_deliveries',
 ];
 
 describe.skipIf(!url)('database (integration)', () => {
@@ -341,6 +342,99 @@ describe.skipIf(!url)('database (integration)', () => {
       db.delete(evidenceEvents).where(eq(evidenceEvents.id, event.id)),
     ).rejects.toMatchObject(appendOnly);
     await expect(db.execute(sql`truncate evidence_events`)).rejects.toMatchObject(appendOnly);
+  });
+
+  it('evidence pack queries return only rows inside the period (P5-04)', async () => {
+    const [org] = await db
+      .insert(organizations)
+      .values({ name: 'Evidence Range', slug: 'evidence-range' })
+      .returning();
+    const orgId = asOrgId(org!.id);
+    const [site] = await db
+      .insert(sites)
+      .values({
+        orgId,
+        name: 'Range Site',
+        rootUrl: 'https://range.example.com',
+        verifyToken: 'range-token',
+      })
+      .returning();
+    const siteId = site!.id;
+    const inside = new Date('2026-03-15T12:00:00Z');
+    const before = new Date('2025-12-31T23:00:00Z');
+
+    await db.insert(scans).values([
+      { orgId, siteId, trigger: 'manual', status: 'completed', score: 80, finishedAt: inside },
+      { orgId, siteId, trigger: 'manual', status: 'completed', score: 70, finishedAt: before },
+      { orgId, siteId, trigger: 'manual', status: 'queued' },
+    ]);
+    const base = {
+      orgId,
+      siteId,
+      ruleId: 'image-alt',
+      impact: 'serious' as const,
+      wcagLevel: 'A' as const,
+      templateKey: 'home',
+      selector: 'img',
+    };
+    await db.insert(issues).values([
+      { ...base, fingerprint: 'fixed-in', status: 'fixed', fixedAt: inside },
+      { ...base, fingerprint: 'fixed-out', status: 'fixed', fixedAt: before },
+      {
+        ...base,
+        fingerprint: 'ignored-in',
+        status: 'ignored',
+        ignoredAt: inside,
+        ignoredReason: 'false_positive',
+      },
+      { ...base, fingerprint: 'open-now', status: 'open' },
+    ]);
+
+    const repos = createRepositories(db);
+    const start = new Date('2026-01-01T00:00:00.000Z');
+    const end = new Date('2026-03-31T23:59:59.999Z');
+
+    const scanRows = await repos.scans.listForEvidencePack(orgId, siteId, start, end);
+    expect(scanRows.map((s) => s.score)).toEqual([80]);
+
+    const sets = await repos.issues.listForEvidencePack(orgId, siteId, start, end);
+    expect(sets.fixed).toHaveLength(1);
+    expect(sets.ignored).toHaveLength(1);
+    expect(sets.open).toHaveLength(1);
+    expect(sets.fixed[0]!.title).toBeTruthy();
+  });
+
+  it('retention can hard-delete an org whose append-only rows cascade', async () => {
+    const [org] = await db
+      .insert(organizations)
+      .values({ name: 'Purge Me', slug: 'purge-me' })
+      .returning();
+    const orgId = asOrgId(org!.id);
+    const [site] = await db
+      .insert(sites)
+      .values({
+        orgId,
+        name: 'Purge Site',
+        rootUrl: 'https://purge.example.com',
+        verifyToken: 'purge-token',
+      })
+      .returning();
+    const repos = createRepositories(db);
+    await repos.evidenceEvents.record(orgId, { siteId: site!.id, type: 'site_added', data: {} });
+    await repos.auditLog.write(orgId, { actorType: 'system', action: 'test.purge' });
+
+    expect(await repos.retention.purgeOrganization(orgId)).toBe(true);
+    expect(await db.select().from(organizations).where(eq(organizations.id, orgId))).toHaveLength(
+      0,
+    );
+    expect(
+      await db.select().from(evidenceEvents).where(eq(evidenceEvents.orgId, orgId)),
+    ).toHaveLength(0);
+
+    // The guard is lifted for that transaction only
+    await expect(db.delete(evidenceEvents)).rejects.toMatchObject({
+      cause: expect.objectContaining({ message: expect.stringMatching(/append-only/) }),
+    });
   });
 
   it('enables row-level security on every app table', async () => {

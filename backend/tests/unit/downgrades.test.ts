@@ -80,6 +80,7 @@ describe('Chunk P4-04: Plan changes, downgrades, and site pausing', () => {
       verifyMethod: null,
       verifyToken: 'ps_test_token',
       verifiedAt: new Date(),
+      verifyFailureCount: 0,
       scanFrequency: 'weekly' as const,
       scanDay: 1,
       scanHour: 2,
