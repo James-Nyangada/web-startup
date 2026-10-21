@@ -1,0 +1,21 @@
+# Secret scanning config (P6-10). Extends the default rules; adds our API key format.
+[extend]
+useDefault = true
+
+[[rules]]
+id = "plainsight-api-key"
+description = "Plainsight public API key"
+regex = '''psk_[A-Za-z0-9_-]{43}'''
+keywords = ["psk_"]
+
+[allowlist]
+description = "Development placeholders and test fixtures"
+paths = [
+  '''backend/\.env\.example''',
+  '''backend/tests/''',
+  '''node_modules/''',
+]
+regexes = [
+  '''dev_encryption_key_32_characters_long_for_aes_256''',
+  '''dev_secret_must_be_at_least_32_characters_long_for_auth''',
+]

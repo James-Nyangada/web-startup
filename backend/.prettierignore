@@ -3,3 +3,4 @@ dist
 coverage
 drizzle/meta
 package-lock.json
+tests/unit/__snapshots__/

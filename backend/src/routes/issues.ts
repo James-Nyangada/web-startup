@@ -4,6 +4,7 @@ import { z } from 'zod';
 import type { Repositories } from '../db/repositories/index.js';
 import { requireOrgRole } from '../middleware/org.js';
 import { ErrorCode } from '../shared/errors.js';
+import { csvField } from '../lib/csv.js';
 import type { BulkAction, IssueListFilters } from '../db/repositories/issues.js';
 import type { Impact, IssueStatus, IgnoredReason } from '../db/schema/index.js';
 import { enqueueIssueRecheck } from '../worker/boss.js';
@@ -351,14 +352,8 @@ export function orgIssuesRouter(repos: Repositories, options?: IssuesRouterOptio
       'Last Seen At',
     ];
 
-    const escapeCsv = (val: string | number | null | undefined): string => {
-      if (val === null || val === undefined) return '';
-      const str = String(val);
-      if (/[",\r\n]/.test(str)) {
-        return `"${str.replace(/"/g, '""')}"`;
-      }
-      return str;
-    };
+    // Shared escaping also neutralises spreadsheet formulas in selectors and snippets (P6-10).
+    const escapeCsv = csvField;
 
     const csvLines = [headers.map(escapeCsv).join(',')];
 
