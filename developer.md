@@ -214,6 +214,16 @@ Paddle has a sandbox; staging uses it. Production uses live Paddle.
 | `SCANNER_USER_AGENT` | worker | e.g. `PRODUCT_NAMEBot/1.0 (+https://example.com/bot)` |
 | `FREE_CHECK_DAILY_CAP` | api | Global daily cap for free checks (default 300) |
 | `ENCRYPTION_KEY` | api, worker | AES-256-GCM key for encrypting webhook URLs and API secrets at rest |
+| `MAINTENANCE_MODE` | web, api, worker | `true` shows the maintenance page, API answers 503 (health checks stay up), worker takes no jobs (P6-12) |
+| `COOKIE_DOMAIN` | api | Session cookie domain shared by app and api, e.g. `.example.com` (spec 11.1) |
+| `CUSTOM_DOMAIN_TARGET` | api | Host agencies point custom portal domains at with a CNAME; default `portal.<app host>` (P6-07) |
+| `DATA_DIR` | api | Volume whose free space the staff system monitor reports (P6-03) |
+| `PG_BOSS_SCHEMA` | api, worker | pg-boss schema (default `pgboss`); read by the staff queue monitor and `/health/deep` |
+| `CUSTOM_DOMAINS_ENABLED` | web | `true` routes hosts that are not ours to the client portal (custom portal domains, P6-07). Off by default |
+| `APP_HOSTS` | web | Extra comma-separated hosts that are ours (marketing, app); with custom domains on, every other host is a portal domain |
+| `DOCS_HOST` | web | Host that serves the API reference, e.g. `docs.example.com` (P6-06) |
+| `CSP_REPORT_ONLY`, `CSP_REPORT_URI` | web | Send the CSP as report-only while trying changes; where browsers report violations (P6-10) |
+| `NEXT_PUBLIC_STATUS_URL` | web | Public status page (UptimeRobot), linked from the footer, help centre and maintenance page (P6-13) |
 
 ---
 

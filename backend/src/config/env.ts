@@ -51,6 +51,12 @@ const envSchema = z.object({
   PADDLE_PRICE_AGENCY_ANNUAL: z.string().optional(),
   PADDLE_PRICE_AGENCY_PRO_MONTHLY: z.string().optional(),
   PADDLE_PRICE_AGENCY_PRO_ANNUAL: z.string().optional(),
+  /** P6-12: API answers 503 and the worker stops taking jobs. */
+  MAINTENANCE_MODE: booleanString.default(false),
+  /** P6-07: host agencies point custom portal domains at (CNAME). Defaults to portal.<app host>. */
+  CUSTOM_DOMAIN_TARGET: z.string().optional(),
+  /** P6-10: cookie domain shared by app and api, e.g. `.example.com`. Unset in development. */
+  COOKIE_DOMAIN: z.string().optional(),
 });
 
 export type Env = z.infer<typeof envSchema>;

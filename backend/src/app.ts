@@ -10,6 +10,8 @@ import { createAuth, type Auth } from './lib/auth.js';
 import type { TurnstileVerifier } from './lib/turnstile.js';
 import { errorHandler, notFoundHandler } from './middleware/error-handler.js';
 import { requestLogger } from './middleware/request-logger.js';
+import { maintenanceMode } from './middleware/maintenance.js';
+import { originCheck } from './middleware/csrf.js';
 import { authRouter } from './routes/auth.js';
 import { healthRouter } from './routes/health.js';
 import { meRouter } from './routes/me.js';
@@ -33,6 +35,15 @@ import { paddleWebhookRouter } from './routes/billing.js';
 import type { PaddleClient } from './billing/paddle-api.js';
 import { getStorage, type StorageService } from './storage/index.js';
 import { portalRouter } from './routes/portal.js';
+import { staffRouter } from './routes/staff.js';
+import {
+  customDomainTrustedOrigins,
+  internalRouter,
+  portalDomainsRouter,
+} from './routes/internal.js';
+import { publicApiRouter } from './routes/public-api.js';
+import { buildOpenApiDocument } from './openapi/document.js';
+import { pgBossQueueAdmin, type QueueAdmin } from './staff/queue-admin.js';
 
 declare module 'http' {
   interface IncomingMessage {
@@ -50,7 +61,8 @@ export interface AppDeps {
     | 'AUTH_SECRET'
     | 'GOOGLE_CLIENT_ID'
     | 'GOOGLE_CLIENT_SECRET'
-  >;
+  > &
+    Partial<Pick<Env, 'MAINTENANCE_MODE' | 'COOKIE_DOMAIN'>>;
   pool: pg.Pool;
   repos: Repositories;
   verifyTurnstile: TurnstileVerifier;
@@ -60,6 +72,8 @@ export interface AppDeps {
   storage?: StorageService;
   freeChecksOptions?: FreeChecksRouterOptions;
   paddleClient?: PaddleClient;
+  /** Staff queue monitor (S-72); defaults to the pg-boss instance in scansOptions. */
+  queueAdmin?: QueueAdmin;
 }
 
 export function createApp({
@@ -73,6 +87,7 @@ export function createApp({
   storage: injectedStorage,
   freeChecksOptions,
   paddleClient,
+  queueAdmin,
 }: AppDeps): express.Express {
   const app = express();
   const emailSender = injectedEmailSender ?? new EmailSender();
@@ -88,7 +103,35 @@ export function createApp({
   );
 
   app.use(requestLogger);
-  app.use(helmet());
+  // Spec 11.1 security headers. The API returns JSON, plus a few self-contained HTML pages
+  // (published statements, email previews) that only need inline styles and images.
+  app.use(
+    helmet({
+      contentSecurityPolicy: {
+        useDefaults: false,
+        directives: {
+          defaultSrc: ["'none'"],
+          styleSrc: ["'unsafe-inline'"],
+          imgSrc: ["'self'", 'data:', 'https:'],
+          fontSrc: ["'self'", 'https:', 'data:'],
+          baseUri: ["'none'"],
+          formAction: ["'none'"],
+          frameAncestors: ["'none'"],
+        },
+      },
+      strictTransportSecurity: { maxAge: 63_072_000, includeSubDomains: true, preload: true },
+      referrerPolicy: { policy: 'strict-origin-when-cross-origin' },
+      // Logos are fetched by app.<domain> from api.<domain>: same site, different origin.
+      crossOriginResourcePolicy: { policy: 'same-site' },
+    }),
+  );
+  app.use((_req, res, next) => {
+    res.setHeader(
+      'Permissions-Policy',
+      'camera=(), microphone=(), geolocation=(), payment=(), usb=()',
+    );
+    next();
+  });
   app.use(
     cors({
       origin: (origin, callback) => callback(null, !origin || allowedOrigins.has(origin)),
@@ -104,8 +147,10 @@ export function createApp({
     }),
   );
 
+  app.use(maintenanceMode(Boolean(config.MAINTENANCE_MODE)));
   app.use(healthRouter(pool));
 
+  const trustedOrigins = customDomainTrustedOrigins(repos, [...allowedOrigins]);
   const auth =
     injectedAuth ??
     createAuth(createDb(pool), {
@@ -114,11 +159,34 @@ export function createApp({
       googleClientId: config.GOOGLE_CLIENT_ID,
       googleClientSecret: config.GOOGLE_CLIENT_SECRET,
       mailer: emailSender,
+      trustedOrigins,
+      cookieDomain: config.COOKIE_DOMAIN,
     });
+  app.use(
+    originCheck(async (origin) => {
+      if (allowedOrigins.has(origin)) return true;
+      const trusted = await trustedOrigins(new Request(config.APP_URL, { headers: { origin } }));
+      return trusted.includes(origin);
+    }),
+  );
 
   const v1 = Router();
+  // Public REST API (P6-06): only requests with a `psk_` bearer key; others fall through.
+  v1.use(publicApiRouter(repos, scansOptions));
+  const openApiByHost = new Map<string, ReturnType<typeof buildOpenApiDocument>>();
+  v1.get('/openapi.json', (req, res) => {
+    const origin = `${req.protocol}://${req.get('host') ?? 'localhost'}`;
+    let doc = openApiByHost.get(origin);
+    if (!doc) {
+      doc = buildOpenApiDocument(origin);
+      openApiByHost.set(origin, doc);
+    }
+    res.setHeader('Cache-Control', 'public, max-age=300');
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.json(doc);
+  });
   v1.use('/auth', authRouter(auth, verifyTurnstile, config));
-  v1.use('/me', meRouter(auth, repos));
+  v1.use('/me', meRouter(auth, repos, { boss: scansOptions?.boss, storage, emailSender }));
   v1.use('/orgs', orgsRouter(auth, repos, scansOptions, emailSender, storage, paddleClient));
   v1.use('/invitations', invitationsRouter(repos, auth));
   v1.use('/sites', detectPlatformRouter(auth));
@@ -126,18 +194,28 @@ export function createApp({
   v1.use('/webhooks/paddle', paddleWebhookRouter(repos, paddleWebhookOpts));
   v1.use('/public', waitlistRouter(repos, verifyTurnstile));
   v1.use('/public', publicPlansRouter());
+  v1.use('/public/portal-domains', portalDomainsRouter(repos));
   v1.use(
     '/public',
     freeChecksPublicRouter(repos, verifyTurnstile, emailSender, storage, freeChecksOptions),
   );
-  v1.use('/emails', createEmailPreviewRouter());
+  // Template previews are a development aid; they render sample data only.
+  if (process.env.NODE_ENV !== 'production') v1.use('/emails', createEmailPreviewRouter());
   v1.use('/reports', reportsPublicRouter(repos, storage));
   v1.use('/manual-checks', manualChecksPublicRouter(repos, storage));
   v1.use('/public/statements', statementsPublicRouter(repos));
   v1.use('/notifications', globalNotificationsRouter(repos));
   v1.use('/notification-preferences', globalNotificationsRouter(repos));
   v1.use('/portal', portalRouter(repos, auth));
+  v1.use(
+    '/staff',
+    staffRouter(auth, repos, {
+      queueAdmin:
+        queueAdmin ?? (scansOptions?.boss ? pgBossQueueAdmin(scansOptions.boss, pool) : undefined),
+    }),
+  );
   app.use('/v1', v1);
+  app.use('/internal', internalRouter(repos));
   app.use('/webhooks/paddle', paddleWebhookRouter(repos, paddleWebhookOpts));
   app.use('/public', publicPlansRouter());
   app.use('/public/statements', statementsPublicRouter(repos));
