@@ -1,6 +1,6 @@
-import { eq } from 'drizzle-orm';
+import { and, eq, isNotNull, isNull } from 'drizzle-orm';
 import type { Database } from '../client.js';
-import { branding } from '../schema/identity.js';
+import { branding, organizations } from '../schema/identity.js';
 import type { OrgId } from './org-scope.js';
 
 export type BrandingRecord = typeof branding.$inferSelect;
@@ -37,6 +37,39 @@ export function brandingRepository(db: Database) {
         .returning();
       if (!created) throw new Error('Failed to insert branding record');
       return created;
+    },
+
+    /** Any org holding the domain, verified or not; used to refuse duplicates. */
+    async findByCustomDomain(domain: string): Promise<BrandingRecord | null> {
+      const [row] = await db
+        .select()
+        .from(branding)
+        .where(eq(branding.customDomain, domain))
+        .limit(1);
+      return row ?? null;
+    },
+
+    /**
+     * The org behind a verified custom domain (P6-07): TLS `ask` checks and host-based routing.
+     * Unverified domains and deleted orgs never resolve.
+     */
+    async findVerifiedDomain(domain: string) {
+      const [row] = await db
+        .select({
+          branding,
+          org: { id: organizations.id, slug: organizations.slug, name: organizations.name },
+        })
+        .from(branding)
+        .innerJoin(organizations, eq(organizations.id, branding.orgId))
+        .where(
+          and(
+            eq(branding.customDomain, domain),
+            isNotNull(branding.customDomainVerifiedAt),
+            isNull(organizations.deletedAt),
+          ),
+        )
+        .limit(1);
+      return row ?? null;
     },
   };
 }

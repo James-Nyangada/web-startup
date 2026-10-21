@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import Link from "next/link";
 import { SettingsLayout } from "@/components/settings/settings-layout";
+import { CustomDomainCard } from "@/components/settings/custom-domain-card";
 import { Icon } from "@/components/icons";
 import { useToast } from "@/components/shell/toast-context";
 import {
@@ -36,7 +37,7 @@ export default function BrandingSettingsPage() {
   const [reportFooter, setReportFooter] = useState("");
   const [hidePlainsightBranding, setHidePlainsightBranding] = useState(false);
   const [customDomain, setCustomDomain] = useState("");
-  const [customDomainVerified, setCustomDomainVerified] = useState(false);
+  const onDomainChange = useCallback((d: string | null) => setCustomDomain(d ?? ""), []);
 
   // File upload states
   const [uploadingLight, setUploadingLight] = useState(false);
@@ -81,7 +82,6 @@ export default function BrandingSettingsPage() {
         setReportFooter(b.reportFooter || "");
         setHidePlainsightBranding(Boolean(b.hidePlainsightBranding));
         setCustomDomain(b.customDomain || "");
-        setCustomDomainVerified(Boolean(b.customDomainVerified));
       }
     } catch {
       // Allow user to edit even if fetch failed
@@ -181,7 +181,6 @@ export default function BrandingSettingsPage() {
         emailSenderName: emailSenderName.trim() || null,
         reportFooter: reportFooter.trim() || null,
         hidePlainsightBranding,
-        customDomain: customDomain.trim() || null,
       });
       showToast("White-label branding saved successfully.");
     } catch (err: unknown) {
@@ -484,32 +483,8 @@ export default function BrandingSettingsPage() {
             </div>
           </div>
 
-          {/* Section 4: Custom Domain */}
-          <div className="rounded-2xl border border-line bg-surface p-6 shadow-card flex flex-col gap-4">
-            <div className="flex items-center justify-between">
-              <h2 className="text-base font-semibold m-0 text-ink">Custom Portal Domain</h2>
-              <span className="rounded-md bg-neutral-100 px-2 py-0.5 text-[11px] font-medium text-neutral-600">
-                {customDomainVerified ? "Active & Verified" : "Agency Pro"}
-              </span>
-            </div>
-
-            <div className="flex flex-col gap-1.5">
-              <label htmlFor="customDomain" className="text-sm font-medium text-ink">
-                Portal Hostname
-              </label>
-              <input
-                id="customDomain"
-                type="text"
-                placeholder="accessibility.yourdomain.com"
-                value={customDomain}
-                onChange={(e) => setCustomDomain(e.target.value)}
-                className="h-10 rounded-xl border border-line bg-surface px-3 text-sm text-ink outline-none focus:border-primary focus:ring-1 focus:ring-primary"
-              />
-              <p className="text-xs text-muted m-0">
-                Point a DNS CNAME record for your hostname to <code className="bg-neutral-100 px-1 py-0.5 rounded text-[11px]">cname.plainsight.io</code>. SSL certificates are provisioned automatically.
-              </p>
-            </div>
-          </div>
+          {/* Section 4: Custom Domain (P6-07) */}
+          <CustomDomainCard slug={orgSlug} plan={orgPlan} onDomainChange={onDomainChange} />
 
           {/* Save Button */}
           <div className="flex items-center gap-4 pt-2">

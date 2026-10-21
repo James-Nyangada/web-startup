@@ -5,6 +5,35 @@ import type { StorageService } from '../storage/index.js';
 import { requireOrgRole } from '../middleware/org.js';
 import { assertWithinPlan } from '../shared/plans.js';
 import { getContrastAgainstWhite, findAccessibleAlternative } from '../shared/contrast.js';
+import { AppError } from '../lib/app-error.js';
+import {
+  VERIFY_TXT_LABEL,
+  checkCustomDomainDns,
+  customDomainProblem,
+  newDomainVerifyToken,
+  normalizeDomain,
+  systemResolver,
+  type DnsResolver,
+} from '../lib/custom-domain.js';
+import { ErrorCode } from '../shared/errors.js';
+import { imageDimensions, sniffImageType, unsafeSvgReason } from '../lib/image-check.js';
+
+export interface BrandingRouterOptions {
+  dnsResolver?: DnsResolver;
+  /** Host agencies point their CNAME at (P6-07). */
+  customDomainTarget?: string;
+  /** Our own hosts, refused as custom domains. */
+  ownHosts?: string[];
+}
+
+const customDomainSchema = z.object({ domain: z.string().min(1).max(253) });
+
+/** Where an agency's CNAME must point; defaults to `portal.<app host>`. */
+export function customDomainTarget(): string {
+  if (process.env.CUSTOM_DOMAIN_TARGET) return process.env.CUSTOM_DOMAIN_TARGET;
+  const host = new URL(process.env.APP_URL || 'http://localhost:3000').hostname;
+  return `portal.${host.replace(/^app\./, '')}`;
+}
 
 const updateBrandingSchema = z.object({
   displayName: z.string().max(100).nullable().optional(),
@@ -23,8 +52,19 @@ const uploadLogoSchema = z.object({
   dataUrl: z.string().min(1),
 });
 
-export function orgBrandingRouter(repos: Repositories, storage: StorageService): Router {
+export function orgBrandingRouter(
+  repos: Repositories,
+  storage: StorageService,
+  options: BrandingRouterOptions = {},
+): Router {
   const router = Router({ mergeParams: true });
+  const resolver = options.dnsResolver ?? systemResolver;
+  const target = () => options.customDomainTarget ?? customDomainTarget();
+  const ownHosts = () =>
+    options.ownHosts ??
+    [process.env.APP_URL, process.env.SITE_URL]
+      .filter((u): u is string => Boolean(u))
+      .map((u) => new URL(u).hostname);
 
   // GET /v1/orgs/:orgId/branding - Retrieve organisation branding
   router.get('/', async (req: Request, res: Response): Promise<void> => {
@@ -56,6 +96,28 @@ export function orgBrandingRouter(repos: Repositories, storage: StorageService):
               customDomainVerifiedAt: branding.customDomainVerifiedAt,
             }
           : null,
+      },
+    });
+  });
+
+  const dnsInstructions = (domain: string, token: string) => ({
+    cname: { type: 'CNAME', host: domain, value: target() },
+    txt: { type: 'TXT', host: `${VERIFY_TXT_LABEL}.${domain}`, value: token },
+  });
+
+  // GET /v1/orgs/:orgId/branding/custom-domain - Status and DNS records to add (S-43, P6-07)
+  router.get('/custom-domain', requireOrgRole('admin'), async (req: Request, res: Response) => {
+    const branding = await repos.branding.findByOrgId(req.orgId!);
+    const domain = branding?.customDomain ?? null;
+    res.json({
+      data: {
+        domain,
+        verifiedAt: branding?.customDomainVerifiedAt ?? null,
+        status: !domain ? 'none' : branding?.customDomainVerifiedAt ? 'verified' : 'pending',
+        records:
+          domain && branding?.customDomainVerifyToken
+            ? dnsInstructions(domain, branding.customDomainVerifyToken)
+            : null,
       },
     });
   });
@@ -259,11 +321,11 @@ export function orgBrandingRouter(repos: Repositories, storage: StorageService):
       return;
     }
 
-    const contentType = matches[1];
+    const declaredType = matches[1];
     const base64Data = matches[2];
 
     const allowedTypes = ['image/png', 'image/jpeg', 'image/webp', 'image/svg+xml'];
-    if (!allowedTypes.includes(contentType)) {
+    if (!allowedTypes.includes(declaredType)) {
       res.status(400).json({
         error: {
           code: 'INVALID_TYPE',
@@ -274,11 +336,48 @@ export function orgBrandingRouter(repos: Repositories, storage: StorageService):
     }
 
     const buffer = Buffer.from(base64Data, 'base64');
-    if (buffer.length > 2 * 1024 * 1024) {
+    // Spec 7.8 / 11.1: at most 1 MB.
+    if (buffer.length > 1024 * 1024) {
       res.status(400).json({
-        error: { code: 'FILE_TOO_LARGE', message: 'Logo file size exceeds the 2 MB limit.' },
+        error: { code: 'FILE_TOO_LARGE', message: 'Logo file size exceeds the 1 MB limit.' },
       });
       return;
+    }
+
+    // The stored type comes from the bytes, never from what the browser claimed (spec 11.1).
+    const contentType = sniffImageType(buffer);
+    if (!contentType) {
+      res.status(400).json({
+        error: {
+          code: 'INVALID_TYPE',
+          message: 'That file is not a PNG, JPEG, WebP or SVG image.',
+        },
+      });
+      return;
+    }
+
+    if (contentType === 'image/svg+xml') {
+      const reason = unsafeSvgReason(buffer.toString('utf8'));
+      if (reason) {
+        res.status(400).json({
+          error: {
+            code: 'INVALID_FILE_TYPE',
+            message: `This SVG contains ${reason}, which logos cannot use. Export it again as a plain SVG or a PNG.`,
+          },
+        });
+        return;
+      }
+    } else {
+      const size = imageDimensions(buffer, contentType);
+      if (size && (size.width > 1000 || size.height > 1000)) {
+        res.status(400).json({
+          error: {
+            code: 'FILE_TOO_LARGE',
+            message: `Logos can be at most 1000 × 1000 pixels; this one is ${size.width} × ${size.height}.`,
+          },
+        });
+        return;
+      }
     }
 
     const ext = contentType === 'image/svg+xml' ? 'svg' : contentType.split('/')[1] || 'png';
@@ -305,6 +404,104 @@ export function orgBrandingRouter(repos: Repositories, storage: StorageService):
         logoUrl: `${appUrl}/v1/orgs/${orgId}/branding/logo/${type}`,
       },
     });
+  });
+
+  // POST /v1/orgs/:orgId/branding/custom-domain - Set the domain, get DNS records (O, Agency Pro)
+  router.post('/custom-domain', requireOrgRole('owner'), async (req: Request, res: Response) => {
+    assertWithinPlan(req.org, 'custom_domain');
+    const domain = normalizeDomain(customDomainSchema.parse(req.body).domain);
+    const problem = customDomainProblem(domain, ownHosts());
+    if (problem) throw AppError.validation(problem, { domain });
+
+    const holder = await repos.branding.findByCustomDomain(domain);
+    if (holder && holder.orgId !== req.orgId) {
+      throw new AppError(409, ErrorCode.CONFLICT, 'Another organisation already uses this domain.');
+    }
+    const current = await repos.branding.findByOrgId(req.orgId!);
+    const unchanged = current?.customDomain === domain && current.customDomainVerifyToken;
+    const token = unchanged ? current.customDomainVerifyToken! : newDomainVerifyToken();
+    await repos.branding.upsert(req.orgId!, {
+      customDomain: domain,
+      customDomainVerifyToken: token,
+      // Changing the domain always needs a fresh verification.
+      customDomainVerifiedAt: unchanged ? current.customDomainVerifiedAt : null,
+    });
+    await repos.auditLog.write(req.orgId!, {
+      actorId: req.auth!.user.id,
+      actorType: 'user',
+      action: 'branding.custom_domain_set',
+      targetType: 'branding',
+      ip: req.ip ?? null,
+      userAgent: req.get('user-agent') ?? null,
+      data: { domain, previous: current?.customDomain ?? null },
+    });
+    res.status(201).json({
+      data: { domain, status: 'pending', records: dnsInstructions(domain, token) },
+    });
+  });
+
+  // POST /v1/orgs/:orgId/branding/custom-domain/verify - Check DNS and enable (O)
+  router.post(
+    '/custom-domain/verify',
+    requireOrgRole('owner'),
+    async (req: Request, res: Response) => {
+      assertWithinPlan(req.org, 'custom_domain');
+      const branding = await repos.branding.findByOrgId(req.orgId!);
+      if (!branding?.customDomain || !branding.customDomainVerifyToken) {
+        throw AppError.notFound('Set a custom domain first.');
+      }
+      const check = await checkCustomDomainDns(
+        branding.customDomain,
+        branding.customDomainVerifyToken,
+        target(),
+        resolver,
+      );
+      if (!check.verified) {
+        throw new AppError(
+          422,
+          ErrorCode.DOMAIN_NOT_VERIFIED,
+          !check.cname && !check.txt
+            ? 'We could not find either DNS record yet. Changes can take up to an hour to appear.'
+            : !check.cname
+              ? `The CNAME record for ${branding.customDomain} does not point to ${target()} yet.`
+              : `The TXT record at ${VERIFY_TXT_LABEL}.${branding.customDomain} was not found or does not match.`,
+          { cname: check.cname, txt: check.txt, found: check.found },
+        );
+      }
+      const verifiedAt = new Date();
+      await repos.branding.upsert(req.orgId!, { customDomainVerifiedAt: verifiedAt });
+      await repos.auditLog.write(req.orgId!, {
+        actorId: req.auth!.user.id,
+        actorType: 'user',
+        action: 'branding.custom_domain_verified',
+        targetType: 'branding',
+        ip: req.ip ?? null,
+        userAgent: req.get('user-agent') ?? null,
+        data: { domain: branding.customDomain },
+      });
+      res.json({ data: { domain: branding.customDomain, status: 'verified', verifiedAt } });
+    },
+  );
+
+  // DELETE /v1/orgs/:orgId/branding/custom-domain - Stop using the domain (O)
+  router.delete('/custom-domain', requireOrgRole('owner'), async (req: Request, res: Response) => {
+    const branding = await repos.branding.findByOrgId(req.orgId!);
+    if (!branding?.customDomain) throw AppError.notFound('No custom domain is set.');
+    await repos.branding.upsert(req.orgId!, {
+      customDomain: null,
+      customDomainVerifyToken: null,
+      customDomainVerifiedAt: null,
+    });
+    await repos.auditLog.write(req.orgId!, {
+      actorId: req.auth!.user.id,
+      actorType: 'user',
+      action: 'branding.custom_domain_removed',
+      targetType: 'branding',
+      ip: req.ip ?? null,
+      userAgent: req.get('user-agent') ?? null,
+      data: { domain: branding.customDomain },
+    });
+    res.json({ data: { domain: null, status: 'none' } });
   });
 
   // DELETE /v1/orgs/:orgId/branding/logo/:type - Remove light or dark logo

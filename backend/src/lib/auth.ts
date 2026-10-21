@@ -24,6 +24,12 @@ export interface CreateAuthOptions {
   googleClientId?: string;
   googleClientSecret?: string;
   mailer?: AuthMailer;
+  /** Extra origins allowed to sign in, e.g. verified custom portal domains (P6-07). */
+  trustedOrigins?: (request?: Request) => Promise<string[]>;
+  /** Spec 11.1: share the session cookie between app.<domain> and api.<domain>. */
+  cookieDomain?: string;
+  /** Secure cookies; on whenever the base URL is https. */
+  secureCookies?: boolean;
 }
 
 export function createAuth(db: Database, options: CreateAuthOptions) {
@@ -65,9 +71,18 @@ export function createAuth(db: Database, options: CreateAuthOptions) {
       },
     },
     // All ids are UUIDv7 columns, so Better Auth must not invent its own string ids.
-    advanced: { database: { generateId: () => newId() } },
+    advanced: {
+      database: { generateId: () => newId() },
+      // Spec 11.1: HttpOnly, Secure, SameSite=Lax, domain .<domain>.
+      useSecureCookies: options.secureCookies ?? options.baseURL.startsWith('https://'),
+      defaultCookieAttributes: { httpOnly: true, sameSite: 'lax' },
+      ...(options.cookieDomain
+        ? { crossSubDomainCookies: { enabled: true, domain: options.cookieDomain } }
+        : {}),
+    },
     secret: options.secret,
     baseURL: options.baseURL,
+    ...(options.trustedOrigins ? { trustedOrigins: options.trustedOrigins } : {}),
     basePath: '/v1/auth',
     emailAndPassword: {
       enabled: true,

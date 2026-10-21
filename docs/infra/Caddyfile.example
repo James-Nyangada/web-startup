@@ -1,0 +1,58 @@
+# Reference Caddy config for production (spec 4, 13.4). Adapt host names to the real domain.
+# Ensures: HSTS and security headers at the edge, on-demand TLS only for verified custom
+# portal domains (P6-07), and /internal/* never reachable from the internet.
+
+{
+	email ops@plainsight.io
+	on_demand_tls {
+		# 200 only for verified custom portal domains (backend/src/routes/internal.ts).
+		ask http://api:4000/internal/tls-allowed
+	}
+}
+
+(security_headers) {
+	header {
+		Strict-Transport-Security "max-age=63072000; includeSubDomains; preload"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=(), usb=()"
+		-Server
+	}
+}
+
+app.plainsight.io {
+	import security_headers
+	reverse_proxy web:3000 {
+		health_uri /sign-in
+	}
+}
+
+api.plainsight.io {
+	import security_headers
+	# The TLS ask endpoint is for Caddy only.
+	@internal path /internal/*
+	respond @internal 404
+	reverse_proxy api:4000 {
+		health_uri /health
+	}
+}
+
+docs.plainsight.io {
+	import security_headers
+	# web/proxy.ts serves /developers/api for this host (set DOCS_HOST=docs.plainsight.io).
+	reverse_proxy web:3000
+}
+
+# Custom portal domains: any other host, certificate on demand after the ask check.
+# The API is proxied on the same origin so sign-in cookies are first-party (P6-07).
+https:// {
+	tls {
+		on_demand
+	}
+	import security_headers
+	@internal path /internal/*
+	respond @internal 404
+	@api path /v1/*
+	reverse_proxy @api api:4000
+	reverse_proxy web:3000
+}
