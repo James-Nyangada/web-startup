@@ -1,6 +1,8 @@
 import type { Metadata, Viewport } from "next";
 import { Instrument_Serif, JetBrains_Mono, Manrope } from "next/font/google";
 import { ThemeProvider } from "@/components/theme";
+import { ToastProvider } from "@/components/shell/toast-context";
+import { EdgeListeners } from "@/components/shell/edge-listeners";
 import "./globals.css";
 
 const serif = Instrument_Serif({
@@ -90,7 +92,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         )}
       </head>
       <body>
-        <ThemeProvider>{children}</ThemeProvider>
+        <ThemeProvider>
+          {/* App-wide so pages can call useToast() above their shell (S-80 offline toast too). */}
+          <ToastProvider>
+            {children}
+            <EdgeListeners />
+          </ToastProvider>
+        </ThemeProvider>
       </body>
     </html>
   );

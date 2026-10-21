@@ -5,6 +5,12 @@ import { authClient, type MeResponse } from "./auth-client";
 import { initials } from "./app-api";
 
 let pending: Promise<MeResponse> | null = null;
+let lastEmail = "";
+
+/** Email of the last signed-in user seen on this page, e.g. to prefill a re-auth dialog. */
+export function lastKnownEmail(): string {
+  return lastEmail;
+}
 
 /** The signed-in user, loaded once per page load and shared by the shell components. */
 export function useCurrentUser() {
@@ -15,6 +21,7 @@ export function useCurrentUser() {
     let cancelled = false;
     pending
       .then((res) => {
+        lastEmail = res.user.email;
         if (!cancelled) setMe(res);
       })
       .catch(() => {

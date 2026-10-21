@@ -1,5 +1,5 @@
 import request from 'supertest';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { buildTestApp } from '../helpers/fakes.js';
 
 describe('health', () => {
@@ -119,5 +119,28 @@ describe('POST /v1/public/waitlist', () => {
       message: 'Something went wrong on our side.',
       details: {},
     });
+  });
+});
+
+describe('GET /health/deep queue lag (spec 13.3)', () => {
+  it('warns when a ready job has waited more than 15 minutes, still 200', async () => {
+    const { createApp } = await import('../../src/app.js');
+    const { fakeRepos, testConfig } = await import('../helpers/fakes.js');
+    const pool = {
+      query: vi
+        .fn()
+        .mockImplementation((sql: string) =>
+          Promise.resolve({ rows: sql.includes('job') ? [{ lag: 1200 }] : [{ '?column?': 1 }] }),
+        ),
+    };
+    const app = createApp({
+      config: testConfig,
+      pool: pool as never,
+      repos: fakeRepos().repos,
+      verifyTurnstile: () => Promise.resolve(true),
+    });
+    const res = await request(app).get('/health/deep').expect(200);
+    expect(res.body.status).toBe('warn');
+    expect(res.body.checks.queue).toEqual({ status: 'warn', oldestReadySeconds: 1200 });
   });
 });

@@ -14,7 +14,8 @@ export interface ToastItem {
 }
 
 interface ToastContextValue {
-  showToast: (message: string, options?: { type?: ToastType; duration?: number }) => void;
+  /** Returns the toast id, so a persistent toast (duration 0) can be dismissed later. */
+  showToast: (message: string, options?: { type?: ToastType; duration?: number }) => string;
   dismissToast: (id: string) => void;
 }
 
@@ -24,7 +25,7 @@ export function useToast(): ToastContextValue {
   const ctx = useContext(ToastContext);
   if (!ctx) {
     return {
-      showToast: () => {},
+      showToast: () => "",
       dismissToast: () => {},
     };
   }
@@ -123,6 +124,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
     (message: string, options?: { type?: ToastType; duration?: number }) => {
       const id = "toast_" + Math.random().toString(36).slice(2, 9);
       setToasts((prev) => [...prev, { id, message, type: options?.type ?? "success", duration: options?.duration }]);
+      return id;
     },
     []
   );

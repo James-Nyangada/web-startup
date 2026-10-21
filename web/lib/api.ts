@@ -24,11 +24,38 @@ export class ApiException extends Error {
   }
 }
 
-export async function apiClient<T>(
-  path: string,
-  options: RequestInit = {},
-): Promise<T> {
-  const url = path.startsWith('http') ? path : `${API_BASE_URL}${path}`;
+/**
+ * On a custom portal domain the API is reached through the same origin (Caddy proxies
+ * `/v1/*`), so cookies stay first-party (P6-07).
+ */
+export function apiBaseUrl(): string {
+  if (typeof window === 'undefined') return API_BASE_URL;
+  const appHost = (() => {
+    try {
+      return new URL(process.env.NEXT_PUBLIC_APP_URL || window.location.origin).host;
+    } catch {
+      return window.location.host;
+    }
+  })();
+  const knownHosts = new Set([appHost, 'localhost:3000', '127.0.0.1:3000']);
+  return knownHosts.has(window.location.host) ? API_BASE_URL : window.location.origin;
+}
+
+/** Fired on `window` when a signed-in request comes back 401 (S-80 re-auth dialog). */
+export const SESSION_EXPIRED_EVENT = 'plainsight:session-expired';
+/** Fired on `window` when the API answers 503 MAINTENANCE (S-80 maintenance page). */
+export const MAINTENANCE_EVENT = 'plainsight:maintenance';
+
+const AUTH_PATHS = ['/v1/auth/', '/v1/me'];
+
+export async function apiClient<T>(path: string, options: RequestInit = {}): Promise<T> {
+  const payload = await apiFetch<{ data?: T } | null>(path, options);
+  return (payload?.data ?? payload) as T;
+}
+
+/** Like apiClient but returns the whole body, e.g. `{ data, nextCursor }`. */
+export async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<T> {
+  const url = path.startsWith('http') ? path : `${apiBaseUrl()}${path}`;
   const headers = new Headers(options.headers);
 
   if (!headers.has('Content-Type') && options.body && typeof options.body === 'string') {
@@ -47,6 +74,14 @@ export async function apiClient<T>(
 
   if (!res.ok) {
     const error = payload?.error;
+    if (typeof window !== 'undefined') {
+      if (res.status === 401 && !AUTH_PATHS.some((p) => path.startsWith(p))) {
+        window.dispatchEvent(new CustomEvent(SESSION_EXPIRED_EVENT));
+      }
+      if (res.status === 503 && error?.code === 'MAINTENANCE') {
+        window.dispatchEvent(new CustomEvent(MAINTENANCE_EVENT));
+      }
+    }
     throw new ApiException(
       error?.code || 'UNKNOWN_ERROR',
       error?.message || `Request failed with status ${res.status}`,
@@ -55,5 +90,5 @@ export async function apiClient<T>(
     );
   }
 
-  return (payload?.data ?? payload) as T;
+  return payload as T;
 }
