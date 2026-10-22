@@ -85,10 +85,13 @@ export function createBoss(options?: CreateBossOptions): PgBoss {
   const connectionString =
     options?.connectionString ?? process.env.DATABASE_URL ?? 'postgresql://localhost:5432/postgres';
   const schema = options?.schema ?? process.env.PG_BOSS_SCHEMA ?? 'pgboss';
+  // pg-boss opens its own pool (default 10). Keep it small behind Supabase's session pooler.
+  const max = options?.max ?? (Number(process.env.PG_BOSS_POOL_MAX) || undefined);
 
   const bossOptions = {
     connectionString,
     schema,
+    ...(max !== undefined ? { max } : {}),
     ...(options?.ssl !== undefined ? { ssl: options.ssl } : {}),
   } as unknown as ConstructorOptions;
 

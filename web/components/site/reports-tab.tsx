@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useId } from "react";
 import Link from "next/link";
 import { Icon, I } from "@/components/icons";
-import { apiClient, ApiException } from "@/lib/api";
+import { apiBaseUrl, apiClient, ApiException } from "@/lib/api";
 import { appApi, type ApiReportSchedule } from "@/lib/app-api";
 
 export interface ReportItem {
@@ -27,10 +27,10 @@ export interface ReportsTabProps {
 }
 
 const REPORT_TITLES: Record<ReportItem["type"], string> = {
-  scan_summary: "Accessibility Scan Summary (R-01)",
-  full: "Full Accessibility Audit Report (R-02)",
-  evidence_pack: "Accessibility Evidence Pack (R-03)",
-  client_monthly: "Client Monthly Report (R-04)",
+  scan_summary: "Accessibility Scan Summary",
+  full: "Full Accessibility Audit Report",
+  evidence_pack: "Accessibility Evidence Pack",
+  client_monthly: "Client Monthly Report",
 };
 
 type RangePreset = "12" | "6" | "3" | "1" | "custom";
@@ -120,8 +120,9 @@ export function ReportsTab({
   onToast,
 }: ReportsTabProps) {
   const [activeSubTab, setActiveSubTab] = useState<"reports" | "schedules">("reports");
-  const [reports, setReports] = useState<ReportItem[]>(DEMO_REPORTS);
-  const [loading, setLoading] = useState(false);
+  // Demo rows only for the demo workspace (no real site); a real site starts empty until loaded
+  const [reports, setReports] = useState<ReportItem[]>(siteId ? [] : DEMO_REPORTS);
+  const [loading, setLoading] = useState(Boolean(siteId));
   const [isGenerateOpen, setIsGenerateOpen] = useState(false);
   const [isSendOpen, setIsSendOpen] = useState(false);
   const [selectedReport, setSelectedReport] = useState<ReportItem | null>(null);
@@ -196,11 +197,11 @@ export function ReportsTab({
     async function loadReports() {
       try {
         setLoading(true);
-        const res = await apiClient<{ data: Array<any> }>(
+        const rows = await apiClient<Array<any>>(
           `/v1/orgs/${orgSlug}/reports?siteId=${siteId}`,
         );
-        if (!canceled && res?.data && res.data.length > 0) {
-          const mapped: ReportItem[] = res.data.map((r: any) => ({
+        if (!canceled && Array.isArray(rows)) {
+          const mapped: ReportItem[] = rows.map((r: any) => ({
             id: r.id,
             type: r.type,
             status: r.status,
@@ -223,7 +224,7 @@ export function ReportsTab({
           setReports(mapped);
         }
       } catch {
-        // Fall back to demo data in demo mode
+        if (!canceled) onToast("Reports could not be loaded. Refresh the page to try again.");
       } finally {
         if (!canceled) setLoading(false);
       }
@@ -243,16 +244,15 @@ export function ReportsTab({
 
     try {
       onToast(`Requesting secure download link for ${report.title}...`);
-      const res = await apiClient<{ data: { downloadUrl: string } }>(
+      const res = await apiClient<{ downloadUrl: string }>(
         `/v1/orgs/${orgSlug}/reports/${report.id}/download`,
       );
-      if (res?.data?.downloadUrl) {
-        window.open(res.data.downloadUrl, "_blank");
+      if (res?.downloadUrl) {
+        window.open(`${apiBaseUrl()}${res.downloadUrl}`, "_blank", "noopener");
         onToast("Download started.");
       }
-    } catch (err: any) {
-      // In demo mode without backend report row, simulate instant download
-      onToast(`Downloading ${report.title} (${paper.toUpperCase()})...`);
+    } catch (err) {
+      onToast(err instanceof ApiException ? err.message : "Could not start the download. Please try again.");
     }
   };
 
@@ -261,10 +261,10 @@ export function ReportsTab({
     for (let attempt = 0; attempt < REPORT_POLL_LIMIT; attempt++) {
       await new Promise((resolve) => setTimeout(resolve, REPORT_POLL_MS));
       try {
-        const res = await apiClient<{
-          data: { status: ReportItem["status"]; fileSize: number | null };
+        const { status, fileSize } = await apiClient<{
+          status: ReportItem["status"];
+          fileSize: number | null;
         }>(`/v1/orgs/${orgSlug}/reports/${id}`);
-        const { status, fileSize } = res.data;
         setReports((prev) =>
           prev.map((r) => (r.id === id ? { ...r, status, fileSize } : r)),
         );
@@ -301,13 +301,11 @@ export function ReportsTab({
 
     setGenerating(true);
     try {
-      const res = await apiClient<{
-        data: {
-          id: string;
-          status: ReportItem["status"];
-          dateFrom?: string | null;
-          dateTo?: string | null;
-        };
+      const created = await apiClient<{
+        id: string;
+        status: ReportItem["status"];
+        dateFrom?: string | null;
+        dateTo?: string | null;
       }>(`/v1/orgs/${orgSlug}/reports`, {
         method: "POST",
         body: JSON.stringify({
@@ -318,7 +316,6 @@ export function ReportsTab({
         }),
       });
 
-      const created = res.data;
       const newReport: ReportItem = {
         id: created.id,
         type: reportType,
@@ -350,10 +347,10 @@ export function ReportsTab({
         status: "ready",
         title:
           reportType === "scan_summary"
-            ? "Scan #23 Summary Report (R-01)"
+            ? "Scan #23 Summary Report"
             : reportType === "full"
-              ? "Full Accessibility Audit Report (R-02)"
-              : "Accessibility Evidence Pack (R-03)",
+              ? "Full Accessibility Audit Report"
+              : "Accessibility Evidence Pack",
         scanLabel:
           reportType === "evidence_pack"
             ? periodLabel(dateRange?.start, dateRange?.end)
@@ -547,8 +544,8 @@ export function ReportsTab({
                 On-demand Reports
               </h2>
               <p className="mt-1 text-sm text-muted">
-                Generate and download tagged, accessible PDFs (R-01 Scan Summary,
-                R-02 Full Report, R-03 Evidence Pack) or share them directly with clients and
+                Generate and download tagged, accessible PDFs (Scan Summary,
+                Full Report, Evidence Pack) or share them directly with clients and
                 stakeholders.
               </p>
             </div>
@@ -582,8 +579,8 @@ export function ReportsTab({
                   No reports generated yet
                 </p>
                 <p className="text-sm text-muted mt-1 max-w-md mx-auto">
-                  Generate an executive summary (R-01) or a full developer
-                  remediation report (R-02) for this site.
+                  Generate an executive summary or a full developer
+                  remediation report for this site.
                 </p>
                 <button
                   type="button"
@@ -635,11 +632,11 @@ export function ReportsTab({
                         <td className="px-4 py-3">
                           <span className="rounded-full bg-subtle px-2.5 py-0.5 text-xs font-medium text-ink">
                             {r.type === "scan_summary"
-                              ? "R-01 Summary"
+                              ? "Summary"
                               : r.type === "full"
-                                ? "R-02 Full Report"
+                                ? "Full Report"
                                 : r.type === "evidence_pack"
-                                  ? "R-03 Evidence Pack"
+                                  ? "Evidence Pack"
                                   : "Client Monthly"}
                           </span>
                         </td>
@@ -693,7 +690,7 @@ export function ReportsTab({
                               onClick={() => openSendModal(r)}
                               disabled={r.status !== "ready"}
                               className="ease-ui flex items-center gap-1.5 rounded-lg border border-line bg-surface px-2.5 py-1 text-xs font-medium text-ink hover:bg-subtle disabled:opacity-40 disabled:cursor-not-allowed"
-                              title="Send report by email (E-11)"
+                              title="Send report by email"
                             >
                               <Icon d={I.mail} size={13} />
                               <span>Share</span>
@@ -714,7 +711,7 @@ export function ReportsTab({
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div>
               <h2 className="m-0 text-xl font-semibold text-ink">
-                Automated Client Reports (R-04)
+                Automated Client Reports
               </h2>
               <p className="mt-1 text-sm text-muted">
                 Deliver white-labeled monthly accessibility reports to your clients on a recurring schedule with custom branding.
@@ -738,7 +735,7 @@ export function ReportsTab({
                 <Icon d={I.mail} size={24} />
               </div>
               <h3 className="text-lg font-semibold text-ink">
-                Scheduled Client Reports (R-04)
+                Scheduled Client Reports
               </h3>
               <p className="mt-2 text-sm text-muted leading-relaxed">
                 Automated recurring monthly delivery of white-labeled accessibility reports to up to 10 client stakeholders requires an Agency or Agency Pro plan.
@@ -763,7 +760,7 @@ export function ReportsTab({
                 No automated report schedules configured
               </p>
               <p className="text-sm text-muted mt-1 max-w-md mx-auto">
-                Set up recurring monthly deliveries of R-04 client reports with white-label branding and portal links.
+                Set up recurring monthly deliveries of client reports with white-label branding and portal links.
               </p>
               <button
                 type="button"
@@ -800,7 +797,7 @@ export function ReportsTab({
                                 Monthly on day {s.dayOfMonth}
                               </div>
                               <div className="text-xs font-normal text-muted">
-                                R-04 Client Monthly Report · 06:00 UTC
+                                Client Monthly Report · 06:00 UTC
                               </div>
                             </div>
                           </div>
@@ -845,7 +842,7 @@ export function ReportsTab({
                               onClick={() => handleSendNow(s.id)}
                               disabled={actionLoadingId === s.id}
                               className="ease-ui flex items-center gap-1.5 rounded-lg border border-line bg-surface px-2.5 py-1 text-xs font-medium text-ink hover:bg-subtle disabled:opacity-40"
-                              title="Render R-04 report and send E-12 email right now"
+                              title="Generate the client report and email it now"
                             >
                               <Icon d={I.mail} size={13} />
                               <span>{actionLoadingId === s.id ? "Sending..." : "Send now"}</span>
@@ -1018,7 +1015,7 @@ export function ReportsTab({
                     }`}
                   >
                     <div className="text-sm font-semibold text-ink">
-                      R-01 Summary
+                      Summary
                     </div>
                     <div className="text-xs text-muted mt-1">
                       1–2 pages executive summary with score and top 10 issues.
@@ -1034,7 +1031,7 @@ export function ReportsTab({
                     }`}
                   >
                     <div className="text-sm font-semibold text-ink">
-                      R-02 Full Report
+                      Full Report
                     </div>
                     <div className="text-xs text-muted mt-1">
                       Detailed remediation report with occurrences and code
@@ -1051,7 +1048,7 @@ export function ReportsTab({
                     }`}
                   >
                     <div className="text-sm font-semibold text-ink">
-                      R-03 Evidence Pack
+                      Evidence Pack
                     </div>
                     <div className="text-xs text-muted mt-1">
                       Full compliance audit trail across scans, manual checks,
@@ -1226,7 +1223,7 @@ export function ReportsTab({
                   Email Report to Stakeholders
                 </h3>
                 <p className="text-xs text-muted mt-0.5">
-                  Sends template E-11 with a secure download link (valid for 7
+                  Sends an email with a secure download link (valid for 7
                   days).
                 </p>
               </div>

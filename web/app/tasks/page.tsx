@@ -247,7 +247,7 @@ export default function MyTasksPage() {
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
             <h1 className="m-0 font-serif text-[32px] sm:text-[38px] font-normal text-ink">
-              My tasks (S-49)
+              My tasks
             </h1>
             <p className="mt-1 text-sm text-muted">
               Accessibility issues assigned to you across all monitored sites, prioritized by due date.

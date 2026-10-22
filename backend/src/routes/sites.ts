@@ -709,7 +709,7 @@ export function orgSitesRouter(repos: Repositories): Router {
             dns: {
               name: 'DNS TXT Record',
               type: 'TXT',
-              host: '@ (or _plainsight)',
+              host: `_plainsight.${new URL(site.rootUrl).hostname.replace(/^www\./, '')}`,
               value: txtRecord,
               token: site.verifyToken,
               instructions:

@@ -7,11 +7,18 @@ import {
   PutObjectCommand,
   S3Client,
 } from '@aws-sdk/client-s3';
+import { v2 as cloudinary, type UploadApiOptions } from 'cloudinary';
 
 export interface StorageService {
   putObject(key: string, data: string | Buffer, contentType?: string): Promise<string>;
   getObject(key: string): Promise<Buffer | null>;
   deleteObject(key: string): Promise<void>;
+  /**
+   * Publicly served images (avatars). Only backends with a CDN implement these; callers
+   * check for them and refuse the upload otherwise.
+   */
+  putPublicImage?(key: string, data: Buffer): Promise<string>;
+  deletePublicImage?(key: string): Promise<void>;
 }
 
 export class MemoryStorageService implements StorageService {
@@ -30,6 +37,16 @@ export class MemoryStorageService implements StorageService {
 
   deleteObject(key: string): Promise<void> {
     this.store.delete(key);
+    return Promise.resolve();
+  }
+
+  putPublicImage(key: string, data: Buffer): Promise<string> {
+    this.store.set(`public/${key}`, Buffer.from(data));
+    return Promise.resolve(`https://images.test/${key}`);
+  }
+
+  deletePublicImage(key: string): Promise<void> {
+    this.store.delete(`public/${key}`);
     return Promise.resolve();
   }
 
@@ -138,6 +155,113 @@ export class R2StorageService implements StorageService {
   }
 }
 
+export interface CloudinaryOptions {
+  cloudName: string;
+  apiKey: string;
+  apiSecret: string;
+  /** Prefix for every public ID, e.g. "production". Keeps environments apart in one account. */
+  folder?: string;
+}
+
+/** The slice of the Cloudinary SDK the storage service uses, so tests can fake it. */
+export interface CloudinaryClient {
+  upload(data: Buffer, options: UploadApiOptions): Promise<{ secure_url: string }>;
+  destroy(publicId: string, options: { resource_type: string; type: string }): Promise<unknown>;
+  signedUrl(publicId: string, options: { resource_type: string; type: string }): string;
+}
+
+/** Private files are raw assets that only the backend can read, through signed URLs. */
+const PRIVATE = { resource_type: 'raw', type: 'authenticated' } as const;
+const PUBLIC_IMAGE = { resource_type: 'image', type: 'upload' } as const;
+
+/**
+ * Cloudinary. Reports, attachments, exports and logos are stored as authenticated raw assets
+ * and streamed by the API after its own access checks, exactly as with the other backends.
+ * Avatars are public images served straight from Cloudinary's CDN.
+ */
+export class CloudinaryStorageService implements StorageService {
+  private readonly prefix: string;
+
+  constructor(
+    private readonly client: CloudinaryClient,
+    folder = '',
+    private readonly fetchFn: typeof fetch = fetch,
+  ) {
+    const trimmed = folder.replace(/^\/+|\/+$/g, '');
+    this.prefix = trimmed ? `${trimmed}/` : '';
+  }
+
+  static fromOptions(options: CloudinaryOptions): CloudinaryStorageService {
+    const credentials = {
+      cloud_name: options.cloudName,
+      api_key: options.apiKey,
+      api_secret: options.apiSecret,
+    };
+    const client: CloudinaryClient = {
+      upload: (data, uploadOptions) =>
+        new Promise((resolve, reject) => {
+          cloudinary.uploader
+            .upload_stream({ ...uploadOptions, ...credentials }, (err, result) => {
+              if (err || !result) {
+                reject(new Error(`Cloudinary upload failed: ${err?.message ?? 'no result'}`));
+              } else resolve(result);
+            })
+            .end(data);
+        }),
+      destroy: (publicId, destroyOptions) =>
+        cloudinary.uploader.destroy(publicId, {
+          ...destroyOptions,
+          ...credentials,
+          invalidate: true,
+        }) as Promise<unknown>,
+      // A signed API download rather than a signed CDN URL: the CDN refuses PDFs and ZIPs on
+      // accounts with the default security settings, and this link expires after an hour.
+      signedUrl: (publicId, urlOptions) =>
+        cloudinary.utils.private_download_url(publicId, '', { ...urlOptions, ...credentials }),
+    };
+    return new CloudinaryStorageService(client, options.folder);
+  }
+
+  private publicId(key: string): string {
+    return this.prefix + key.replace(/\.\./g, '').replace(/^\/+/, '');
+  }
+
+  async putObject(key: string, data: string | Buffer): Promise<string> {
+    await this.client.upload(typeof data === 'string' ? Buffer.from(data, 'utf-8') : data, {
+      ...PRIVATE,
+      public_id: this.publicId(key),
+      overwrite: true,
+      invalidate: true,
+    });
+    return key;
+  }
+
+  async getObject(key: string): Promise<Buffer | null> {
+    const res = await this.fetchFn(this.client.signedUrl(this.publicId(key), PRIVATE));
+    if (res.status === 404) return null;
+    if (!res.ok) throw new Error(`Cloudinary returned ${res.status} for ${key}`);
+    return Buffer.from(await res.arrayBuffer());
+  }
+
+  async deleteObject(key: string): Promise<void> {
+    await this.client.destroy(this.publicId(key), PRIVATE);
+  }
+
+  async putPublicImage(key: string, data: Buffer): Promise<string> {
+    const result = await this.client.upload(data, {
+      ...PUBLIC_IMAGE,
+      public_id: this.publicId(key),
+      overwrite: true,
+      invalidate: true,
+    });
+    return result.secure_url;
+  }
+
+  async deletePublicImage(key: string): Promise<void> {
+    await this.client.destroy(this.publicId(key), PUBLIC_IMAGE);
+  }
+}
+
 let defaultStorage: StorageService | undefined;
 
 function r2OptionsFromEnv(): R2Options | undefined {
@@ -151,9 +275,25 @@ function r2OptionsFromEnv(): R2Options | undefined {
   };
 }
 
+function cloudinaryOptionsFromEnv(): CloudinaryOptions | undefined {
+  const { CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, CLOUDINARY_API_SECRET, CLOUDINARY_FOLDER } =
+    process.env;
+  if (!CLOUDINARY_CLOUD_NAME || !CLOUDINARY_API_KEY || !CLOUDINARY_API_SECRET) return undefined;
+  return {
+    cloudName: CLOUDINARY_CLOUD_NAME,
+    apiKey: CLOUDINARY_API_KEY,
+    apiSecret: CLOUDINARY_API_SECRET,
+    folder: CLOUDINARY_FOLDER,
+  };
+}
+
 export function getStorage(options?: { baseDir?: string; memory?: boolean }): StorageService {
   if (options?.memory) {
     return new MemoryStorageService();
+  }
+  if (!defaultStorage && !options?.baseDir) {
+    const cld = cloudinaryOptionsFromEnv();
+    if (cld) defaultStorage = CloudinaryStorageService.fromOptions(cld);
   }
   if (!defaultStorage && !options?.baseDir) {
     const r2 = r2OptionsFromEnv();

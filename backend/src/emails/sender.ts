@@ -1,3 +1,4 @@
+import { logger } from '../lib/logger.js';
 import { renderEmail } from './renderer.js';
 import type {
   EmailBranding,
@@ -52,10 +53,28 @@ export class MockTransport implements EmailTransport {
   }
 }
 
+/** Development fallback when no Resend key is set: logs each email so links can be clicked. */
+export class LogTransport extends MockTransport {
+  override send(message: {
+    to: string;
+    subject: string;
+    html: string;
+    text: string;
+    from?: string;
+  }): Promise<{ id: string; ok: boolean }> {
+    logger.info(
+      { to: message.to, subject: message.subject },
+      `Email not sent (RESEND_API_KEY unset):\n${message.text}`,
+    );
+    return super.send(message);
+  }
+}
+
 export class ResendTransport implements EmailTransport {
   constructor(
     private readonly apiKey: string,
     private readonly defaultFrom: string = 'Plainsight <notifications@plainsight.app>',
+    private readonly replyTo?: string,
   ) {}
 
   async send(message: {
@@ -77,6 +96,7 @@ export class ResendTransport implements EmailTransport {
         subject: message.subject,
         html: message.html,
         text: message.text,
+        ...(this.replyTo ? { reply_to: this.replyTo } : {}),
       }),
     });
 
@@ -117,7 +137,7 @@ export class EmailSender implements AuthMailer {
     const activeBranding = branding || this.defaultBranding;
     const rendered = renderEmail(templateId, data, activeBranding);
     const from = activeBranding?.senderName
-      ? `${activeBranding.senderName} <notifications@plainsight.app>`
+      ? `${activeBranding.senderName} <${senderAddress(this.defaultFrom)}>`
       : this.defaultFrom;
 
     return this.transport.send({
@@ -170,4 +190,26 @@ export class EmailSender implements AuthMailer {
       data,
     });
   }
+}
+
+/** `Name <addr@x>` -> `addr@x`; a bare address is returned as is. */
+function senderAddress(from: string): string {
+  return /<([^>]+)>/.exec(from)?.[1] ?? from;
+}
+
+export function createEmailSender(config: {
+  NODE_ENV: string;
+  RESEND_API_KEY?: string;
+  EMAIL_FROM: string;
+  EMAIL_REPLY_TO?: string;
+}): EmailSender {
+  let transport: EmailTransport;
+  if (config.RESEND_API_KEY) {
+    transport = new ResendTransport(config.RESEND_API_KEY, config.EMAIL_FROM, config.EMAIL_REPLY_TO);
+  } else if (config.NODE_ENV === 'production') {
+    throw new Error('RESEND_API_KEY is required when NODE_ENV=production.');
+  } else {
+    transport = config.NODE_ENV === 'test' ? new MockTransport() : new LogTransport();
+  }
+  return new EmailSender({ transport, from: config.EMAIL_FROM });
 }

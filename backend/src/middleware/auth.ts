@@ -24,10 +24,33 @@ declare global {
   }
 }
 
+/**
+ * Polls the app makes on its own (notification bell, scan progress) send this header so they
+ * do not count as activity and keep an idle session alive.
+ */
+export const BACKGROUND_REQUEST_HEADER = 'x-background-request';
+
+/**
+ * Loads the session and, for real activity, slides its expiry forward. Better Auth returns the
+ * refreshed cookie as response headers, which must reach the browser or the cookie's own
+ * max-age would still end the session.
+ */
+async function loadSession(auth: Auth, req: Request, res: Response) {
+  const background = req.get(BACKGROUND_REQUEST_HEADER) === '1';
+  const { headers, response } = await auth.api.getSession({
+    headers: req.headers,
+    query: { disableRefresh: background },
+    returnHeaders: true,
+  });
+  const cookies = headers.getSetCookie();
+  if (cookies.length > 0) res.append('Set-Cookie', cookies);
+  return response;
+}
+
 export function requireAuth(auth: Auth) {
   return async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      const session = await auth.api.getSession({ headers: req.headers });
+      const session = await loadSession(auth, req, res);
       if (!session) {
         res.status(401).json({
           error: {
@@ -62,9 +85,9 @@ export function requireAuth(auth: Auth) {
 }
 
 export function optionalAuth(auth: Auth) {
-  return async (req: Request, _res: Response, next: NextFunction): Promise<void> => {
+  return async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      const session = await auth.api.getSession({ headers: req.headers });
+      const session = await loadSession(auth, req, res);
       if (session) {
         req.auth = session;
       }

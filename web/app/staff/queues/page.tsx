@@ -93,7 +93,7 @@ export default function StaffQueuesPage() {
   return (
     <StaffShell
       title="Queues and system"
-      screen="S-72"
+     
       actions={
         <button type="button" className={btn.secondary} onClick={() => void load()}>
           Refresh

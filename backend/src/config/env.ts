@@ -21,6 +21,10 @@ const envSchema = z.object({
   SENTRY_DSN_API: z.string().optional(),
   SENTRY_RELEASE: z.string().optional(),
   TURNSTILE_SECRET_KEY: z.string().optional(),
+  /** Resend. When unset, emails are logged (development) instead of sent. */
+  RESEND_API_KEY: z.string().optional(),
+  EMAIL_FROM: z.string().default('Plainsight <notifications@plainsight.app>'),
+  EMAIL_REPLY_TO: z.string().optional(),
   ENCRYPTION_KEY: z.string().min(16).default('dev_encryption_key_32_characters_long_for_aes_256'),
   AUTH_SECRET: z
     .string()
@@ -32,6 +36,12 @@ const envSchema = z.object({
   GEMINI_MODEL: z.string().default('gemini-2.5-flash'),
   AI_SUGGESTIONS_MONTHLY_CAP: z.coerce.number().int().positive().default(50),
   FEATURE_AI_SUGGESTIONS: booleanString.default(true),
+  /** Cloudinary. When the three keys are set, all files go there (it wins over R2 and disk). */
+  CLOUDINARY_CLOUD_NAME: z.string().optional(),
+  CLOUDINARY_API_KEY: z.string().optional(),
+  CLOUDINARY_API_SECRET: z.string().optional(),
+  /** Optional public-ID prefix, e.g. "production", to keep environments apart. */
+  CLOUDINARY_FOLDER: z.string().optional(),
   /** Cloudflare R2. When all four are set, files go to R2; otherwise to STORAGE_DIR on disk. */
   R2_ACCOUNT_ID: z.string().optional(),
   R2_ACCESS_KEY_ID: z.string().optional(),

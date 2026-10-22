@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { AuthCard } from '@/components/auth/auth-card';
 import { authClient, ApiException } from '@/lib/auth-client';
+import { landingPathAfterSignIn } from '@/lib/post-sign-in';
 
 function MagicLinkContent() {
   const router = useRouter();
@@ -28,9 +29,10 @@ function MagicLinkContent() {
 
     authClient
       .verifyMagicLink(token)
-      .then(() => {
+      .then(() => landingPathAfterSignIn())
+      .then((path) => {
         if (isMounted) {
-          router.push('/overview');
+          router.push(path);
         }
       })
       .catch((err: unknown) => {

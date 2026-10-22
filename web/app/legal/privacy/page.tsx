@@ -76,7 +76,7 @@ export default function PrivacyPage() {
             We retain scan results, issue histories, and audit records for as long as your account remains active.
           </p>
           <p>
-            You may request an export of your personal data archive or request complete account deletion at any time in Account Settings (Screen S-48). Upon organization deletion, all associated scan data, HTML snippets, and database records are scheduled for permanent purge across our database and object storage.
+            You may request an export of your personal data archive or request complete account deletion at any time in Account Settings. Upon organization deletion, all associated scan data, HTML snippets, and database records are scheduled for permanent purge across our database and object storage.
           </p>
         </section>
 

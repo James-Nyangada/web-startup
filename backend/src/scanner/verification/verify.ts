@@ -196,12 +196,16 @@ export async function verifyDns(
   }
 
   const foundTxtValues: string[] = [];
+  // A stale token on one host must not hide a correct one on another, so
+  // mismatches are only reported once every host has been checked.
+  let mismatch: { host: string; foundToken: string } | null = null;
 
   for (const host of hostsToCheck) {
     try {
       const records = await lookup(host);
       for (const chunkGroup of records) {
-        const fullTxt = chunkGroup.join('').trim();
+        // Some DNS panels store the quotes users paste around the value.
+        const fullTxt = chunkGroup.join('').trim().replace(/^"(.*)"$/, '$1').trim();
         foundTxtValues.push(fullTxt);
 
         if (fullTxt === expectedRecord || fullTxt === expectedToken) {
@@ -219,17 +223,21 @@ export async function verifyDns(
               method: 'dns',
             };
           }
-          return {
-            ok: false,
-            method: 'dns',
-            reason: `Found DNS TXT record for ${host}, but token does not match. Found '${foundToken}', expected '${expectedToken}'.`,
-            details: { host, foundToken, expectedToken },
-          };
+          mismatch ??= { host, foundToken };
         }
       }
     } catch {
       // Continue to next host
     }
+  }
+
+  if (mismatch) {
+    return {
+      ok: false,
+      method: 'dns',
+      reason: `Found DNS TXT record for ${mismatch.host}, but token does not match. Found '${mismatch.foundToken}', expected '${expectedToken}'.`,
+      details: { host: mismatch.host, foundToken: mismatch.foundToken, expectedToken },
+    };
   }
 
   return {

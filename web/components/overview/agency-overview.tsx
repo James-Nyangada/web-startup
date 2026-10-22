@@ -87,7 +87,7 @@ function TableLayout({
   const handleExportReport = async () => {
     try {
       setIsExporting(true);
-      setExportMessage({ text: "Generating Agency Portfolio Report (R-05)..." });
+      setExportMessage({ text: "Generating Agency Portfolio Report..." });
       const report = await appApi.generateAgencyOverviewReport(orgSlug, true);
       setExportMessage({ text: "Report ready! Fetching download link..." });
       const dl = await apiClient<{ data: { downloadUrl: string } }>(
@@ -96,7 +96,7 @@ function TableLayout({
       if (dl.data?.downloadUrl) {
         window.open(dl.data.downloadUrl, "_blank");
         setExportMessage({
-          text: "Agency Overview Report (R-05) downloaded successfully.",
+          text: "Agency Overview Report downloaded successfully.",
           downloadUrl: dl.data.downloadUrl,
         });
       }
@@ -243,7 +243,7 @@ function TableLayout({
             className="ease-ui inline-flex h-10 items-center rounded-full border border-line-strong bg-surface px-4 text-sm font-semibold text-ink hover:bg-subtle hover:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:opacity-50"
           >
             <Icon d={I.download} size={15} className="mr-1.5 text-primary" />
-            <span>{isExporting ? "Generating R-05..." : "Export Agency Report (R-05)"}</span>
+            <span>{isExporting ? "Generating report..." : "Export Agency Report"}</span>
           </button>
           <Link href={`/${orgSlug}/sites`} className={PRIMARY}>
             <Icon d={I.plus} size={16} className="mr-1.5" />
@@ -316,7 +316,7 @@ function TableLayout({
         </div>
       )}
 
-      {/* S-20 Cross-Site View: Most Common Problems Across Sites */}
+      {/* Cross-Site View: Most Common Problems Across Sites */}
       {commonIssues.length > 0 && (
         <section aria-labelledby="common-issues-heading" className={`${CARD} p-5`}>
           <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line pb-3">
@@ -456,7 +456,7 @@ function TableLayout({
         </div>
       </div>
 
-      {/* Main S-20 Sites Table */}
+      {/* Main Sites Table */}
       <div className="overflow-hidden rounded-2xl border border-line bg-surface shadow-card">
         {clientGroups ? (
           // Grouped by client view
@@ -764,7 +764,7 @@ export interface AgencyOverviewProps {
   orgSlug: string;
 }
 
-/** S-20 Agency overview — with persistent sorting and filtering per user (P2-20). */
+/** Agency overview — with persistent sorting and filtering per user (P2-20). */
 export function AgencyOverview({ orgSlug }: AgencyOverviewProps) {
   const router = useRouter();
   const [data, setData] = useState<OverviewData | null>(null);
@@ -780,7 +780,7 @@ export function AgencyOverview({ orgSlug }: AgencyOverviewProps) {
     ])
       .then(([orgRes, sites, commonIssues]) => {
         if (cancelled) return;
-        // Stores with one site go straight to that site's overview (S-20).
+        // Stores with one site go straight to that site's overview.
         if (orgRes.org.type === "store" && sites.length === 1) {
           setIsStoreSingleSite(true);
           router.replace(`/${orgSlug}/sites/${sites[0]!.id}`);

@@ -272,7 +272,7 @@ export function IssueDetailContent({
   const directFullPageUrl = siteHref ? `${siteHref}/issues/${issue.id}` : `/issues/${issue.id}`;
 
   return (
-    <div className="flex flex-1 flex-col">
+    <div className="flex min-h-0 flex-1 flex-col">
       {/* Header */}
       <div className="flex flex-col gap-3 border-b border-line px-4 pt-5 pb-4 sm:px-6">
         <div className="flex items-center gap-2">
@@ -455,7 +455,7 @@ export function IssueDetailContent({
         id="dpanel"
         role="tabpanel"
         aria-labelledby={`dtab-${dTab}`}
-        className="flex flex-1 flex-col gap-6 overflow-y-auto p-4 text-base leading-6 sm:p-6"
+        className="flex min-h-0 flex-1 flex-col gap-6 overflow-y-auto overscroll-contain p-4 text-base leading-6 sm:p-6"
       >
         {/* Tab 0: Overview */}
         {dTab === 0 && (

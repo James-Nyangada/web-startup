@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import { MarketingHeader } from "@/components/marketing/marketing-header";
 import { MarketingFooter } from "@/components/marketing/marketing-footer";
 import { Collapse } from "@/components/disclosure";
@@ -346,7 +346,7 @@ export default function PricingPage() {
                 </thead>
                 <tbody>
                   {COMPARISON_CATEGORIES.map((cat) => (
-                    <tr key={cat.category} className="contents">
+                    <Fragment key={cat.category}>
                       {/* Category Header Row */}
                       <tr>
                         <th
@@ -394,7 +394,7 @@ export default function PricingPage() {
                           </td>
                         </tr>
                       ))}
-                    </tr>
+                    </Fragment>
                   ))}
                 </tbody>
               </table>

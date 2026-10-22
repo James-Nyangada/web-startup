@@ -1,6 +1,8 @@
+import { env } from '../config/env.js';
 import { getDb, closeDb } from '../db/index.js';
 import { createRepositories } from '../db/repositories/index.js';
 import { ensureRulesSeeded } from '../db/seed-rules.js';
+import { createEmailSender } from '../emails/sender.js';
 import { getStorage } from '../storage/index.js';
 import { createBoss, ensureQueues, registerWorkers, registerSchedules } from './boss.js';
 import { recoverInterruptedScans } from './recovery.js';
@@ -16,6 +18,8 @@ export async function startWorker() {
 
   console.log('[worker] Starting pg-boss...');
   const boss = createBoss();
+  // Without a listener, a transient pg-boss error (e.g. pool connect timeout) kills the process.
+  boss.on('error', (err) => console.error('[worker] pg-boss error:', err));
   await boss.start();
   await ensureQueues(boss);
 
@@ -26,6 +30,7 @@ export async function startWorker() {
     storage,
     boss,
     pool,
+    emailSender: createEmailSender(env()),
     abortSignal: abortController.signal,
     scannerConcurrency: Number(process.env.SCANNER_CONCURRENCY) || 2,
     userAgent: process.env.SCANNER_USER_AGENT,

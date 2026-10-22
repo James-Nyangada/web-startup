@@ -13,6 +13,7 @@ import { isStaffVerified } from '../db/repositories/staff.js';
 import type { StorageService } from '../storage/index.js';
 import type { EmailSender } from '../emails/sender.js';
 import { enqueueDataExport } from '../worker/boss.js';
+import { sniffImageType } from '../lib/image-check.js';
 
 export interface MeRouterOptions {
   boss?: PgBoss;
@@ -28,10 +29,30 @@ const EXPORT_COOLDOWN_MS = 24 * 60 * 60 * 1000;
 
 const patchMeSchema = z.object({
   name: z.string().min(1).max(100).optional(),
-  timeZone: z.string().min(1).max(50).optional(),
+  // Scheduling hands this straight to Intl, so it must be a zone the runtime knows.
+  timeZone: z
+    .string()
+    .min(1)
+    .max(50)
+    .refine((tz) => {
+      try {
+        new Intl.DateTimeFormat('en-US', { timeZone: tz });
+        return true;
+      } catch {
+        return false;
+      }
+    }, 'Unknown time zone.')
+    .optional(),
   avatarUrl: z.string().url().nullable().optional(),
   lastActiveOrgId: z.string().uuid().nullable().optional(),
 });
+
+const avatarSchema = z.object({ dataUrl: z.string().min(1) });
+
+/** The browser resizes to 256 × 256 first, so a real avatar is far below this. */
+const AVATAR_MAX_BYTES = 512 * 1024;
+
+const avatarKey = (userId: string) => `avatars/${userId}`;
 
 const changePasswordSchema = z.object({
   currentPassword: z.string().min(1),
@@ -122,6 +143,63 @@ export function meRouter(auth: Auth, repos: Repositories, options: MeRouterOptio
     res.status(200).json({ data: { user: updated } });
   });
 
+  // POST /v1/me/avatar - Upload a profile picture; it is served from the storage CDN.
+  router.post('/avatar', async (req: Request, res: Response): Promise<void> => {
+    const storage = options.storage;
+    if (!storage?.putPublicImage) {
+      res.status(503).json({
+        error: {
+          code: 'STORAGE_UNAVAILABLE',
+          message: 'Avatar uploads are not available on this server.',
+        },
+      });
+      return;
+    }
+
+    const parse = avatarSchema.safeParse(req.body);
+    const base64 = parse.success
+      ? /^data:image\/[a-z+]+;base64,(.+)$/.exec(parse.data.dataUrl)?.[1]
+      : undefined;
+    if (!base64) {
+      res.status(400).json({
+        error: {
+          code: ErrorCode.VALIDATION_ERROR,
+          message: 'Expected a base64 image data URL.',
+        },
+      });
+      return;
+    }
+
+    const buffer = Buffer.from(base64, 'base64');
+    if (buffer.length > AVATAR_MAX_BYTES) {
+      res.status(400).json({
+        error: { code: 'FILE_TOO_LARGE', message: 'Avatars can be at most 512 KB.' },
+      });
+      return;
+    }
+    // SVG is refused: the type comes from the bytes, and only raster images are accepted.
+    const contentType = sniffImageType(buffer);
+    if (!contentType || contentType === 'image/svg+xml') {
+      res.status(400).json({
+        error: { code: 'INVALID_TYPE', message: 'Avatars must be PNG, JPEG or WebP images.' },
+      });
+      return;
+    }
+
+    const userId = req.auth!.user.id;
+    const avatarUrl = await storage.putPublicImage(avatarKey(userId), buffer);
+    const updated = await repos.users.update(userId, { avatarUrl });
+    res.status(200).json({ data: { user: updated } });
+  });
+
+  // DELETE /v1/me/avatar - Remove the profile picture and fall back to initials.
+  router.delete('/avatar', async (req: Request, res: Response): Promise<void> => {
+    const userId = req.auth!.user.id;
+    await options.storage?.deletePublicImage?.(avatarKey(userId)).catch(() => undefined);
+    const updated = await repos.users.update(userId, { avatarUrl: null });
+    res.status(200).json({ data: { user: updated } });
+  });
+
   // POST /v1/me/change-password
   router.post('/change-password', async (req: Request, res: Response): Promise<void> => {
     const parse = changePasswordSchema.safeParse(req.body);
@@ -200,25 +278,41 @@ export function meRouter(auth: Auth, repos: Repositories, options: MeRouterOptio
     }
   });
 
-  // GET /v1/me/sessions
+  // GET /v1/me/sessions - Session tokens are bearer credentials, so only safe fields leave the server.
   router.get('/sessions', async (req: Request, res: Response): Promise<void> => {
-    try {
-      const sessions = await auth.api.listSessions({ headers: req.headers });
-      res.status(200).json({ data: { sessions } });
-    } catch {
-      res.status(200).json({ data: { sessions: [] } });
-    }
+    const sessions = await auth.api.listSessions({ headers: req.headers });
+    const currentId = req.auth!.session.id;
+    res.status(200).json({
+      data: {
+        sessions: sessions
+          .map((s) => ({
+            id: s.id,
+            ipAddress: s.ipAddress ?? null,
+            userAgent: s.userAgent ?? null,
+            createdAt: s.createdAt,
+            lastActiveAt: s.updatedAt,
+            expiresAt: s.expiresAt,
+            isCurrent: s.id === currentId,
+          }))
+          .sort(
+            (a, b) =>
+              Number(b.isCurrent) - Number(a.isCurrent) ||
+              new Date(b.lastActiveAt).getTime() - new Date(a.lastActiveAt).getTime(),
+          ),
+      },
+    });
   });
 
-  // DELETE /v1/me/sessions/:id
+  // DELETE /v1/me/sessions/:id - Takes the session id; the token is looked up here, never sent to the browser.
   router.delete('/sessions/:id', async (req: Request, res: Response): Promise<void> => {
-    const token = req.params.id as string;
-    try {
-      await auth.api.revokeSession({ body: { token }, headers: req.headers });
-      res.status(200).json({ data: { success: true } });
-    } catch {
-      res.status(200).json({ data: { success: true } });
+    if (req.params.id === req.auth!.session.id) {
+      throw AppError.validation('Use sign out to end the session you are using.');
     }
+    const sessions = await auth.api.listSessions({ headers: req.headers });
+    const target = sessions.find((s) => s.id === req.params.id);
+    if (!target) throw AppError.notFound('Session not found.');
+    await auth.api.revokeSession({ body: { token: target.token }, headers: req.headers });
+    res.status(200).json({ data: { success: true } });
   });
 
   // POST /v1/me/export - Request a personal data export (GDPR, P6-09) → E-22 when ready
@@ -330,6 +424,7 @@ export function meRouter(auth: Auth, repos: Repositories, options: MeRouterOptio
     for (const e of exports) {
       if (e.fileKey) await options.storage?.deleteObject(e.fileKey).catch(() => undefined);
     }
+    await options.storage?.deletePublicImage?.(avatarKey(userId)).catch(() => undefined);
 
     await repos.auditLog.write(null, {
       actorId: userId,

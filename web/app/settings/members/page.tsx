@@ -5,7 +5,8 @@ import { SettingsLayout } from "@/components/settings/settings-layout";
 import { Icon, I } from "@/components/icons";
 import { useToast } from "@/components/shell/toast-context";
 import { apiClient } from "@/lib/api";
-import { appApi, type ApiClientViewer } from "@/lib/app-api";
+import { appApi, type ApiClientViewer, type ApiUsage } from "@/lib/app-api";
+import { useActiveOrg } from "@/lib/use-active-org";
 
 export interface MemberRow {
   id: string;
@@ -13,7 +14,7 @@ export interface MemberRow {
   email: string;
   role: "owner" | "admin" | "member";
   initials: string;
-  lastActive: string;
+  joinedAt: string | null;
 }
 
 export interface PendingInvitation {
@@ -32,78 +33,24 @@ export interface OrgSiteSummary {
   rootUrl: string;
 }
 
-const DEFAULT_MEMBERS: MemberRow[] = [
-  {
-    id: "m-1",
-    name: "Daniel Mwangi",
-    email: "daniel@brightline.studio",
-    role: "owner",
-    initials: "DM",
-    lastActive: "Just now",
-  },
-  {
-    id: "m-2",
-    name: "Aisha Kamau",
-    email: "aisha@brightline.studio",
-    role: "admin",
-    initials: "AK",
-    lastActive: "2 hours ago",
-  },
-  {
-    id: "m-3",
-    name: "Mark Otieno",
-    email: "mark@brightline.studio",
-    role: "member",
-    initials: "MO",
-    lastActive: "Yesterday",
-  },
-];
+/** "12 Mar 2026" for a membership's join date. */
+function formatJoined(value: string | null | undefined): string {
+  if (!value) return "—";
+  return new Date(value).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+}
 
-const DEFAULT_INVITATIONS: PendingInvitation[] = [
-  {
-    id: "inv-demo-1",
-    email: "sarah.dev@brightline.studio",
-    role: "member",
-    expiresAt: new Date(Date.now() + 6 * 24 * 60 * 60 * 1000).toISOString(),
-    createdAt: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
-    invitedByName: "Daniel Mwangi",
-  },
-];
-
-const DEFAULT_CLIENTS: ApiClientViewer[] = [
-  {
-    user: {
-      id: "cv-1",
-      name: "Helena Rost",
-      email: "helena@oakhaus.de",
-      avatarUrl: null,
-    },
-    sites: [
-      {
-        id: "site-1",
-        name: "Oakhaus Living",
-        rootUrl: "https://oakhaus.de",
-        status: "active",
-        platform: "shopify",
-      },
-    ],
-    createdAt: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),
-  },
-];
-
-const DEFAULT_SITES: OrgSiteSummary[] = [
-  { id: "site-1", name: "Oakhaus Living", rootUrl: "https://oakhaus.de" },
-  { id: "site-2", name: "Fjord Apparel", rootUrl: "https://fjord.co" },
-  { id: "site-3", name: "Sørensen Law", rootUrl: "https://sorensen.dk" },
-];
+/** Plan limits serialise Infinity as null. */
+function isUnlimited(limit: number | null | undefined): boolean {
+  return limit == null || !Number.isFinite(limit);
+}
 
 export default function MembersSettingsPage() {
   const { showToast } = useToast();
   const [activeTab, setActiveTab] = useState<"team" | "clients">("team");
 
   // Team state
-  const [members, setMembers] = useState<MemberRow[]>(DEFAULT_MEMBERS);
-  const [invitations, setInvitations] = useState<PendingInvitation[]>(DEFAULT_INVITATIONS);
+  const [members, setMembers] = useState<MemberRow[]>([]);
+  const [invitations, setInvitations] = useState<PendingInvitation[]>([]);
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteRole, setInviteRole] = useState<"admin" | "member">("member");
   const [inviteModalOpen, setInviteModalOpen] = useState(false);
@@ -111,9 +58,9 @@ export default function MembersSettingsPage() {
   const [memberToRemove, setMemberToRemove] = useState<MemberRow | null>(null);
   const [isRemoving, setIsRemoving] = useState(false);
 
-  // Client viewers state (S-42)
-  const [clients, setClients] = useState<ApiClientViewer[]>(DEFAULT_CLIENTS);
-  const [orgSites, setOrgSites] = useState<OrgSiteSummary[]>(DEFAULT_SITES);
+  // Client viewers state
+  const [clients, setClients] = useState<ApiClientViewer[]>([]);
+  const [orgSites, setOrgSites] = useState<OrgSiteSummary[]>([]);
   const [inviteClientModalOpen, setInviteClientModalOpen] = useState(false);
   const [inviteClientEmail, setInviteClientEmail] = useState("");
   const [inviteClientSiteIds, setInviteClientSiteIds] = useState<string[]>([]);
@@ -123,14 +70,18 @@ export default function MembersSettingsPage() {
   const [clientToRemove, setClientToRemove] = useState<ApiClientViewer | null>(null);
   const [isRemovingClient, setIsRemovingClient] = useState(false);
 
-  const orgSlug = "brightline";
+  const [usage, setUsage] = useState<ApiUsage | null>(null);
+  const [membersState, setMembersState] = useState<"loading" | "ready" | "error">("loading");
+
+  const { slug: orgSlug } = useActiveOrg();
 
   const fetchMembers = useCallback(async () => {
+    if (!orgSlug) return;
     try {
       const res = await apiClient<{ members: any[]; invitations: any[] }>(
         `/v1/orgs/${orgSlug}/members`,
       );
-      if (res?.members && res.members.length > 0) {
+      if (res?.members) {
         setMembers(
           res.members.map((m) => {
             const name = m.name || m.email.split("@")[0] || "User";
@@ -146,7 +97,7 @@ export default function MembersSettingsPage() {
               email: m.email,
               role: m.role || "member",
               initials,
-              lastActive: "Active today",
+              joinedAt: m.joinedAt ?? null,
             };
           }),
         );
@@ -154,17 +105,19 @@ export default function MembersSettingsPage() {
       if (res?.invitations) {
         setInvitations(res.invitations);
       }
+      setMembersState("ready");
     } catch {
-      // Fallback to demo data
+      setMembersState("error");
     }
   }, [orgSlug]);
 
   const fetchSites = useCallback(async () => {
+    if (!orgSlug) return;
     try {
-      const res = await apiClient<{ sites: any[] }>(`/v1/orgs/${orgSlug}/sites`);
-      if (res?.sites && res.sites.length > 0) {
+      const sites = await appApi.listSites(orgSlug);
+      if (sites) {
         setOrgSites(
-          res.sites.map((s) => ({
+          sites.map((s) => ({
             id: s.id,
             name: s.name,
             rootUrl: s.rootUrl,
@@ -172,18 +125,28 @@ export default function MembersSettingsPage() {
         );
       }
     } catch {
-      // Fallback
+      // The invite dialog shows "no sites" when this fails
     }
   }, [orgSlug]);
 
   const fetchClients = useCallback(async () => {
+    if (!orgSlug) return;
     try {
       const clientsList = await appApi.listClients(orgSlug);
       if (clientsList) {
         setClients(clientsList);
       }
     } catch {
-      // Fallback
+      // Client viewers are admin-only; members see the empty state
+    }
+  }, [orgSlug]);
+
+  const fetchUsage = useCallback(async () => {
+    if (!orgSlug) return;
+    try {
+      setUsage(await appApi.getUsage(orgSlug));
+    } catch {
+      // The seat meter falls back to the member count alone
     }
   }, [orgSlug]);
 
@@ -191,7 +154,8 @@ export default function MembersSettingsPage() {
     fetchMembers();
     fetchSites();
     fetchClients();
-  }, [fetchMembers, fetchSites, fetchClients]);
+    fetchUsage();
+  }, [fetchMembers, fetchSites, fetchClients, fetchUsage]);
 
   const handleInvite = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -274,7 +238,7 @@ export default function MembersSettingsPage() {
 
   const handleSaveClientSites = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!clientToEdit) return;
+    if (!clientToEdit || !orgSlug) return;
     if (editClientSiteIds.length === 0) {
       showToast("Client viewer must be assigned to at least one site.");
       return;
@@ -312,7 +276,7 @@ export default function MembersSettingsPage() {
   };
 
   const confirmRemoveClient = async () => {
-    if (!clientToRemove) return;
+    if (!clientToRemove || !orgSlug) return;
     setIsRemovingClient(true);
 
     try {
@@ -403,6 +367,8 @@ export default function MembersSettingsPage() {
     return `Expires in ${days} ${days === 1 ? "day" : "days"}`;
   };
 
+  const seatLimit = usage && !isUnlimited(usage.limits.teamMembers) ? usage.limits.teamMembers : null;
+
   const teamInvitations = invitations.filter((i) => i.role !== "client_viewer");
   const clientInvitations = invitations.filter((i) => i.role === "client_viewer");
 
@@ -412,7 +378,7 @@ export default function MembersSettingsPage() {
       description="Manage internal team members and external client viewers."
     >
       <div className="flex flex-col gap-8 max-w-4xl">
-        {/* Navigation Tabs (S-42) */}
+        {/* Navigation Tabs */}
         <div
           role="tablist"
           aria-label="Access management tabs"
@@ -442,7 +408,7 @@ export default function MembersSettingsPage() {
                 : "text-muted hover:text-ink"
             }`}
           >
-            <span>Client Viewers (S-42)</span>
+            <span>Client Viewers</span>
             <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs text-primary font-bold">
               Agency
             </span>
@@ -455,11 +421,26 @@ export default function MembersSettingsPage() {
             <div className="flex flex-wrap items-center justify-between gap-4">
               <div>
                 <span className="text-sm font-semibold text-ink">
-                  {members.length} of 10 seats used
+                  {seatLimit === null
+                    ? `${members.length} ${members.length === 1 ? "member" : "members"}`
+                    : `${members.length} of ${seatLimit} seats used`}
                 </span>
-                <span className="text-xs text-muted block">
-                  Agency Plan allows up to 10 team members. Need more? Upgrade to Agency Pro.
-                </span>
+                {usage && (
+                  <span className="text-xs text-muted block">
+                    {seatLimit === null ? (
+                      `The ${usage.planName} plan includes unlimited team members.`
+                    ) : (
+                      <>
+                        The {usage.planName} plan allows up to {seatLimit} team{" "}
+                        {seatLimit === 1 ? "member" : "members"}. Need more?{" "}
+                        <a href="/settings/billing" className="text-primary hover:underline">
+                          Change plan
+                        </a>
+                        .
+                      </>
+                    )}
+                  </span>
+                )}
               </div>
               <button
                 type="button"
@@ -481,11 +462,20 @@ export default function MembersSettingsPage() {
                       <tr className="border-b border-line bg-subtle text-xs font-semibold text-muted">
                         <th scope="col" className="px-4 py-3 sm:px-6">Member</th>
                         <th scope="col" className="px-4 py-3">Role</th>
-                        <th scope="col" className="px-4 py-3 hidden sm:table-cell">Last Active</th>
+                        <th scope="col" className="px-4 py-3 hidden sm:table-cell">Joined</th>
                         <th scope="col" className="px-4 py-3 text-right">Actions</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-line">
+                      {membersState !== "ready" && members.length === 0 && (
+                        <tr>
+                          <td colSpan={4} className="px-6 py-8 text-center text-sm text-muted">
+                            {membersState === "loading"
+                              ? "Loading members…"
+                              : "Members could not be loaded. Refresh the page to try again."}
+                          </td>
+                        </tr>
+                      )}
                       {members.map((m) => (
                         <tr key={m.id} className="hover:bg-subtle/50 transition-colors">
                           <td className="px-4 py-3.5 sm:px-6">
@@ -519,7 +509,7 @@ export default function MembersSettingsPage() {
                             )}
                           </td>
                           <td className="px-4 py-3.5 text-xs text-muted hidden sm:table-cell">
-                            {m.lastActive}
+                            {formatJoined(m.joinedAt)}
                           </td>
                           <td className="px-4 py-3.5 text-right">
                             {m.role !== "owner" && (
@@ -616,7 +606,7 @@ export default function MembersSettingsPage() {
             </div>
           </>
         ) : (
-          /* Client Viewers Tab (S-42) */
+          /* Client Viewers Tab */
           <>
             {/* Header & Feature Explanation */}
             <div className="flex flex-wrap items-center justify-between gap-4">
@@ -625,7 +615,12 @@ export default function MembersSettingsPage() {
                   {clients.length} Client {clients.length === 1 ? "Viewer" : "Viewers"} Active
                 </span>
                 <span className="text-xs text-muted block">
-                  Agency plans feature unlimited client viewers. Each client viewer can only access their explicitly assigned sites in the branded client portal.
+                  {usage && !isUnlimited(usage.limits.clientViewers)
+                    ? `The ${usage.planName} plan allows up to ${usage.limits.clientViewers} client viewers. `
+                    : usage
+                      ? `The ${usage.planName} plan includes unlimited client viewers. `
+                      : ""}
+                  Each client viewer can only access their explicitly assigned sites in the branded client portal.
                 </span>
               </div>
               <button
@@ -644,7 +639,7 @@ export default function MembersSettingsPage() {
 
             {/* Active Client Viewers Table */}
             <div className="flex flex-col gap-3">
-              <h2 className="m-0 text-base font-semibold text-ink">Client Viewers (S-42)</h2>
+              <h2 className="m-0 text-base font-semibold text-ink">Client Viewers</h2>
               {clients.length === 0 ? (
                 <div className="rounded-2xl border border-dashed border-line-strong p-8 text-center text-sm text-muted">
                   No client viewers added yet. Click &ldquo;Invite client viewer&rdquo; to grant your clients direct read-only access to their portal.
@@ -850,7 +845,7 @@ export default function MembersSettingsPage() {
                     className="h-10 rounded-xl border border-line-strong bg-surface px-3 text-sm text-ink outline-none focus:border-primary focus:ring-1 focus:ring-primary"
                   />
                   <span className="text-xs text-muted">
-                    We will send an invitation email (E-04) with a single-use 7-day link.
+                    We will send an invitation email with a single-use 7-day link.
                   </span>
                 </div>
 
@@ -890,7 +885,7 @@ export default function MembersSettingsPage() {
           </div>
         )}
 
-        {/* Invite Client Viewer Modal (S-42) */}
+        {/* Invite Client Viewer Modal */}
         {inviteClientModalOpen && (
           <div
             role="dialog"
@@ -996,7 +991,7 @@ export default function MembersSettingsPage() {
           </div>
         )}
 
-        {/* Edit Client Sites Modal (S-42) */}
+        {/* Edit Client Sites Modal */}
         {clientToEdit && (
           <div
             role="dialog"

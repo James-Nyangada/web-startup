@@ -8,7 +8,7 @@ import { ApiException } from "@/lib/api";
 /**
  * Sends org-less URLs (/overview, /sites/...) to the same page under the user's active org,
  * as spec 8.2 routes everything by `/[org]`. Signed-out users go to sign-in; users without an
- * organisation go to onboarding.
+ * organisation go to onboarding, except staff, who go to the staff dashboard.
  */
 export function OrgRedirect({ path = "" }: { path?: string }) {
   const router = useRouter();
@@ -20,7 +20,7 @@ export function OrgRedirect({ path = "" }: { path?: string }) {
       .then((me) => {
         const org = me.activeOrg ?? me.memberships[0]?.org;
         if (!org) {
-          router.replace("/onboarding");
+          router.replace(me.user.isStaff ? "/staff" : "/onboarding");
           return;
         }
         router.replace(`/${org.slug ?? org.id}${path}${window.location.search}`);

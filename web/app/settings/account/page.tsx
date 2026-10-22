@@ -8,53 +8,41 @@ import { useToast } from "@/components/shell/toast-context";
 import { Icon, I } from "@/components/icons";
 import { ThemePreferenceRadio } from "@/components/theme";
 import { useFocusTrap } from "@/components/use-focus-trap";
-import { authClient, type User, ApiException } from "@/lib/auth-client";
+import { TimeZoneCombobox } from "@/components/settings/time-zone-combobox";
+import { authClient, type ActiveSession, type User, ApiException } from "@/lib/auth-client";
+import { describeUserAgent } from "@/lib/user-agent";
 
-const TIMEZONES = [
-  { value: "UTC", label: "UTC (Coordinated Universal Time · +00:00)" },
-  { value: "Europe/London", label: "London (GMT / BST · +00:00 / +01:00)" },
-  { value: "Europe/Paris", label: "Paris, Berlin, Amsterdam (CET · +01:00)" },
-  { value: "America/New_York", label: "New York, Toronto (Eastern · -05:00)" },
-  { value: "America/Chicago", label: "Chicago, Mexico City (Central · -06:00)" },
-  { value: "America/Denver", label: "Denver, Calgary (Mountain · -07:00)" },
-  { value: "America/Los_Angeles", label: "San Francisco, Seattle (Pacific · -08:00)" },
-  { value: "Africa/Nairobi", label: "Nairobi, Addis Ababa (EAT · +03:00)" },
-  { value: "Asia/Dubai", label: "Dubai (GST · +04:00)" },
-  { value: "Asia/Singapore", label: "Singapore, Hong Kong (SGT · +08:00)" },
-  { value: "Asia/Tokyo", label: "Tokyo, Seoul (JST · +09:00)" },
-  { value: "Australia/Sydney", label: "Sydney, Melbourne (AEST · +10:00)" },
-];
-
-interface SessionItem {
-  id: string;
-  device: string;
-  browser: string;
-  location: string;
-  ipAddress: string;
-  isCurrent: boolean;
-  lastActive: string;
+function lastActiveLabel(sess: ActiveSession): string {
+  if (sess.isCurrent) return "Active now";
+  const mins = Math.round((Date.now() - new Date(sess.lastActiveAt).getTime()) / 60000);
+  const rtf = new Intl.RelativeTimeFormat("en", { numeric: "auto" });
+  if (mins < 60) return mins < 2 ? "Active just now" : `Active ${rtf.format(-mins, "minute")}`;
+  if (mins < 60 * 24) return `Active ${rtf.format(-Math.round(mins / 60), "hour")}`;
+  return `Active ${rtf.format(-Math.round(mins / (60 * 24)), "day")}`;
 }
 
-const DEFAULT_SESSIONS: SessionItem[] = [
-  {
-    id: "sess-current",
-    device: "MacBook Pro",
-    browser: "Chrome 129",
-    location: "London, United Kingdom",
-    ipAddress: "82.165.197.10",
-    isCurrent: true,
-    lastActive: "Active now",
-  },
-  {
-    id: "sess-mobile",
-    device: "iPhone 15 Pro",
-    browser: "Safari Mobile",
-    location: "London, United Kingdom",
-    ipAddress: "82.165.197.12",
-    isCurrent: false,
-    lastActive: "3 hours ago",
-  },
-];
+/** Centre-crops an image to a 256 × 256 WebP data URL, small enough for the API's body limit. */
+async function resizeAvatar(file: File): Promise<string> {
+  const bitmap = await createImageBitmap(file);
+  const side = Math.min(bitmap.width, bitmap.height);
+  const canvas = document.createElement("canvas");
+  canvas.width = canvas.height = 256;
+  canvas
+    .getContext("2d")!
+    .drawImage(
+      bitmap,
+      (bitmap.width - side) / 2,
+      (bitmap.height - side) / 2,
+      side,
+      side,
+      0,
+      0,
+      256,
+      256,
+    );
+  bitmap.close();
+  return canvas.toDataURL("image/webp", 0.9);
+}
 
 export default function AccountSettingsPage() {
   const router = useRouter();
@@ -68,9 +56,9 @@ export default function AccountSettingsPage() {
   const [avatarUrl, setAvatarUrl] = useState<string>("");
   const [timeZone, setTimeZone] = useState("Europe/London");
 
-  // Custom avatar URL modal / edit state
-  const [customAvatarInput, setCustomAvatarInput] = useState("");
-  const [editingAvatar, setEditingAvatar] = useState(false);
+  // Avatar upload state
+  const avatarInputRef = useRef<HTMLInputElement>(null);
+  const [avatarBusy, setAvatarBusy] = useState(false);
 
   // Password state
   const [currentPassword, setCurrentPassword] = useState("");
@@ -83,7 +71,8 @@ export default function AccountSettingsPage() {
   const [savingPassword, setSavingPassword] = useState(false);
 
   // Sessions state
-  const [sessions, setSessions] = useState<SessionItem[]>(DEFAULT_SESSIONS);
+  const [sessions, setSessions] = useState<ActiveSession[] | null>(null);
+  const [sessionsError, setSessionsError] = useState(false);
   const [revokingSessionId, setRevokingSessionId] = useState<string | null>(null);
 
 
@@ -116,6 +105,10 @@ export default function AccountSettingsPage() {
     }
 
     loadAccount();
+    authClient
+      .listSessions()
+      .then((res) => mounted && setSessions(res.sessions))
+      .catch(() => mounted && setSessionsError(true));
     return () => {
       mounted = false;
     };
@@ -151,21 +144,38 @@ export default function AccountSettingsPage() {
     }
   };
 
-  // Handle Avatar Update
-  const handleApplyCustomAvatar = () => {
-    if (customAvatarInput.trim()) {
-      setAvatarUrl(customAvatarInput.trim());
-      setCustomAvatarInput("");
-      setEditingAvatar(false);
-      showToast("Avatar image URL updated. Remember to save profile.");
+  // Handle Avatar Update: resized to 256 × 256 in the browser, then stored by the API.
+  const handleAvatarFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    if (!["image/png", "image/jpeg", "image/webp"].includes(file.type)) {
+      showToast("Choose a PNG, JPEG or WebP image.", { type: "error" });
+      return;
+    }
+    setAvatarBusy(true);
+    try {
+      const res = await authClient.uploadAvatar(await resizeAvatar(file));
+      setAvatarUrl(res.user.avatarUrl || "");
+      showToast("Profile picture updated.");
+    } catch (err: any) {
+      showToast(err.message || "Failed to upload profile picture.", { type: "error" });
+    } finally {
+      setAvatarBusy(false);
     }
   };
 
-  const handleClearAvatar = () => {
-    setAvatarUrl("");
-    setCustomAvatarInput("");
-    setEditingAvatar(false);
-    showToast("Avatar reset to your initials. Remember to save profile.");
+  const handleClearAvatar = async () => {
+    setAvatarBusy(true);
+    try {
+      await authClient.removeAvatar();
+      setAvatarUrl("");
+      showToast("Avatar reset to your initials.");
+    } catch (err: any) {
+      showToast(err.message || "Failed to remove profile picture.", { type: "error" });
+    } finally {
+      setAvatarBusy(false);
+    }
   };
 
   // Handle Password Change
@@ -211,28 +221,24 @@ export default function AccountSettingsPage() {
     setRevokingSessionId(sessionId);
     try {
       await authClient.revokeSession(sessionId);
-      setSessions((prev) => prev.filter((s) => s.id !== sessionId));
-      showToast("Session revoked successfully.");
-    } catch (err: any) {
-      // Still remove from UI in dev
-      setSessions((prev) => prev.filter((s) => s.id !== sessionId));
-      showToast("Session revoked successfully.");
+      setSessions((prev) => prev?.filter((s) => s.id !== sessionId) ?? null);
+      showToast("Session revoked. That device is now signed out.");
+    } catch (err) {
+      showToast(err instanceof ApiException ? err.message : "Could not revoke that session.", { type: "error" });
     } finally {
       setRevokingSessionId(null);
     }
   };
 
   const handleRevokeAllOtherSessions = async () => {
-    try {
-      const otherSessions = sessions.filter((s) => !s.isCurrent);
-      for (const s of otherSessions) {
-        await authClient.revokeSession(s.id).catch(() => {});
-      }
-      setSessions((prev) => prev.filter((s) => s.isCurrent));
-      showToast("All other active sessions have been revoked.");
-    } catch {
-      showToast("Revoked other sessions.");
-    }
+    const others = sessions?.filter((s) => !s.isCurrent) ?? [];
+    setRevokingSessionId("all");
+    const results = await Promise.allSettled(others.map((s) => authClient.revokeSession(s.id)));
+    const revoked = new Set(others.filter((_, i) => results[i]?.status === "fulfilled").map((s) => s.id));
+    setSessions((prev) => prev?.filter((s) => !revoked.has(s.id)) ?? null);
+    setRevokingSessionId(null);
+    if (revoked.size === others.length) showToast("All other sessions have been signed out.");
+    else showToast(`Signed out ${revoked.size} of ${others.length} sessions. Try again for the rest.`, { type: "error" });
   };
 
   // Handle Account Deletion
@@ -263,7 +269,7 @@ export default function AccountSettingsPage() {
   return (
     <SettingsLayout
       title="Account & Profile"
-      description="Manage your personal details, appearance, security preferences, and active sessions (S-48)."
+      description="Manage your personal details, appearance, security preferences, and active sessions."
     >
       <div className="flex flex-col gap-8 max-w-3xl">
         {/* Profile Card */}
@@ -301,51 +307,36 @@ export default function AccountSettingsPage() {
             <div className="flex flex-col gap-2">
               <span className="text-sm font-semibold text-ink">Profile Avatar</span>
               <div className="flex flex-wrap items-center gap-2">
+                <input
+                  ref={avatarInputRef}
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp"
+                  onChange={handleAvatarFile}
+                  className="sr-only"
+                  aria-label="Upload profile picture"
+                />
                 <button
                   type="button"
-                  onClick={() => setEditingAvatar((prev) => !prev)}
-                  className="ease-ui rounded-full border border-line bg-surface px-3 py-1.5 text-xs font-semibold text-ink hover:bg-subtle"
+                  onClick={() => avatarInputRef.current?.click()}
+                  disabled={avatarBusy}
+                  className="ease-ui rounded-full border border-line bg-surface px-3 py-1.5 text-xs font-semibold text-ink hover:bg-subtle disabled:opacity-50"
                 >
-                  {editingAvatar ? "Hide URL input" : "Change avatar image"}
+                  {avatarBusy ? "Uploading…" : avatarUrl ? "Change picture" : "Upload picture"}
                 </button>
                 {avatarUrl && (
                   <button
                     type="button"
                     onClick={handleClearAvatar}
-                    className="ease-ui rounded-full border border-line bg-surface px-3 py-1.5 text-xs font-semibold text-muted hover:text-crit hover:border-crit/40"
+                    disabled={avatarBusy}
+                    className="ease-ui rounded-full border border-line bg-surface px-3 py-1.5 text-xs font-semibold text-muted hover:text-crit hover:border-crit/40 disabled:opacity-50"
                   >
                     Reset to initials
                   </button>
                 )}
               </div>
+              <span className="text-xs text-muted">PNG, JPEG or WebP. Cropped to a square.</span>
             </div>
           </div>
-
-          {editingAvatar && (
-            <div className="flex flex-col gap-2 rounded-xl border border-line bg-subtle/50 p-3.5 text-xs">
-              <label htmlFor="custom-avatar-url" className="font-semibold text-ink">
-                Avatar Image URL (HTTPS)
-              </label>
-              <div className="flex gap-2">
-                <input
-                  id="custom-avatar-url"
-                  type="url"
-                  placeholder="https://example.com/avatar.png"
-                  value={customAvatarInput}
-                  onChange={(e) => setCustomAvatarInput(e.target.value)}
-                  className="h-9 flex-1 rounded-xl border border-line bg-surface px-3 text-xs text-ink placeholder:text-muted outline-none focus:border-primary"
-                />
-                <button
-                  type="button"
-                  onClick={handleApplyCustomAvatar}
-                  disabled={!customAvatarInput.trim()}
-                  className="ease-ui rounded-xl bg-primary px-3.5 text-xs font-semibold text-on-primary hover:bg-primary-hover disabled:opacity-50"
-                >
-                  Apply
-                </button>
-              </div>
-            </div>
-          )}
 
           {/* Name Field */}
           <div className="flex flex-col gap-1.5">
@@ -385,19 +376,13 @@ export default function AccountSettingsPage() {
             <label htmlFor="timezone-select" className="text-sm font-medium text-ink">
               Time Zone
             </label>
-            <select
+            <TimeZoneCombobox
               id="timezone-select"
               value={timeZone}
-              onChange={(e) => setTimeZone(e.target.value)}
-              className="h-10 rounded-xl border border-line bg-surface px-3 text-sm text-ink outline-none focus:border-primary focus:ring-1 focus:ring-primary"
-            >
-              {TIMEZONES.map((tz) => (
-                <option key={tz.value} value={tz.value}>
-                  {tz.label}
-                </option>
-              ))}
-            </select>
-            <span className="text-xs text-muted">
+              onChange={setTimeZone}
+              describedBy="timezone-help"
+            />
+            <span id="timezone-help" className="text-xs text-muted">
               Used for audit logs, scan schedules, and summary report timestamps.
             </span>
           </div>
@@ -537,30 +522,43 @@ export default function AccountSettingsPage() {
                 Devices currently signed in to your account. Revoke any unfamiliar session.
               </p>
             </div>
-            {sessions.length > 1 && (
+            {sessions && sessions.length > 1 && (
               <button
                 type="button"
                 onClick={handleRevokeAllOtherSessions}
+                disabled={revokingSessionId === "all"}
                 className="ease-ui rounded-full border border-line bg-surface px-3.5 py-1.5 text-xs font-semibold text-crit hover:bg-crit-soft hover:border-crit/40"
               >
-                Revoke all other sessions
+                {revokingSessionId === "all" ? "Revoking..." : "Revoke all other sessions"}
               </button>
             )}
           </div>
 
           <div className="divide-y divide-line">
-            {sessions.map((sess) => (
+            {sessionsError && (
+              <p role="alert" className="m-0 py-3.5 text-xs text-crit">
+                Could not load your sessions. Refresh the page to try again.
+              </p>
+            )}
+            {!sessions && !sessionsError && (
+              <p role="status" className="m-0 py-3.5 text-xs text-muted">
+                Loading sessions…
+              </p>
+            )}
+            {sessions?.map((sess) => {
+              const ua = describeUserAgent(sess.userAgent);
+              return (
               <div key={sess.id} className="flex flex-wrap items-center justify-between gap-4 py-3.5">
                 <div className="flex items-center gap-3.5">
                   <div className="grid size-10 place-items-center rounded-xl border border-line bg-subtle text-ink">
                     <Icon
-                      d={sess.device.includes("iPhone") ? I.smartphone : sess.device.includes("MacBook") ? I.laptop : I.monitor}
+                      d={ua.kind === "desktop" ? (ua.device === "Mac" || ua.device === "Chromebook" ? I.laptop : I.monitor) : I.smartphone}
                       size={20}
                     />
                   </div>
                   <div className="flex flex-col">
                     <div className="flex items-center gap-2">
-                      <span className="text-sm font-semibold text-ink">{sess.device} · {sess.browser}</span>
+                      <span className="text-sm font-semibold text-ink">{ua.device} · {ua.browser}</span>
                       {sess.isCurrent && (
                         <span className="rounded-full bg-primary-soft px-2 py-0.5 text-[11px] font-bold text-ptext">
                           Current device
@@ -568,7 +566,8 @@ export default function AccountSettingsPage() {
                       )}
                     </div>
                     <span className="text-xs text-muted">
-                      {sess.location} · IP {sess.ipAddress} · {sess.lastActive}
+                      {sess.ipAddress ? `IP ${sess.ipAddress} · ` : ""}
+                      {lastActiveLabel(sess)}
                     </span>
                   </div>
                 </div>
@@ -584,7 +583,8 @@ export default function AccountSettingsPage() {
                   </button>
                 )}
               </div>
-            ))}
+              );
+            })}
           </div>
         </div>
 

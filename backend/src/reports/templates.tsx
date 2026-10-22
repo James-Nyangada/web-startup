@@ -266,7 +266,7 @@ export function AgencyOverviewReport({
           </div>
         )}
         <h1>{title}</h1>
-        <p className="site">{orgDisplayName} · Multi-storefront portfolio audit (R-05)</p>
+        <p className="site">{orgDisplayName} · Multi-storefront portfolio audit</p>
         <dl className="meta">
           <dt>Generated</dt>
           <dd>{new Date(data.generatedAt).toUTCString()}</dd>

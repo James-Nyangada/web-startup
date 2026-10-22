@@ -186,7 +186,9 @@ export function useScanProgress(orgId: string, scanId: string, initialScan?: Sca
       setIsPolling(true);
       pollTimer = setInterval(async () => {
         try {
-          const res = await apiClient<{ scan: ScanRecord }>(`/v1/orgs/${orgId}/scans/${scanId}`);
+          const res = await apiClient<{ scan: ScanRecord }>(`/v1/orgs/${orgId}/scans/${scanId}`, {
+            background: true,
+          });
           if (isDisposed) return;
           const s = res.scan;
           setScan(s);

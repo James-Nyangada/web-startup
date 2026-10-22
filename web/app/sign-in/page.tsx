@@ -5,11 +5,12 @@ import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { AuthCard } from '@/components/auth/auth-card';
 import { authClient, ApiException } from '@/lib/auth-client';
+import { landingPathAfterSignIn } from '@/lib/post-sign-in';
 
 function SignInContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const redirectUrl = searchParams.get('redirect') || '/overview';
+  const requestedRedirect = searchParams.get('redirect');
 
   const errorRef = useRef<HTMLDivElement | null>(null);
   const [email, setEmail] = useState('');
@@ -37,7 +38,7 @@ function SignInContent() {
     setIsSubmitting(true);
     try {
       await authClient.signIn({ email, password });
-      router.push(redirectUrl);
+      router.push(await landingPathAfterSignIn(requestedRedirect));
     } catch (err: unknown) {
       if (err instanceof ApiException) {
         if (err.code === 'RATE_LIMITED') {

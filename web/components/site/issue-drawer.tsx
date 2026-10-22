@@ -56,6 +56,20 @@ export function IssueDrawer({
 
   useFocusTrap(panel, isOpen && !modalOpen);
 
+  // Lock page scroll while open so the wheel scrolls the drawer, not the page behind it.
+  useEffect(() => {
+    if (!shown) return;
+    const root = document.documentElement;
+    const prevOverflow = root.style.overflow;
+    const prevGutter = root.style.scrollbarGutter;
+    root.style.scrollbarGutter = "stable";
+    root.style.overflow = "hidden";
+    return () => {
+      root.style.overflow = prevOverflow;
+      root.style.scrollbarGutter = prevGutter;
+    };
+  }, [shown]);
+
   // Enter / exit animation.
   useGSAP(
     () => {
@@ -104,14 +118,14 @@ export function IssueDrawer({
         ref={scrim}
         onClick={onClose}
         aria-hidden="true"
-        className="fixed inset-0 z-20 bg-scrim"
+        className="fixed inset-0 z-40 bg-scrim"
       />
       <aside
         ref={panel}
         role="dialog"
         aria-modal="true"
         aria-labelledby="drawer-title"
-        className="fixed inset-y-0 right-0 z-[21] flex w-full flex-col border-l border-line bg-surface shadow-dialog sm:w-[min(560px,100vw)] sm:rounded-l-xl overflow-hidden"
+        className="fixed inset-y-0 right-0 z-[41] flex w-full flex-col overscroll-contain border-l border-line bg-surface shadow-dialog sm:w-[min(560px,100vw)] sm:rounded-l-xl overflow-hidden"
       >
         <IssueDetailContent
           issue={shown}

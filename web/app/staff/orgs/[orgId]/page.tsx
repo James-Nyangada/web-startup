@@ -54,7 +54,7 @@ export default function StaffOrgDetailPage() {
   return (
     <StaffShell
       title={o?.name ?? "Organisation"}
-      screen="S-71"
+     
       actions={
         o && !o.deletedAt ? (
           <div className="flex flex-wrap gap-2">

@@ -107,7 +107,7 @@ export function OrgSwitcher({
           onClick={() => setOpen((prev) => !prev)}
           aria-expanded={open}
           aria-haspopup="true"
-          className="ease-ui flex w-full items-center gap-3 rounded-full border border-line bg-surface p-2 text-left text-ink hover:border-line-strong focus-visible:outline-2 focus-visible:outline-primary"
+          className="ease-ui flex w-full items-center gap-3 rounded-2xl border border-line bg-surface p-2 pr-3 text-left text-ink hover:border-line-strong focus-visible:outline-2 focus-visible:outline-primary"
         >
           <span aria-hidden="true" className="grid size-8 place-items-center rounded-md bg-primary text-[13px] font-bold text-on-primary">
             {currentOrg.initials}

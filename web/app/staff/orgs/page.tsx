@@ -41,7 +41,7 @@ export default function StaffOrgsPage() {
   }, [load]);
 
   return (
-    <StaffShell title="Organisations" screen="S-70">
+    <StaffShell title="Organisations">
       <form role="search" onSubmit={(e) => e.preventDefault()} className={`${card} mb-4 grid gap-3 sm:grid-cols-[2fr_1fr_1fr_auto]`}>
         <div>
           <label htmlFor="org-q" className="mb-1 block text-xs font-semibold text-muted">

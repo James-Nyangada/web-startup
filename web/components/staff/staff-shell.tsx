@@ -9,11 +9,11 @@ import { ApiException } from "@/lib/api";
 import { staffApi, type StaffSession } from "@/lib/admin-api";
 
 const NAV = [
-  { href: "/staff/orgs", label: "Organisations", icon: I.building, screen: "S-70" },
-  { href: "/staff/queues", label: "Queues & system", icon: I.monitor, screen: "S-72" },
-  { href: "/staff/leads", label: "Leads", icon: I.mail, screen: "S-73" },
-  { href: "/staff/content", label: "Content review", icon: I.fileText, screen: "S-74" },
-  { href: "/staff/flags", label: "Feature flags", icon: I.settings, screen: "S-75" },
+  { href: "/staff/orgs", label: "Organisations", icon: I.building },
+  { href: "/staff/queues", label: "Queues & system", icon: I.monitor },
+  { href: "/staff/leads", label: "Leads", icon: I.mail },
+  { href: "/staff/content", label: "Content review", icon: I.fileText },
+  { href: "/staff/flags", label: "Feature flags", icon: I.settings },
 ];
 
 /* Shared styles for staff screens, matching the app's tokens. */
@@ -174,12 +174,10 @@ function TotpGate({ session, onDone }: { session: StaffSession; onDone: () => Pr
 
 export function StaffShell({
   title,
-  screen,
   actions,
   children,
 }: {
   title: string;
-  screen: string;
   actions?: React.ReactNode;
   children: React.ReactNode;
 }) {
@@ -285,7 +283,7 @@ export function StaffShell({
           <main id="main" tabIndex={-1} className="mx-auto w-full max-w-[1344px] px-4 pb-16 pt-6 outline-none sm:px-8">
             <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
               <div>
-                <p className="m-0 text-xs font-semibold uppercase tracking-wider text-muted">{screen}</p>
+                <p className="m-0 text-xs font-semibold uppercase tracking-wider text-muted">Staff console</p>
                 <h1 className="m-0 font-serif text-[32px] font-normal tracking-tight">{title}</h1>
               </div>
               {actions}

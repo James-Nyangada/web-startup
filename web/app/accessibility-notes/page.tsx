@@ -4,21 +4,21 @@ import Link from "next/link";
 export const metadata: Metadata = { title: "Accessibility notes" };
 
 const SCREENS: [string, [string, string][]][] = [
-  ["S-24 Site overview", [
+  ["Site overview", [
     ["Landmarks", "header (top bar) · nav “Main” (sidebar) · nav “Breadcrumb” · main. Site tabs are a tablist inside main."],
     ["Headings", "h1 “Oakhaus Furniture” → h2 per card: Automated check score, Open problems by severity, Since 12 Oct, Score over the last 12 scans, Fix these first, Recently fixed, Coverage."],
     ["Focus order", "Skip link → org switcher → sidebar nav → breadcrumbs → command palette → theme → notifications → site URL → Download report → Scan now → tabs → score info → change links → chart toggle → chart points (each focusable, labelled “7 Oct: score 74, 13 open problems”) → Fix these first rows → links."],
     ["Accessible names", "Score info button: “About the automated check score”. Bell: “Notifications, 3 unread”. Fix-first rows: “Critical: Images are missing descriptions, Product pages. Open details”."],
     ["Live text", "None on load. Score toggletip uses role=status when opened."],
   ]],
-  ["S-25 Issues", [
+  ["Issues", [
     ["Headings", "h2 “Issues” (page h1 stays the site name) → h3 per rule group, containing the expand button."],
     ["Focus order", "Search → severity chips (aria-pressed) → Status / Template / More → Clear all → bulk bar (when shown) → per group: header button → row checkbox → row title button."],
     ["Live text", "Result count: “Showing 7 of 11 issues” (polite, on every filter change). Selection: “3 issues selected” (polite)."],
     ["Accessible names", "Row checkbox: “Select issue: Text doesn’t have enough contrast, Collection pages”. Group header announces expanded/collapsed."],
     ["Keyboard", "Space toggles checkbox; Enter on title opens drawer."],
   ]],
-  ["S-26 Issue drawer", [
+  ["Issue drawer", [
     ["Role", "role=dialog, aria-modal, labelled by the issue title."],
     ["Focus", "On open: focus moves to the h2 title (tabindex −1). Trap inside drawer. Escape closes. Focus returns to the row that opened it."],
     ["Headings", "h2 issue title → h3 per section (Who this affects, Why it matters, HTML on the first page, How to check your fix)."],
@@ -26,20 +26,20 @@ const SCREENS: [string, [string, string][]][] = [
     ["Accessible names", "Copy link, Open in full page, Close issue details. External “Open page” links add “(opens in new tab)” for screen readers."],
     ["Ignore dialog", "Focus starts on first radio. Note becomes “(required)” for Won’t fix / Accepted risk; error is shown next to the field with aria-invalid. Escape cancels."],
   ]],
-  ["S-20 Agency overview", [
+  ["Agency overview", [
     ["Headings", "h1 “Overview” (1b: greeting) → h2 per lane / client group / side card."],
     ["Tables", "1a: real table, th scope=col; Score column has aria-sort=ascending plus visible arrow."],
     ["Cards", "1b/1c: whole-card link with visible focus; card text reads name, client, score, band, reason in that order."],
     ["Mobile", "Table becomes stacked SiteCards showing name, score + band, critical/serious, status."],
   ]],
-  ["S-01 / S-03 Home and free check", [
+  ["Home and free check", [
     ["Landmarks", "header with nav “Main” · main · footer."],
     ["Form", "Visible label “Check one page free”; help text linked with aria-describedby. Invalid URL: error with role=alert next to field, aria-invalid on input."],
     ["Progress", "Step list is role=status (polite); each step reads “Running 92 automated checks, in progress”."],
     ["Result", "h1 “Results for soraskin.co” receives focus when ready. Problem rows are h3 buttons with aria-expanded. Email consent checkbox unticked by default."],
     ["Comparison table", "Row headers th scope=row; empty corner header has hidden text “Question”."],
   ]],
-  ["S-60 / S-61 Client portal", [
+  ["Client portal", [
     ["Targets", "All controls ≥ 44 px tall at 375 px."],
     ["Brand colour", "Agency colour validated ≥ 4.5:1 on white before use; focus ring uses brand colour."],
     ["Chart", "Text summary above chart; “View as table” toggle reveals a real table."],
@@ -53,10 +53,10 @@ const SCREENS: [string, [string, string][]][] = [
 
 const FILES = [
   ["/foundations", "Foundations"],
-  ["/sites/oakhaus", "Site workspace (S-24/25/26)"],
-  ["/overview", "Agency overview (S-20)"],
-  ["/", "Home + free check (S-01/S-03)"],
-  ["/portal", "Client portal (S-60/61)"],
+  ["/sites/oakhaus", "Site workspace"],
+  ["/overview", "Agency overview"],
+  ["/", "Home + free check"],
+  ["/portal", "Client portal"],
 ];
 
 export default function Page() {

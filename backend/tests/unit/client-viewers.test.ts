@@ -4,7 +4,7 @@ import request from 'supertest';
 import { orgsRouter } from '../../src/routes/orgs.js';
 import { invitationsRouter } from '../../src/routes/invitations.js';
 import { errorHandler } from '../../src/middleware/error-handler.js';
-import { fakeRepos } from '../helpers/fakes.js';
+import { fakeRepos, withSessionHeaders } from '../helpers/fakes.js';
 import { EmailSender, MockTransport } from '../../src/emails/sender.js';
 import type { Repositories } from '../../src/db/repositories/index.js';
 import type { Auth } from '../../src/lib/auth.js';
@@ -305,7 +305,7 @@ describe('P4-08 Client Viewers (S-42) & Strict Isolation', () => {
     // Setup Express App
     app = express();
     app.use(express.json());
-    app.use('/v1/orgs', orgsRouter(fakeAuth, repos, undefined, emailSender));
+    app.use('/v1/orgs', orgsRouter(withSessionHeaders(fakeAuth), repos, undefined, emailSender));
     app.use('/v1/invitations', invitationsRouter(repos, fakeAuth));
     app.use(errorHandler);
   });

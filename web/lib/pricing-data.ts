@@ -141,7 +141,7 @@ export const COMPARISON_CATEGORIES: PlanFeatureCategory[] = [
         agencyPro: true,
       },
       {
-        name: "Worst-First Agency Overview (S-20)",
+        name: "Worst-First Agency Overview",
         store: false,
         growth: false,
         agency: true,

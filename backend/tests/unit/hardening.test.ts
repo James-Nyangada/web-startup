@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { createApp } from '../../src/app.js';
 import { ErrorCode } from '../../src/shared/errors.js';
 import { MemoryStorageService } from '../../src/storage/index.js';
-import { buildTestApp, fakePool, fakeRepos, mockAuth, testConfig } from '../helpers/fakes.js';
+import { buildTestApp, fakePool, fakeRepos, mockAuth, testConfig, withSessionHeaders } from '../helpers/fakes.js';
 
 describe('P6-10: CSRF origin check', () => {
   it('refuses a cookie-authenticated write from a foreign origin', async () => {
@@ -121,7 +121,7 @@ describe('P6-10 / F-4: E-23 security notice', () => {
       pool: fakePool(),
       repos: fakeRepos().repos,
       verifyTurnstile: () => Promise.resolve(true),
-      auth,
+      auth: withSessionHeaders(auth),
       storage: new MemoryStorageService(),
       emailSender: new EmailSender({ transport }),
     });

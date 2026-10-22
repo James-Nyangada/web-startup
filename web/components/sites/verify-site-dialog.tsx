@@ -65,7 +65,10 @@ export function VerifySiteDialog({
   }
   const verifyToken = token ?? "";
   const metaSnippet = `<meta name="plainsight-verify" content="${verifyToken}">`;
-  const dnsHost = "_plainsight";
+  // The full name matters for subdomain sites: a bare "_plainsight" lands on
+  // the zone apex, which the backend does not check for shop.example.com.
+  const siteHost = new URL(site.rootUrl).hostname.replace(/^www\./, "");
+  const dnsHost = `_plainsight.${siteHost}`;
   const dnsValue = `plainsight-verify=${verifyToken}`;
   const filePath = "/.well-known/plainsight-verify.txt";
   const fileUrl = `${site.rootUrl}${filePath}`;
@@ -468,7 +471,9 @@ export function VerifySiteDialog({
                     lineHeight: "16px",
                   }}
                 >
-                  <strong>Note:</strong> DNS changes typically take 1–3 minutes to propagate, but may take longer depending on TTL.
+                  <strong>Note:</strong> If your DNS host adds your domain automatically, enter only the part before it
+                  (for example <code>_plainsight</code> or <code>_plainsight.shop</code>). DNS changes typically take 1–3 minutes to
+                  propagate, but may take longer depending on TTL.
                 </div>
               </div>
             )}

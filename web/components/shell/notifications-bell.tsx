@@ -54,44 +54,17 @@ export function NotificationsBell() {
     try {
       setLoading(true);
       const res = await apiClient<{
-        data: { items: RawNotification[]; unreadCount: number };
-      }>("/v1/notifications");
-      if (res?.data) {
-        setNotifications(res.data.items);
-        setUnreadCount(res.data.unreadCount);
+        items: RawNotification[];
+        unreadCount: number;
+      }>("/v1/notifications", {
+        background: true,
+      });
+      if (res?.items) {
+        setNotifications(res.items);
+        setUnreadCount(res.unreadCount);
       }
     } catch {
-      // Demo fallback if unauthenticated
-      setNotifications([
-        {
-          id: "notif-demo-1",
-          title: "Oakhaus Furniture regression",
-          body: "Scan #23 completed with 1 new regression in Product images.",
-          link: "/sites/demo/issues",
-          readAt: null,
-          createdAt: new Date(Date.now() - 7200000).toISOString(),
-          type: "regression_alert",
-        },
-        {
-          id: "notif-demo-2",
-          title: "Mwanga Solar scan failed",
-          body: "Weekly scan failed: server returned HTTP 503.",
-          link: "/sites/demo/scans",
-          readAt: null,
-          createdAt: new Date(Date.now() - 86400000).toISOString(),
-          type: "scan_failed",
-        },
-        {
-          id: "notif-demo-3",
-          title: "Baraka Bikes reached Good band",
-          body: "Accessibility score improved to 91 with 0 critical issues.",
-          link: "/sites/demo",
-          readAt: new Date(Date.now() - 172800000).toISOString(),
-          createdAt: new Date(Date.now() - 259200000).toISOString(),
-          type: "score_improved",
-        },
-      ]);
-      setUnreadCount(2);
+      // Keep what is already shown; a signed-out session is handled by the re-auth dialog.
     } finally {
       setLoading(false);
     }
@@ -284,7 +257,7 @@ export function NotificationsBell() {
 
           {/* Footer */}
           <div className="pt-2 border-t border-line flex items-center justify-between text-xs text-muted">
-            <span>Notification Centre (S-50)</span>
+            <span>Notification Centre</span>
             <Link
               href="/settings/notifications"
               onClick={() => setOpen(false)}

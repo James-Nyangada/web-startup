@@ -53,7 +53,7 @@ export default function StaffLeadsPage() {
   return (
     <StaffShell
       title="Leads"
-      screen="S-73"
+     
       actions={
         <a href={`${apiBaseUrl()}${staffApi.leadsCsvPath}`} className={`${btn.primary} no-underline`}>
           Export consented leads (CSV)

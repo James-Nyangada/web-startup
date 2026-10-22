@@ -152,7 +152,7 @@ export default function StaffFlagsPage() {
   }, [load]);
 
   return (
-    <StaffShell title="Feature flags" screen="S-75">
+    <StaffShell title="Feature flags">
       {error && (
         <p role="alert" className="text-sm text-crit">
           Flags could not load.

@@ -812,6 +812,22 @@ export const testGuardPolicy: GuardPolicy = {
     ),
 };
 
+/**
+ * Mock `getSession`s return the session itself; the auth middleware asks for
+ * `returnHeaders: true`, which Better Auth answers with `{ headers, response }`.
+ */
+export function withSessionHeaders(auth: Auth): Auth {
+  const api = auth.api as unknown as Record<string, unknown> & {
+    getSession: (args: { returnHeaders?: boolean }) => Promise<unknown>;
+  };
+  const getSession = api.getSession;
+  const wrapped = async (args: { returnHeaders?: boolean }) => {
+    const response = await getSession(args);
+    return args?.returnHeaders ? { headers: new Headers(), response } : response;
+  };
+  return { ...auth, api: { ...api, getSession: wrapped } } as unknown as Auth;
+}
+
 export function buildTestApp(
   options: {
     healthy?: boolean;
@@ -837,7 +853,7 @@ export function buildTestApp(
     pool: fakePool(options.healthy ?? true),
     repos,
     verifyTurnstile: options.turnstile ?? (() => Promise.resolve(true)),
-    auth: options.auth,
+    auth: options.auth && withSessionHeaders(options.auth),
     storage,
     freeChecksOptions,
     paddleClient: options.paddleClient,

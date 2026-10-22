@@ -512,17 +512,43 @@ describe('profile (/v1/me) endpoints', () => {
       .expect(200);
 
     expect(res.body.data.sessions).toHaveLength(1);
+    expect(res.body.data.sessions[0]).not.toHaveProperty('token');
+    expect(res.body.data.sessions[0].isCurrent).toBe(true);
   });
 
-  it('DELETE /v1/me/sessions/:id revokes a session', async () => {
+  it('DELETE /v1/me/sessions/:id revokes another session by id, looking up its token', async () => {
+    const [current] = await mockAuth.api.listSessions({ headers: {} });
+    vi.mocked(mockAuth.api.listSessions).mockResolvedValueOnce([
+      current,
+      { ...current, id: 'session-456', token: 'token-other' },
+    ]);
     const { app } = buildTestApp({ auth: mockAuth });
     const res = await request(app)
-      .delete('/v1/me/sessions/session-123')
+      .delete('/v1/me/sessions/session-456')
       .set('Cookie', 'better-auth.session_token=token-xyz')
       .expect(200);
 
     expect(res.body.data.success).toBe(true);
-    expect(mockAuth.api.revokeSession).toHaveBeenCalled();
+    expect(mockAuth.api.revokeSession).toHaveBeenCalledWith(
+      expect.objectContaining({ body: { token: 'token-other' } }),
+    );
+  });
+
+  it('DELETE /v1/me/sessions/:id returns 404 for a session that is not the user’s', async () => {
+    const { app } = buildTestApp({ auth: mockAuth });
+    await request(app)
+      .delete('/v1/me/sessions/someone-elses')
+      .set('Cookie', 'better-auth.session_token=token-xyz')
+      .expect(404);
+  });
+
+  it('PATCH /v1/me rejects an unknown time zone', async () => {
+    const { app } = buildTestApp({ auth: mockAuth });
+    await request(app)
+      .patch('/v1/me')
+      .set('Cookie', 'better-auth.session_token=token-xyz')
+      .send({ timeZone: 'Mars/Olympus_Mons' })
+      .expect(400);
   });
 
   it('DELETE /v1/me blocks while the user owns a paying org', async () => {

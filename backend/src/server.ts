@@ -3,6 +3,7 @@ import { createApp } from './app.js';
 import { env } from './config/env.js';
 import { closeDb, getDb } from './db/index.js';
 import { createRepositories } from './db/repositories/index.js';
+import { createEmailSender } from './emails/sender.js';
 import { logger } from './lib/logger.js';
 import { createTurnstileVerifier } from './lib/turnstile.js';
 import { startNotifyBridge, stopNotifyBridge } from './lib/notify-bridge.js';
@@ -15,7 +16,7 @@ const { pool, db } = getDb();
 void startNotifyBridge(pool);
 
 // Send-only pg-boss client: the API enqueues jobs, apps/worker consumes them.
-const boss = createBoss();
+const boss = createBoss({ max: 2 });
 boss.on('error', (err) => logger.error({ err }, 'pg-boss error'));
 await boss.start();
 await ensureQueues(boss);
@@ -27,6 +28,7 @@ const app = createApp({
   verifyTurnstile: createTurnstileVerifier(config.TURNSTILE_SECRET_KEY),
   scansOptions: { boss },
   freeChecksOptions: { boss },
+  emailSender: createEmailSender(config),
 });
 
 const server = app.listen(config.PORT, () => {

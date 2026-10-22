@@ -8,6 +8,7 @@ import { createDb } from './db/client.js';
 import type { Repositories } from './db/repositories/index.js';
 import { createAuth, type Auth } from './lib/auth.js';
 import type { TurnstileVerifier } from './lib/turnstile.js';
+import { requireAuth } from './middleware/auth.js';
 import { errorHandler, notFoundHandler } from './middleware/error-handler.js';
 import { requestLogger } from './middleware/request-logger.js';
 import { maintenanceMode } from './middleware/maintenance.js';
@@ -204,8 +205,8 @@ export function createApp({
   v1.use('/reports', reportsPublicRouter(repos, storage));
   v1.use('/manual-checks', manualChecksPublicRouter(repos, storage));
   v1.use('/public/statements', statementsPublicRouter(repos));
-  v1.use('/notifications', globalNotificationsRouter(repos));
-  v1.use('/notification-preferences', globalNotificationsRouter(repos));
+  v1.use('/notifications', requireAuth(auth), globalNotificationsRouter(repos));
+  v1.use('/notification-preferences', requireAuth(auth), globalNotificationsRouter(repos));
   v1.use('/portal', portalRouter(repos, auth));
   v1.use(
     '/staff',

@@ -163,6 +163,29 @@ describe('Site Ownership Verification (Chunk P2-07 & Section 6.9)', () => {
       expect(result.details?.foundToken).toBe('ps_mismatched');
     });
 
+    it('succeeds when a stale token on the apex sits beside a matching _plainsight record', async () => {
+      const mockLookup = (host: string): Promise<string[][]> => {
+        if (host === 'oakhaus.com') return Promise.resolve([['plainsight-verify=ps_old']]);
+        if (host === '_plainsight.oakhaus.com') {
+          return Promise.resolve([[`plainsight-verify=${expectedToken}`]]);
+        }
+        return Promise.reject(new Error('NXDOMAIN'));
+      };
+
+      const result = await verifyDns(rootUrl, expectedToken, { lookupTxt: mockLookup });
+      expect(result.ok).toBe(true);
+    });
+
+    it('succeeds when the stored TXT value kept pasted quotes', async () => {
+      const mockLookup = (host: string): Promise<string[][]> =>
+        host === 'oakhaus.com'
+          ? Promise.resolve([[`"plainsight-verify=${expectedToken}"`]])
+          : Promise.reject(new Error('NXDOMAIN'));
+
+      const result = await verifyDns(rootUrl, expectedToken, { lookupTxt: mockLookup });
+      expect(result.ok).toBe(true);
+    });
+
     it('fails when no TXT record is found for host or subdomain', async () => {
       const mockLookup = (): Promise<string[][]> => Promise.reject(new Error('ENODATA'));
 

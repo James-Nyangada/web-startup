@@ -76,7 +76,7 @@ export default function NotificationsSettingsPage() {
   return (
     <SettingsLayout
       title="Notification Preferences"
-      description="Control email alerts, weekly summaries, and scan status notifications (S-45)."
+      description="Control email alerts, weekly summaries, and scan status notifications."
     >
       <form onSubmit={handleSave} className="flex flex-col gap-6 max-w-2xl">
         <div className="rounded-2xl border border-line bg-surface p-6 shadow-card flex flex-col gap-5">
@@ -88,7 +88,7 @@ export default function NotificationsSettingsPage() {
           <label className="flex items-start justify-between gap-4 cursor-pointer">
             <div className="flex flex-col">
               <span className="text-sm font-semibold text-ink">
-                Weekly portfolio digest (E-10)
+                Weekly portfolio digest
               </span>
               <span className="text-xs text-muted">
                 Sent every Monday morning summarizing score changes, new and
@@ -109,7 +109,7 @@ export default function NotificationsSettingsPage() {
           <label className="flex items-start justify-between gap-4 cursor-pointer">
             <div className="flex flex-col">
               <span className="text-sm font-semibold text-ink">
-                Regression alerts (E-08)
+                Regression alerts
               </span>
               <span className="text-xs text-muted">
                 Instant notification when a previously fixed issue returns, or
@@ -132,7 +132,7 @@ export default function NotificationsSettingsPage() {
               htmlFor="scan-completed-select"
               className="block text-sm font-semibold text-ink mb-1"
             >
-              Scan completion summaries (E-07)
+              Scan completion summaries
             </label>
             <p className="text-xs text-muted mb-2">
               Choose when to receive automated email summaries after scheduled
@@ -164,7 +164,7 @@ export default function NotificationsSettingsPage() {
           <label className="flex items-start justify-between gap-4 cursor-pointer">
             <div className="flex flex-col">
               <span className="text-sm font-semibold text-ink">
-                Billing &amp; subscription notices (E-17)
+                Billing &amp; subscription notices
               </span>
               <span className="text-xs text-muted">
                 Receive important notices about payment renewals, failed

@@ -4,6 +4,7 @@ import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { AppShell } from "@/components/app-shell";
 import { Icon, I } from "@/components/icons";
+import { SEV, SEVERITIES } from "@/lib/severity";
 import { BandBadge, SeverityBadge, StatusBadge } from "@/components/badges";
 import { ScanProgressBar } from "./scan-progress-bar";
 import { ScanPhaseStepper } from "./scan-phase-stepper";
@@ -393,30 +394,24 @@ export function ScanDetailView({
               <div className="col-span-2 flex flex-col gap-3">
                 <span className="text-sm font-semibold text-muted">Open problems by severity</span>
                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                  <div className="flex flex-col gap-1 rounded-xl bg-crit-soft/60 p-3">
-                    <SeverityBadge sev="critical" />
-                    <span className="tnum text-2xl font-bold text-crit">
-                      {counts?.critical ?? 0}
-                    </span>
-                  </div>
-                  <div className="flex flex-col gap-1 rounded-xl bg-ser-soft/60 p-3">
-                    <SeverityBadge sev="serious" />
-                    <span className="tnum text-2xl font-bold text-ser">
-                      {counts?.serious ?? 0}
-                    </span>
-                  </div>
-                  <div className="flex flex-col gap-1 rounded-xl bg-mod-soft/60 p-3">
-                    <SeverityBadge sev="moderate" />
-                    <span className="tnum text-2xl font-bold text-mod">
-                      {counts?.moderate ?? 0}
-                    </span>
-                  </div>
-                  <div className="flex flex-col gap-1 rounded-xl bg-min-soft/60 p-3">
-                    <SeverityBadge sev="minor" />
-                    <span className="tnum text-2xl font-bold text-min">
-                      {counts?.minor ?? 0}
-                    </span>
-                  </div>
+                  {SEVERITIES.map((k) => {
+                    const n = counts?.[k] ?? 0;
+                    return (
+                      <div
+                        key={k}
+                        title={SEV[k].tip}
+                        className={`flex flex-col gap-1 rounded-xl border p-3 ${
+                          n ? `border-transparent ${SEV[k].bg} ${SEV[k].text}` : "border-line bg-subtle text-muted"
+                        }`}
+                      >
+                        <span className="inline-flex items-center gap-1.5 text-[13px] leading-5 font-semibold">
+                          <Icon d={SEV[k].icon} />
+                          {SEV[k].label}
+                        </span>
+                        <span className="tnum text-2xl leading-8 font-bold">{n}</span>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             </div>

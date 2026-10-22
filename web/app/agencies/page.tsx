@@ -112,7 +112,7 @@ export default function AgenciesPage() {
                 </div>
                 <h3 className="m-0 text-lg font-semibold">White-Label Client Reports</h3>
                 <p className="m-0 text-sm leading-relaxed text-muted">
-                  Send automated monthly PDF reports (R-04/R-05) complete with your agency logo, brand colors, executive summaries, and dated proof of continuous improvement.
+                  Send automated monthly PDF reports complete with your agency logo, brand colors, executive summaries, and dated proof of continuous improvement.
                 </p>
               </div>
 

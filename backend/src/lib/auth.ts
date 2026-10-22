@@ -32,8 +32,17 @@ export interface CreateAuthOptions {
   secureCookies?: boolean;
 }
 
+/** A signed-in session ends after 30 minutes with no activity. */
+export const SESSION_IDLE_TIMEOUT_SECONDS = 30 * 60;
+/** Activity slides the expiry forward at most once a minute, to spare the database. */
+const SESSION_REFRESH_INTERVAL_SECONDS = 60;
+
 export function createAuth(db: Database, options: CreateAuthOptions) {
   return betterAuth({
+    session: {
+      expiresIn: SESSION_IDLE_TIMEOUT_SECONDS,
+      updateAge: SESSION_REFRESH_INTERVAL_SECONDS,
+    },
     database: drizzleAdapter(db, {
       provider: 'pg',
       schema: {

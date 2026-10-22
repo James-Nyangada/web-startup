@@ -39,6 +39,7 @@
   --shc: rgba(12, 23, 84, 0.04) 0 4px 5px, rgba(12, 23, 84, 0.03) 0 4px 10px, rgba(12, 23, 84, 0.05) 0 10px 20px;
   --sh2: rgba(12, 23, 84, 0.04) 0 4px 5px, rgba(12, 23, 84, 0.03) 0 8px 15px, rgba(12, 23, 84, 0.12) 0 15px 30px;
   --sh3: rgba(12, 23, 84, 0.06) 0 8px 10px, rgba(12, 23, 84, 0.08) 0 20px 40px, rgba(12, 23, 84, 0.18) 0 40px 80px;
+  --select-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23476788' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
   color-scheme: light;
 }
 
@@ -49,6 +50,7 @@
   --sunk: #0e1626;
   --text: #e6eaf0;
   --muted: #a3aec0;
+  --select-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23a3aec0' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
   --border: #26354f;
   --bstrong: #6b7a90;
   --primary: #6ea8ff;
@@ -148,9 +150,43 @@
   button:disabled {
     cursor: default;
   }
+  /* Native select arrows ignore padding and sit flush against rounded borders; draw our own. */
+  select:not([multiple]):not([size]) {
+    appearance: none;
+    background-image: var(--select-chevron);
+    background-repeat: no-repeat;
+    background-position: right 0.75rem center;
+    background-size: 1rem;
+    padding-right: 2.25rem !important;
+    cursor: pointer;
+  }
+  select option {
+    background-color: var(--bg);
+    color: var(--text);
+  }
   /* Serif display headings use italics for emphasis. */
   .font-serif em {
     font-style: italic;
+  }
+  /* Preflight zeroes every margin, which strips the browser's centring of modal dialogs. */
+  dialog:modal {
+    margin: auto;
+    max-height: calc(100dvh - 2rem);
+    overflow-y: auto;
+  }
+  dialog:modal[open] {
+    animation: dialog-in 180ms ease-out;
+  }
+  dialog::backdrop {
+    background: rgba(5, 8, 15, 0.55);
+    backdrop-filter: blur(4px);
+  }
+}
+
+@keyframes dialog-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.98);
   }
 }
 

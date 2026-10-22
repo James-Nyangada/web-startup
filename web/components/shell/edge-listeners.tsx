@@ -103,78 +103,94 @@ function ReauthDialog() {
     }
   };
 
+  const inputClass =
+    "w-full rounded-lg border border-line bg-surface px-3.5 py-2.5 text-sm text-ink placeholder:text-muted focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30 ease-ui";
+
   return (
     <dialog
       ref={ref}
       onClose={() => setOpen(false)}
       aria-labelledby="reauth-title"
       aria-describedby="reauth-desc"
-      className="w-[min(28rem,calc(100vw-2rem))] rounded-2xl border border-line bg-surface p-0 text-ink shadow-dialog backdrop:bg-scrim/60"
+      className="w-[min(26rem,calc(100vw-2rem))] rounded-2xl border border-line bg-surface p-0 text-ink shadow-dialog"
     >
-      <form onSubmit={submit} className="flex flex-col gap-4 p-6" noValidate>
-        <div>
+      <form onSubmit={submit} className="flex flex-col gap-5 p-6 sm:p-7" noValidate>
+        <div className="flex flex-col items-center text-center">
+          <span aria-hidden className="mb-4 grid size-12 place-items-center rounded-full bg-primary-soft text-ptext">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="4" y="11" width="16" height="10" rx="2" />
+              <path d="M8 11V7a4 4 0 0 1 8 0v4" />
+            </svg>
+          </span>
           <h2 id="reauth-title" className="m-0 text-lg font-semibold">
             Your session has ended
           </h2>
-          <p id="reauth-desc" className="m-0 mt-1 text-sm text-muted">
+          <p id="reauth-desc" className="m-0 mt-1.5 max-w-[22rem] text-sm text-muted">
             Sign in again to carry on. Anything you typed on this page is kept.
           </p>
         </div>
-        <div>
-          <label htmlFor="reauth-email" className="mb-1 block text-sm font-semibold">
-            Email
-          </label>
-          <input
-            id="reauth-email"
-            type="email"
-            autoComplete="username"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            className="w-full rounded-xl border border-line bg-surface px-3 py-2 text-sm text-ink focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-          />
-        </div>
-        <div>
-          <label htmlFor="reauth-password" className="mb-1 block text-sm font-semibold">
-            Password
-          </label>
-          <input
-            id="reauth-password"
-            type="password"
-            autoComplete="current-password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            aria-invalid={error ? true : undefined}
-            aria-describedby={error ? "reauth-error" : undefined}
-            autoFocus
-            className="w-full rounded-xl border border-line bg-surface px-3 py-2 text-sm text-ink focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-          />
-        </div>
-        {error && (
-          <p id="reauth-error" role="alert" className="m-0 text-sm text-crit">
-            {error}
-          </p>
-        )}
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <a href="/sign-in" target="_blank" rel="noopener" className="text-sm font-semibold">
-            Use another sign-in method (opens a new tab)
-          </a>
-          <div className="flex gap-2">
-            <button
-              type="button"
-              onClick={() => setOpen(false)}
-              className="ease-ui rounded-full border border-line px-4 py-2 text-sm font-semibold text-ink hover:bg-subtle"
-            >
-              Not now
-            </button>
-            <button
-              type="submit"
-              disabled={busy || !email || !password}
-              className="ease-ui rounded-full bg-primary px-4 py-2 text-sm font-semibold text-on-primary hover:bg-primary-hover disabled:opacity-50"
-            >
-              {busy ? "Signing in…" : "Sign in"}
-            </button>
+        <div className="flex flex-col gap-4">
+          <div>
+            <label htmlFor="reauth-email" className="mb-1.5 block text-sm font-medium">
+              Email
+            </label>
+            <input
+              id="reauth-email"
+              type="email"
+              autoComplete="username"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className={inputClass}
+            />
           </div>
+          <div>
+            <label htmlFor="reauth-password" className="mb-1.5 block text-sm font-medium">
+              Password
+            </label>
+            <input
+              id="reauth-password"
+              type="password"
+              autoComplete="current-password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              aria-invalid={error ? true : undefined}
+              aria-describedby={error ? "reauth-error" : undefined}
+              autoFocus
+              className={`${inputClass} ${error ? "border-crit" : ""}`}
+            />
+          </div>
+          {error && (
+            <p id="reauth-error" role="alert" className="m-0 rounded-lg bg-crit-soft px-3 py-2 text-sm font-medium text-crit">
+              {error}
+            </p>
+          )}
         </div>
+        <div className="flex flex-col gap-2">
+          <button
+            type="submit"
+            disabled={busy || !email || !password}
+            className="ease-ui w-full rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-on-primary hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {busy ? "Signing in…" : "Sign in"}
+          </button>
+          <button
+            type="button"
+            onClick={() => setOpen(false)}
+            className="ease-ui w-full rounded-lg px-4 py-2.5 text-sm font-semibold text-muted hover:bg-subtle hover:text-ink"
+          >
+            Not now
+          </button>
+        </div>
+        <p className="m-0 border-t border-line pt-4 text-center text-sm text-muted">
+          Signed in another way?{" "}
+          <a href="/sign-in" target="_blank" rel="noopener" className="font-semibold">
+            Use another method
+            <span className="sr-only"> (opens a new tab)</span>
+            <svg aria-hidden width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="ml-1 inline-block align-[-1px]">
+              <path d="M7 17 17 7M8 7h9v9" />
+            </svg>
+          </a>
+        </p>
       </form>
     </dialog>
   );

@@ -3,7 +3,7 @@ import express from 'express';
 import request from 'supertest';
 import { portalRouter } from '../../src/routes/portal.js';
 import { errorHandler } from '../../src/middleware/error-handler.js';
-import { fakeRepos } from '../helpers/fakes.js';
+import { fakeRepos, withSessionHeaders } from '../helpers/fakes.js';
 import type { Repositories } from '../../src/db/repositories/index.js';
 import type { Auth } from '../../src/lib/auth.js';
 
@@ -265,7 +265,7 @@ describe('P4-09 Client Portal (S-60, S-61)', () => {
 
     app = express();
     app.use(express.json());
-    app.use('/v1/portal', portalRouter(repos, fakeAuth));
+    app.use('/v1/portal', portalRouter(repos, withSessionHeaders(fakeAuth)));
     app.use(errorHandler);
   });
 

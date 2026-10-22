@@ -10,7 +10,7 @@ export interface ApiResponse<T = unknown> {
 }
 
 export const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+  process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
 
 export class ApiException extends Error {
   constructor(
@@ -48,15 +48,21 @@ export const MAINTENANCE_EVENT = 'plainsight:maintenance';
 
 const AUTH_PATHS = ['/v1/auth/', '/v1/me'];
 
-export async function apiClient<T>(path: string, options: RequestInit = {}): Promise<T> {
+export interface ApiRequestInit extends RequestInit {
+  /** A poll the app makes on its own; it does not count as activity for the idle session timeout. */
+  background?: boolean;
+}
+
+export async function apiClient<T>(path: string, options: ApiRequestInit = {}): Promise<T> {
   const payload = await apiFetch<{ data?: T } | null>(path, options);
   return (payload?.data ?? payload) as T;
 }
 
 /** Like apiClient but returns the whole body, e.g. `{ data, nextCursor }`. */
-export async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<T> {
+export async function apiFetch<T>(path: string, { background, ...options }: ApiRequestInit = {}): Promise<T> {
   const url = path.startsWith('http') ? path : `${apiBaseUrl()}${path}`;
   const headers = new Headers(options.headers);
+  if (background) headers.set('X-Background-Request', '1');
 
   if (!headers.has('Content-Type') && options.body && typeof options.body === 'string') {
     headers.set('Content-Type', 'application/json');

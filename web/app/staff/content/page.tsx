@@ -47,7 +47,7 @@ export default function StaffContentPage() {
   };
 
   return (
-    <StaffShell title="Content review" screen="S-74">
+    <StaffShell title="Content review">
       <p className="mb-4 max-w-3xl text-sm text-muted">
         These AI suggestions were reported as wrong or unhelpful and are hidden from customers. Approve one to show it
         again, delete it so a fresh one is generated, or turn a good one into an unpublished written-guide draft.

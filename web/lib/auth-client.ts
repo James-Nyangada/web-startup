@@ -71,6 +71,16 @@ export interface ChangePasswordParams {
   newPassword: string;
 }
 
+export interface ActiveSession {
+  id: string;
+  ipAddress: string | null;
+  userAgent: string | null;
+  createdAt: string;
+  lastActiveAt: string;
+  expiresAt: string;
+  isCurrent: boolean;
+}
+
 export const authClient = {
   async signUp(params: SignUpParams) {
     return apiClient<{ message: string }>('/v1/auth/sign-up', {
@@ -140,6 +150,18 @@ export const authClient = {
     });
   },
 
+  /** Uploads a profile picture (a data URL, already resized) and returns the updated user. */
+  async uploadAvatar(dataUrl: string) {
+    return apiClient<{ user: User }>('/v1/me/avatar', {
+      method: 'POST',
+      body: JSON.stringify({ dataUrl }),
+    });
+  },
+
+  async removeAvatar() {
+    return apiClient<{ user: User }>('/v1/me/avatar', { method: 'DELETE' });
+  },
+
   async changePassword(params: ChangePasswordParams) {
     return apiClient<{ success: boolean; message: string }>('/v1/me/change-password', {
       method: 'POST',
@@ -148,7 +170,7 @@ export const authClient = {
   },
 
   async listSessions() {
-    return apiClient<{ sessions: any[] }>('/v1/me/sessions', {
+    return apiClient<{ sessions: ActiveSession[] }>('/v1/me/sessions', {
       method: 'GET',
     });
   },

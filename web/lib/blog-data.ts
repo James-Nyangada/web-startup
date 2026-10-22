@@ -195,8 +195,8 @@ export const CHANGELOG_ENTRIES: ChangelogEntry[] = [
     summary:
       "Launched complete marketing platform, agency care plan framework, comprehensive legal and trust documentation, and public engineering blog.",
     highlights: [
-      "Screen S-06 For Agencies: Interactive care plan revenue calculator and white-label care plan packages.",
-      "Screen S-07 Legal Documents: Comprehensive Terms of Service, Privacy Policy (zero tracking cookies), DPA, and Subprocessors Registry.",
+      "Screen For Agencies: Interactive care plan revenue calculator and white-label care plan packages.",
+      "Screen Legal Documents: Comprehensive Terms of Service, Privacy Policy (zero tracking cookies), DPA, and Subprocessors Registry.",
       "PlainsightBot Documentation (/bot): Detailed crawler politeness, 1 req/sec rate caps, and robots.txt compliance specs.",
       "Machine-readable infrastructure: Automated sitemap.xml and robots.txt generation.",
     ],
@@ -236,7 +236,7 @@ export const CHANGELOG_ENTRIES: ChangelogEntry[] = [
     summary:
       "Complete personal profile controls, 12 IANA time zones, light/dark/system theme selection, active session management, and GDPR personal data export.",
     highlights: [
-      "Screen S-48 implementation with device-specific session badges and one-click remote session revocation.",
+      "implementation with device-specific session badges and one-click remote session revocation.",
       "Delete Account modal with sole-owner protection preventing orphaned organizations.",
       "Show/hide password toggles with accessible eye icons and length validation.",
     ],
@@ -247,7 +247,7 @@ export const CHANGELOG_ENTRIES: ChangelogEntry[] = [
     title: "Agency Organisation Overview & Worst-First Sorting",
     badge: "Feature",
     summary:
-      "Screen S-20 agency dashboard providing worst-first ranking across client properties, client grouping, and persistent layout preferences.",
+      "agency dashboard providing worst-first ranking across client properties, client grouping, and persistent layout preferences.",
     highlights: [
       "Default worst-first sorting by accessibility score and open critical violations.",
       "Client grouping lanes for agencies managing multiple client storefronts.",
