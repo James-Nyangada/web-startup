@@ -1,6 +1,6 @@
 # Issues CSV Export Specification (P2-22)
 
-Plainsight provides on-demand CSV export for accessibility issues at both the API level and user interface. Exports strictly respect the active query filters (status, severity, template, WCAG criteria, assignee, regression status, and keyword search).
+EveryVisitor provides on-demand CSV export for accessibility issues at both the API level and user interface. Exports strictly respect the active query filters (status, severity, template, WCAG criteria, assignee, regression status, and keyword search).
 
 ## Endpoints
 

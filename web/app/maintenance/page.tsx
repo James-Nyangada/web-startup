@@ -20,7 +20,7 @@ export default function MaintenancePage() {
       }
     >
       <p className="m-0">
-        Plainsight is down for scheduled maintenance, usually for less than 15 minutes. Your sites, scans and reports are
+        EveryVisitor is down for scheduled maintenance, usually for less than 15 minutes. Your sites, scans and reports are
         safe, and scheduled scans run once we are back.
       </p>
       <p className="m-0 mt-3 text-sm">Refresh this page in a few minutes.</p>

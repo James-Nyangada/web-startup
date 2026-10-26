@@ -6,7 +6,7 @@ import { BLOG_POSTS } from "@/lib/blog-data";
 
 export const metadata: Metadata = {
   title: "Accessibility Engineering Blog",
-  description: "In-depth technical guides, WCAG 2.2 analysis, and e-commerce compliance insights from the Plainsight engineering team.",
+  description: "In-depth technical guides, WCAG 2.2 analysis, and e-commerce compliance insights from the EveryVisitor engineering team.",
 };
 
 const H2 = "m-0 font-serif text-[42px] leading-[46px] font-normal sm:text-[56px] sm:leading-[60px]";

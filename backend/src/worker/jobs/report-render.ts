@@ -305,13 +305,13 @@ export async function handleReportRender(
       };
 
       pdfBuffer = await renderAgencyOverviewReportPdf(overviewData, {
-        paper: 'a4',
+        paper: report.paper,
         branding: reportBranding,
       });
     } else if (report.type === 'evidence_pack') {
       const evidenceData = await buildEvidencePackData(report, ctx);
       pdfBuffer = await renderEvidencePackReportPdf(evidenceData, {
-        paper: 'a4',
+        paper: report.paper,
         branding: reportBranding,
       });
     } else if (report.type === 'client_monthly') {
@@ -395,85 +395,30 @@ export async function handleReportRender(
       };
 
       pdfBuffer = await renderClientMonthlyReportPdf(monthlyData, {
-        paper: 'a4',
+        paper: report.paper,
         branding: reportBranding,
       });
     } else {
-      let scanResult: ScanResult | null = null;
-
-      if (report.scanId) {
-        const scan = await ctx.repos.scans.findRawById(report.scanId);
-        if (scan?.rawKey) {
-          const rawBuffer = await ctx.storage.getObject(scan.rawKey);
-          if (rawBuffer) {
-            try {
-              scanResult = JSON.parse(rawBuffer.toString('utf-8')) as ScanResult;
-            } catch {
-              scanResult = null;
-            }
-          }
-        }
+      // Reports queued before the API resolved a scan fall back to the site's latest one
+      const scan = report.scanId
+        ? await ctx.repos.scans.findRawById(report.scanId)
+        : report.siteId
+          ? await ctx.repos.scans.findLatestReportable(asOrgId(report.orgId), report.siteId)
+          : null;
+      if (!scan?.rawKey) {
+        throw new Error(`Report ${report.id} has no scan results to render.`);
       }
-
-      if (!scanResult) {
-        const site = report.siteId ? await ctx.repos.sites.findRawById(report.siteId) : null;
-        const rootUrl = site?.rootUrl ?? 'https://example.com';
-        scanResult = {
-          engineVersion: '1.0.0',
-          axeVersion: '4.14.0',
-          standard: 'wcag22aa',
-          rootUrl,
-          platform: (site?.platform as ScanResult['platform']) ?? 'custom',
-          status: 'completed',
-          startedAt: new Date(Date.now() - 120_000).toISOString(),
-          finishedAt: new Date().toISOString(),
-          pagesDiscovered: 1,
-          pagesPlanned: 1,
-          pagesScanned: 1,
-          pagesFailed: 0,
-          templatesFound: 1,
-          score: report.scanScore ?? 80,
-          counts: {
-            critical: 0,
-            serious: 0,
-            moderate: 0,
-            minor: 0,
-            total: 0,
-            needsReview: 0,
-          },
-          planned: [],
-          pages: [
-            {
-              url: rootUrl,
-              finalUrl: rootUrl,
-              templateKey: 'home',
-              status: 'ok',
-              httpStatus: 200,
-              loadMs: 120,
-              title: site?.name ?? 'Home',
-              score: report.scanScore ?? 80,
-              violations: 0,
-              incomplete: 0,
-              passes: 10,
-            },
-          ],
-          issues: [],
-          discovery: {
-            robots: { found: false, crawlDelaySeconds: undefined, sitemaps: [] },
-            sitemapsRead: [],
-            crawled: false,
-            stats: { sitemapUrls: 0, crawlUrls: 0, dropped: 0, requestIntervalMs: 1000 },
-            errors: [],
-          },
-          throttled: false,
-        };
+      const rawBuffer = await ctx.storage.getObject(scan.rawKey);
+      if (!rawBuffer) {
+        throw new Error(`Scan results for ${scan.id} are no longer stored.`);
       }
+      const scanResult = JSON.parse(rawBuffer.toString('utf-8')) as ScanResult;
 
       const reportType = report.type === 'scan_summary' ? 'summary' : 'full';
 
       pdfBuffer = await renderReportPdf(scanResult, {
         type: reportType,
-        paper: 'a4',
+        paper: report.paper,
         branding: reportBranding,
       });
     }

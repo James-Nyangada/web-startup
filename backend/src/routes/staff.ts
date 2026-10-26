@@ -96,7 +96,7 @@ export function staffRouter(
   options: StaffRouterOptions = {},
 ): Router {
   const router = Router();
-  const issuer = options.totpIssuer ?? 'Plainsight Staff';
+  const issuer = options.totpIssuer ?? 'EveryVisitor Staff';
   router.use(requireAuth(auth), loadStaff(repos));
 
   const audit = (

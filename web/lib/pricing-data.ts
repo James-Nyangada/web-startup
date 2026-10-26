@@ -195,7 +195,7 @@ export const PRICING_FAQS = [
   },
   {
     q: "What happens if a client site has more than 250 or 500 pages?",
-    a: "Plainsight uses intelligent template discovery. Online stores typically share repeating templates (product pages, collection listings, blog posts). By sampling 250 to 500 representative URLs across each template family, we detect over 95% of unique template-level code defects without overloading your server.",
+    a: "EveryVisitor uses intelligent template discovery. Online stores typically share repeating templates (product pages, collection listings, blog posts). By sampling 250 to 500 representative URLs across each template family, we detect over 95% of unique template-level code defects without overloading your server.",
   },
   {
     q: "What payment methods and currencies do you support?",

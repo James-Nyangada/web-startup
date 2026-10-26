@@ -32,7 +32,7 @@ export function GET() {
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Plainsight Data Processing Agreement</title>
+<title>EveryVisitor Data Processing Agreement</title>
 <style>
   body { font: 16px/1.6 Georgia, "Times New Roman", serif; color: #111; max-width: 46rem; margin: 2.5rem auto; padding: 0 1.25rem; }
   h1 { font-size: 1.75rem; margin: 0 0 .25rem; }
@@ -47,11 +47,11 @@ export function GET() {
 <body>
 <main>
 <h1>Data Processing Agreement</h1>
-<p class="meta">Plainsight Ltd. · Article 28 GDPR and UK GDPR · Version of ${esc(DPA_UPDATED)}</p>
+<p class="meta">EveryVisitor Ltd. · Article 28 GDPR and UK GDPR · Version of ${esc(DPA_UPDATED)}</p>
 ${body}
 <section class="sigs" aria-label="Signatures">
 ${signature("Controller (Customer)")}
-${signature("Processor (Plainsight Ltd.)")}
+${signature("Processor (EveryVisitor Ltd.)")}
 </section>
 </main>
 </body>
@@ -60,7 +60,7 @@ ${signature("Processor (Plainsight Ltd.)")}
   return new Response(html, {
     headers: {
       "Content-Type": "text/html; charset=utf-8",
-      "Content-Disposition": 'attachment; filename="plainsight-dpa.html"',
+      "Content-Disposition": 'attachment; filename="everyvisitor-dpa.html"',
       "Cache-Control": "public, max-age=3600",
     },
   });

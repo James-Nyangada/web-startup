@@ -5,6 +5,7 @@ import {
   scans,
   sites,
   users,
+  type ReportPaper,
   type ReportRow,
   type ReportType,
   type ReportStatus,
@@ -16,6 +17,7 @@ export interface CreateReportInput {
   scanId?: string | null;
   type: ReportType;
   branded?: boolean;
+  paper?: ReportPaper;
   requestedBy?: string | null;
   expiresAt?: Date | null;
   /** Period covered, YYYY-MM-DD (evidence packs). */
@@ -46,6 +48,7 @@ export function reportsRepository(db: Database) {
           scanId: input.scanId ?? null,
           type: input.type,
           branded: input.branded ?? false,
+          paper: input.paper ?? 'a4',
           requestedBy: input.requestedBy ?? null,
           expiresAt: input.expiresAt ?? null,
           dateFrom: input.dateFrom ?? null,

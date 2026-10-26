@@ -16,7 +16,7 @@
 
 ## 1. Executive Summary
 
-Phase 2 introduces the core web application for Plainsight, encompassing onboarding, site verification, scanning workflows, issues management, reporting, team administration, and account profile controls.
+Phase 2 introduces the core web application for EveryVisitor, encompassing onboarding, site verification, scanning workflows, issues management, reporting, team administration, and account profile controls.
 
 As an accessibility-first product, all internal application interfaces were evaluated against WCAG 2.2 Level AA requirements. All 14 major screen groups pass manual keyboard navigation, screen reader verification, and automated axe audits with **0 critical, serious, or moderate violations**.
 

@@ -31,7 +31,7 @@ export async function generateMetadata({ params }: FixGuidePageProps): Promise<M
   const guide = getFixGuideBySlug(slug);
 
   if (!guide) {
-    return { title: "Fix Guide Not Found | Plainsight" };
+    return { title: "Fix Guide Not Found | EveryVisitor" };
   }
 
   const platformName = guide.platform === "shopify" ? "Shopify" : "WordPress";
@@ -39,7 +39,7 @@ export async function generateMetadata({ params }: FixGuidePageProps): Promise<M
     title: `${guide.title} | ${platformName} Accessibility Guide`,
     description: guide.summary,
     openGraph: {
-      title: `${guide.title} | Plainsight Fix Guide`,
+      title: `${guide.title} | EveryVisitor Fix Guide`,
       description: guide.summary,
       type: "article",
     },

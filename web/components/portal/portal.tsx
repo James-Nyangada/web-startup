@@ -95,7 +95,7 @@ function PortalFrame({ branding, user, header, children }: PortalFrameProps) {
             Contact your agency
           </a>
           <ThemeTextToggle />
-          {!branding?.hideProductBrand && <span>Powered by Plainsight</span>}
+          {!branding?.hideProductBrand && <span>Powered by EveryVisitor</span>}
         </div>
       </footer>
     </div>

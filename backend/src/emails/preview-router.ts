@@ -32,7 +32,7 @@ export function createEmailPreviewRouter(): Router {
       <!DOCTYPE html>
       <html>
         <head>
-          <title>Plainsight Email Templates Preview</title>
+          <title>EveryVisitor Email Templates Preview</title>
           <style>
             body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; padding: 40px; background: #F8F7F4; color: #1A1816; }
             h1 { font-size: 24px; margin-bottom: 24px; }

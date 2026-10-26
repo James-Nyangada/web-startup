@@ -17,7 +17,7 @@ export const DPA_SECTIONS: DpaSection[] = [
   {
     title: "1. Scope and Applicability",
     paragraphs: [
-      'This Data Processing Agreement ("DPA") supplements the Plainsight Terms of Service and applies to the extent that Plainsight Ltd. ("Processor") processes Personal Data on behalf of the Customer ("Controller") in the course of providing the Plainsight accessibility monitoring and scan engine services.',
+      'This Data Processing Agreement ("DPA") supplements the EveryVisitor Terms of Service and applies to the extent that EveryVisitor Ltd. ("Processor") processes Personal Data on behalf of the Customer ("Controller") in the course of providing the EveryVisitor accessibility monitoring and scan engine services.',
       'This DPA complies with the requirements of Article 28 of Regulation (EU) 2016/679 ("GDPR") and the UK General Data Protection Regulation ("UK GDPR").',
     ],
   },
@@ -34,7 +34,7 @@ export const DPA_SECTIONS: DpaSection[] = [
       },
       {
         term: "Categories of Data Subjects",
-        text: "Customer employees, contractors, agency clients, and authorized users who access the Plainsight platform.",
+        text: "Customer employees, contractors, agency clients, and authorized users who access the EveryVisitor platform.",
       },
       {
         term: "Categories of Personal Data",

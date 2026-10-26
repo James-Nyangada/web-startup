@@ -104,7 +104,7 @@ export function UserMenu() {
           </Link>
 
           <a
-            href="https://plainsight.example.com/docs"
+            href="/help"
             target="_blank"
             rel="noreferrer"
             role="menuitem"

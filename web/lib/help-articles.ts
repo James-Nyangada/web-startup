@@ -26,7 +26,7 @@ export const HELP_ARTICLES: HelpArticle[] = [
     summary: "Add a store or website and get your first results in a few minutes.",
     category: "Getting started",
     body: [
-      { type: "p", text: "Plainsight checks the public pages of your site for accessibility problems that automated tools can find, groups them, and tells you what to fix first." },
+      { type: "p", text: "EveryVisitor checks the public pages of your site for accessibility problems that automated tools can find, groups them, and tells you what to fix first." },
       { type: "ol", items: [
         "Go to Sites and choose Add site.",
         "Enter your home page address, such as https://yourstore.com. We detect Shopify, WordPress, WooCommerce, Webflow, Wix and Squarespace; you can change the platform if we guess wrong.",

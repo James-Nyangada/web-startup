@@ -4,6 +4,7 @@ import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Icon, I } from "@/components/icons";
+import { Lockup } from "@/components/logo";
 import { VerifySiteDialog } from "@/components/sites/verify-site-dialog";
 import { apiClient, ApiException } from "@/lib/api";
 import { appApi } from "@/lib/app-api";
@@ -66,7 +67,7 @@ const STORAGE_KEY = "plainsight_onboarding_v1";
 const EDUCATIONAL_SLIDES = [
   {
     title: "WCAG 2.2 AA Standards",
-    desc: "Plainsight checks your pages against the newest WCAG 2.2 standard, identifying contrast failures, keyboard traps, and focus indicator defects.",
+    desc: "EveryVisitor checks your pages against the newest WCAG 2.2 standard, identifying contrast failures, keyboard traps, and focus indicator defects.",
     icon: I.audit,
   },
   {
@@ -76,7 +77,7 @@ const EDUCATIONAL_SLIDES = [
   },
   {
     title: "Automated vs Manual Checking",
-    desc: "Automated testing catches 30–50% of WCAG defects instantly. Plainsight highlights what requires manual human review.",
+    desc: "Automated testing catches 30–50% of WCAG defects instantly. EveryVisitor highlights what requires manual human review.",
     icon: I.check,
   },
   {
@@ -115,8 +116,35 @@ export default function OnboardingPage() {
     try {
       const saved = localStorage.getItem(STORAGE_KEY);
       if (saved) {
-        const parsed = JSON.parse(saved);
+        const parsed = JSON.parse(saved) as Partial<OnboardingState>;
         setState((prev) => ({ ...prev, ...parsed }));
+
+        // Saved progress is per browser, not per user: if it points at an org the
+        // signed-in user is not a member of (another account, or a deleted org),
+        // discard it so this user creates their own organisation.
+        if (parsed.orgId) {
+          apiClient<{ memberships?: Array<{ orgId: string }> }>("/v1/me")
+            .then((me) => {
+              if (me.memberships?.some((m) => m.orgId === parsed.orgId)) return;
+              try {
+                localStorage.removeItem(STORAGE_KEY);
+              } catch {}
+              setState((prev) => ({
+                ...prev,
+                step: 1,
+                orgName: "",
+                orgId: undefined,
+                orgSlug: undefined,
+                siteId: undefined,
+                scanId: undefined,
+                scanProgress: 0,
+                scanScore: null,
+                scanCounts: undefined,
+                scanFailed: null,
+              }));
+            })
+            .catch(() => {});
+        }
       }
 
       if (typeof window !== "undefined") {
@@ -325,33 +353,7 @@ export default function OnboardingPage() {
           padding: "0 24px",
         }}
       >
-        <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-          <div
-            style={{
-              width: "28px",
-              height: "28px",
-              borderRadius: "6px",
-              background: "var(--primary, #2545FF)",
-              display: "grid",
-              placeItems: "center",
-              color: "#FFFFFF",
-              fontWeight: 800,
-              fontSize: "14px",
-            }}
-          >
-            P
-          </div>
-          <span
-            style={{
-              fontFamily: "'Instrument Serif', serif",
-              fontSize: "20px",
-              fontWeight: 700,
-              letterSpacing: "-0.01em",
-            }}
-          >
-            Plainsight
-          </span>
-        </div>
+        <Lockup className="h-6 text-ink" />
 
         {/* Stepper Indicator */}
         <nav
@@ -472,7 +474,7 @@ export default function OnboardingPage() {
                   lineHeight: "22px",
                 }}
               >
-                Welcome to Plainsight. Let&apos;s configure your organization settings and tailor your dashboard.
+                Welcome to EveryVisitor. Let&apos;s configure your organization settings and tailor your dashboard.
               </p>
 
               <form
@@ -521,7 +523,7 @@ export default function OnboardingPage() {
                       marginBottom: "10px",
                     }}
                   >
-                    How do you plan to use Plainsight?
+                    How do you plan to use EveryVisitor?
                   </span>
                   <div
                     style={{

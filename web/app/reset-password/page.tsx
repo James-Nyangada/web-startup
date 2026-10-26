@@ -103,7 +103,7 @@ function ResetPasswordForm() {
   return (
     <AuthCard
       title="Create new password"
-      description="Choose a strong, unique password for your Plainsight account."
+      description="Choose a strong, unique password for your EveryVisitor account."
       error={errorMessage}
       errorRef={errorRef}
       footer={

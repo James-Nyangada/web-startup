@@ -57,59 +57,24 @@ const TYPE_CATEGORIES: {
   },
 ];
 
-// Fallback demo items if backend has no recorded events yet
-const DEMO_EVIDENCE: EvidenceEventItem[] = [
-  {
-    id: "demo-ev-1",
-    orgId: "demo-org",
-    siteId: "demo-site",
-    type: "scan_completed",
-    actorId: null,
-    occurredAt: new Date(Date.now() - 2 * 3600000).toISOString(),
-    data: { scanId: "scan-demo-23", score: 84, pagesScanned: 15, counts: { new: 0, fixed: 2, regressed: 0 } },
-  },
-  {
-    id: "demo-ev-2",
-    orgId: "demo-org",
-    siteId: "demo-site",
-    type: "issue_fixed",
-    actorId: null,
-    occurredAt: new Date(Date.now() - 3 * 3600000).toISOString(),
-    data: { issueId: "iss-1", ruleId: "image-alt", score: 84 },
-  },
-  {
-    id: "demo-ev-3",
-    orgId: "demo-org",
-    siteId: "demo-site",
-    type: "report_generated",
-    actorId: null,
-    occurredAt: new Date(Date.now() - 24 * 3600000).toISOString(),
-    data: { reportId: "rep-1", type: "scan_summary" },
-  },
-  {
-    id: "demo-ev-4",
-    orgId: "demo-org",
-    siteId: "demo-site",
-    type: "site_verified",
-    actorId: null,
-    occurredAt: new Date(Date.now() - 7 * 86400000).toISOString(),
-    data: { method: "meta_tag" },
-  },
-  {
-    id: "demo-ev-5",
-    orgId: "demo-org",
-    siteId: "demo-site",
-    type: "site_added",
-    actorId: null,
-    occurredAt: new Date(Date.now() - 14 * 86400000).toISOString(),
-    data: { name: "Storefront", platform: "shopify" },
-  },
-];
+const REPORT_NAMES: Record<string, string> = {
+  scan_summary: "Scan summary",
+  full: "Full audit report",
+  evidence_pack: "Evidence pack",
+  client_monthly: "Client monthly report",
+  agency_overview: "Agency overview",
+};
+
+/** "wont_fix" → "wont fix" */
+function humanize(value: unknown, fallback: string): string {
+  return typeof value === "string" && value ? value.replace(/_/g, " ") : fallback;
+}
 
 export function EvidenceTab({ orgSlug, siteId, siteName = "Website", onToast }: EvidenceTabProps) {
   const [events, setEvents] = useState<EvidenceEventItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [total, setTotal] = useState(0);
 
   // Filters
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
@@ -123,22 +88,20 @@ export function EvidenceTab({ orgSlug, siteId, siteName = "Website", onToast }: 
 
       const params = new URLSearchParams();
       if (fromDate) params.set("from", new Date(fromDate).toISOString());
-      if (toDate) params.set("to", new Date(toDate + "T23:59:59").toISOString());
+      if (toDate) params.set("to", new Date(`${toDate}T23:59:59.999Z`).toISOString());
       params.set("limit", "100");
 
       const queryStr = params.toString() ? `?${params.toString()}` : "";
-      const res = await apiClient<{ data: { events: EvidenceEventItem[]; total: number } }>(
+      const res = await apiClient<{ events: EvidenceEventItem[]; total: number }>(
         `/v1/orgs/${orgSlug}/sites/${siteId}/evidence${queryStr}`,
       );
 
-      if (res?.data?.events) {
-        setEvents(res.data.events);
-      } else {
-        setEvents(DEMO_EVIDENCE);
-      }
+      setEvents(res?.events ?? []);
+      setTotal(res?.total ?? 0);
     } catch {
-      // Fallback to demo items if API fails or empty in initial setup
-      setEvents(DEMO_EVIDENCE);
+      setEvents([]);
+      setTotal(0);
+      setError("The evidence timeline could not be loaded. Use Refresh to try again.");
     } finally {
       setLoading(false);
     }
@@ -173,7 +136,7 @@ export function EvidenceTab({ orgSlug, siteId, siteName = "Website", onToast }: 
       case "site_added":
         return {
           title: "Site registered in workspace",
-          detail: `Initial record established for ${siteName}.`,
+          detail: `Initial record established for ${event.data?.name || siteName}${event.data?.rootUrl ? ` (${event.data.rootUrl})` : ""}.`,
           icon: I.globe,
           badge: "Site",
           badgeColor: "bg-surface-sunken text-muted border-line",
@@ -183,7 +146,7 @@ export function EvidenceTab({ orgSlug, siteId, siteName = "Website", onToast }: 
       case "site_verified":
         return {
           title: "Domain ownership verified",
-          detail: `Ownership verified via ${event.data?.method?.replace("_", " ") || "token"}.`,
+          detail: `Ownership verified via ${humanize(event.data?.method, "token")}.`,
           icon: I.fixed,
           badge: "Verification",
           badgeColor: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/20",
@@ -193,7 +156,7 @@ export function EvidenceTab({ orgSlug, siteId, siteName = "Website", onToast }: 
       case "scan_completed":
         return {
           title: `Automated scan completed (Score ${event.data?.score ?? "—"}/100)`,
-          detail: `Scanned ${event.data?.pagesScanned ?? "all"} pages with ${event.data?.counts?.fixed ?? 0} fixes and ${event.data?.counts?.regressed ?? 0} regressions.`,
+          detail: `Scanned ${event.data?.pagesScanned ?? "all"} pages: ${event.data?.counts?.new ?? 0} new, ${event.data?.counts?.fixed ?? 0} fixed and ${event.data?.counts?.regressed ?? 0} regressed issues.`,
           icon: I.search,
           badge: "Scan",
           badgeColor: "bg-indigo-500/10 text-indigo-700 dark:text-indigo-400 border-indigo-500/20",
@@ -228,7 +191,7 @@ export function EvidenceTab({ orgSlug, siteId, siteName = "Website", onToast }: 
         };
       case "issue_ignored":
         return {
-          title: `Issue ignored: ${event.data?.reason?.replace("_", " ") || "wont_fix"}`,
+          title: `Issue ignored: ${humanize(event.data?.reason, "no reason given")}`,
           detail: event.data?.note || "Exception granted with justification recorded.",
           icon: I.shield,
           badge: "Ignored",
@@ -240,8 +203,18 @@ export function EvidenceTab({ orgSlug, siteId, siteName = "Website", onToast }: 
         };
       case "manual_check_logged":
         return {
-          title: `Manual testing logged: ${event.data?.checkType || "Human check"}`,
-          detail: `Result: ${event.data?.result || "completed"}. Tester: ${event.data?.tester || "Staff"}.`,
+          title: event.data?.deleted
+            ? `Manual check removed: ${humanize(event.data?.checkType, "manual check")}`
+            : `Manual testing logged: ${humanize(event.data?.checkType, "manual check")}`,
+          detail: event.data?.deleted
+            ? "The check record was deleted; this entry preserves that it existed."
+            : [
+                `Result: ${humanize(event.data?.result, "recorded")}.`,
+                event.data?.performedByName ? `Tester: ${event.data.performedByName}.` : null,
+                event.data?.tool ? `Tool: ${event.data.tool}.` : null,
+              ]
+                .filter(Boolean)
+                .join(" "),
           icon: I.users,
           badge: "Manual",
           badgeColor: "bg-blue-500/10 text-blue-700 dark:text-blue-400 border-blue-500/20",
@@ -251,7 +224,15 @@ export function EvidenceTab({ orgSlug, siteId, siteName = "Website", onToast }: 
       case "statement_published":
         return {
           title: `Accessibility statement published (v${event.data?.version ?? 1})`,
-          detail: "Public conformance disclosure statement generated and made publicly available.",
+          detail: [
+            "Accessibility statement published",
+            event.data?.targetStandard ? `against ${humanize(event.data.targetStandard, "")}` : null,
+            event.data?.conformanceStatus
+              ? `with ${humanize(event.data.conformanceStatus, "")} conformance`
+              : null,
+          ]
+            .filter(Boolean)
+            .join(" ") + ".",
           icon: I.fileText,
           badge: "Statement",
           badgeColor: "bg-purple-500/10 text-purple-700 dark:text-purple-400 border-purple-500/20",
@@ -260,8 +241,8 @@ export function EvidenceTab({ orgSlug, siteId, siteName = "Website", onToast }: 
         };
       case "report_generated":
         return {
-          title: `Report generated: ${event.data?.type?.replace("_", " ") || "Audit report"}`,
-          detail: "Standalone PDF report artifact generated and stored.",
+          title: `Report generated: ${REPORT_NAMES[event.data?.type] ?? "Audit report"}`,
+          detail: "PDF report generated and stored.",
           icon: I.fileText,
           badge: "Report",
           badgeColor: "bg-sky-500/10 text-sky-700 dark:text-sky-400 border-sky-500/20",
@@ -270,8 +251,11 @@ export function EvidenceTab({ orgSlug, siteId, siteName = "Website", onToast }: 
         };
       case "report_sent":
         return {
-          title: "Report delivered via email",
-          detail: `Sent to ${event.data?.recipients?.length ?? 1} recipient(s).`,
+          title: `Report emailed: ${REPORT_NAMES[event.data?.type] ?? "Audit report"}`,
+          detail: (() => {
+            const count = Array.isArray(event.data?.recipients) ? event.data.recipients.length : 0;
+            return count ? `Sent to ${count} ${count === 1 ? "recipient" : "recipients"}.` : "Sent by email.";
+          })(),
           icon: I.external,
           badge: "Delivery",
           badgeColor: "bg-sky-500/10 text-sky-700 dark:text-sky-400 border-sky-500/20",
@@ -280,7 +264,7 @@ export function EvidenceTab({ orgSlug, siteId, siteName = "Website", onToast }: 
         };
       case "plan_changed":
         return {
-          title: `Plan update: ${event.data?.plan || "Subscription"}`,
+          title: `Plan update: ${humanize(event.data?.plan, "subscription")}${event.data?.interval ? ` (${event.data.interval})` : ""}`,
           detail: "Organisation subscription tier changed; monitoring limits adjusted.",
           icon: I.creditCard,
           badge: "Governance",
@@ -431,7 +415,14 @@ export function EvidenceTab({ orgSlug, siteId, siteName = "Website", onToast }: 
       </div>
 
       {/* Timeline Content */}
-      {loading ? (
+      {error && !loading ? (
+        <div
+          role="alert"
+          className="rounded-2xl border border-line bg-surface p-8 text-center text-sm text-muted shadow-card"
+        >
+          {error}
+        </div>
+      ) : loading ? (
         <div className="flex flex-col gap-3 py-8" role="status" aria-label="Loading events">
           {[1, 2, 3].map((i) => (
             <div
@@ -446,10 +437,15 @@ export function EvidenceTab({ orgSlug, siteId, siteName = "Website", onToast }: 
           <div className="rounded-full bg-subtle p-3 text-muted">
             <Icon d={I.search} className="h-6 w-6" />
           </div>
-          <h3 className="mt-3 text-base font-semibold text-ink">No evidence events found</h3>
+          <h3 className="mt-3 text-base font-semibold text-ink">
+            {events.length === 0 && !fromDate && !toDate ? "No evidence recorded yet" : "No evidence events found"}
+          </h3>
           <p className="mt-1 max-w-sm text-xs text-muted">
-            No events matched your current category or date range filter. Try broadening your criteria.
+            {events.length === 0 && !fromDate && !toDate
+              ? "Events are logged automatically as this site is verified, scanned, and remediated."
+              : "No events matched your current category or date range filter. Try broadening your criteria."}
           </p>
+          {(selectedCategory !== "all" || fromDate || toDate) && (
           <button
             type="button"
             onClick={() => {
@@ -460,6 +456,7 @@ export function EvidenceTab({ orgSlug, siteId, siteName = "Website", onToast }: 
           >
             Reset all filters
           </button>
+          )}
         </div>
       ) : (
         <div className="relative border-l border-line ml-4 md:ml-6 flex flex-col gap-6 pl-6 py-2">
@@ -469,11 +466,13 @@ export function EvidenceTab({ orgSlug, siteId, siteName = "Website", onToast }: 
               day: "numeric",
               month: "short",
               year: "numeric",
+              timeZone: "UTC",
             });
             const formattedTime = new Date(event.occurredAt).toLocaleTimeString("en-GB", {
               hour: "2-digit",
               minute: "2-digit",
               hour12: false,
+              timeZone: "UTC",
             });
 
             return (
@@ -527,6 +526,11 @@ export function EvidenceTab({ orgSlug, siteId, siteName = "Website", onToast }: 
               </div>
             );
           })}
+          {total > events.length && (
+            <p className="m-0 text-xs text-muted">
+              Showing the latest {events.length} of {total} events. Narrow the date range to see older entries.
+            </p>
+          )}
         </div>
       )}
     </div>

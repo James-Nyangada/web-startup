@@ -5,11 +5,11 @@ import { MarketingFooter } from "@/components/marketing/marketing-footer";
 import { FreeCheckFlow } from "@/components/marketing/free-check-flow";
 
 export const metadata: Metadata = {
-  title: "Free Website Accessibility Checker (WCAG 2.2 AA) | Plainsight",
+  title: "Free Website Accessibility Checker (WCAG 2.2 AA) | EveryVisitor",
   description:
     "Test any public website against WCAG 2.2 AA accessibility standards in 30 seconds. Free automated audit, severity scores, and plain-English fix guides.",
   openGraph: {
-    title: "Free Website Accessibility Checker | Plainsight",
+    title: "Free Website Accessibility Checker | EveryVisitor",
     description: "Scan your storefront or digital product against WCAG 2.2 AA standards in 30 seconds.",
     type: "website",
   },

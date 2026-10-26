@@ -23,7 +23,7 @@ const envSchema = z.object({
   TURNSTILE_SECRET_KEY: z.string().optional(),
   /** Resend. When unset, emails are logged (development) instead of sent. */
   RESEND_API_KEY: z.string().optional(),
-  EMAIL_FROM: z.string().default('Plainsight <notifications@plainsight.app>'),
+  EMAIL_FROM: z.string().default('EveryVisitor <no-reply@everyvisitor.app>'),
   EMAIL_REPLY_TO: z.string().optional(),
   ENCRYPTION_KEY: z.string().min(16).default('dev_encryption_key_32_characters_long_for_aes_256'),
   AUTH_SECRET: z

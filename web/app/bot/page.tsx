@@ -25,7 +25,7 @@ export default function BotPage() {
               About <em>PlainsightBot</em>
             </h1>
             <p className="m-0 max-w-[720px] text-lg text-muted">
-              PlainsightBot is an automated web accessibility scanner operated by Plainsight.
+              PlainsightBot is an automated web accessibility scanner operated by EveryVisitor.
               It verifies web pages against WCAG 2.2 Level AA accessibility standards on behalf of verified site owners and their digital agencies.
             </p>
           </div>

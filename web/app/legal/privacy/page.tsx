@@ -2,14 +2,14 @@ import type { Metadata } from "next";
 
 export const metadata: Metadata = {
   title: "Privacy Policy",
-  description: "Plainsight Privacy Policy: Zero third-party cookies, privacy-by-design, and GDPR compliance.",
+  description: "EveryVisitor Privacy Policy: Zero third-party cookies, privacy-by-design, and GDPR compliance.",
 };
 
 export default function PrivacyPage() {
   return (
     <div className="prose prose-slate max-w-none text-ink">
       <div className="border-b border-line pb-6 mb-8">
-        <span className="text-xs font-bold tracking-wider uppercase text-primary">Plainsight Legal</span>
+        <span className="text-xs font-bold tracking-wider uppercase text-primary">EveryVisitor Legal</span>
         <h1 className="mt-2 font-serif text-3xl sm:text-4xl font-normal text-ink">Privacy Policy</h1>
         <p className="mt-2 text-sm text-muted">Last updated: October 18, 2026 · Effective date: October 18, 2026</p>
       </div>
@@ -18,7 +18,7 @@ export default function PrivacyPage() {
         <section className="rounded-xl border border-line bg-subtle p-5">
           <h2 className="text-base font-bold text-ink mb-2">Our Core Privacy Commitment: No Tracking Cookies</h2>
           <p className="mb-0">
-            Plainsight is built with a strict privacy-first philosophy. We do <strong>not</strong> use third-party tracking cookies,
+            EveryVisitor is built with a strict privacy-first philosophy. We do <strong>not</strong> use third-party tracking cookies,
             cross-site advertising beacons, or behavioral remarketing pixels anywhere on our marketing site or application.
             Our website analytics are powered by our self-hosted Umami instance, which does not track individuals, does not collect personal identifiers, and complies with EU ePrivacy regulations without annoying cookie consent banners.
           </p>
@@ -28,13 +28,13 @@ export default function PrivacyPage() {
           <h2 className="text-xl font-bold text-ink mb-3">1. Information We Collect</h2>
           <div className="flex flex-col gap-3">
             <div>
-              <strong className="text-ink">Account &amp; Profile Data:</strong> When you register for Plainsight, we collect your email address, name, hashed password, and organization name. For team invitations, we collect the email address and assigned role.
+              <strong className="text-ink">Account &amp; Profile Data:</strong> When you register for EveryVisitor, we collect your email address, name, hashed password, and organization name. For team invitations, we collect the email address and assigned role.
             </div>
             <div>
               <strong className="text-ink">Site &amp; Scan Configuration:</strong> We store the domains you register, verification records (DNS/file tokens), scan schedules, page path exclusions, and scan results (rule violations, CSS selectors, affected HTML snippets, and scores).
             </div>
             <div>
-              <strong className="text-ink">Payment &amp; Billing Data:</strong> Payment card details, billing addresses, and invoices are processed and stored directly by Paddle.com Market Ltd. (our Merchant of Record). Plainsight stores only customer references, subscription IDs, and billing status.
+              <strong className="text-ink">Payment &amp; Billing Data:</strong> Payment card details, billing addresses, and invoices are processed and stored directly by Paddle.com Market Ltd. (our Merchant of Record). EveryVisitor stores only customer references, subscription IDs, and billing status.
             </div>
             <div>
               <strong className="text-ink">Technical &amp; Log Data:</strong> We collect essential server access logs, IP addresses for security and session revocation, and audit log entries of sensitive account actions (e.g., role changes, member removals, session revocations).
@@ -56,7 +56,7 @@ export default function PrivacyPage() {
         <section>
           <h2 className="text-xl font-bold text-ink mb-3">3. Subprocessors &amp; Service Providers</h2>
           <p className="mb-3">
-            We partner with a minimal, vetted list of infrastructure and technology providers to deliver Plainsight:
+            We partner with a minimal, vetted list of infrastructure and technology providers to deliver EveryVisitor:
           </p>
           <ul className="list-disc pl-5 flex flex-col gap-2">
             <li><strong>PostgreSQL Hosting:</strong> Dedicated managed database infrastructure for persistent application data.</li>

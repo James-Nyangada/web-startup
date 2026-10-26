@@ -60,10 +60,10 @@ export function formatSlackMessage(event: string, data: Record<string, unknown>)
       }\n<${sitePath('/verify')}|Check verification settings>`;
     }
     case 'test': {
-      return `:white_check_mark: *Plainsight Webhook Test*\nWebhook connection successfully received test event.`;
+      return `:white_check_mark: *EveryVisitor Webhook Test*\nWebhook connection successfully received test event.`;
     }
     default:
-      return `*Plainsight Event: ${slackEscape(event)}* on ${siteName}\n<${appUrl}|Open dashboard>`;
+      return `*EveryVisitor Event: ${slackEscape(event)}* on ${siteName}\n<${appUrl}|Open dashboard>`;
   }
 }
 

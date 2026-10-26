@@ -1,4 +1,4 @@
-# Plainsight web (working name)
+# EveryVisitor web (working name)
 
 Next.js 16 (App Router) + Tailwind CSS v4 + GSAP implementation of the Claude Design v3 handoff in `../project/`.
 

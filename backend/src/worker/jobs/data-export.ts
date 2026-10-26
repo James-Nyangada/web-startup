@@ -4,7 +4,7 @@ import { logger } from '../../lib/logger.js';
 import { createZip, type ZipEntry } from '../../lib/zip.js';
 import type { DataExportJobPayload, WorkerContext } from '../types.js';
 
-const README = `This archive holds the personal data Plainsight keeps about you (GDPR article 15/20).
+const README = `This archive holds the personal data EveryVisitor keeps about you (GDPR article 15/20).
 
 personal-data.json   Your profile, organisation roles, client access, sign-in sessions,
                      linked sign-in methods, notification settings, in-app notifications,

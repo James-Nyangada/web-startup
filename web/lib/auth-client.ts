@@ -111,6 +111,12 @@ export const authClient = {
   },
 
   async signOut() {
+    // Onboarding progress is stored per browser; don't hand it to the next account.
+    try {
+      localStorage.removeItem('plainsight_onboarding_v1');
+    } catch {
+      // Ignore storage errors
+    }
     return apiClient<{ success: boolean }>('/v1/auth/sign-out', {
       method: 'POST',
     });

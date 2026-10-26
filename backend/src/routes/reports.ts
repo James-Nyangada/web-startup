@@ -5,6 +5,8 @@ import type { StorageService } from '../storage/index.js';
 import type { EmailSender } from '../emails/sender.js';
 import type { PgBoss } from 'pg-boss';
 import { requireOrgRole } from '../middleware/org.js';
+import { REPORT_PAPERS } from '../db/schema/index.js';
+import { REPORTABLE_SCAN_STATUSES } from '../db/repositories/scans.js';
 import { ErrorCode } from '../shared/errors.js';
 import { assertWithinPlan, PlanLimitError } from '../shared/plans.js';
 import { signReportDownloadToken, verifyReportDownloadToken } from '../reports/token.js';
@@ -29,6 +31,7 @@ const createReportSchema = z.object({
     })
     .optional(),
   branded: z.boolean().default(false),
+  paper: z.enum(REPORT_PAPERS).default('a4'),
 });
 
 const sendReportSchema = z.object({
@@ -66,8 +69,10 @@ export function orgReportsRouter(repos: Repositories, options?: ReportsRouterOpt
       return;
     }
 
-    const { type, scanId, branded } = parse.data;
-    let { siteId } = parse.data;
+    const { type, branded, paper } = parse.data;
+    let { siteId, scanId } = parse.data;
+    // Summary and full reports render a stored scan result, so they always need a scan
+    const needsScan = type === 'scan_summary' || type === 'full';
 
     if (branded) {
       assertWithinPlan(req.org, 'white_label');
@@ -112,6 +117,26 @@ export function orgReportsRouter(repos: Repositories, options?: ReportsRouterOpt
         });
         return;
       }
+      if (siteId && scan.siteId !== siteId) {
+        res.status(404).json({
+          error: {
+            code: ErrorCode.NOT_FOUND,
+            message: 'Scan not found.',
+            details: {},
+          },
+        });
+        return;
+      }
+      if (needsScan && (!REPORTABLE_SCAN_STATUSES.includes(scan.status) || !scan.rawKey)) {
+        res.status(409).json({
+          error: {
+            code: ErrorCode.CONFLICT,
+            message: 'That scan has no results to report on. Choose a completed scan.',
+            details: { field: 'scanId' },
+          },
+        });
+        return;
+      }
       if (!siteId) {
         siteId = scan.siteId;
       }
@@ -130,6 +155,21 @@ export function orgReportsRouter(repos: Repositories, options?: ReportsRouterOpt
         });
         return;
       }
+    }
+
+    if (needsScan && !scanId && siteId) {
+      const latest = await repos.scans.findLatestReportable(orgId, siteId);
+      if (!latest) {
+        res.status(409).json({
+          error: {
+            code: ErrorCode.CONFLICT,
+            message: 'This site has no completed scans yet. Run a scan, then generate the report.',
+            details: { field: 'scanId' },
+          },
+        });
+        return;
+      }
+      scanId = latest.id;
     }
 
     let range: ReportDateRange | null = null;
@@ -154,6 +194,7 @@ export function orgReportsRouter(repos: Repositories, options?: ReportsRouterOpt
       scanId: scanId ?? null,
       type,
       branded,
+      paper,
       requestedBy: req.auth?.user?.id ?? null,
       dateFrom: range?.from ?? null,
       dateTo: range?.to ?? null,

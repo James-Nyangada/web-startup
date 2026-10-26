@@ -199,7 +199,7 @@ export function StaffShell({
   }, [refresh]);
 
   useEffect(() => {
-    document.title = `${title} · Staff · Plainsight`;
+    document.title = `${title} · Staff · EveryVisitor`;
   }, [title]);
 
   if (state === "loading") {
@@ -253,7 +253,7 @@ export function StaffShell({
               <span className="rounded-full bg-crit px-2.5 py-0.5 text-xs font-bold uppercase tracking-wider text-on-primary">
                 Staff
               </span>
-              <span className="font-semibold">Plainsight admin</span>
+              <span className="font-semibold">EveryVisitor admin</span>
               <span className="flex-1" />
               <span className="hidden text-sm text-muted sm:inline">{s.email}</span>
               <ThemeIconToggle />

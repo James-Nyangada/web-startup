@@ -59,7 +59,7 @@ function SignInContent() {
 
   return (
     <AuthCard
-      title="Sign in to Plainsight"
+      title="Sign in to EveryVisitor"
       description="Welcome back. Enter your credentials to access your dashboard."
       error={errorMessage}
       errorRef={errorRef}

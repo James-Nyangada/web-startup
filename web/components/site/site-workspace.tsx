@@ -409,7 +409,7 @@ export function SiteWorkspace({
                 className="inline-flex items-center gap-1 font-medium text-mod"
               >
                 <Icon d={I.moderate} />
-                Verify to enable monitoring
+                Verify site ownership to enable monitoring
               </a>
             )}
             <span>{lastScanText}</span>

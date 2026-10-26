@@ -74,7 +74,7 @@ export function getContrastAgainstWhite(hex: string): { contrast: number; valid:
  */
 export function findAccessibleAlternative(hex: string, targetRatio = 4.5): string {
   const rgb = parseHexColor(hex);
-  if (!rgb) return '#0F3D3E'; // Fallback to Plainsight high-contrast primary
+  if (!rgb) return '#0F3D3E'; // Fallback to EveryVisitor high-contrast primary
 
   const { contrast } = getContrastAgainstWhite(hex);
   if (contrast >= targetRatio) {

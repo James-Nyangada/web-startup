@@ -318,7 +318,7 @@ Index `(site_id, queued_at desc)`.
 
 **`statements`** — `org_id`, `site_id`, `version int`, `status text` (`draft|published`), `data jsonb` (form answers), `rendered_html text`, `published_at`, `published_by`. Public URL `/s/<site-public-id>/accessibility-statement` optional.
 
-**`reports`** — `org_id`, `site_id null` (null = multi-site agency summary), `scan_id null`, `type text` (`scan_summary|full|evidence_pack|client_monthly|agency_overview`), `status text` (`queued|rendering|ready|failed`), `file_key text`, `file_size int`, `branded boolean`, `requested_by uuid null`, `expires_at timestamptz null`.
+**`reports`** — `org_id`, `site_id null` (null = multi-site agency summary), `scan_id null`, `type text` (`scan_summary|full|evidence_pack|client_monthly|agency_overview`), `status text` (`queued|rendering|ready|failed`), `file_key text`, `file_size int`, `branded boolean`, `paper text` (`a4|letter`), `requested_by uuid null`, `expires_at timestamptz null`.
 
 **`report_schedules`** — `org_id`, `site_id`, `recipients citext[]` (max 10), `day_of_month smallint` (1–28), `type text` (`client_monthly`), `active boolean`, `last_sent_at`.
 
@@ -579,7 +579,7 @@ Sign-in rate limit: 5 attempts per 15 minutes per email + IP. Passwords: min 10 
 
 | Method | Path | Who | Purpose |
 | --- | --- | --- | --- |
-| POST | `/orgs/:orgId/reports` | O A M | Generate: `type`, `siteId?`, `scanId?`, `dateRange?`, `branded` |
+| POST | `/orgs/:orgId/reports` | O A M | Generate: `type`, `siteId?`, `scanId?`, `dateRange?`, `branded`, `paper?` (`a4|letter`). Summary and full reports without `scanId` use the site's latest completed scan; 409 if it has none |
 | GET | `/orgs/:orgId/reports` | O A M C | List (clients: own sites only) |
 | GET | `/orgs/:orgId/reports/:id/download` | O A M C | Signed URL (15 min) |
 | POST | `/orgs/:orgId/reports/:id/send` | O A M | Email the report to ≤ 10 recipients with an optional message |

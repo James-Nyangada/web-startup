@@ -11,7 +11,7 @@ const field =
 
 const ACTOR_LABEL: Record<AuditEntry["actorType"], string> = {
   user: "Person",
-  staff: "Plainsight staff",
+  staff: "EveryVisitor staff",
   system: "System",
   api_key: "API key",
 };

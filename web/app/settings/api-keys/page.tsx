@@ -151,7 +151,7 @@ export default function ApiKeysSettingsPage() {
           <div className="rounded-2xl border border-line bg-primary-soft p-5">
             <h2 className="m-0 text-base font-semibold text-ink">The API is part of Agency Pro</h2>
             <p className="m-0 mt-1 text-sm text-ink">
-              Upgrade to connect your reporting tools, CI pipeline or client dashboards to Plainsight.
+              Upgrade to connect your reporting tools, CI pipeline or client dashboards to EveryVisitor.
             </p>
             <Link href="/settings/billing" className={`${primary} mt-3 no-underline`}>
               See plans

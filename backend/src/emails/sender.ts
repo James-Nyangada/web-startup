@@ -73,7 +73,7 @@ export class LogTransport extends MockTransport {
 export class ResendTransport implements EmailTransport {
   constructor(
     private readonly apiKey: string,
-    private readonly defaultFrom: string = 'Plainsight <notifications@plainsight.app>',
+    private readonly defaultFrom: string = 'EveryVisitor <no-reply@everyvisitor.app>',
     private readonly replyTo?: string,
   ) {}
 
@@ -123,7 +123,7 @@ export class EmailSender implements AuthMailer {
 
   constructor(options: EmailSenderOptions = {}) {
     this.transport = options.transport || new MockTransport();
-    this.defaultFrom = options.from || 'Plainsight <notifications@plainsight.app>';
+    this.defaultFrom = options.from || 'EveryVisitor <no-reply@everyvisitor.app>';
     this.defaultBranding = options.branding;
   }
 
@@ -205,7 +205,11 @@ export function createEmailSender(config: {
 }): EmailSender {
   let transport: EmailTransport;
   if (config.RESEND_API_KEY) {
-    transport = new ResendTransport(config.RESEND_API_KEY, config.EMAIL_FROM, config.EMAIL_REPLY_TO);
+    transport = new ResendTransport(
+      config.RESEND_API_KEY,
+      config.EMAIL_FROM,
+      config.EMAIL_REPLY_TO,
+    );
   } else if (config.NODE_ENV === 'production') {
     throw new Error('RESEND_API_KEY is required when NODE_ENV=production.');
   } else {

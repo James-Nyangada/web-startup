@@ -4,7 +4,7 @@ import { MarketingFooter } from "@/components/marketing/marketing-footer";
 import { FreeCheckFlow } from "@/components/marketing/free-check-flow";
 
 export const metadata: Metadata = {
-  title: "Accessibility Scan Results | Plainsight",
+  title: "Accessibility Scan Results | EveryVisitor",
   description: "Automated WCAG 2.2 Level AA accessibility report.",
   robots: {
     index: false,

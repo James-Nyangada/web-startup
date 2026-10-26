@@ -14,7 +14,7 @@ async function main() {
   const args = process.argv.slice(2);
   if (args.length === 0 || args.includes('--help') || args.includes('-h')) {
     console.log(`
-Plainsight Staff Tooling: Paddle Webhook Replay
+EveryVisitor Staff Tooling: Paddle Webhook Replay
 
 Usage:
   npm run paddle:replay <eventId>              Replay an event by Paddle Event ID (e.g. evt_01h...)

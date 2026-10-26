@@ -23,6 +23,9 @@ export const REPORT_TYPES = [
 ] as const;
 export type ReportType = (typeof REPORT_TYPES)[number];
 
+export const REPORT_PAPERS = ['a4', 'letter'] as const;
+export type ReportPaper = (typeof REPORT_PAPERS)[number];
+
 export const REPORT_STATUSES = ['queued', 'rendering', 'ready', 'failed'] as const;
 export type ReportStatus = (typeof REPORT_STATUSES)[number];
 
@@ -40,6 +43,7 @@ export const reports = pgTable(
     fileKey: text('file_key'),
     fileSize: integer('file_size'),
     branded: boolean('branded').notNull().default(false),
+    paper: text('paper').$type<ReportPaper>().notNull().default('a4'),
     requestedBy: uuid('requested_by').references(() => users.id, { onDelete: 'set null' }),
     expiresAt: timestamp('expires_at', { withTimezone: true }),
     /** Period covered (inclusive, YYYY-MM-DD). Set for evidence packs (R-03). */
@@ -56,6 +60,7 @@ export const reports = pgTable(
     index('reports_site_id_idx').on(t.siteId),
     check('reports_type_check', sql`${t.type} in (${inList(REPORT_TYPES)})`),
     check('reports_status_check', sql`${t.status} in (${inList(REPORT_STATUSES)})`),
+    check('reports_paper_check', sql`${t.paper} in (${inList(REPORT_PAPERS)})`),
   ],
 );
 

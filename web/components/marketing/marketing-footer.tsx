@@ -140,7 +140,7 @@ export function MarketingFooter() {
         </div>
 
         <div className="mt-12 flex flex-wrap items-center justify-between gap-4 border-t border-line pt-8 text-xs text-muted">
-          <span>© {new Date().getFullYear()} Plainsight. All rights reserved.</span>
+          <span>© {new Date().getFullYear()} EveryVisitor. All rights reserved.</span>
           <div className="flex gap-6">
             <Link href="/legal/terms" className="text-muted no-underline hover:text-ink">
               Terms

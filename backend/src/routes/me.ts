@@ -394,7 +394,7 @@ export function meRouter(auth: Auth, repos: Repositories, options: MeRouterOptio
     res.setHeader('Content-Type', 'application/zip');
     res.setHeader(
       'Content-Disposition',
-      `attachment; filename="plainsight-personal-data-${row.createdAt.toISOString().slice(0, 10)}.zip"`,
+      `attachment; filename="everyvisitor-personal-data-${row.createdAt.toISOString().slice(0, 10)}.zip"`,
     );
     res.setHeader('Cache-Control', 'no-store');
     res.status(200).send(file);

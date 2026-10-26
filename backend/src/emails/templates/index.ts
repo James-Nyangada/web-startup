@@ -31,7 +31,7 @@ export function renderVerifyEmail(
   data: VerifyEmailData,
   branding?: EmailBranding,
 ): EmailRenderOutput {
-  const brandName = branding?.displayName || 'Plainsight';
+  const brandName = branding?.displayName || 'EveryVisitor';
   const subject = `Verify your email for ${brandName}`;
 
   const contentHtml = `
@@ -72,7 +72,7 @@ This link is valid for 7 days. If you did not create this account, you can safel
 
 // E-02: Magic sign-in link
 export function renderMagicLink(data: MagicLinkData, branding?: EmailBranding): EmailRenderOutput {
-  const brandName = branding?.displayName || 'Plainsight';
+  const brandName = branding?.displayName || 'EveryVisitor';
   const subject = `Your sign-in link for ${brandName}`;
 
   const contentHtml = `
@@ -87,7 +87,7 @@ export function renderMagicLink(data: MagicLinkData, branding?: EmailBranding): 
 
   const html = renderEmailLayout({
     preheader: `Click to sign in to your ${brandName} account`,
-    title: 'Sign in to Plainsight',
+    title: 'Sign in to EveryVisitor',
     contentHtml,
     buttonLabel: 'Sign in to your account',
     buttonUrl: data.url,
@@ -116,7 +116,7 @@ export function renderResetPassword(
   data: ResetPasswordData,
   branding?: EmailBranding,
 ): EmailRenderOutput {
-  const brandName = branding?.displayName || 'Plainsight';
+  const brandName = branding?.displayName || 'EveryVisitor';
   const subject = `Reset your ${brandName} password`;
 
   const contentHtml = `
@@ -160,7 +160,7 @@ export function renderInvitationEmail(
   data: InvitationEmailData,
   branding?: EmailBranding,
 ): EmailRenderOutput {
-  const brandName = branding?.displayName || 'Plainsight';
+  const brandName = branding?.displayName || 'EveryVisitor';
   const inviter = data.inviterName || 'A team administrator';
   const roleLabel =
     data.role === 'admin'
@@ -213,7 +213,7 @@ export function renderWelcomeEmail(
   data: WelcomeEmailData,
   branding?: EmailBranding,
 ): EmailRenderOutput {
-  const brandName = branding?.displayName || 'Plainsight';
+  const brandName = branding?.displayName || 'EveryVisitor';
   const subject = `Welcome to ${brandName} — Next steps for ${data.orgName}`;
 
   const contentHtml = `
@@ -260,7 +260,7 @@ export function renderFirstScanReady(
   data: FirstScanReadyData,
   branding?: EmailBranding,
 ): EmailRenderOutput {
-  const brandName = branding?.displayName || 'Plainsight';
+  const brandName = branding?.displayName || 'EveryVisitor';
   const subject = `First scan complete for ${data.siteName}: Accessibility score ${data.score}/100`;
 
   const contentHtml = `
@@ -319,7 +319,7 @@ export function renderScanSummary(
   data: ScanSummaryData,
   branding?: EmailBranding,
 ): EmailRenderOutput {
-  const brandName = branding?.displayName || 'Plainsight';
+  const brandName = branding?.displayName || 'EveryVisitor';
   const delta =
     data.previousScore !== null && data.previousScore !== undefined
       ? data.score - data.previousScore
@@ -387,7 +387,7 @@ export function renderReportShared(
   data: ReportSharedData,
   branding?: EmailBranding,
 ): EmailRenderOutput {
-  const brandName = branding?.displayName || 'Plainsight';
+  const brandName = branding?.displayName || 'EveryVisitor';
   const senderText = data.senderName
     ? `${data.senderName} shared an accessibility report`
     : 'Your accessibility report is ready';
@@ -463,7 +463,7 @@ export function renderFreeCheckReport(
   data: FreeCheckReportData,
   branding?: EmailBranding,
 ): EmailRenderOutput {
-  const brandName = branding?.displayName || 'Plainsight';
+  const brandName = branding?.displayName || 'EveryVisitor';
   const subject = `Your accessibility audit report for ${data.url}`;
 
   const contentHtml = `
@@ -522,7 +522,7 @@ export function renderTrialEnding(
   data: TrialEndingData,
   branding?: EmailBranding,
 ): EmailRenderOutput {
-  const brandName = branding?.displayName || 'Plainsight';
+  const brandName = branding?.displayName || 'EveryVisitor';
   const subject = `Your ${brandName} trial ends in ${data.daysLeft} day${data.daysLeft === 1 ? '' : 's'}`;
 
   const contentHtml = `
@@ -570,7 +570,7 @@ export function renderTrialEnded(
   data: TrialEndedData,
   branding?: EmailBranding,
 ): EmailRenderOutput {
-  const brandName = branding?.displayName || 'Plainsight';
+  const brandName = branding?.displayName || 'EveryVisitor';
   const subject = `Your ${brandName} trial has ended — account in read-only mode`;
 
   const contentHtml = `
@@ -624,7 +624,7 @@ export function renderDataDeletionWarning(
   data: DataDeletionWarningData,
   branding?: EmailBranding,
 ): EmailRenderOutput {
-  const brandName = branding?.displayName || 'Plainsight';
+  const brandName = branding?.displayName || 'EveryVisitor';
   const subject = `Action required: Data deletion notice for ${data.orgName} (${data.daysUntilDeletion} day${data.daysUntilDeletion === 1 ? '' : 's'} remaining)`;
 
   const contentHtml = `
@@ -676,7 +676,7 @@ export function renderPaymentFailed(
   data: PaymentFailedData,
   branding?: EmailBranding,
 ): EmailRenderOutput {
-  const brandName = branding?.displayName || 'Plainsight';
+  const brandName = branding?.displayName || 'EveryVisitor';
   const subject = `Action required: Payment failed for ${data.orgName}`;
 
   const contentHtml = `
@@ -722,7 +722,7 @@ export function renderSubscriptionCanceled(
   data: SubscriptionCanceledData,
   branding?: EmailBranding,
 ): EmailRenderOutput {
-  const brandName = branding?.displayName || 'Plainsight';
+  const brandName = branding?.displayName || 'EveryVisitor';
   const subject = `Your subscription for ${data.orgName} has been canceled`;
 
   const formattedDate = new Date(data.effectiveDate).toLocaleDateString('en-US', {
@@ -782,7 +782,7 @@ export function renderPlanChanged(
   data: PlanChangedData,
   branding?: EmailBranding,
 ): EmailRenderOutput {
-  const brandName = branding?.displayName || 'Plainsight';
+  const brandName = branding?.displayName || 'EveryVisitor';
   const subject = `Your ${data.orgName} plan has been updated to ${data.newPlanName}`;
 
   const contentHtml = `
@@ -1066,8 +1066,8 @@ export function renderSecurityNotice(
 ): EmailRenderOutput {
   const changed = data.kind === 'password_changed';
   const subject = changed
-    ? 'Your Plainsight password was changed'
-    : 'New sign-in to your Plainsight account';
+    ? 'Your EveryVisitor password was changed'
+    : 'New sign-in to your EveryVisitor account';
   const when = new Date(data.when).toUTCString();
   const greeting = data.name ? `Hi ${escapeHtml(data.name)},` : 'Hi,';
   const where = [data.ip, data.userAgent]

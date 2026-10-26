@@ -10,13 +10,13 @@ export default function GlobalError({ error, retry }: { error: Error & { digest?
   return (
     <html lang="en" data-theme="light">
       <body>
-        <title>Something went wrong · Plainsight</title>
+        <title>Something went wrong · EveryVisitor</title>
         <main id="main" style={{ minHeight: "100vh", display: "grid", placeItems: "center", padding: "1rem" }}>
           <div style={{ maxWidth: "32rem", textAlign: "center" }}>
             <p style={{ fontFamily: "monospace", color: "var(--muted)", margin: 0 }}>500</p>
             <h1 style={{ fontSize: "2.25rem", fontWeight: 400, margin: "0.5rem 0 1rem" }}>Something went wrong</h1>
             <p style={{ color: "var(--muted)", margin: 0 }}>
-              Plainsight could not load. Try again in a moment.
+              EveryVisitor could not load. Try again in a moment.
               {error.digest ? ` Reference: ${error.digest}.` : ""}
             </p>
             <button

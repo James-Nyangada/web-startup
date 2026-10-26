@@ -6,7 +6,7 @@ import { MarketingFooter } from "@/components/marketing/marketing-footer";
 export const metadata: Metadata = {
   title: "API reference",
   description:
-    "Plainsight public REST API: read sites, scans and accessibility issues, and start scans, with an Agency Pro API key.",
+    "EveryVisitor public REST API: read sites, scans and accessibility issues, and start scans, with an Agency Pro API key.",
 };
 
 // Re-read the OpenAPI document every 5 minutes so the docs follow the API (P6-06).

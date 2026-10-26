@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Icon, I } from "@/components/icons";
 import { apiBaseUrl, apiClient, ApiException } from "@/lib/api";
 import { appApi, type ApiReportSchedule } from "@/lib/app-api";
+import type { ScanHistoryItem } from "@/components/site/scans-tab";
 
 export interface ReportItem {
   id: string;
@@ -19,10 +20,10 @@ export interface ReportItem {
 }
 
 export interface ReportsTabProps {
-  orgSlug?: string;
+  orgSlug: string;
   siteSlug?: string;
-  siteId?: string;
-  siteName?: string;
+  siteId: string;
+  siteName: string;
   onToast: (msg: string) => void;
 }
 
@@ -68,41 +69,24 @@ function periodLabel(from?: string | null, to?: string | null): string {
 const REPORT_POLL_MS = 3000;
 const REPORT_POLL_LIMIT = 100; // ~5 minutes
 
-const DEMO_REPORTS: ReportItem[] = [
-  {
-    id: "rep-demo-1",
-    type: "scan_summary",
-    status: "ready",
-    title: "Scan #23 Summary Report",
-    scanLabel: "Scan #23 · 14 Oct 2026",
-    scanScore: 78,
-    fileSize: 491520, // 480 KB
-    createdAt: "14 Oct 2026, 14:32",
-    downloadUrl: "#",
-  },
-  {
-    id: "rep-demo-2",
-    type: "full",
-    status: "ready",
-    title: "Full Accessibility Audit Report",
-    scanLabel: "Scan #23 · 14 Oct 2026",
-    scanScore: 78,
-    fileSize: 1887436, // 1.8 MB
-    createdAt: "14 Oct 2026, 14:35",
-    downloadUrl: "#",
-  },
-  {
-    id: "rep-demo-3",
-    type: "scan_summary",
-    status: "ready",
-    title: "Scan #22 Summary Report",
-    scanLabel: "Scan #22 · 12 Oct 2026",
-    scanScore: 72,
-    fileSize: 471040, // 460 KB
-    createdAt: "12 Oct 2026, 10:15",
-    downloadUrl: "#",
-  },
-];
+/** Summary and full reports render from one finished scan with stored results. */
+function isReportableScan(scan: ScanHistoryItem): boolean {
+  return scan.status === "completed" || scan.status === "partial";
+}
+
+function scanOptionLabel(scan: ScanHistoryItem): string {
+  const date = new Date(scan.finishedAt ?? scan.queuedAt).toLocaleDateString("en-GB", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
+  const score = scan.score !== null ? ` — Score: ${scan.score}` : "";
+  return `${date}${score}${scan.status === "partial" ? " (partial)" : ""}`;
+}
+
+function scanScoreLabel(score?: number | null): string {
+  return score ? `Scan Score: ${score}/100` : "Latest scan";
+}
 
 function formatFileSize(bytes?: number | null): string {
   if (!bytes || bytes <= 0) return "—";
@@ -113,16 +97,15 @@ function formatFileSize(bytes?: number | null): string {
 }
 
 export function ReportsTab({
-  orgSlug = "brightline",
+  orgSlug,
   siteSlug,
   siteId,
-  siteName = "Oakhaus Furniture",
+  siteName,
   onToast,
 }: ReportsTabProps) {
   const [activeSubTab, setActiveSubTab] = useState<"reports" | "schedules">("reports");
-  // Demo rows only for the demo workspace (no real site); a real site starts empty until loaded
-  const [reports, setReports] = useState<ReportItem[]>(siteId ? [] : DEMO_REPORTS);
-  const [loading, setLoading] = useState(Boolean(siteId));
+  const [reports, setReports] = useState<ReportItem[]>([]);
+  const [loading, setLoading] = useState(true);
   const [isGenerateOpen, setIsGenerateOpen] = useState(false);
   const [isSendOpen, setIsSendOpen] = useState(false);
   const [selectedReport, setSelectedReport] = useState<ReportItem | null>(null);
@@ -149,6 +132,11 @@ export function ReportsTab({
   const [paper, setPaper] = useState<"a4" | "letter">("a4");
   const [branded, setBranded] = useState(false);
   const [generating, setGenerating] = useState(false);
+  // Scans the summary and full reports can be built from, newest first
+  const [scans, setScans] = useState<ScanHistoryItem[] | null>(null);
+  const [scansError, setScansError] = useState(false);
+  // Empty means the latest scan, resolved by the API when the report is created
+  const [scanId, setScanId] = useState("");
 
   // Send modal form state
   const [recipients, setRecipients] = useState("");
@@ -190,9 +178,28 @@ export function ReportsTab({
     }
   }, [activeSubTab, orgSlug, siteId]);
 
-  // Load real reports if siteId is present
+  // Load the scans to choose from whenever the generate dialog opens
   useEffect(() => {
-    if (!siteId) return;
+    if (!isGenerateOpen) return;
+    let canceled = false;
+    setScans(null);
+    setScansError(false);
+    setScanId("");
+    appApi
+      .listScans(orgSlug, siteId)
+      .then((rows) => {
+        if (!canceled) setScans(rows.filter(isReportableScan));
+      })
+      .catch(() => {
+        if (!canceled) setScansError(true);
+      });
+    return () => {
+      canceled = true;
+    };
+  }, [isGenerateOpen, orgSlug, siteId]);
+
+  // Load the site's reports
+  useEffect(() => {
     let canceled = false;
     async function loadReports() {
       try {
@@ -209,9 +216,7 @@ export function ReportsTab({
             scanLabel:
               r.type === "evidence_pack"
                 ? periodLabel(r.dateFrom, r.dateTo)
-                : r.scanScore
-                  ? `Scan Score: ${r.scanScore}/100`
-                  : "Latest scan",
+                : scanScoreLabel(r.scanScore),
             scanScore: r.scanScore,
             fileSize: r.fileSize,
             createdAt: new Date(r.createdAt).toLocaleDateString("en-GB", {
@@ -310,12 +315,15 @@ export function ReportsTab({
         method: "POST",
         body: JSON.stringify({
           type: reportType,
-          siteId: siteId || undefined,
+          siteId,
+          scanId: reportType === "evidence_pack" ? undefined : scanId || undefined,
           branded,
+          paper,
           dateRange,
         }),
       });
 
+      const chosenScan = scanId ? scans?.find((sc) => sc.id === scanId) : scans?.[0];
       const newReport: ReportItem = {
         id: created.id,
         type: reportType,
@@ -324,7 +332,8 @@ export function ReportsTab({
         scanLabel:
           reportType === "evidence_pack"
             ? periodLabel(created.dateFrom, created.dateTo)
-            : "Latest scan",
+            : scanScoreLabel(chosenScan?.score),
+        scanScore: chosenScan?.score ?? null,
         fileSize: null,
         createdAt: "Just now",
       };
@@ -334,39 +343,11 @@ export function ReportsTab({
       onToast(`Generating ${newReport.title}. We'll let you know when it's ready.`);
       void pollReport(created.id);
     } catch (err) {
-      if (err instanceof ApiException) {
-        // The API rejected the request (for example an invalid period): show why.
-        setGenerateError(err.message);
-        return;
-      }
-      // Demo mode (no backend reachable): keep the simulated flow.
-      const newId = `rep-${Date.now()}`;
-      const newReport: ReportItem = {
-        id: newId,
-        type: reportType,
-        status: "ready",
-        title:
-          reportType === "scan_summary"
-            ? "Scan #23 Summary Report"
-            : reportType === "full"
-              ? "Full Accessibility Audit Report"
-              : "Accessibility Evidence Pack",
-        scanLabel:
-          reportType === "evidence_pack"
-            ? periodLabel(dateRange?.start, dateRange?.end)
-            : "Scan #23 · 14 Oct 2026",
-        scanScore: 78,
-        fileSize:
-          reportType === "scan_summary"
-            ? 491520
-            : reportType === "full"
-              ? 1887436
-              : 2450000,
-        createdAt: "Just now",
-      };
-      setReports((prev) => [newReport, ...prev]);
-      setIsGenerateOpen(false);
-      onToast(`Generated ${newReport.title} successfully.`);
+      setGenerateError(
+        err instanceof ApiException
+          ? err.message
+          : "Could not reach the server. Check your connection and try again.",
+      );
     } finally {
       setGenerating(false);
     }
@@ -1123,23 +1104,38 @@ export function ReportsTab({
                 </div>
               ) : (
                 <div>
-                  <label className="block text-xs font-semibold text-ink mb-1.5">
+                  <label
+                    htmlFor="report-scan-source"
+                    className="block text-xs font-semibold text-ink mb-1.5"
+                  >
                     Scan Source
                   </label>
-                  <select
-                    className="w-full rounded-xl border border-line bg-surface px-3 py-2 text-sm text-ink focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-                    defaultValue="latest"
-                  >
-                    <option value="latest">
-                      Latest Scan (Scan #23 · 14 Oct 2026 — Score: 78)
-                    </option>
-                    <option value="scan-22">
-                      Scan #22 (12 Oct 2026 — Score: 72)
-                    </option>
-                    <option value="scan-21">
-                      Scan #21 (7 Oct 2026 — Score: 74)
-                    </option>
-                  </select>
+                  {scansError ? (
+                    <p className="m-0 text-sm text-crit">
+                      Scans could not be loaded. Close this dialog and try again.
+                    </p>
+                  ) : scans === null ? (
+                    <p className="m-0 text-sm text-muted">Loading scans...</p>
+                  ) : scans.length === 0 ? (
+                    <p className="m-0 text-sm text-muted">
+                      This site has no completed scans yet. Run a scan, then generate the
+                      report.
+                    </p>
+                  ) : (
+                    <select
+                      id="report-scan-source"
+                      value={scanId}
+                      onChange={(e) => setScanId(e.target.value)}
+                      className="w-full rounded-xl border border-line bg-surface px-3 py-2 text-sm text-ink focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                    >
+                      <option value="">Latest scan ({scanOptionLabel(scans[0]!)})</option>
+                      {scans.slice(1).map((sc) => (
+                        <option key={sc.id} value={sc.id}>
+                          {scanOptionLabel(sc)}
+                        </option>
+                      ))}
+                    </select>
+                  )}
                 </div>
               )}
 
@@ -1194,7 +1190,10 @@ export function ReportsTab({
                 </button>
                 <button
                   type="submit"
-                  disabled={generating}
+                  disabled={
+                    generating ||
+                    (reportType !== "evidence_pack" && !scans?.length)
+                  }
                   className="ease-ui rounded-full bg-primary px-5 py-2 text-sm font-semibold text-on-primary hover:bg-primary-hover disabled:opacity-50"
                 >
                   {generating ? "Generating..." : "Generate PDF"}

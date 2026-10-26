@@ -100,6 +100,7 @@ export function fakeRepos() {
       update: vi.fn().mockResolvedValue(null),
       listBySite: vi.fn().mockResolvedValue([]),
       listForEvidencePack: vi.fn().mockResolvedValue([]),
+      findLatestReportable: vi.fn().mockResolvedValue(null),
       countBySite: vi.fn().mockResolvedValue(0),
       findRunningScanForSite: vi.fn().mockResolvedValue(null),
       countOnboardingScansForSite: vi.fn().mockResolvedValue(0),

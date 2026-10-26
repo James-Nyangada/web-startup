@@ -193,6 +193,7 @@ describe('P4-10: Agency Overview & Cross-Site Views (S-20, R-05)', () => {
         fileKey: null,
         fileSize: null,
         branded: true,
+        paper: 'a4',
         requestedBy: memberId,
         expiresAt: null,
         dateFrom: null,

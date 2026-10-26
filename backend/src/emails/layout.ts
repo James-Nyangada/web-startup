@@ -25,7 +25,7 @@ export function renderEmailLayout(options: LayoutOptions): string {
     unsubscribeUrl,
   } = options;
 
-  const brandName = branding?.displayName || 'Plainsight';
+  const brandName = branding?.displayName || 'EveryVisitor';
   const primaryColor = branding?.primaryColor || '#0F3D3E'; // 10.1:1 contrast on white
 
   const buttonHtml =

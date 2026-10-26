@@ -6,7 +6,7 @@
 
 ## 1. Architecture Overview
 
-Plainsight processes Paddle Billing (v2) webhooks via the following sequence:
+EveryVisitor processes Paddle Billing (v2) webhooks via the following sequence:
 
 1. **Receipt & Authentication (`POST /webhooks/paddle` / `POST /v1/webhooks/paddle`)**:
    - Computes HMAC-SHA256 signature using `PADDLE_WEBHOOK_SECRET` over `rawBody`.
@@ -112,4 +112,4 @@ After executing a replay:
 | `Unknown price ID: pri_...` | Price ID in webhook does not match `PADDLE_PRICE_*` in environment | Check `backend/.env` for missing or misconfigured price IDs. Once configured, replay the event. |
 | `Missing price ID or subscription ID` | Malformed webhook payload from test source | Inspect payload with `--list`. Ensure valid Paddle Billing format. |
 | `Out-of-order event ignored` | Event occurred before current subscription state | Expected behavior under Section 12.2. If manual overwrite is required, check current subscription state first. |
-| `Paddle event with ID ... not found` | Webhook never reached Plainsight server | Re-send webhook from the Paddle developer dashboard or replay via `--file`. |
+| `Paddle event with ID ... not found` | Webhook never reached EveryVisitor server | Re-send webhook from the Paddle developer dashboard or replay via `--file`. |

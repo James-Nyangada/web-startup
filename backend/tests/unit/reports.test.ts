@@ -9,6 +9,7 @@ import { MemoryStorageService } from '../../src/storage/index.js';
 import { renderReportShared } from '../../src/emails/templates/index.js';
 import { renderEvidencePackReportHtml } from '../../src/reports/render.js';
 import type { EvidencePackReportData } from '../../src/reports/templates.js';
+import type { ScanResult } from '../../src/scanner/scan.js';
 import type { Auth } from '../../src/lib/auth.js';
 
 function createMockAuth() {
@@ -194,6 +195,8 @@ describe('Reports API Endpoints (Chunk P2-19)', () => {
         orgId,
         siteId: 'site-1',
         score: 78,
+        status: 'completed',
+        rawKey: `scans/${orgId}/${validScanId}/raw.json`,
       } as never);
       vi.mocked(repos.sites.findById).mockResolvedValueOnce({
         id: 'site-1',
@@ -239,6 +242,96 @@ describe('Reports API Endpoints (Chunk P2-19)', () => {
         });
 
       expect(res.status).toBe(404);
+    });
+
+    describe('scan selection for summary and full reports', () => {
+      const siteId = '55555555-5555-4555-a555-555555555555';
+      const scanId = '66666666-6666-4666-a666-666666666666';
+
+      beforeEach(() => {
+        vi.mocked(repos.sites.findById).mockResolvedValue({
+          id: siteId,
+          orgId,
+          name: 'Oakhaus Furniture',
+        } as never);
+      });
+
+      it('uses the latest completed scan when only a site is given', async () => {
+        vi.mocked(repos.scans.findLatestReportable).mockResolvedValueOnce({
+          id: scanId,
+          siteId,
+          status: 'completed',
+          rawKey: 'scans/raw.json',
+        } as never);
+
+        const res = await request(app)
+          .post(`/v1/orgs/${orgId}/reports`)
+          .set('Cookie', [memberCookie])
+          .send({ type: 'full', siteId, paper: 'letter' });
+
+        expect(res.status).toBe(201);
+        expect(repos.scans.findLatestReportable).toHaveBeenCalledWith(orgId, siteId);
+        expect(repos.reports.create).toHaveBeenCalledWith(
+          orgId,
+          expect.objectContaining({ scanId, paper: 'letter' }),
+        );
+      });
+
+      it('returns 409 when the site has no completed scan', async () => {
+        const res = await request(app)
+          .post(`/v1/orgs/${orgId}/reports`)
+          .set('Cookie', [memberCookie])
+          .send({ type: 'scan_summary', siteId });
+
+        expect(res.status).toBe(409);
+        expect(res.body.error.message).toMatch(/no completed scans/);
+        expect(repos.reports.create).not.toHaveBeenCalled();
+      });
+
+      it('returns 409 for a scan without stored results', async () => {
+        vi.mocked(repos.scans.findById).mockResolvedValueOnce({
+          id: scanId,
+          orgId,
+          siteId,
+          status: 'failed',
+          rawKey: null,
+        } as never);
+
+        const res = await request(app)
+          .post(`/v1/orgs/${orgId}/reports`)
+          .set('Cookie', [memberCookie])
+          .send({ type: 'scan_summary', siteId, scanId });
+
+        expect(res.status).toBe(409);
+        expect(repos.reports.create).not.toHaveBeenCalled();
+      });
+
+      it('returns 404 for a scan from a different site', async () => {
+        vi.mocked(repos.scans.findById).mockResolvedValueOnce({
+          id: scanId,
+          orgId,
+          siteId: '77777777-7777-4777-a777-777777777777',
+          status: 'completed',
+          rawKey: 'scans/raw.json',
+        } as never);
+
+        const res = await request(app)
+          .post(`/v1/orgs/${orgId}/reports`)
+          .set('Cookie', [memberCookie])
+          .send({ type: 'scan_summary', siteId, scanId });
+
+        expect(res.status).toBe(404);
+        expect(repos.reports.create).not.toHaveBeenCalled();
+      });
+
+      it('rejects an unknown paper size', async () => {
+        const res = await request(app)
+          .post(`/v1/orgs/${orgId}/reports`)
+          .set('Cookie', [memberCookie])
+          .send({ type: 'scan_summary', siteId, paper: 'a3' });
+
+        expect(res.status).toBe(400);
+      });
     });
 
     describe('evidence_pack date range (P5-04)', () => {
@@ -291,6 +384,8 @@ describe('Reports API Endpoints (Chunk P2-19)', () => {
           id: '33333333-3333-4333-a333-333333333333',
           orgId,
           siteId,
+          status: 'completed',
+          rawKey: 'scans/raw.json',
         } as never);
         await request(app)
           .post(`/v1/orgs/${orgId}/reports`)
@@ -337,6 +432,7 @@ describe('Reports API Endpoints (Chunk P2-19)', () => {
             fileKey: `reports/${orgId}/rep-1.pdf`,
             fileSize: 1024,
             branded: false,
+            paper: 'a4',
             requestedBy: memberId,
             expiresAt: null,
             dateFrom: null,
@@ -369,6 +465,7 @@ describe('Reports API Endpoints (Chunk P2-19)', () => {
         fileKey: `reports/${orgId}/rep-ready-1.pdf`,
         fileSize: 1024,
         branded: false,
+        paper: 'a4',
         requestedBy: memberId,
         expiresAt: null,
         dateFrom: null,
@@ -397,6 +494,7 @@ describe('Reports API Endpoints (Chunk P2-19)', () => {
         fileKey: null,
         fileSize: null,
         branded: false,
+        paper: 'a4',
         requestedBy: memberId,
         expiresAt: null,
         dateFrom: null,
@@ -437,6 +535,7 @@ describe('Reports API Endpoints (Chunk P2-19)', () => {
         fileKey: `reports/${orgId}/rep-ready-1.pdf`,
         fileSize: 1024,
         branded: false,
+        paper: 'a4',
         requestedBy: memberId,
         expiresAt: null,
         dateFrom: null,
@@ -480,9 +579,41 @@ describe('Reports API Endpoints (Chunk P2-19)', () => {
   });
 });
 
+function storedScanResult(): ScanResult {
+  return {
+    engineVersion: '1.0.0',
+    axeVersion: '4.14.0',
+    standard: 'wcag22aa',
+    rootUrl: 'https://oakhaus.com',
+    platform: 'shopify',
+    status: 'completed',
+    startedAt: '2026-10-14T10:00:00.000Z',
+    finishedAt: '2026-10-14T10:02:00.000Z',
+    pagesDiscovered: 1,
+    pagesPlanned: 1,
+    pagesScanned: 1,
+    pagesFailed: 0,
+    templatesFound: 1,
+    score: 84,
+    counts: { critical: 0, serious: 0, moderate: 0, minor: 0, total: 0, needsReview: 0 },
+    planned: [],
+    pages: [],
+    issues: [],
+    discovery: {
+      robots: { found: false, crawlDelaySeconds: undefined, sitemaps: [] },
+      sitemapsRead: [],
+      crawled: false,
+      stats: { sitemapUrls: 0, crawlUrls: 0, dropped: 0, requestIntervalMs: 1000 },
+      errors: [],
+    },
+    throttled: false,
+  };
+}
+
 describe('Worker job: handleReportRender', () => {
   it('renders report PDF and transitions status to ready', async () => {
     const storage = new MemoryStorageService();
+    await storage.putObject('scans/raw.json', JSON.stringify(storedScanResult()));
     const updateStatus = vi.fn().mockResolvedValue({ id: 'rep-1', status: 'ready' });
     const writeAudit = vi.fn().mockResolvedValue(undefined);
 
@@ -495,6 +626,7 @@ describe('Worker job: handleReportRender', () => {
           scanId: 'scan-1',
           type: 'scan_summary',
           status: 'queued',
+          paper: 'letter',
           scanScore: 84,
           requestedBy: 'user-1',
         }),
@@ -504,7 +636,7 @@ describe('Worker job: handleReportRender', () => {
         findRawById: vi.fn().mockResolvedValue({
           id: 'scan-1',
           score: 84,
-          rawKey: null,
+          rawKey: 'scans/raw.json',
         }),
       },
       sites: {
@@ -536,6 +668,8 @@ describe('Worker job: handleReportRender', () => {
     const pdf = await storage.getObject('reports/11111111-1111-4111-a111-111111111111/rep-1.pdf');
     expect(pdf).not.toBeNull();
     expect(pdf?.toString('utf-8')).toContain('%PDF');
+    // Printed on the paper size stored with the report
+    expect(pdf?.toString('latin1')).toMatch(/\/MediaBox\s*\[0 0 612 792\]/);
 
     // Audit log written
     expect(writeAudit).toHaveBeenCalledWith(
@@ -544,6 +678,43 @@ describe('Worker job: handleReportRender', () => {
         action: 'report.generated',
       }),
     );
+  });
+});
+
+describe('Worker job: handleReportRender without scan results', () => {
+  it('fails the report instead of rendering placeholder data', async () => {
+    const storage = new MemoryStorageService();
+    const updateStatus = vi.fn().mockResolvedValue(null);
+    const findLatestReportable = vi.fn().mockResolvedValue(null);
+    const repos = {
+      reports: {
+        findRawById: vi.fn().mockResolvedValue({
+          id: 'rep-2',
+          orgId: '11111111-1111-4111-a111-111111111111',
+          siteId: 'site-1',
+          scanId: null,
+          type: 'full',
+          status: 'queued',
+          paper: 'a4',
+        }),
+        updateStatus,
+      },
+      scans: { findRawById: vi.fn(), findLatestReportable },
+      sites: { findRawById: vi.fn().mockResolvedValue({ id: 'site-1', name: 'Oakhaus' }) },
+      auditLog: { write: vi.fn() },
+    } as unknown as Repositories;
+
+    await expect(handleReportRender({ reportId: 'rep-2' }, { repos, storage })).rejects.toThrow(
+      /no scan results/,
+    );
+    expect(findLatestReportable).toHaveBeenCalledWith(
+      '11111111-1111-4111-a111-111111111111',
+      'site-1',
+    );
+    expect(updateStatus).toHaveBeenLastCalledWith('rep-2', 'failed');
+    expect(
+      await storage.getObject('reports/11111111-1111-4111-a111-111111111111/rep-2.pdf'),
+    ).toBeNull();
   });
 });
 

@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 
 export const metadata: Metadata = {
   title: "Subprocessors Registry",
-  description: "Official list of third-party subprocessors authorized to process data on behalf of Plainsight.",
+  description: "Official list of third-party subprocessors authorized to process data on behalf of EveryVisitor.",
 };
 
 const SUBPROCESSORS = [
@@ -68,7 +68,7 @@ export default function SubprocessorsPage() {
   return (
     <div className="prose prose-slate max-w-none text-ink">
       <div className="border-b border-line pb-6 mb-8">
-        <span className="text-xs font-bold tracking-wider uppercase text-primary">Plainsight Legal</span>
+        <span className="text-xs font-bold tracking-wider uppercase text-primary">EveryVisitor Legal</span>
         <h1 className="mt-2 font-serif text-3xl sm:text-4xl font-normal text-ink">Subprocessors Registry</h1>
         <p className="mt-2 text-sm text-muted">
           Current list of authorized third-party service providers · Last updated: October 18, 2026
@@ -77,7 +77,7 @@ export default function SubprocessorsPage() {
 
       <div className="flex flex-col gap-6 text-sm leading-relaxed text-ink/90">
         <p>
-          To deliver our continuous accessibility monitoring service, Plainsight engages third-party service providers (&quot;subprocessors&quot;) to perform technical, infrastructure, and payment processing functions. Prior to engaging any subprocessor, Plainsight conducts due diligence to evaluate their security posture, confidentiality obligations, and data protection compliance.
+          To deliver our continuous accessibility monitoring service, EveryVisitor engages third-party service providers (&quot;subprocessors&quot;) to perform technical, infrastructure, and payment processing functions. Prior to engaging any subprocessor, EveryVisitor conducts due diligence to evaluate their security posture, confidentiality obligations, and data protection compliance.
         </p>
 
         <div className="overflow-x-auto rounded-xl border border-line">

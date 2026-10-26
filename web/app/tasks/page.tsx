@@ -183,7 +183,7 @@ export default function MyTasksPage() {
     try {
       setResolvingId(task.id);
       await appApi.recheck(orgSlug, task.id);
-      showToast("Recheck queued. Plainsight will verify the fix on the next page re-scan.");
+      showToast("Recheck queued. EveryVisitor will verify the fix on the next page re-scan.");
       setTasks((prev) => prev.filter((t) => t.id !== task.id));
     } catch {
       setTasks((prev) => prev.filter((t) => t.id !== task.id));

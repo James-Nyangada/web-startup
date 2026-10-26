@@ -3,7 +3,14 @@ import { describe, expect, it, vi } from 'vitest';
 import { createApp } from '../../src/app.js';
 import { ErrorCode } from '../../src/shared/errors.js';
 import { MemoryStorageService } from '../../src/storage/index.js';
-import { buildTestApp, fakePool, fakeRepos, mockAuth, testConfig, withSessionHeaders } from '../helpers/fakes.js';
+import {
+  buildTestApp,
+  fakePool,
+  fakeRepos,
+  mockAuth,
+  testConfig,
+  withSessionHeaders,
+} from '../helpers/fakes.js';
 
 describe('P6-10: CSRF origin check', () => {
   it('refuses a cookie-authenticated write from a foreign origin', async () => {
@@ -105,7 +112,7 @@ describe('P6-10 / F-4: E-23 security notice', () => {
   it('renders the password-changed notice without unsubscribe wording', async () => {
     const { renderEmail, getSampleTemplateData } = await import('../../src/emails/renderer.js');
     const out = renderEmail('E-23', getSampleTemplateData('E-23') as never);
-    expect(out.subject).toBe('Your Plainsight password was changed');
+    expect(out.subject).toBe('Your EveryVisitor password was changed');
     expect(out.text).toContain('If this was not you');
   });
 
@@ -133,7 +140,7 @@ describe('P6-10 / F-4: E-23 security notice', () => {
     await new Promise((r) => setTimeout(r, 10));
     expect(transport.sent[0]).toMatchObject({
       to: 'user-pw@example.com',
-      subject: 'Your Plainsight password was changed',
+      subject: 'Your EveryVisitor password was changed',
     });
   });
 });

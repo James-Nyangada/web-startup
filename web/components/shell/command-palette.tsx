@@ -404,7 +404,7 @@ export function CommandPalette({
               <kbd className="rounded border border-line bg-surface px-1.5 py-0.5 font-mono">↵</kbd> to select
             </span>
           </div>
-          <span>Plainsight Command Palette</span>
+          <span>EveryVisitor Command Palette</span>
         </div>
       </div>
     </div>

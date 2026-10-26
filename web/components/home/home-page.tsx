@@ -102,7 +102,7 @@ export function HomePage() {
                       Overlay widget
                     </th>
                     <th scope="col" className="border-b border-line px-4 py-3 text-ptext">
-                      Plainsight
+                      EveryVisitor
                     </th>
                   </tr>
                 </thead>

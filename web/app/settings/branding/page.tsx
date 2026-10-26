@@ -461,11 +461,11 @@ export default function BrandingSettingsPage() {
                 className="h-10 rounded-xl border border-line bg-surface px-3 text-sm text-ink outline-none focus:border-primary focus:ring-1 focus:ring-primary"
               />
               <p className="text-xs text-muted m-0">
-                Replaces the default Plainsight disclaimer in the bottom footer of PDF reports.
+                Replaces the default EveryVisitor disclaimer in the bottom footer of PDF reports.
               </p>
             </div>
 
-            {/* Hide Plainsight Branding Toggle */}
+            {/* Hide EveryVisitor Branding Toggle */}
             <div className="flex items-start gap-3 pt-2">
               <input
                 id="hidePlainsight"
@@ -475,9 +475,9 @@ export default function BrandingSettingsPage() {
                 className="mt-1 h-4 w-4 rounded border-line text-primary focus:ring-primary"
               />
               <label htmlFor="hidePlainsight" className="flex flex-col cursor-pointer">
-                <span className="text-sm font-medium text-ink">Hide Plainsight marks</span>
+                <span className="text-sm font-medium text-ink">Hide EveryVisitor marks</span>
                 <span className="text-xs text-muted">
-                  Removes &apos;Powered by Plainsight&apos; branding from client reports, emails, and the client portal.
+                  Removes &apos;Powered by EveryVisitor&apos; branding from client reports, emails, and the client portal.
                 </span>
               </label>
             </div>
@@ -602,7 +602,7 @@ export default function BrandingSettingsPage() {
                   </p>
                   {!hidePlainsightBranding && (
                     <div className="text-[9px] text-neutral-400">
-                      Powered by Plainsight
+                      Powered by EveryVisitor
                     </div>
                   )}
                 </div>
@@ -617,7 +617,7 @@ export default function BrandingSettingsPage() {
                   <div className="flex items-center gap-1.5 text-neutral-600">
                     <span className="font-semibold text-neutral-900">From:</span>
                     <span>
-                      {emailSenderName || displayName || "Plainsight"} &lt;notifications@updates.io&gt;
+                      {emailSenderName || displayName || "EveryVisitor"} &lt;notifications@updates.io&gt;
                     </span>
                   </div>
                   <div className="flex items-center gap-1.5 text-neutral-600">
@@ -645,7 +645,7 @@ export default function BrandingSettingsPage() {
                         />
                       ) : (
                         <span className="font-bold text-sm tracking-tight">
-                          {displayName || "Plainsight"}
+                          {displayName || "EveryVisitor"}
                         </span>
                       )}
                       <span className="text-[10px] font-mono opacity-80 uppercase tracking-widest">
@@ -671,7 +671,7 @@ export default function BrandingSettingsPage() {
                   {/* Email Footer */}
                   <div className="p-3 bg-neutral-50 border-t border-neutral-100 text-[10px] text-neutral-400 text-center">
                     {!hidePlainsightBranding ? (
-                      <span>Delivered via Plainsight White-Label</span>
+                      <span>Delivered via EveryVisitor White-Label</span>
                     ) : (
                       <span>Sent by {displayName || "Agency Studio"}</span>
                     )}
@@ -751,7 +751,7 @@ export default function BrandingSettingsPage() {
                   <div className="border-t border-neutral-100 p-2.5 text-center text-[10px] text-neutral-400 flex items-center justify-between px-4">
                     <span>© {new Date().getFullYear()} {displayName || "Agency Studio"}</span>
                     {!hidePlainsightBranding && (
-                      <span className="text-neutral-300 text-[9px]">Powered by Plainsight</span>
+                      <span className="text-neutral-300 text-[9px]">Powered by EveryVisitor</span>
                     )}
                   </div>
                 </div>

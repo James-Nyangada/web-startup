@@ -42,9 +42,9 @@ describe('P6-01: TOTP', () => {
   });
 
   it('builds an otpauth URI with issuer and account', () => {
-    const uri = totpUri('JBSWY3DPEHPK3PXP', 'staff@example.com', 'Plainsight Staff');
-    expect(uri.startsWith('otpauth://totp/Plainsight%20Staff%3Astaff%40example.com?')).toBe(true);
+    const uri = totpUri('JBSWY3DPEHPK3PXP', 'staff@example.com', 'EveryVisitor Staff');
+    expect(uri.startsWith('otpauth://totp/EveryVisitor%20Staff%3Astaff%40example.com?')).toBe(true);
     expect(uri).toContain('secret=JBSWY3DPEHPK3PXP');
-    expect(uri).toContain('issuer=Plainsight+Staff');
+    expect(uri).toContain('issuer=EveryVisitor+Staff');
   });
 });

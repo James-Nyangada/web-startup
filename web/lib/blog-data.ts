@@ -63,7 +63,7 @@ export const BLOG_POSTS: BlogPost[] = [
         sectionTitle: "The Remediation Roadmap: Real Code over Overlays",
         paragraphs: [
           "European consumer protection groups and regulatory guidelines explicitly emphasize that superficial widget overlays do not constitute compliance. Genuine EAA conformance requires clean, accessible HTML and ARIA patterns built directly into your theme code.",
-          "Using automated weekly monitoring with Plainsight gives merchants and agencies immediate notice when theme updates or new marketing landing pages introduce accessibility regressions.",
+          "Using automated weekly monitoring with EveryVisitor gives merchants and agencies immediate notice when theme updates or new marketing landing pages introduce accessibility regressions.",
         ],
       },
     ],
@@ -106,7 +106,7 @@ export const BLOG_POSTS: BlogPost[] = [
         sectionTitle: "The Solution: Transparent Continuous Monitoring",
         paragraphs: [
           "The only sustainable path to compliance is fixing the source code: correcting color values in CSS, adding explicit descriptive labels to icon buttons, and structuring logical headings.",
-          "By monitoring your real storefront with Plainsight, you receive clear, plain-language guidance that your internal developers or agency partners can apply directly to your theme repository.",
+          "By monitoring your real storefront with EveryVisitor, you receive clear, plain-language guidance that your internal developers or agency partners can apply directly to your theme repository.",
         ],
       },
     ],

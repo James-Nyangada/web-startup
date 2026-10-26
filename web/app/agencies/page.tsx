@@ -23,11 +23,11 @@ const AGENCY_FAQS = [
     a: "Team members are your internal agency staff (designers, developers, project managers) who have full or admin access to all client sites. Client viewers are external contacts with read-only access to their specific client portal view.",
   },
   {
-    q: "Does Plainsight replace our manual audit services?",
-    a: "No, and we are completely transparent about that. Automated scans catch 30% to 50% of WCAG violations (contrast, missing labels, missing alt text, duplicate IDs). Plainsight handles continuous weekly regression monitoring, freeing your agency to sell high-value manual assistive tech audits on top.",
+    q: "Does EveryVisitor replace our manual audit services?",
+    a: "No, and we are completely transparent about that. Automated scans catch 30% to 50% of WCAG violations (contrast, missing labels, missing alt text, duplicate IDs). EveryVisitor handles continuous weekly regression monitoring, freeing your agency to sell high-value manual assistive tech audits on top.",
   },
   {
-    q: "How does Plainsight detect theme-wide issues across multiple sites?",
+    q: "How does EveryVisitor detect theme-wide issues across multiple sites?",
     a: "Our Cross-Site View aggregates rule failures across all client stores. If 8 of your Shopify clients share the same Dawn theme variant with an unlabeled mobile menu button, you can fix it once in your theme repository and verify the fix across all 8 stores simultaneously.",
   },
 ];
@@ -219,7 +219,7 @@ export default function AgenciesPage() {
                       </div>
                     </div>
                     <div>
-                      <span className="text-xs text-muted">Plainsight Software Fee</span>
+                      <span className="text-xs text-muted">EveryVisitor Software Fee</span>
                       <div className="text-3xl font-extrabold text-muted tnum">
                         ${agencySoftwareCost}
                         <span className="text-xs font-normal"> / mo</span>
@@ -239,7 +239,7 @@ export default function AgenciesPage() {
                   </div>
 
                   <div className="rounded-xl bg-subtle p-4 text-xs text-muted leading-relaxed">
-                    💡 <strong>Agency tip:</strong> Bundle Plainsight weekly monitoring into your standard maintenance retainer. Clients appreciate automated compliance defense, and you gain reliable recurring cash flow without extra manual hours.
+                    💡 <strong>Agency tip:</strong> Bundle EveryVisitor weekly monitoring into your standard maintenance retainer. Clients appreciate automated compliance defense, and you gain reliable recurring cash flow without extra manual hours.
                   </div>
 
                   <Link
@@ -262,7 +262,7 @@ export default function AgenciesPage() {
                 Three proven <em>care plan packages</em>
               </h2>
               <p className="mt-3 text-lg text-muted">
-                Here is how top Shopify and WordPress digital agencies package and price Plainsight for their client base.
+                Here is how top Shopify and WordPress digital agencies package and price EveryVisitor for their client base.
               </p>
             </div>
 

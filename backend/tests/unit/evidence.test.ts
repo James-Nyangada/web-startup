@@ -452,13 +452,19 @@ describe('Evidence Timeline & Compliance Events (P5-01)', () => {
         id: reportId,
         orgId,
         siteId,
+        scanId: 'scan-1',
         type: 'full',
         status: 'queued',
+        paper: 'a4',
         requestedBy: userId,
+      } as never);
+      vi.mocked(repos.scans.findRawById).mockResolvedValue({
+        id: 'scan-1',
+        rawKey: 'scans/raw.json',
       } as never);
 
       const storage = {
-        getObject: vi.fn().mockResolvedValue(null),
+        getObject: vi.fn().mockResolvedValue(Buffer.from('{}')),
         putObject: vi.fn().mockResolvedValue(undefined),
       };
 

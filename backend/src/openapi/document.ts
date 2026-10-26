@@ -422,7 +422,7 @@ export function buildOpenApiDocument(serverUrl: string) {
   return {
     openapi: '3.1.0',
     info: {
-      title: 'Plainsight API',
+      title: 'EveryVisitor API',
       version: '1.0.0',
       description: [
         'Read sites, scans and accessibility issues, and start scans, from your own tools.',

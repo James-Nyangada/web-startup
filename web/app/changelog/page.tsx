@@ -6,7 +6,7 @@ import { CHANGELOG_ENTRIES } from "@/lib/blog-data";
 
 export const metadata: Metadata = {
   title: "Product Changelog",
-  description: "Recent product updates, improvements, and releases for Plainsight.",
+  description: "Recent product updates, improvements, and releases for EveryVisitor.",
 };
 
 const H2 = "m-0 font-serif text-[42px] leading-[46px] font-normal sm:text-[56px] sm:leading-[60px]";
@@ -26,7 +26,7 @@ export default function ChangelogPage() {
               Product <em>changelog</em>
             </h1>
             <p className="m-0 max-w-[640px] text-lg text-muted">
-              Continuous improvements, accessibility rule additions, and platform releases shipped to Plainsight.
+              Continuous improvements, accessibility rule additions, and platform releases shipped to EveryVisitor.
             </p>
           </div>
 

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Icon, I } from "@/components/icons";
+import { Lockup } from "@/components/logo";
 import { StatusBadge, SeverityBadge, type IssueStatus } from "@/components/badges";
 import { ThemeRadio, useTheme } from "@/components/theme";
 import { useReveal } from "@/components/reveal";
@@ -81,14 +82,11 @@ export function Foundations() {
             {[
               {
                 id: "A",
-                name: "Plainsight",
-                note: "“Problems in plain sight, in plain language.” Lowercase, calm, closest to the voice rules.",
+                name: "EveryVisitor",
+                note: "“Make your website work for every visitor.” An open doorway with someone stepping through it.",
                 mark: (
                   <>
-                    <span className="grid size-9 place-items-center rounded-full bg-primary">
-                      <span className="size-3.5 rounded-full bg-on-primary" />
-                    </span>
-                    <span className="text-[30px] font-bold tracking-[-0.03em]">plainsight</span>
+                    <Lockup className="h-9" />
                   </>
                 ),
               },

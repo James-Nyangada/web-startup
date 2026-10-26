@@ -205,7 +205,11 @@ export async function verifyDns(
       const records = await lookup(host);
       for (const chunkGroup of records) {
         // Some DNS panels store the quotes users paste around the value.
-        const fullTxt = chunkGroup.join('').trim().replace(/^"(.*)"$/, '$1').trim();
+        const fullTxt = chunkGroup
+          .join('')
+          .trim()
+          .replace(/^"(.*)"$/, '$1')
+          .trim();
         foundTxtValues.push(fullTxt);
 
         if (fullTxt === expectedRecord || fullTxt === expectedToken) {

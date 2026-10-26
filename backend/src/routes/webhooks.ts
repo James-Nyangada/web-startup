@@ -248,7 +248,7 @@ export function orgWebhooksRouter(repos: Repositories, options: WebhookRouterOpt
             event: 'test',
             payload: {
               test: true,
-              message: 'Test event delivered from Plainsight',
+              message: 'Test event delivered from EveryVisitor',
               timestamp: new Date().toISOString(),
             },
           },

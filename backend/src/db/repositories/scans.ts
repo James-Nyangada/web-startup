@@ -1,8 +1,11 @@
-import { and, asc, desc, eq, gte, inArray, isNull, ne, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, gte, inArray, isNotNull, isNull, ne, sql } from 'drizzle-orm';
 import type { Database } from '../client.js';
 import type { Standard } from '../../scanner/types.js';
 import { scans, sites, type ScanStatus, type ScanTrigger } from '../schema/index.js';
 import type { OrgId } from './org-scope.js';
+
+/** Scan statuses whose stored results can back a summary or full report. */
+export const REPORTABLE_SCAN_STATUSES: ScanStatus[] = ['completed', 'partial'];
 
 export interface CreateScanInput {
   siteId: string;
@@ -89,6 +92,24 @@ export function scansRepository(db: Database) {
         .orderBy(desc(scans.queuedAt))
         .limit(limit)
         .offset(offset);
+    },
+
+    /** Newest finished scan with stored results, which summary and full reports render from. */
+    async findLatestReportable(orgId: OrgId, siteId: string) {
+      const [row] = await db
+        .select()
+        .from(scans)
+        .where(
+          and(
+            eq(scans.orgId, orgId),
+            eq(scans.siteId, siteId),
+            inArray(scans.status, REPORTABLE_SCAN_STATUSES),
+            isNotNull(scans.rawKey),
+          ),
+        )
+        .orderBy(desc(sql`coalesce(${scans.finishedAt}, ${scans.queuedAt})`))
+        .limit(1);
+      return row ?? null;
     },
 
     /** Finished scans whose finish (or queue) time falls in [start, end], oldest first. */

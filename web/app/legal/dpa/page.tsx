@@ -4,14 +4,14 @@ import { DPA_SECTIONS, DPA_UPDATED } from "@/lib/legal/dpa";
 
 export const metadata: Metadata = {
   title: "Data Processing Agreement (DPA)",
-  description: "Plainsight Data Processing Agreement under Article 28 of the GDPR and UK GDPR.",
+  description: "EveryVisitor Data Processing Agreement under Article 28 of the GDPR and UK GDPR.",
 };
 
 export default function DpaPage() {
   return (
     <div className="prose prose-slate max-w-none text-ink">
       <div className="border-b border-line pb-6 mb-8">
-        <span className="text-xs font-bold tracking-wider uppercase text-primary">Plainsight Legal</span>
+        <span className="text-xs font-bold tracking-wider uppercase text-primary">EveryVisitor Legal</span>
         <h1 className="mt-2 font-serif text-3xl sm:text-4xl font-normal text-ink">Data Processing Agreement (DPA)</h1>
         <p className="mt-2 text-sm text-muted">Standard Article 28 Contractual Terms · Last updated: {DPA_UPDATED}</p>
         <div className="mt-4 flex flex-wrap gap-3 not-prose">

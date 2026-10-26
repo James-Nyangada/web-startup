@@ -2,14 +2,14 @@ import type { Metadata } from "next";
 
 export const metadata: Metadata = {
   title: "Terms of Service",
-  description: "Terms of Service and Customer Agreement for Plainsight Accessibility Monitoring.",
+  description: "Terms of Service and Customer Agreement for EveryVisitor Accessibility Monitoring.",
 };
 
 export default function TermsPage() {
   return (
     <div className="prose prose-slate max-w-none text-ink">
       <div className="border-b border-line pb-6 mb-8">
-        <span className="text-xs font-bold tracking-wider uppercase text-primary">Plainsight Legal</span>
+        <span className="text-xs font-bold tracking-wider uppercase text-primary">EveryVisitor Legal</span>
         <h1 className="mt-2 font-serif text-3xl sm:text-4xl font-normal text-ink">Terms of Service</h1>
         <p className="mt-2 text-sm text-muted">Last updated: October 18, 2026 · Effective date: October 18, 2026</p>
       </div>
@@ -18,8 +18,8 @@ export default function TermsPage() {
         <section>
           <h2 className="text-xl font-bold text-ink mb-3">1. Agreement to Terms</h2>
           <p>
-            By registering for an account, accessing, or using Plainsight (&quot;the Service&quot;), operated by Plainsight Ltd.
-            (&quot;Plainsight&quot;, &quot;we&quot;, &quot;us&quot;, or &quot;our&quot;), you (&quot;Customer&quot; or &quot;User&quot;) agree to be bound by these Terms of Service.
+            By registering for an account, accessing, or using EveryVisitor (&quot;the Service&quot;), operated by EveryVisitor Ltd.
+            (&quot;EveryVisitor&quot;, &quot;we&quot;, &quot;us&quot;, or &quot;our&quot;), you (&quot;Customer&quot; or &quot;User&quot;) agree to be bound by these Terms of Service.
             If you are entering into this agreement on behalf of a company or other legal entity, you represent that you have the authority to bind such entity.
           </p>
         </section>
@@ -27,7 +27,7 @@ export default function TermsPage() {
         <section>
           <h2 className="text-xl font-bold text-ink mb-3">2. Description of Service &amp; Scope</h2>
           <p>
-            Plainsight provides automated web accessibility scanning, regression detection, fix guidance, and reporting tools primarily
+            EveryVisitor provides automated web accessibility scanning, regression detection, fix guidance, and reporting tools primarily
             tailored for e-commerce platforms (including Shopify and WordPress/WooCommerce). Scans evaluate pages against the Web Content
             Accessibility Guidelines (WCAG) 2.2 Level A and Level AA standards using industry-standard rulesets (including axe-core).
           </p>
@@ -41,7 +41,7 @@ export default function TermsPage() {
             require human judgment and assistive technology verification.
           </p>
           <p className="mb-0">
-            Plainsight is an engineering and quality assurance tool, not a law firm. Nothing in the Service, our reports, or our documentation
+            EveryVisitor is an engineering and quality assurance tool, not a law firm. Nothing in the Service, our reports, or our documentation
             constitutes legal advice. Use of the Service does not guarantee immunity from accessibility-related lawsuits, demand letters, or regulatory enforcement actions under the Americans with Disabilities Act (ADA), the European Accessibility Act (EAA), or any other jurisdiction.
           </p>
         </section>
@@ -49,10 +49,10 @@ export default function TermsPage() {
         <section>
           <h2 className="text-xl font-bold text-ink mb-3">4. Authorized Use &amp; Site Ownership Verification</h2>
           <p className="mb-2">
-            You agree to use Plainsight solely to scan and monitor websites and web applications that you own, operate, or for which you have obtained explicit written authorization from the owner.
+            You agree to use EveryVisitor solely to scan and monitor websites and web applications that you own, operate, or for which you have obtained explicit written authorization from the owner.
           </p>
           <p>
-            Plainsight requires site verification (via DNS TXT record, root HTML file upload, or platform OAuth) prior to initiating recurrent deep scans. We reserve the right to immediately suspend or terminate scans for any domain where ownership or authorization is disputed.
+            EveryVisitor requires site verification (via DNS TXT record, root HTML file upload, or platform OAuth) prior to initiating recurrent deep scans. We reserve the right to immediately suspend or terminate scans for any domain where ownership or authorization is disputed.
           </p>
         </section>
 
@@ -66,7 +66,7 @@ export default function TermsPage() {
         <section>
           <h2 className="text-xl font-bold text-ink mb-3">6. Subscriptions, Payments &amp; Taxes</h2>
           <p className="mb-2">
-            Plainsight offers subscription plans billed on a monthly or annual basis. Payments are processed securely via our Merchant of Record, Paddle.com Market Ltd. (&quot;Paddle&quot;), which acts as the merchant of record for billing, sales tax, VAT, and invoice generation.
+            EveryVisitor offers subscription plans billed on a monthly or annual basis. Payments are processed securely via our Merchant of Record, Paddle.com Market Ltd. (&quot;Paddle&quot;), which acts as the merchant of record for billing, sales tax, VAT, and invoice generation.
           </p>
           <p>
             Subscriptions renew automatically unless canceled prior to the renewal date via your account billing dashboard. You may cancel your subscription at any time. Canceled subscriptions remain active through the end of the current paid billing cycle.
@@ -83,7 +83,7 @@ export default function TermsPage() {
         <section>
           <h2 className="text-xl font-bold text-ink mb-3">8. Limitation of Liability</h2>
           <p>
-            To the maximum extent permitted by applicable law, in no event shall Plainsight or its directors, employees, or partners be liable for any indirect, incidental, special, consequential, or punitive damages (including loss of profits, revenue, data, or business opportunities), arising out of or related to your use of the Service, whether based on contract, tort, or any other legal theory, even if advised of the possibility of such damages. In no event shall our total aggregate liability exceed the total amounts paid by you to Plainsight in the twelve (12) months preceding the incident.
+            To the maximum extent permitted by applicable law, in no event shall EveryVisitor or its directors, employees, or partners be liable for any indirect, incidental, special, consequential, or punitive damages (including loss of profits, revenue, data, or business opportunities), arising out of or related to your use of the Service, whether based on contract, tort, or any other legal theory, even if advised of the possibility of such damages. In no event shall our total aggregate liability exceed the total amounts paid by you to EveryVisitor in the twelve (12) months preceding the incident.
           </p>
         </section>
 
