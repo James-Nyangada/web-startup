@@ -29,7 +29,7 @@ const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://plainsight.io";
 
 export const metadata: Metadata = {
   metadataBase: new URL(baseUrl),
-  title: { default: "EveryVisitor — Accessibility monitoring for online stores", template: "%s · EveryVisitor" },
+  title: { default: "EveryVisitor | Accessibility monitoring for online stores", template: "%s · EveryVisitor" },
   description:
     "Weekly accessibility checks for Shopify and WordPress sites, plain-language fix guides, and a verifiable record of your compliance progress.",
   keywords: [
@@ -47,13 +47,13 @@ export const metadata: Metadata = {
     locale: "en_US",
     url: baseUrl,
     siteName: "EveryVisitor",
-    title: "EveryVisitor — Accessibility monitoring for online stores",
+    title: "EveryVisitor | Accessibility monitoring for online stores",
     description:
       "Weekly accessibility checks for Shopify and WordPress sites, plain-language fix guides, and a verifiable record of your compliance progress.",
   },
   twitter: {
     card: "summary_large_image",
-    title: "EveryVisitor — Accessibility monitoring for online stores",
+    title: "EveryVisitor | Accessibility monitoring for online stores",
     description:
       "Weekly accessibility checks for Shopify and WordPress sites, plain-language fix guides, and a verifiable record of your compliance progress.",
   },

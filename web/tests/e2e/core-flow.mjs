@@ -59,7 +59,7 @@ try {
   step('issue ignored and reopened');
   await page.locator('aside button:has-text("Recheck")').first().click({ timeout: 10000 });
   await page.waitForFunction(
-    () => /Fixed —|Still there|couldn’t load|longer than expected/.test(document.body.innerText),
+    () => /Fixed\.|Still there|couldn’t load|longer than expected/.test(document.body.innerText),
     null,
     { timeout: 170000 },
   );

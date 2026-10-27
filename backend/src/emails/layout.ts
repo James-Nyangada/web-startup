@@ -1,5 +1,12 @@
 import type { EmailBranding } from './types.js';
 
+/** Hosted PNG of the light lockup (web/public/email); email clients don't render SVG. */
+function productLogoUrl(): string {
+  if (process.env.EMAIL_LOGO_URL) return process.env.EMAIL_LOGO_URL;
+  const appUrl = (process.env.APP_URL || 'http://localhost:3000').replace(/\/$/, '');
+  return `${appUrl}/email/everyvisitor-logo.png`;
+}
+
 export interface LayoutOptions {
   preheader?: string;
   title: string;
@@ -27,6 +34,13 @@ export function renderEmailLayout(options: LayoutOptions): string {
 
   const brandName = branding?.displayName || 'EveryVisitor';
   const primaryColor = branding?.primaryColor || '#0F3D3E'; // 10.1:1 contrast on white
+
+  // A white-label brand shows its own logo (or name); otherwise the EveryVisitor lockup.
+  const brandHtml = branding?.logoUrl
+    ? `<img src="${branding.logoUrl}" alt="${brandName}" height="28" style="display: block; max-height: 28px; width: auto;" />`
+    : branding?.displayName
+      ? brandName
+      : `<img src="${productLogoUrl()}" alt="EveryVisitor" width="196" height="28" style="display: block; width: 196px; height: 28px;" />`;
 
   const buttonHtml =
     buttonLabel && buttonUrl
@@ -110,7 +124,7 @@ export function renderEmailLayout(options: LayoutOptions): string {
               <table role="presentation" border="0" cellpadding="0" cellspacing="0">
                 <tr>
                   <td style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 20px; font-weight: 700; letter-spacing: -0.02em; color: ${primaryColor};">
-                    ${branding?.logoUrl ? `<img src="${branding.logoUrl}" alt="${brandName}" height="28" style="display: block; max-height: 28px; width: auto;" />` : brandName}
+                    ${brandHtml}
                   </td>
                 </tr>
               </table>

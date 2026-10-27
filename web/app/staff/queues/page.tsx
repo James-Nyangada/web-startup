@@ -110,7 +110,7 @@ export default function StaffQueuesPage() {
           />
           <Stat
             label="Average scan time"
-            value={m.scans.avgDurationMs ? `${Math.round(m.scans.avgDurationMs / 60_000)} min` : "—"}
+            value={m.scans.avgDurationMs ? `${Math.round(m.scans.avgDurationMs / 60_000)} min` : "-"}
           />
           <Stat
             label="Trials converted"

@@ -11,7 +11,7 @@ const when = (v: string | null) =>
     ? new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" }).format(
         new Date(v),
       )
-    : "—";
+    : "-";
 
 /**
  * S-48 personal data export (GDPR, P6-09): request a zip, see its status, download it while

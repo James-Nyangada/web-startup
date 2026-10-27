@@ -132,12 +132,12 @@ export default function StaffLeadsPage() {
                   <tr key={c.id}>
                     <td className={td}>{c.email}</td>
                     <td className={`${td} max-w-xs truncate`}>{c.domain}</td>
-                    <td className={`${td} tnum text-right`}>{c.score ?? "—"}</td>
+                    <td className={`${td} tnum text-right`}>{c.score ?? "-"}</td>
                     <td className={td}>
                       <Yes on={c.marketingConsent} />
                     </td>
                     <td className={td}>
-                      <Yes on={Boolean(c.convertedOrgId)} yes="Signed up" no="—" />
+                      <Yes on={Boolean(c.convertedOrgId)} yes="Signed up" no="-" />
                     </td>
                     <td className={td}>{formatDate(c.createdAt, true)}</td>
                   </tr>
@@ -159,12 +159,12 @@ export default function StaffLeadsPage() {
                 {waitlist.map((w) => (
                   <tr key={w.id}>
                     <td className={td}>{w.email}</td>
-                    <td className={td}>{w.source ?? "—"}</td>
+                    <td className={td}>{w.source ?? "-"}</td>
                     <td className={td}>
                       <Yes on={w.consent} />
                     </td>
                     <td className={td}>
-                      <Yes on={w.converted} yes="Has an account" no="—" />
+                      <Yes on={w.converted} yes="Has an account" no="-" />
                     </td>
                     <td className={td}>{formatDate(w.createdAt)}</td>
                   </tr>

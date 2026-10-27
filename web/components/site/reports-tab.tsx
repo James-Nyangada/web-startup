@@ -80,7 +80,7 @@ function scanOptionLabel(scan: ScanHistoryItem): string {
     month: "short",
     year: "numeric",
   });
-  const score = scan.score !== null ? ` — Score: ${scan.score}` : "";
+  const score = scan.score !== null ? `, Score: ${scan.score}` : "";
   return `${date}${score}${scan.status === "partial" ? " (partial)" : ""}`;
 }
 
@@ -89,7 +89,7 @@ function scanScoreLabel(score?: number | null): string {
 }
 
 function formatFileSize(bytes?: number | null): string {
-  if (!bytes || bytes <= 0) return "—";
+  if (!bytes || bytes <= 0) return "-";
   if (bytes < 1024 * 1024) {
     return `${Math.round(bytes / 1024)} KB`;
   }

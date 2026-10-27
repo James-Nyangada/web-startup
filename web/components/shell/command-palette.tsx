@@ -179,7 +179,7 @@ export function CommandPalette({
         id: `site-${s.id}`,
         category: "Sites",
         label: s.name,
-        subtext: `${host} · ${platformLabel(s.platform)} · Score: ${s.score ?? "—"}`,
+        subtext: `${host} · ${platformLabel(s.platform)} · Score: ${s.score ?? "-"}`,
         href: `/${org}/sites/${s.id}`,
         icon: I.globe,
         keywords: [host, s.clientName ?? "", s.platform, "site", "store"],

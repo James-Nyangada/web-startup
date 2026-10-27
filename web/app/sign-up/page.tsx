@@ -157,7 +157,7 @@ function SignUpContent() {
         <div className="mb-4 flex items-center gap-2 rounded-lg bg-primary-soft p-3 text-xs text-ink">
           <Icon d={I.globe} size={16} className="text-ptext flex-none" />
           <span className="font-medium">
-            Monitoring <strong className="font-semibold text-ptext">{pendingUrl}</strong> — 14-day free trial included
+            Monitoring <strong className="font-semibold text-ptext">{pendingUrl}</strong>, 14-day free trial included
           </span>
         </div>
       )}

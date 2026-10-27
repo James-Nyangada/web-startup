@@ -18,7 +18,7 @@ export default function HelpIndexPage() {
       <h1 className="m-0 mt-2 font-serif text-4xl font-normal sm:text-5xl">How can we help?</h1>
       <p className="mt-4 max-w-2xl text-base leading-7 text-muted">
         Short guides to the things people ask us most. Can’t find an answer? Email{" "}
-        <a href="mailto:support@plainsight.io">support@plainsight.io</a>; we reply within one working day.
+        <a href="mailto:info@everyvisitor.app">info@everyvisitor.app</a>; we reply within one working day.
       </p>
 
       <div className="mt-10 flex flex-col gap-10">
@@ -61,7 +61,7 @@ export default function HelpIndexPage() {
             </li>
           )}
           <li>
-            <a href="mailto:support@plainsight.io">Email support</a>
+            <a href="mailto:info@everyvisitor.app">Email info@everyvisitor.app</a>
           </li>
         </ul>
       </section>

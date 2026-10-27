@@ -19,23 +19,59 @@ export const TOP_PROBLEMS: { sev: Severity; title: string; n: number; who: strin
 ];
 
 export const FACTS = [
-  { fact: "Online stores are the most common target of US accessibility lawsuits.", source: "Source: [to confirm before launch]" },
+  { fact: "Online stores are the most common target of US accessibility lawsuits.", source: "Source: UsableNet, 2025 Year-End Digital Accessibility Lawsuit Report (about 70% e-commerce)" },
   { fact: "The European Accessibility Act has applied to e-commerce since 28 June 2025.", source: "Source: Directive (EU) 2019/882" },
-  { fact: "Overlays don't fix the underlying code — and can make things worse.", source: "Source: [to confirm before launch]" },
+  { fact: "Overlays don't fix the underlying code, and can make things worse.", source: "Source: US FTC, accessiBe final order, April 2025" },
 ];
 
 export const HOW = [
-  { n: "Step 1", t: "Scan", d: "We check up to 150 pages every week and group them by template.", shot: "screenshot: scan progress" },
-  { n: "Step 2", t: "Understand", d: "Problems in plain words, ranked by who they block.", shot: "screenshot: fix these first" },
-  { n: "Step 3", t: "Fix", d: "Step-by-step guides for Shopify and WordPress, with code.", shot: "screenshot: fix guide" },
-  { n: "Step 4", t: "Prove", d: "A dated record of scans, fixes and manual checks.", shot: "screenshot: evidence timeline" },
+  {
+    n: "Step 1",
+    t: "Scan",
+    d: "We check up to 150 pages every week and group them by template.",
+    shot: "screenshot: scan progress",
+    image: "/screenshots/scan-progress.png",
+    imageLight: "/screenshots/scan-progress-light.png",
+    imageDark: "/screenshots/scan-progress-dark.png",
+    alt: "EveryVisitor scanning a store: 87 of 150 pages checked.",
+  },
+  {
+    n: "Step 2",
+    t: "Understand",
+    d: "Problems in plain words, ranked by who they block.",
+    shot: "screenshot: fix these first",
+    image: "/screenshots/fix-these-first.png",
+    imageLight: "/screenshots/fix-these-first-light.png",
+    imageDark: "/screenshots/fix-these-first-dark.png",
+    alt: "Site score of 72 with the top problems listed in plain language.",
+  },
+  {
+    n: "Step 3",
+    t: "Fix",
+    d: "Step-by-step guides for Shopify and WordPress, with code.",
+    shot: "screenshot: fix guide",
+    image: "/screenshots/fix-guide.png",
+    imageLight: "/screenshots/fix-guide-light.png",
+    imageDark: "/screenshots/fix-guide-dark.png",
+    alt: "Step-by-step Shopify fix guide with the code to copy.",
+  },
+  {
+    n: "Step 4",
+    t: "Prove",
+    d: "A dated record of scans, fixes and manual checks.",
+    shot: "screenshot: evidence timeline",
+    image: "/screenshots/evidence-timeline.png",
+    imageLight: "/screenshots/evidence-timeline-light.png",
+    imageDark: "/screenshots/evidence-timeline-dark.png",
+    alt: "Dated record of fixes, scans and manual checks, with an evidence pack download.",
+  },
 ];
 
 export const COMPARE = [
-  { q: "Changes your code", a: "No — adds a script on top", b: "Shows you exactly what to change" },
+  { q: "Changes your code", a: "No, adds a script on top", b: "Shows you exactly what to change" },
   { q: "Works with screen readers", a: "Often conflicts with them", b: "Fixes are in your real HTML" },
   { q: "Proof of effort", a: "None", b: "Evidence pack with dates" },
-  { q: "Claims compliance", a: "Often", b: "Never — we’re honest about limits" },
+  { q: "Claims compliance", a: "Often", b: "Never, we’re honest about limits" },
 ];
 
 export const PLANS = [
@@ -48,7 +84,7 @@ export const PLANS = [
 export const FAQ = [
   {
     q: "Will this make my site compliant?",
-    a: "No tool can make a site compliant on its own. Automated checks find part of the problems; the rest needs people to test. We help you find, fix and record your work — which is what reduces risk.",
+    a: "No tool can make a site compliant on its own. Automated checks find part of the problems; the rest needs people to test. We help you find, fix and record your work, which is what reduces risk.",
   },
   { q: "Do I need to install anything?", a: "No. We check your site from the outside, like a visitor. Nothing is added to your pages." },
   {

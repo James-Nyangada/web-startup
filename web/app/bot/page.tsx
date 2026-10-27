@@ -122,10 +122,10 @@ export default function BotPage() {
               </p>
               <div className="flex flex-wrap items-center gap-4 mt-2">
                 <a
-                  href="mailto:bot@plainsight.io"
+                  href="mailto:info@everyvisitor.app"
                   className="ease-ui flex h-10 items-center rounded-full bg-primary px-5 text-sm font-semibold text-on-primary no-underline hover:bg-primary-hover"
                 >
-                  Contact bot@plainsight.io
+                  Contact info@everyvisitor.app
                 </a>
                 <Link href="/agencies" className="text-sm font-semibold text-primary hover:underline">
                   Learn more about our agency platform →

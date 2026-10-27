@@ -52,7 +52,7 @@ function PortalFrame({ branding, user, header, children }: PortalFrameProps) {
       ? user.email.slice(0, 2).toUpperCase()
       : "ME";
 
-  const contactHref = `mailto:${branding?.contactEmail || "hello@brightline.studio"}`;
+  const contactHref = `mailto:${branding?.contactEmail || "info@everyvisitor.app"}`;
 
   const handleSignOut = async () => {
     try {
@@ -206,7 +206,7 @@ export function PortalHome() {
                       <strong className="block text-[17px]">{s.name}</strong>
                       <span className="text-sm text-muted">{s.rootUrl}</span>
                     </span>
-                    <span className="tnum text-[28px] leading-8 font-bold">{s.score ?? "—"}</span>
+                    <span className="tnum text-[28px] leading-8 font-bold">{s.score ?? "-"}</span>
                   </span>
                   <span className="flex items-center justify-between gap-2 text-sm">
                     <span className={`rounded-full px-2.5 py-0.5 font-semibold ${s.cls}`}>{s.status}</span>
@@ -228,7 +228,7 @@ export function PortalHome() {
   );
 }
 
-/** S-61 Portal site view — plain language, no rule IDs or selectors. */
+/** S-61 Portal site view - plain language, no rule IDs or selectors. */
 export function PortalSite({ siteId: propSiteId }: { siteId?: string }) {
   const params = useParams();
   const resolvedSiteId = (propSiteId || params?.site || "") as string;
@@ -286,7 +286,7 @@ export function PortalSite({ siteId: propSiteId }: { siteId?: string }) {
 
   const branding = data?.branding ?? null;
   const agencyName = branding?.displayName || data?.org?.name || "Your Agency";
-  const contactHref = `mailto:${branding?.contactEmail || "hello@brightline.studio"}`;
+  const contactHref = `mailto:${branding?.contactEmail || "info@everyvisitor.app"}`;
 
   return (
     <PortalFrame

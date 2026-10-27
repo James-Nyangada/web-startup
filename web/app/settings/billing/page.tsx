@@ -615,7 +615,7 @@ export default function BillingSettingsPage() {
                             Download PDF
                           </a>
                         ) : (
-                          <span className="text-xs text-muted">—</span>
+                          <span className="text-xs text-muted">-</span>
                         )}
                       </td>
                     </tr>

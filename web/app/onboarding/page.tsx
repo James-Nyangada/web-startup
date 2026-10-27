@@ -1084,7 +1084,7 @@ export default function OnboardingPage() {
                         color: "var(--mod, #8A6100)",
                       }}
                     >
-                      {state.scanScore ?? "—"}
+                      {state.scanScore ?? "-"}
                     </span>
                     <span style={{ fontSize: "14px", fontWeight: 600, color: "var(--mod, #8A6100)" }}>
                       / 100 · {state.scanScore !== null ? band(state.scanScore).label : "No score"}

@@ -106,7 +106,7 @@ export default function StaffOrgDetailPage() {
               ["Override", o.planOverride ? `${label(o.planOverride)} until ${formatDate(o.planOverrideExpiresAt)}` : "None"],
               ["Billing status", label(o.billingStatus)],
               ["Trial ends", formatDate(o.trialEndsAt)],
-              ["MRR", detail.mrrCents ? formatMoney(detail.mrrCents) : "—"],
+              ["MRR", detail.mrrCents ? formatMoney(detail.mrrCents) : "-"],
               ["Created", formatDate(o.createdAt)],
             ].map(([k, v]) => (
               <div key={k}>
@@ -178,7 +178,7 @@ export default function StaffOrgDetailPage() {
                       <td className={td}>{s.trigger}</td>
                       <td className={`${td} ${s.status === "failed" ? "font-semibold text-crit" : ""}`}>{s.status}</td>
                       <td className={`${td} tnum text-right`}>{s.pagesScanned}</td>
-                      <td className={`${td} tnum text-right`}>{s.score ?? "—"}</td>
+                      <td className={`${td} tnum text-right`}>{s.score ?? "-"}</td>
                       <td className={`${td} text-xs text-muted`}>{s.errorCode ? `${s.errorCode}: ${s.errorMessage ?? ""}` : ""}</td>
                     </tr>
                   ))}

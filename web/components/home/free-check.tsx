@@ -14,8 +14,8 @@ type Phase = "input" | "progress" | "result";
 
 const HEADLINE: { w: string; em?: boolean }[] = [
   ..."Find the accessibility problems that".split(" ").map((w) => ({ w })),
-  ..."stop people buying".split(" ").map((w) => ({ w, em: true })),
-  ..."— and fix them in order.".split(" ").map((w) => ({ w })),
+  ..."stop people buying,".split(" ").map((w) => ({ w, em: true })),
+  ..."and fix them in order.".split(" ").map((w) => ({ w })),
 ];
 const HEADLINE_TEXT = HEADLINE.map((h) => h.w).join(" ");
 
@@ -277,7 +277,7 @@ export function FreeCheck() {
                 <li>Whether your site works with a keyboard alone</li>
                 <li>Whether alt text and labels actually make sense</li>
                 <li>Problems on your other pages, cart and checkout</li>
-                <li>Whether your site meets any law — no automated tool can say that</li>
+                <li>Whether your site meets any law. No automated tool can say that</li>
               </ul>
             </section>
             {!sent ? (
@@ -315,7 +315,7 @@ export function FreeCheck() {
               </p>
             )}
             <section className="flex flex-col gap-3 rounded-2xl bg-ink p-6 text-surface">
-              <h2 className="m-0 text-xl leading-7 font-semibold">Monitor your whole site — 14 days free</h2>
+              <h2 className="m-0 text-xl leading-7 font-semibold">Monitor your whole site, 14 days free</h2>
               <p className="m-0 text-sm leading-5">We&apos;ll check up to 150 pages every week, group the problems by template, and alert you when something breaks.</p>
               <Link
                 href="/overview"

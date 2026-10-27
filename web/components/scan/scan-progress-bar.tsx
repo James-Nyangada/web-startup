@@ -33,7 +33,7 @@ export function ScanProgressBar({
 
   let statusText = `Scanning ${pagesScanned} of ${pagesPlanned} pages (${percent}%)`;
   if (isComplete) {
-    statusText = `Scan finished — ${pagesScanned} pages checked`;
+    statusText = `Scan finished: ${pagesScanned} pages checked`;
   } else if (isFailed) {
     statusText = "Scan failed";
   } else if (isCanceled) {

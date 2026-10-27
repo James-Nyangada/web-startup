@@ -87,7 +87,7 @@ export default async function HelpArticlePage({ params }: { params: Promise<{ sl
             </li>
           ))}
           <li>
-            <a href="mailto:support@plainsight.io">Email support@plainsight.io</a>
+            <a href="mailto:info@everyvisitor.app">Email info@everyvisitor.app</a>
           </li>
         </ul>
       </aside>

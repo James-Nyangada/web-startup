@@ -3,7 +3,7 @@
 # portal domains (P6-07), and /internal/* never reachable from the internet.
 
 {
-	email ops@plainsight.io
+	email info@everyvisitor.app
 	on_demand_tls {
 		# 200 only for verified custom portal domains (backend/src/routes/internal.ts).
 		ask http://api:4000/internal/tls-allowed

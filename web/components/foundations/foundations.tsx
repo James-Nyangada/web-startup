@@ -72,7 +72,7 @@ export function Foundations() {
         <section id="brand" aria-labelledby="h-brand" className="flex flex-col gap-5">
           <div data-reveal>
             <h2 id="h-brand" className="m-0 text-2xl leading-8 font-semibold">
-              Name and mark — three directions
+              Name and mark: three directions
             </h2>
             <p className="mt-1 mb-0 max-w-[720px] text-pretty text-muted">
               Working names for discussion; each needs a trademark and domain check. Marks are built from simple geometry so they hold at 16 px and in one colour.
@@ -93,7 +93,7 @@ export function Foundations() {
               {
                 id: "B",
                 name: "Kerbside",
-                note: "Named after the kerb cut — access built in for everyone. Rising steps read as progress.",
+                note: "Named after the kerb cut: access built in for everyone. Rising steps read as progress.",
                 mark: (
                   <>
                     <span className="flex h-8 items-end gap-[3px]">
@@ -158,7 +158,7 @@ export function Foundations() {
               );
             })}
           </div>
-          <h3 className="mt-2 mb-0 text-base font-semibold">Severity — always icon + word</h3>
+          <h3 className="mt-2 mb-0 text-base font-semibold">Severity: always icon + word</h3>
           <div data-reveal="stagger" className="grid gap-4 [grid-template-columns:repeat(auto-fit,minmax(240px,1fr))]">
             {SEVERITIES.map((k) => (
               <div key={k} className={`flex flex-col gap-1.5 rounded-lg p-4 ${SEV[k].bg} ${SEV[k].text}`}>
@@ -175,7 +175,7 @@ export function Foundations() {
 
         <section id="type" aria-labelledby="h-type" className="flex flex-col gap-5">
           <h2 id="h-type" data-reveal className="m-0 text-2xl leading-8 font-semibold">
-            Type scale — Instrument Serif, Manrope and JetBrains Mono
+            Type scale: Instrument Serif, Manrope and JetBrains Mono
           </h2>
           <div data-reveal className={CARD}>
             {TYPES.map((t, i) => (
@@ -232,7 +232,7 @@ export function Foundations() {
           </h2>
 
           <div data-reveal className="flex flex-col gap-3">
-            <h3 className="m-0 text-base font-semibold">Button — variants × states (md 40)</h3>
+            <h3 className="m-0 text-base font-semibold">Button: variants × states (md 40)</h3>
             <div className="overflow-x-auto">
               <div className="grid min-w-[760px] grid-cols-[120px_repeat(5,minmax(0,1fr))] items-center gap-3 text-xs text-muted">
                 <span />
@@ -343,7 +343,7 @@ export function Foundations() {
             </div>
             <div className="flex gap-3 rounded-lg border border-line bg-surface px-4 py-3.5 shadow-pop">
               <Icon d={I.fixed} size={20} stroke="var(--ok)" className="flex-none" />
-              <span className="flex-1 text-sm leading-5">Fixed — the problem no longer appears on 3 checked pages.</span>
+              <span className="flex-1 text-sm leading-5">Fixed. The problem no longer appears on 3 checked pages.</span>
               <span aria-hidden="true" className="text-muted">✕</span>
             </div>
           </div>

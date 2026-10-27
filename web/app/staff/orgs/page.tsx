@@ -125,7 +125,7 @@ export default function StaffOrgsPage() {
                   </td>
                   <td className={td}>{label(o.billingStatus)}</td>
                   <td className={`${td} tnum text-right`}>{o.siteCount}</td>
-                  <td className={`${td} tnum text-right`}>{o.mrrCents ? formatMoney(o.mrrCents) : "—"}</td>
+                  <td className={`${td} tnum text-right`}>{o.mrrCents ? formatMoney(o.mrrCents) : "-"}</td>
                   <td className={td}>{formatDate(o.lastActivityAt, true)}</td>
                   <td className={td}>{formatDate(o.createdAt)}</td>
                 </tr>

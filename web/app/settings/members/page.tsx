@@ -35,7 +35,7 @@ export interface OrgSiteSummary {
 
 /** "12 Mar 2026" for a membership's join date. */
 function formatJoined(value: string | null | undefined): string {
-  if (!value) return "—";
+  if (!value) return "-";
   return new Date(value).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
 }
 
@@ -859,8 +859,8 @@ export default function MembersSettingsPage() {
                     onChange={(e) => setInviteRole(e.target.value as "admin" | "member")}
                     className="h-10 rounded-xl border border-line-strong bg-surface px-3 text-sm text-ink outline-none focus:border-primary focus:ring-1 focus:ring-primary"
                   >
-                    <option value="member">Member — Can triage issues, recheck, and download reports</option>
-                    <option value="admin">Admin — Can add sites, invite members, and configure settings</option>
+                    <option value="member">Member: Can triage issues, recheck, and download reports</option>
+                    <option value="admin">Admin: Can add sites, invite members, and configure settings</option>
                   </select>
                 </div>
 

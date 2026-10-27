@@ -37,7 +37,7 @@ export interface SiteWorkspaceProps {
   siteId: string;
 }
 
-/** S-24 Site overview · S-25 Issues · S-26 Issue drawer — interactive flow F-04 (triage and fix). */
+/** S-24 Site overview · S-25 Issues · S-26 Issue drawer - interactive flow F-04 (triage and fix). */
 export function SiteWorkspace({
   startTab = 0,
   orgSlug,
@@ -83,7 +83,7 @@ export function SiteWorkspace({
   const errorText = (err: unknown, fallback: string) =>
     err instanceof ApiException ? err.message : fallback;
 
-  // Site detail (score, trend, top issues, counts) — reloaded after every change.
+  // Site detail (score, trend, top issues, counts) - reloaded after every change.
   useEffect(() => {
     let cancelled = false;
     appApi

@@ -471,7 +471,7 @@ function renderCell(val: string | boolean) {
       </span>
     ) : (
       <span className="text-muted/40 font-mono text-base" title="Not included">
-        <span aria-hidden="true">—</span>
+        <span aria-hidden="true">-</span>
         <span className="sr-only">Not included</span>
       </span>
     );

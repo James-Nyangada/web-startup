@@ -7,6 +7,7 @@ import { MarketingFooter } from "@/components/marketing/marketing-footer";
 import { FreeCheck } from "./free-check";
 import { Collapse } from "@/components/disclosure";
 import { useReveal } from "@/components/reveal";
+import { useTheme } from "@/components/theme";
 import { COMPARE, FACTS, FAQ, HOW, PLANS } from "@/lib/home-data";
 
 const H2 = "m-0 font-serif text-[40px] leading-[44px] font-normal sm:text-[52px] sm:leading-[56px]";
@@ -24,6 +25,8 @@ function Placeholder({ label, className = "" }: { label: string; className?: str
 export function HomePage() {
   const [faq, setFaq] = useState(0);
   const scope = useReveal<HTMLDivElement>();
+  const { theme } = useTheme();
+  const isDark = theme === "dark";
 
   return (
     <div ref={scope} className="min-h-screen bg-page text-ink flex flex-col justify-between">
@@ -53,14 +56,26 @@ export function HomePage() {
             How it <em>works</em>
           </h2>
           <ol data-reveal="stagger" className="m-0 grid list-none gap-6 p-0 [grid-template-columns:repeat(auto-fit,minmax(240px,1fr))]">
-            {HOW.map((h) => (
-              <li key={h.t} className="flex flex-col gap-3">
-                <Placeholder label={h.shot} className="aspect-[4/3] rounded-2xl shadow-card" />
-                <span className="text-sm font-semibold text-ptext">{h.n}</span>
-                <h3 className="m-0 text-xl leading-7 font-semibold">{h.t}</h3>
-                <p className="m-0 text-pretty text-muted">{h.d}</p>
-              </li>
-            ))}
+            {HOW.map((h) => {
+              const imageSrc = isDark ? h.imageDark : h.imageLight;
+              return (
+                <li key={h.t} className="flex flex-col gap-3">
+                  <div className="relative aspect-[4/3] overflow-hidden rounded-2xl border border-line bg-surface shadow-card transition-all duration-300 hover:shadow-lg">
+                    <img
+                      src={imageSrc}
+                      alt={h.alt}
+                      width={800}
+                      height={600}
+                      className="h-full w-full object-cover transition-transform duration-300 hover:scale-[1.02]"
+                      loading="lazy"
+                    />
+                  </div>
+                  <span className="text-sm font-semibold text-ptext">{h.n}</span>
+                  <h3 className="m-0 text-xl leading-7 font-semibold">{h.t}</h3>
+                  <p className="m-0 text-pretty text-muted">{h.d}</p>
+                </li>
+              );
+            })}
           </ol>
         </section>
 
@@ -74,7 +89,7 @@ export function HomePage() {
               <ul className="m-0 flex flex-col gap-2 pl-5">
                 <li>Every client site on one screen, worst first</li>
                 <li>Monthly reports with your logo and colours</li>
-                <li>A calm client portal — no rule IDs, no jargon</li>
+                <li>A calm client portal, no rule IDs, no jargon</li>
               </ul>
               <Link href="/agencies" className="font-semibold text-primary hover:text-primary-hover no-underline">
                 See agency plans →

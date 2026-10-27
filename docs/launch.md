@@ -43,7 +43,7 @@ Launch happens when every box is ticked and the sign-off at the bottom is comple
 
 ## 5. Support and help
 
-- [ ] [ops] `support@plainsight.io` mailbox live, with an auto-reply stating response time (one working day)
+- [ ] [ops] `info@everyvisitor.app` mailbox live, with an auto-reply stating response time (one working day)
 - [x] [code] Help centre basics: 10 articles at `/help`
 - [ ] [ops] Help articles reviewed for accuracy against production behaviour
 - [x] [code] API reference at `/developers/api`, served at `docs.<domain>` (`DOCS_HOST`)

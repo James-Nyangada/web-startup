@@ -22,7 +22,7 @@ const SCREENS: [string, [string, string][]][] = [
     ["Role", "role=dialog, aria-modal, labelled by the issue title."],
     ["Focus", "On open: focus moves to the h2 title (tabindex −1). Trap inside drawer. Escape closes. Focus returns to the row that opened it."],
     ["Headings", "h2 issue title → h3 per section (Who this affects, Why it matters, HTML on the first page, How to check your fix)."],
-    ["Live text", "Recheck: button label “Rechecking 3 pages…”, then toast “Fixed — the problem no longer appears on 3 checked pages.” (polite). Copy: button text changes to “Copied”. AI: “Writing a suggestion…” then result in role=status."],
+    ["Live text", "Recheck: button label “Rechecking 3 pages…”, then toast “Fixed. The problem no longer appears on 3 checked pages.” (polite). Copy: button text changes to “Copied”. AI: “Writing a suggestion…” then result in role=status."],
     ["Accessible names", "Copy link, Open in full page, Close issue details. External “Open page” links add “(opens in new tab)” for screen readers."],
     ["Ignore dialog", "Focus starts on first radio. Note becomes “(required)” for Won’t fix / Accepted risk; error is shown next to the field with aria-invalid. Escape cancels."],
   ]],

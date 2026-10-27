@@ -206,7 +206,7 @@ Paddle has a sandbox; staging uses it. Production uses live Paddle.
 | `NEXT_PUBLIC_PADDLE_CLIENT_TOKEN` | web, site | Paddle.js client token |
 | `PADDLE_PRICE_*` | shared | Price IDs per plan and interval (8 vars) |
 | `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET` | api, worker | Object storage |
-| `RESEND_API_KEY`, `EMAIL_FROM`, `EMAIL_REPLY_TO` | worker | Email |
+| `RESEND_API_KEY`, `EMAIL_FROM`, `EMAIL_REPLY_TO`, `EMAIL_LOGO_URL` | worker | Email (logo defaults to `$APP_URL/email/everyvisitor-logo.png`) |
 | `TURNSTILE_SITE_KEY`, `TURNSTILE_SECRET_KEY` | site, api | Bot protection |
 | `AI_PROVIDER`, `GEMINI_API_KEY`, `AI_MONTHLY_CAP_PER_ORG` | worker | AI fix suggestions |
 | `SENTRY_DSN_*` | all | One per app |

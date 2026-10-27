@@ -86,7 +86,7 @@ export default function PrivacyPage() {
             Depending on your location, you hold statutory rights regarding your personal data, including the right to access, rectify, export, restrict processing, or request erasure of your data.
           </p>
           <p>
-            To exercise any statutory privacy right, you can use the self-service export and deletion controls in your settings dashboard or contact our Data Protection Officer at <a href="mailto:privacy@plainsight.io" className="text-primary hover:underline">privacy@plainsight.io</a>.
+            To exercise any statutory privacy right, you can use the self-service export and deletion controls in your settings dashboard or contact our Data Protection Officer at <a href="mailto:info@everyvisitor.app" className="text-primary hover:underline">info@everyvisitor.app</a>.
           </p>
         </section>
       </div>

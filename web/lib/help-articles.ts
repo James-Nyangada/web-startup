@@ -174,7 +174,7 @@ export const HELP_ARTICLES: HelpArticle[] = [
       { type: "p", text: "Also in Settings → Account. If you own an organisation that has other members, transfer ownership first; if it has an active subscription, cancel it first. Organisations you own alone are deleted with your account." },
       { type: "h", text: "Delete an organisation" },
       { type: "p", text: "Owners can delete an organisation in Settings → General by typing its name. The subscription is cancelled at the end of the period, and all data, including files, is permanently erased after 30 days." },
-      { type: "p", text: "Agencies can download our Data Processing Agreement at /legal/dpa, and the list of companies that process data for us is at /legal/subprocessors. Questions: privacy@plainsight.io." },
+      { type: "p", text: "Agencies can download our Data Processing Agreement at /legal/dpa, and the list of companies that process data for us is at /legal/subprocessors. Questions: info@everyvisitor.app." },
     ],
   },
 ];

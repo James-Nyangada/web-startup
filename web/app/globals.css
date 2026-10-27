@@ -1,7 +1,7 @@
 @import "tailwindcss";
 
 /*
- * Design tokens — v3 ("design.md" redesign).
+ * Design tokens - v3 ("design.md" redesign).
  * Raw values live on :root / [data-theme]; Tailwind utilities read them through @theme inline,
  * so `bg-surface`, `text-ink`, `border-line` etc. switch automatically with the theme.
  */
@@ -205,7 +205,7 @@
   font-variant-numeric: tabular-nums;
 }
 
-/* Interactive transitions — 150ms ease-out (spec 4.6). */
+/* Interactive transitions - 150ms ease-out (spec 4.6). */
 @utility ease-ui {
   transition-property: color, background-color, border-color, box-shadow, transform;
   transition-duration: 150ms;

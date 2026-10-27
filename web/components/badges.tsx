@@ -1,7 +1,7 @@
 import { Icon, I } from "./icons";
 import { SEV, type Severity, band } from "@/lib/severity";
 
-/** Severity badge — always icon + word (colour never carries meaning alone). */
+/** Severity badge - always icon + word (colour never carries meaning alone). */
 export function SeverityBadge({ sev, className = "" }: { sev: Severity; className?: string }) {
   const s = SEV[sev];
   return (

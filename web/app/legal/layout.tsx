@@ -38,8 +38,8 @@ export default function LegalLayout({ children }: { children: React.ReactNode })
                 </nav>
                 <div className="mt-6 border-t border-line pt-4 text-xs text-muted">
                   Questions? Contact our legal team at{" "}
-                  <a href="mailto:legal@plainsight.io" className="text-primary hover:underline">
-                    legal@plainsight.io
+                  <a href="mailto:info@everyvisitor.app" className="text-primary hover:underline">
+                    info@everyvisitor.app
                   </a>
                 </div>
               </div>

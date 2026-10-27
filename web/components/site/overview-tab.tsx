@@ -114,17 +114,17 @@ export function OverviewTab({
 
   const pagesCheckedText =
     coverage?.pagesScanned !== undefined
-      ? `${coverage.pagesScanned} of ${coverage.pagesPlanned ?? "—"}`
-      : "—";
+      ? `${coverage.pagesScanned} of ${coverage.pagesPlanned ?? "-"}`
+      : "-";
   const templatesFoundText =
-    coverage?.templatesFound !== undefined ? `${coverage.templatesFound}` : "—";
+    coverage?.templatesFound !== undefined ? `${coverage.templatesFound}` : "-";
   const standardText = coverage?.standard
     ? coverage.standard === "wcag22aa"
       ? "WCAG 2.2 AA"
       : coverage.standard
     : "WCAG 2.2 AA";
   const nextScanText = coverage?.nextScanFormatted || coverage?.nextScan || "Not scheduled";
-  const verificationText = verificationStatus || "—";
+  const verificationText = verificationStatus || "-";
 
   const link = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -157,7 +157,7 @@ export function OverviewTab({
               role="status"
               className="absolute top-8 left-0 z-10 w-[min(320px,80vw)] rounded-lg border border-line bg-surface p-4 text-sm leading-5 shadow-pop"
             >
-              This score reflects only what automated tests can detect on the checked pages — usually
+              This score reflects only what automated tests can detect on the checked pages, usually
               around a third of accessibility problems. It is not a compliance rating.{" "}
               <a href="/fix" className="underline">What automated tests can&apos;t check</a>
             </div>
@@ -176,7 +176,7 @@ export function OverviewTab({
                 </span>
               </>
             ) : (
-              <span className="text-base text-muted">No score yet — run a scan to see results.</span>
+              <span className="text-base text-muted">No score yet. Run a scan to see results.</span>
             )}
           </div>
           {delta !== null && delta > 0 && (
@@ -296,7 +296,7 @@ export function OverviewTab({
                     <td className="px-3 py-2">{r[1]}</td>
                     <td className="px-3 py-2">{r[2]}</td>
                     <td className="px-3 py-2 text-muted">
-                      {r[3] ? "Partial — some pages failed" : "Completed"}
+                      {r[3] ? "Partial: some pages failed" : "Completed"}
                     </td>
                   </tr>
                 ))}

@@ -155,7 +155,7 @@ export function EvidenceTab({ orgSlug, siteId, siteName = "Website", onToast }: 
         };
       case "scan_completed":
         return {
-          title: `Automated scan completed (Score ${event.data?.score ?? "—"}/100)`,
+          title: `Automated scan completed (Score ${event.data?.score ?? "-"}/100)`,
           detail: `Scanned ${event.data?.pagesScanned ?? "all"} pages: ${event.data?.counts?.new ?? 0} new, ${event.data?.counts?.fixed ?? 0} fixed and ${event.data?.counts?.regressed ?? 0} regressed issues.`,
           icon: I.search,
           badge: "Scan",

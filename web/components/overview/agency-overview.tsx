@@ -61,13 +61,13 @@ const deltaCls = (r: SiteRow) => (r.dir > 0 ? "text-ok" : r.dir < 0 ? "text-crit
 function Score({ r, size = "text-base" }: { r: SiteRow; size?: string }) {
   return (
     <span className="flex items-center gap-2">
-      <strong className={`tnum min-w-6 ${size}`}>{r.score ?? "—"}</strong>
+      <strong className={`tnum min-w-6 ${size}`}>{r.score ?? "-"}</strong>
       <BandBadge score={r.score} className="px-1.5 text-[13px]" />
     </span>
   );
 }
 
-/* ---------- 1a — Worst-first table with Client Grouping and Persistent Filters ---------- */
+/* ---------- 1a - Worst-first table with Client Grouping and Persistent Filters ---------- */
 function TableLayout({
   prefs,
   onUpdatePrefs,
@@ -121,7 +121,7 @@ function TableLayout({
     { label: "Sites monitored", value: String(SITES.length), sub: `${SITES.filter((s) => s.status === "Active").length} active`, c: "text-muted" },
     {
       label: "Average score",
-      value: scored.length ? String(Math.round(scored.reduce((a, s) => a + s.score!, 0) / scored.length)) : "—",
+      value: scored.length ? String(Math.round(scored.reduce((a, s) => a + s.score!, 0) / scored.length)) : "-",
       sub: `across ${scored.length} scanned ${scored.length === 1 ? "site" : "sites"}`,
       c: "text-muted",
     },
@@ -272,7 +272,7 @@ function TableLayout({
         <div className="flex flex-wrap items-center gap-4 text-sm">
           {attention.map((a) => (
             <Link key={a.name} href={a.href} className="text-ink font-medium hover:text-primary hover:underline">
-              <strong>{a.name}</strong> — <span className="text-muted">{a.why}</span>
+              <strong>{a.name}</strong>: <span className="text-muted">{a.why}</span>
             </Link>
           ))}
         </div>
@@ -510,7 +510,7 @@ function TableLayout({
                                 <span>{r.regressions} regression{r.regressions === 1 ? "" : "s"}</span>
                               </span>
                             ) : (
-                              <span className="text-muted">—</span>
+                              <span className="text-muted">-</span>
                             )}
                           </td>
                           <td className="px-4 py-3 text-xs text-muted">{r.last}</td>
@@ -618,7 +618,7 @@ function TableLayout({
                           <span>{r.regressions} regression{r.regressions === 1 ? "" : "s"}</span>
                         </span>
                       ) : (
-                        <span className="text-muted">—</span>
+                        <span className="text-muted">-</span>
                       )}
                     </td>
                     <td className="px-4 py-3 text-xs text-muted">{r.last}</td>
@@ -647,7 +647,7 @@ function TableLayout({
   );
 }
 
-/* ---------- 1b — Triage lanes ---------- */
+/* ---------- 1b - Triage lanes ---------- */
 function LanesLayout() {
   const { sites: SITES, siteHref } = useOverview();
   const lanes = [
@@ -696,7 +696,7 @@ function LanesLayout() {
   );
 }
 
-/* ---------- 1c — Grouped by client + common problems ---------- */
+/* ---------- 1c - Grouped by client + common problems ---------- */
 function ClientsLayout() {
   const { sites: SITES, siteHref, commonIssues } = useOverview();
   const groups = [...new Set(SITES.map((s) => s.client))].map((c) => ({
@@ -764,7 +764,7 @@ export interface AgencyOverviewProps {
   orgSlug: string;
 }
 
-/** Agency overview — with persistent sorting and filtering per user (P2-20). */
+/** Agency overview - with persistent sorting and filtering per user (P2-20). */
 export function AgencyOverview({ orgSlug }: AgencyOverviewProps) {
   const router = useRouter();
   const [data, setData] = useState<OverviewData | null>(null);

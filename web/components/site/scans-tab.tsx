@@ -34,7 +34,7 @@ export interface ScanHistoryItem {
 }
 
 function formatDuration(startedAt?: string | null, finishedAt?: string | null): string {
-  if (!startedAt) return "—";
+  if (!startedAt) return "-";
   const start = new Date(startedAt).getTime();
   const end = finishedAt ? new Date(finishedAt).getTime() : Date.now();
   const seconds = Math.max(0, Math.round((end - start) / 1000));
@@ -284,7 +284,7 @@ export function ScansTab({
                             <BandBadge score={scan.score} />
                           </div>
                         ) : (
-                          <span className="text-muted">—</span>
+                          <span className="text-muted">-</span>
                         )}
                       </td>
 
@@ -321,7 +321,7 @@ export function ScansTab({
                             )}
                           </div>
                         ) : (
-                          <span className="text-muted">—</span>
+                          <span className="text-muted">-</span>
                         )}
                       </td>
 

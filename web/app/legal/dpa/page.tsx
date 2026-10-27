@@ -27,7 +27,7 @@ export default function DpaPage() {
         </div>
         <p className="mt-2 text-xs text-muted">
           The download opens in any browser and prints to PDF, with signature blocks for both parties. Agencies can also
-          email legal@plainsight.io for a countersigned copy.
+          email info@everyvisitor.app for a countersigned copy.
         </p>
       </div>
 

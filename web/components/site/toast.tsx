@@ -4,7 +4,7 @@ import { useRef } from "react";
 import { Icon, I } from "@/components/icons";
 import { gsap, useGSAP, MOTION, prefersReducedMotion } from "@/lib/gsap";
 
-/** Success toast — polite live region, closes after 6s (paused on hover/focus by the parent). */
+/** Success toast - polite live region, closes after 6s (paused on hover/focus by the parent). */
 export function Toast({
   message,
   onClose,

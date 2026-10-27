@@ -112,7 +112,7 @@ export default function SubprocessorsPage() {
         <section className="mt-4 rounded-xl border border-line bg-subtle p-5">
           <h2 className="text-base font-bold text-ink mb-2">Notification of New Subprocessors</h2>
           <p className="mb-0 text-muted">
-            Customers with an active Data Processing Agreement can subscribe to notifications of new subprocessor additions by emailing <a href="mailto:privacy@plainsight.io" className="text-primary hover:underline">privacy@plainsight.io</a>. We provide at least 30 days notice prior to authorizing any new subprocessor.
+            Customers with an active Data Processing Agreement can subscribe to notifications of new subprocessor additions by emailing <a href="mailto:info@everyvisitor.app" className="text-primary hover:underline">info@everyvisitor.app</a>. We provide at least 30 days notice prior to authorizing any new subprocessor.
           </p>
         </section>
       </div>

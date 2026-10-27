@@ -617,7 +617,7 @@ export default function BrandingSettingsPage() {
                   <div className="flex items-center gap-1.5 text-neutral-600">
                     <span className="font-semibold text-neutral-900">From:</span>
                     <span>
-                      {emailSenderName || displayName || "EveryVisitor"} &lt;notifications@updates.io&gt;
+                      {emailSenderName || displayName || "EveryVisitor"} &lt;info@everyvisitor.app&gt;
                     </span>
                   </div>
                   <div className="flex items-center gap-1.5 text-neutral-600">

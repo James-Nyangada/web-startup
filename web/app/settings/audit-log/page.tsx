@@ -26,7 +26,7 @@ function targetOf(e: AuditEntry): string {
   const d = e.data ?? {};
   const named = d.name ?? d.email ?? d.domain ?? d.key;
   if (typeof named === "string") return named;
-  return e.targetType ? `${e.targetType}${e.targetId ? ` ${e.targetId.slice(0, 8)}` : ""}` : "—";
+  return e.targetType ? `${e.targetType}${e.targetId ? ` ${e.targetId.slice(0, 8)}` : ""}` : "-";
 }
 
 /** S-51: searchable, filterable audit log for owners and admins, with CSV export (P6-08). */
@@ -237,7 +237,7 @@ export default function AuditLogSettingsPage() {
                           {typeof e.data?.reason === "string" && <span className="block text-muted">“{e.data.reason}”</span>}
                         </td>
                         <td className="px-4 py-3 text-muted">{targetOf(e)}</td>
-                        <td className="px-4 py-3 text-right font-mono text-muted">{e.ip ?? "—"}</td>
+                        <td className="px-4 py-3 text-right font-mono text-muted">{e.ip ?? "-"}</td>
                       </tr>
                     ))}
                   </tbody>

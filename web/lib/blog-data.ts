@@ -39,7 +39,7 @@ export const BLOG_POSTS: BlogPost[] = [
       {
         sectionTitle: "What is the European Accessibility Act?",
         paragraphs: [
-          "On June 28, 2025, the European Accessibility Act (Directive 2019/882) entered into full legal force across all 27 European Union member states. Unlike previous directives that applied exclusively to public sector bodies, the EAA directly regulates private commercial enterprises — with e-commerce websites and mobile apps at the very center of its mandate.",
+          "On June 28, 2025, the European Accessibility Act (Directive 2019/882) entered into full legal force across all 27 European Union member states. Unlike previous directives that applied exclusively to public sector bodies, the EAA directly regulates private commercial enterprises, with e-commerce websites and mobile apps at the very center of its mandate.",
           "If your business sells products or digital services to consumers residing in the European Union, the EAA applies to your storefront regardless of whether your company is incorporated in the EU, the United States, the UK, or elsewhere.",
         ],
       },

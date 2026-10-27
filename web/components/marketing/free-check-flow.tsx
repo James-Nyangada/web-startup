@@ -676,7 +676,7 @@ export function FreeCheckFlow({
               className="flex flex-col gap-4 rounded-2xl bg-ink p-6 text-surface shadow-md"
             >
               <h2 id="trial-cta-heading" className="m-0 font-serif text-2xl font-normal leading-7 text-surface">
-                Monitor your whole storefront — 14 days free
+                Monitor your whole storefront, 14 days free
               </h2>
               <p className="m-0 text-sm leading-5 text-surface/80">
                 We&apos;ll scan up to 250 pages weekly, track your progress score, generate compliance evidence packs, and alert you before regressions reach production.
@@ -685,7 +685,7 @@ export function FreeCheckFlow({
                 href={`/sign-up?url=${encodeURIComponent(checkData.url)}&checkId=${encodeURIComponent(checkData.id)}`}
                 className="ease-ui flex h-11 items-center justify-center rounded-lg bg-primary text-sm font-semibold text-on-primary no-underline hover:bg-primary-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
               >
-                Monitor this site — Start 14-day free trial
+                Monitor this site: Start 14-day free trial
               </Link>
             </section>
 

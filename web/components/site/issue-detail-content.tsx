@@ -364,7 +364,7 @@ export function IssueDetailContent({
         {issue.status === "ignored" && (
           <div className="flex items-center gap-2.5 rounded-lg bg-min-soft px-4 py-3 text-sm leading-5 text-ink">
             <span className="flex-1">
-              Ignored — {issue.ignoreReason ?? "Accepted risk"}. It stays in your evidence log.
+              Ignored: {issue.ignoreReason ?? "Accepted risk"}. It stays in your evidence log.
             </span>
             <button type="button" onClick={onReopen} className={SECONDARY_SM}>
               Reopen
@@ -484,7 +484,7 @@ export function IssueDetailContent({
               </dd>
               <dt className="text-muted">Where</dt>
               <dd className="m-0">
-                {issue.template} — {issue.pages} {issue.pages === 1 ? "page" : "pages"} ({issue.occ} occurrences)
+                {issue.template}: {issue.pages} {issue.pages === 1 ? "page" : "pages"} ({issue.occ} occurrences)
               </dd>
               <dt className="text-muted">First seen</dt>
               <dd className="m-0">{issue.first}</dd>

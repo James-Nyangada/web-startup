@@ -380,7 +380,7 @@ export function ScanDetailView({
                 <span className="text-sm font-semibold text-muted">Automated check score</span>
                 <div className="flex items-baseline gap-3">
                   <span className="tnum font-serif text-[48px] font-bold tracking-tight text-ink">
-                    {score != null ? score : "—"}
+                    {score != null ? score : "-"}
                   </span>
                   <span className="text-lg text-muted">/ 100</span>
                   <BandBadge score={score ?? null} />
@@ -494,7 +494,7 @@ export function ScanDetailView({
                         <h4 className="m-0 text-sm font-bold text-crit">
                           Regressed issues ({regressedList.length})
                         </h4>
-                        <span className="text-xs text-muted">— Issues previously fixed that reappeared</span>
+                        <span className="text-xs text-muted">Issues previously fixed that reappeared</span>
                       </div>
                       <div className="divide-y divide-line rounded-xl border border-crit/30 bg-crit-soft/10">
                         {regressedList.map((item) => (
@@ -537,7 +537,7 @@ export function ScanDetailView({
                       <h4 className="m-0 text-sm font-bold text-mod">
                         New issues ({newList.length})
                       </h4>
-                      <span className="text-xs text-muted">— First seen in this scan</span>
+                      <span className="text-xs text-muted">First seen in this scan</span>
                     </div>
                     <div className="divide-y divide-line rounded-xl border border-mod/30 bg-mod-soft/10">
                       {newList.map((item) => (
@@ -580,7 +580,7 @@ export function ScanDetailView({
                       <h4 className="m-0 text-sm font-bold text-ok">
                         Fixed issues ({fixedList.length})
                       </h4>
-                      <span className="text-xs text-muted">— Resolved in this scan</span>
+                      <span className="text-xs text-muted">Resolved in this scan</span>
                     </div>
                     <div className="divide-y divide-line rounded-xl border border-ok/30 bg-ok-soft/10">
                       {fixedList.map((item) => (
@@ -708,7 +708,7 @@ export function ScanDetailView({
                           </span>
                         </td>
                         <td className="px-3 py-3 font-mono text-xs text-muted">
-                          {page.loadMs ? `${page.loadMs}ms` : "—"}
+                          {page.loadMs ? `${page.loadMs}ms` : "-"}
                         </td>
                         <td className="px-3 py-3 font-mono text-xs font-semibold text-crit">
                           {page.violations ?? 0}
@@ -722,7 +722,7 @@ export function ScanDetailView({
                               {page.score}
                             </span>
                           ) : (
-                            <span className="text-muted">—</span>
+                            <span className="text-muted">-</span>
                           )}
                         </td>
                       </tr>

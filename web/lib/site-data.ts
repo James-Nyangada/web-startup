@@ -59,7 +59,7 @@ export const TREND: [string, number, number, boolean?][] = [
 export const RECENTLY_FIXED: [string, string][] = [
   ["Page has no title", "12 Oct"],
   ["Form errors aren’t announced", "12 Oct"],
-  ["Text doesn’t have enough contrast — Cart", "7 Oct"],
+  ["Text doesn’t have enough contrast: Cart", "7 Oct"],
   ["Links look the same as text", "7 Oct"],
   ["Focus outline removed on buttons", "30 Sep"],
 ];
@@ -69,7 +69,7 @@ export const ISSUES: Issue[] = [
     id: "i1", rule: "image-alt", sev: "critical", title: "Images are missing descriptions", template: "Product pages", occ: 214, pages: 107, status: "regressed",
     assignee: "DM", due: "Due 18 Oct", wcag: "1.1.1 Non-text Content (Level A)", first: "12 Aug, scan #9", last: "14 Oct, scan #23",
     who: "People who use screen readers hear “image” or a file name instead of what the product looks like, so they can’t compare products.",
-    why: "Product photos carry details shoppers need — colour, material, size. Without a description that information is simply missing.",
+    why: "Product photos carry details shoppers need: colour, material, size. Without a description that information is simply missing.",
     occs: [
       ["/products/linden-oak-dining-table", ".product__media-item:nth-child(2) img"],
       ["/products/arlo-lounge-chair", ".product__media-item:nth-child(1) img"],
@@ -91,7 +91,7 @@ export const ISSUES: Issue[] = [
     history: [
       ["found", "First found", "Scan #9 · 12 Aug"],
       ["ok", "Marked fixed", "Daniel Mwangi · 2 Oct"],
-      ["reg", "Came back", "Scan #23 · 14 Oct — likely after the theme update on 13 Oct"],
+      ["reg", "Came back", "Scan #23 · 14 Oct, likely after the theme update on 13 Oct"],
       ["user", "Assigned to Daniel Mwangi, due 18 Oct", "Daniel Mwangi · 14 Oct"],
     ],
   },
@@ -120,7 +120,7 @@ export const ISSUES: Issue[] = [
     steps: ["Go to Online Store → Themes → Edit code.", "Open sections/footer.liquid and find the newsletter form.", "Add a label connected to the input’s id (code below).", "Keep it visible if your design allows; otherwise use the visually-hidden class."],
     code: '<label for="NewsletterForm--footer">Email address</label>',
     gen: '<label for="email">Email address</label>\n<input id="email" type="email">',
-    check: "Click the label text — the field should receive focus. A screen reader should announce “Email address, edit text”.",
+    check: "Click the label text. The field should receive focus. A screen reader should announce “Email address, edit text”.",
     ai: "Use a visible label “Email address” above the field, and keep “Email” as the placeholder only if it adds something.",
   },
   {
@@ -171,7 +171,7 @@ export const ISSUES: Issue[] = [
   {
     id: "i9", rule: "region", sev: "moderate", title: "Some content is outside page landmarks", template: "Announcement bar", occ: 142, pages: 142, status: "needsReview",
     wcag: "1.3.1 Info and Relationships (Level A)", first: "5 Aug, scan #8", last: "14 Oct, scan #23",
-    who: "Screen reader users navigating by landmark can miss the free-delivery announcement.", why: "Automated tests couldn’t decide whether this is a problem — a person should check.",
+    who: "Screen reader users navigating by landmark can miss the free-delivery announcement.", why: "Automated tests couldn’t decide whether this is a problem. A person should check.",
     occs: [["/", ".announcement-bar"]], snippet: '<div class="announcement-bar">Free delivery in Nairobi over KSh 50,000</div>', axe: "Content is not contained by a landmark region.",
     steps: ["Decide if the announcement matters for every visitor.", "If it does, move it inside the header element in sections/header.liquid."],
     code: '<header>…<div class="announcement-bar">…</div></header>', gen: 'Wrap in <header> or <aside aria-label="Announcement">', check: "Use landmark navigation in your screen reader.",
@@ -225,7 +225,7 @@ export const SITES: SiteRow[] = [
   { name: "Oakhaus Furniture", url: "oakhaus.com", client: "Mark Otieno", platform: "Shopify", score: 78, crit: 3, ser: 4, regressions: 1, delta: "Up 6", dir: 1, last: "14 Oct", nextScan: "Tomorrow 02:00", status: "Active", verified: true, reason: "Regressed: product images" },
   { name: "Sora Skincare", url: "soraskin.co", client: "Grace Wanjiru", platform: "Shopify", score: 58, crit: 7, ser: 11, regressions: 2, delta: "Down 9", dir: -1, last: "14 Oct", nextScan: "Wed 03:00", status: "Active", verified: true, reason: "Score dropped 9 after a new app" },
   { name: "Kito Coffee", url: "kitocoffee.com", client: "Kito Ltd", platform: "WordPress", score: 64, crit: 4, ser: 8, regressions: 1, delta: "Up 2", dir: 1, last: "13 Oct", nextScan: "Thu 02:00", status: "Active", verified: true, reason: "" },
-  { name: "Mwanga Solar", url: "mwangasolar.co.ke", client: "Mwanga Energy", platform: "WordPress", score: null, crit: 0, ser: 0, regressions: 0, delta: "—", dir: 0, last: "Failed 13 Oct", nextScan: "Retrying today", status: "Error", verified: false, reason: "Scan failed: site returned 503" },
+  { name: "Mwanga Solar", url: "mwangasolar.co.ke", client: "Mwanga Energy", platform: "WordPress", score: null, crit: 0, ser: 0, regressions: 0, delta: "-", dir: 0, last: "Failed 13 Oct", nextScan: "Retrying today", status: "Error", verified: false, reason: "Scan failed: site returned 503" },
   { name: "Lumen Opticians", url: "lumenoptics.co.uk", client: "Lumen Group", platform: "WordPress", score: 83, crit: 1, ser: 3, regressions: 0, delta: "No change", dir: 0, last: "14 Oct", nextScan: "Friday 02:00", status: "Active", verified: true, reason: "" },
   { name: "Lumen Careers", url: "careers.lumenoptics.co.uk", client: "Lumen Group", platform: "Other", score: 88, crit: 0, ser: 2, regressions: 0, delta: "Up 4", dir: 1, last: "12 Oct", nextScan: "Friday 02:30", status: "Active", verified: true, reason: "" },
   { name: "Baraka Bikes", url: "barakabikes.com", client: "Baraka Cycles", platform: "Shopify", score: 91, crit: 0, ser: 1, regressions: 0, delta: "Up 1", dir: 1, last: "14 Oct", nextScan: "Sat 04:00", status: "Active", verified: true, reason: "" },

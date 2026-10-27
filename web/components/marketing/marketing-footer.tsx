@@ -111,8 +111,8 @@ export function MarketingFooter() {
                 </li>
               )}
               <li>
-                <a href="mailto:support@plainsight.io" className="text-muted no-underline hover:text-ink">
-                  support@plainsight.io
+                <a href="mailto:info@everyvisitor.app" className="text-muted no-underline hover:text-ink">
+                  info@everyvisitor.app
                 </a>
               </li>
               <li>

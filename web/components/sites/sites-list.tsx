@@ -369,7 +369,7 @@ export function SitesList({ orgSlug }: { orgSlug: string }) {
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-2">
                           <span className="font-semibold text-ink tnum">
-                            {site.score ?? "—"}
+                            {site.score ?? "-"}
                           </span>
                           <BandBadge score={site.score} className="px-1.5 text-[11px]" />
                         </div>

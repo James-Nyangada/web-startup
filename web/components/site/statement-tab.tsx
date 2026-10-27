@@ -489,7 +489,7 @@ export function StatementTab({
         </span>
         <div className="space-y-1">
           <p className="font-semibold">
-            Accessibility Statement Template — Not Legal Advice
+            Accessibility Statement Template (Not Legal Advice)
           </p>
           <p className="text-amber-800/90 dark:text-amber-300/80">
             This generator helps you build a standard-aligned accessibility
@@ -1457,7 +1457,7 @@ export function StatementTab({
                 <div>
                   <dt className="text-muted">Email:</dt>
                   <dd className="font-semibold text-foreground">
-                    {formData.feedbackContact.email || "—"}
+                    {formData.feedbackContact.email || "-"}
                   </dd>
                 </div>
                 {formData.feedbackContact.phone && (

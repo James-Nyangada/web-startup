@@ -114,8 +114,11 @@ export function createAuth(db: Database, options: CreateAuthOptions) {
     },
     plugins: [
       magicLink({
-        sendMagicLink: async ({ email, token, url }) => {
+        sendMagicLink: async ({ email, token }) => {
           if (options.mailer) {
+            // Better Auth's own url points at its API path on the web origin, which the web app
+            // does not serve. Send the user to the /magic page, which verifies against the API.
+            const url = `${options.baseURL.replace(/\/$/, '')}/magic?token=${encodeURIComponent(token)}`;
             await options.mailer.sendMagicLink({ email, token, url });
           }
         },

@@ -245,15 +245,15 @@ const DAY_TIME = new Intl.DateTimeFormat("en-GB", {
 });
 
 export function formatDay(value: string | Date | null | undefined): string {
-  if (!value) return "—";
+  if (!value) return "-";
   const d = new Date(value);
-  return Number.isNaN(d.getTime()) ? "—" : DAY.format(d);
+  return Number.isNaN(d.getTime()) ? "-" : DAY.format(d);
 }
 
 export function formatDayTime(value: string | Date | null | undefined): string {
-  if (!value) return "—";
+  if (!value) return "-";
   const d = new Date(value);
-  return Number.isNaN(d.getTime()) ? "—" : DAY_TIME.format(d);
+  return Number.isNaN(d.getTime()) ? "-" : DAY_TIME.format(d);
 }
 
 export function initials(name: string | null | undefined): string | undefined {
@@ -401,7 +401,7 @@ export function toSiteRow(site: ApiSite): SiteRow {
     crit: site.openCritical ?? 0,
     ser: site.openSerious ?? 0,
     regressions: site.regressions ?? 0,
-    delta: delta === null ? "—" : delta > 0 ? `Up ${delta}` : delta < 0 ? `Down ${-delta}` : "No change",
+    delta: delta === null ? "-" : delta > 0 ? `Up ${delta}` : delta < 0 ? `Down ${-delta}` : "No change",
     dir: delta === null || delta === 0 ? 0 : delta > 0 ? 1 : -1,
     last: site.lastScanAt
       ? `${failed ? "Failed " : ""}${formatDay(site.lastScanAt)}`
@@ -414,7 +414,7 @@ export function toSiteRow(site: ApiSite): SiteRow {
           ? formatDayTime(site.nextScanAt)
           : site.scanFrequency === "manual"
             ? "Manual only"
-            : "—",
+            : "-",
     status: site.status === "paused" ? "Paused" : site.status === "error" || failed ? "Error" : "Active",
     verified: site.status !== "pending_verification",
     reason: failed
@@ -980,9 +980,9 @@ export function recheckMessage(outcomes: Map<string, RecheckOutcome>, total: num
   if (total === 1) {
     const [outcome] = outcomes.values();
     return outcome === "fixed"
-      ? "Fixed — the problem no longer appears on the checked pages."
+      ? "Fixed. The problem no longer appears on the checked pages."
       : outcome === "still_open"
-        ? "Still there — the problem was found again on the checked pages."
+        ? "Still there. The problem was found again on the checked pages."
         : "We couldn’t load the pages to check. Try again later.";
   }
   const fixed = [...outcomes.values()].filter((o) => o === "fixed").length;
