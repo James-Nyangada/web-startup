@@ -54,7 +54,7 @@ const METHOD_STYLE: Record<string, string> = {
 };
 
 function curl(method: string, url: string, body?: unknown): string {
-  const lines = [`curl${method === "get" ? "" : ` -X ${method.toUpperCase()}`} "${url}"`, `  -H "Authorization: Bearer $PLAINSIGHT_API_KEY"`];
+  const lines = [`curl${method === "get" ? "" : ` -X ${method.toUpperCase()}`} "${url}"`, `  -H "Authorization: Bearer $EVERYVISITOR_API_KEY"`];
   if (body !== undefined) {
     lines.push(`  -H "Content-Type: application/json"`, `  -d '${JSON.stringify(body)}'`);
   }

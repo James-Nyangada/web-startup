@@ -18,7 +18,7 @@ import { ErrorCode } from '../shared/errors.js';
 import { assertWithinPlan } from '../shared/plans.js';
 
 const guardedFetch = createGuardedFetch({
-  userAgent: 'Mozilla/5.0 (compatible; PlainsightBot/1.0; +https://plainsight.app/bot)',
+  userAgent: 'Mozilla/5.0 (compatible; EveryVisitorBot/1.0; +https://everyvisitor.app/bot)',
   timeoutMs: 8000,
   maxBytes: 1024 * 1024,
 });
@@ -684,9 +684,9 @@ export function orgSitesRouter(repos: Repositories): Router {
         return;
       }
 
-      const metaTag = `<meta name="plainsight-verify" content="${site.verifyToken}">`;
-      const txtRecord = `plainsight-verify=${site.verifyToken}`;
-      const filePath = '/.well-known/plainsight-verify.txt';
+      const metaTag = `<meta name="everyvisitor-verify" content="${site.verifyToken}">`;
+      const txtRecord = `everyvisitor-verify=${site.verifyToken}`;
+      const filePath = '/.well-known/everyvisitor-verify.txt';
       const fileUrl = `${site.rootUrl}${filePath}`;
 
       res.status(200).json({
@@ -702,18 +702,18 @@ export function orgSitesRouter(repos: Repositories): Router {
             meta: {
               name: 'HTML Meta Tag',
               tag: metaTag,
-              metaName: 'plainsight-verify',
+              metaName: 'everyvisitor-verify',
               token: site.verifyToken,
               instructions: 'Add this meta tag inside the <head> section of your homepage HTML.',
             },
             dns: {
               name: 'DNS TXT Record',
               type: 'TXT',
-              host: `_plainsight.${new URL(site.rootUrl).hostname.replace(/^www\./, '')}`,
+              host: `_everyvisitor.${new URL(site.rootUrl).hostname.replace(/^www\./, '')}`,
               value: txtRecord,
               token: site.verifyToken,
               instructions:
-                'Add a TXT record on your apex domain or _plainsight subdomain with this value.',
+                'Add a TXT record on your apex domain or _everyvisitor subdomain with this value.',
             },
             file: {
               name: 'File Upload',
@@ -721,7 +721,7 @@ export function orgSitesRouter(repos: Repositories): Router {
               url: fileUrl,
               content: site.verifyToken,
               instructions:
-                'Create a plain text file at /.well-known/plainsight-verify.txt containing only your token.',
+                'Create a plain text file at /.well-known/everyvisitor-verify.txt containing only your token.',
             },
           },
         },

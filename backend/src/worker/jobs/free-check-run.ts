@@ -24,7 +24,7 @@ export async function runFreeCheck(
 
     // 60-second cap (Spec 11.4)
     const runResult = await runPages([{ url: targetUrl, templateKey: 'home' }], {
-      userAgent: 'Mozilla/5.0 (compatible; PlainsightBot/1.0; +https://plainsight.io/bot)',
+      userAgent: 'Mozilla/5.0 (compatible; EveryVisitorBot/1.0; +https://everyvisitor.app/bot)',
       standard: 'wcag22aa',
       pageTimeoutMs: 50_000,
       navigationTimeoutMs: 30_000,

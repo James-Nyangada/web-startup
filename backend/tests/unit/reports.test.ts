@@ -117,7 +117,7 @@ describe('E-11: Report ready / shared email template', () => {
       siteName: 'Oakhaus Furniture',
       senderName: 'Daniel Mwangi',
       message: 'Here is the scan report for our staging deployment.',
-      downloadUrl: 'https://app.plainsight.test/v1/reports/download/token123',
+      downloadUrl: 'https://app.everyvisitor.test/v1/reports/download/token123',
       expiresInHours: 24,
     });
 
@@ -125,7 +125,7 @@ describe('E-11: Report ready / shared email template', () => {
     expect(output.html).toContain('Daniel Mwangi shared an accessibility report');
     expect(output.html).toContain('Here is the scan report for our staging deployment.');
     expect(output.html).toContain('Download report (PDF)');
-    expect(output.html).toContain('https://app.plainsight.test/v1/reports/download/token123');
+    expect(output.html).toContain('https://app.everyvisitor.test/v1/reports/download/token123');
     expect(output.html).toContain('This secure download link is valid for 24 hours.');
 
     // Plain text version

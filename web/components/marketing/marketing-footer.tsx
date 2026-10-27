@@ -79,7 +79,7 @@ export function MarketingFooter() {
               </li>
               <li>
                 <Link href="/bot" className="text-muted no-underline hover:text-ink">
-                  PlainsightBot crawler
+                  EveryVisitorBot crawler
                 </Link>
               </li>
               <li>

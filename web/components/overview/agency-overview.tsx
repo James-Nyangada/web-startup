@@ -42,7 +42,7 @@ interface OverviewUserPrefs {
   layout: LayoutId;
 }
 
-const STORAGE_KEY = "plainsight_overview_prefs";
+const STORAGE_KEY = "everyvisitor_overview_prefs";
 
 const DEFAULT_PREFS: OverviewUserPrefs = {
   sortKey: "score",

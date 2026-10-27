@@ -87,7 +87,7 @@ export function freeChecksPublicRouter(
     }
 
     // Salted IP hash (Section 11.4)
-    const salt = process.env.IP_HASH_SALT || 'plainsight-salt-2026';
+    const salt = process.env.IP_HASH_SALT || 'everyvisitor-salt-2026';
     const clientIp = req.ip || req.socket.remoteAddress || '127.0.0.1';
     const ipHash = crypto
       .createHash('sha256')
@@ -203,7 +203,7 @@ export function freeChecksPublicRouter(
     await repos.freeChecks.attachEmail(checkId, input.email, input.marketingConsent);
 
     if (emailSender && check.result) {
-      const appUrl = process.env.APP_URL || process.env.SITE_URL || 'https://plainsight.io';
+      const appUrl = process.env.APP_URL || process.env.SITE_URL || 'https://everyvisitor.app';
       await emailSender.sendFreeCheckReport(input.email, {
         url: check.url,
         score: check.result.score,

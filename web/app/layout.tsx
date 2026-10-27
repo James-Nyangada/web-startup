@@ -25,7 +25,7 @@ const mono = JetBrains_Mono({
   display: "swap",
 });
 
-const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://plainsight.io";
+const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://everyvisitor.app";
 
 export const metadata: Metadata = {
   metadataBase: new URL(baseUrl),

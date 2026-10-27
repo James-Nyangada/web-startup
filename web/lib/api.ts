@@ -42,9 +42,9 @@ export function apiBaseUrl(): string {
 }
 
 /** Fired on `window` when a signed-in request comes back 401 (S-80 re-auth dialog). */
-export const SESSION_EXPIRED_EVENT = 'plainsight:session-expired';
+export const SESSION_EXPIRED_EVENT = 'everyvisitor:session-expired';
 /** Fired on `window` when the API answers 503 MAINTENANCE (S-80 maintenance page). */
-export const MAINTENANCE_EVENT = 'plainsight:maintenance';
+export const MAINTENANCE_EVENT = 'everyvisitor:maintenance';
 
 const AUTH_PATHS = ['/v1/auth/', '/v1/me'];
 

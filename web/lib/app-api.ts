@@ -932,7 +932,7 @@ export interface ApiBranding {
   logoDarkKey: string | null;
   emailSenderName: string | null;
   reportFooter: string | null;
-  hidePlainsightBranding: boolean;
+  hideEveryVisitorBranding: boolean;
   customDomain: string | null;
   customDomainVerified: boolean;
   contrastRatio?: number;

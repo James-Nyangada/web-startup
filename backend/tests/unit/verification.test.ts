@@ -28,12 +28,12 @@ describe('Site Ownership Verification (Chunk P2-07 & Section 6.9)', () => {
   const expectedToken = 'ps_9876543210abcdef';
 
   describe('Meta tag verification (verifyMetaTag)', () => {
-    it('succeeds when home page contains valid <meta name="plainsight-verify" content="<token>">', async () => {
+    it('succeeds when home page contains valid <meta name="everyvisitor-verify" content="<token>">', async () => {
       const mockFetch: GuardedFetch = () =>
         Promise.resolve(
           makeGuardedResponse(
             200,
-            `<!DOCTYPE html><html><head><title>Oakhaus</title><meta name="plainsight-verify" content="${expectedToken}"></head><body>Home</body></html>`,
+            `<!DOCTYPE html><html><head><title>Oakhaus</title><meta name="everyvisitor-verify" content="${expectedToken}"></head><body>Home</body></html>`,
           ),
         );
 
@@ -53,7 +53,7 @@ describe('Site Ownership Verification (Chunk P2-07 & Section 6.9)', () => {
 
       const result = await verifyMetaTag(rootUrl, expectedToken, mockFetch);
       expect(result.ok).toBe(false);
-      expect(result.reason).toContain("No meta tag with name='plainsight-verify' was found");
+      expect(result.reason).toContain("No meta tag with name='everyvisitor-verify' was found");
     });
 
     it('fails with specific reason when token does not match', async () => {
@@ -61,14 +61,14 @@ describe('Site Ownership Verification (Chunk P2-07 & Section 6.9)', () => {
         Promise.resolve(
           makeGuardedResponse(
             200,
-            `<!DOCTYPE html><html><head><meta name="plainsight-verify" content="ps_wrong_token"></head><body></body></html>`,
+            `<!DOCTYPE html><html><head><meta name="everyvisitor-verify" content="ps_wrong_token"></head><body></body></html>`,
           ),
         );
 
       const result = await verifyMetaTag(rootUrl, expectedToken, mockFetch);
       expect(result.ok).toBe(false);
       expect(result.reason).toContain(
-        "Found meta tag 'plainsight-verify', but the token does not match",
+        "Found meta tag 'everyvisitor-verify', but the token does not match",
       );
       expect(result.details?.foundToken).toBe('ps_wrong_token');
     });
@@ -83,9 +83,9 @@ describe('Site Ownership Verification (Chunk P2-07 & Section 6.9)', () => {
   });
 
   describe('File verification (verifyFile)', () => {
-    it('succeeds when /.well-known/plainsight-verify.txt contains token', async () => {
+    it('succeeds when /.well-known/everyvisitor-verify.txt contains token', async () => {
       const mockFetch: GuardedFetch = (url) => {
-        expect(String(url)).toBe('https://oakhaus.com/.well-known/plainsight-verify.txt');
+        expect(String(url)).toBe('https://oakhaus.com/.well-known/everyvisitor-verify.txt');
         return Promise.resolve(makeGuardedResponse(200, expectedToken, String(url)));
       };
 
@@ -94,10 +94,10 @@ describe('Site Ownership Verification (Chunk P2-07 & Section 6.9)', () => {
       expect(result.method).toBe('file');
     });
 
-    it('succeeds when file has plainsight-verify=<token> format', async () => {
+    it('succeeds when file has everyvisitor-verify=<token> format', async () => {
       const mockFetch: GuardedFetch = (url) =>
         Promise.resolve(
-          makeGuardedResponse(200, `plainsight-verify = ${expectedToken}\n`, String(url)),
+          makeGuardedResponse(200, `everyvisitor-verify = ${expectedToken}\n`, String(url)),
         );
 
       const result = await verifyFile(rootUrl, expectedToken, mockFetch);
@@ -127,7 +127,7 @@ describe('Site Ownership Verification (Chunk P2-07 & Section 6.9)', () => {
     it('succeeds when apex has matching TXT record', async () => {
       const mockLookup = (host: string): Promise<string[][]> => {
         if (host === 'oakhaus.com') {
-          return Promise.resolve([['v=spf1 ~all'], [`plainsight-verify=${expectedToken}`]]);
+          return Promise.resolve([['v=spf1 ~all'], [`everyvisitor-verify=${expectedToken}`]]);
         }
         return Promise.reject(new Error('NXDOMAIN'));
       };
@@ -137,10 +137,22 @@ describe('Site Ownership Verification (Chunk P2-07 & Section 6.9)', () => {
       expect(result.method).toBe('dns');
     });
 
-    it('succeeds when _plainsight.<host> has matching TXT record', async () => {
+    it('still accepts the legacy _plainsight record with plainsight-verify= value', async () => {
       const mockLookup = (host: string): Promise<string[][]> => {
         if (host === '_plainsight.oakhaus.com') {
           return Promise.resolve([[`plainsight-verify=${expectedToken}`]]);
+        }
+        return Promise.reject(new Error('NXDOMAIN'));
+      };
+
+      const result = await verifyDns(rootUrl, expectedToken, { lookupTxt: mockLookup });
+      expect(result.ok).toBe(true);
+    });
+
+    it('succeeds when _everyvisitor.<host> has matching TXT record', async () => {
+      const mockLookup = (host: string): Promise<string[][]> => {
+        if (host === '_everyvisitor.oakhaus.com') {
+          return Promise.resolve([[`everyvisitor-verify=${expectedToken}`]]);
         }
         return Promise.reject(new Error('NXDOMAIN'));
       };
@@ -152,7 +164,7 @@ describe('Site Ownership Verification (Chunk P2-07 & Section 6.9)', () => {
     it('fails with reason when TXT record has mismatched token', async () => {
       const mockLookup = (host: string): Promise<string[][]> => {
         if (host === 'oakhaus.com') {
-          return Promise.resolve([['plainsight-verify=ps_mismatched']]);
+          return Promise.resolve([['everyvisitor-verify=ps_mismatched']]);
         }
         return Promise.reject(new Error('NXDOMAIN'));
       };
@@ -163,11 +175,11 @@ describe('Site Ownership Verification (Chunk P2-07 & Section 6.9)', () => {
       expect(result.details?.foundToken).toBe('ps_mismatched');
     });
 
-    it('succeeds when a stale token on the apex sits beside a matching _plainsight record', async () => {
+    it('succeeds when a stale token on the apex sits beside a matching _everyvisitor record', async () => {
       const mockLookup = (host: string): Promise<string[][]> => {
-        if (host === 'oakhaus.com') return Promise.resolve([['plainsight-verify=ps_old']]);
-        if (host === '_plainsight.oakhaus.com') {
-          return Promise.resolve([[`plainsight-verify=${expectedToken}`]]);
+        if (host === 'oakhaus.com') return Promise.resolve([['everyvisitor-verify=ps_old']]);
+        if (host === '_everyvisitor.oakhaus.com') {
+          return Promise.resolve([[`everyvisitor-verify=${expectedToken}`]]);
         }
         return Promise.reject(new Error('NXDOMAIN'));
       };
@@ -179,7 +191,7 @@ describe('Site Ownership Verification (Chunk P2-07 & Section 6.9)', () => {
     it('succeeds when the stored TXT value kept pasted quotes', async () => {
       const mockLookup = (host: string): Promise<string[][]> =>
         host === 'oakhaus.com'
-          ? Promise.resolve([[`"plainsight-verify=${expectedToken}"`]])
+          ? Promise.resolve([[`"everyvisitor-verify=${expectedToken}"`]])
           : Promise.reject(new Error('NXDOMAIN'));
 
       const result = await verifyDns(rootUrl, expectedToken, { lookupTxt: mockLookup });
@@ -199,7 +211,7 @@ describe('Site Ownership Verification (Chunk P2-07 & Section 6.9)', () => {
     it('routes meta check properly', async () => {
       const mockFetch: GuardedFetch = () =>
         Promise.resolve(
-          makeGuardedResponse(200, `<meta name="plainsight-verify" content="${expectedToken}">`),
+          makeGuardedResponse(200, `<meta name="everyvisitor-verify" content="${expectedToken}">`),
         );
 
       const res = await verifyOwnership(rootUrl, expectedToken, 'meta', { fetcher: mockFetch });

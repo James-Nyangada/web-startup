@@ -4,8 +4,8 @@ import { MarketingHeader } from "@/components/marketing/marketing-header";
 import { MarketingFooter } from "@/components/marketing/marketing-footer";
 
 export const metadata: Metadata = {
-  title: "PlainsightBot Crawler & Scanner",
-  description: "Information about PlainsightBot, our polite web accessibility audit crawler.",
+  title: "EveryVisitorBot Crawler & Scanner",
+  description: "Information about EveryVisitorBot, our polite web accessibility audit crawler.",
 };
 
 const H2 = "m-0 font-serif text-[32px] leading-[36px] font-normal sm:text-[40px] sm:leading-[44px]";
@@ -22,10 +22,10 @@ export default function BotPage() {
               Web Crawler Specification
             </span>
             <h1 className="m-0 font-serif text-[42px] leading-[46px] font-normal sm:text-[56px] sm:leading-[60px]">
-              About <em>PlainsightBot</em>
+              About <em>EveryVisitorBot</em>
             </h1>
             <p className="m-0 max-w-[720px] text-lg text-muted">
-              PlainsightBot is an automated web accessibility scanner operated by EveryVisitor.
+              EveryVisitorBot is an automated web accessibility scanner operated by EveryVisitor.
               It verifies web pages against WCAG 2.2 Level AA accessibility standards on behalf of verified site owners and their digital agencies.
             </p>
           </div>
@@ -38,10 +38,10 @@ export default function BotPage() {
                 Every HTTP request initiated by our scanner identifies itself using our standard user-agent string:
               </p>
               <div className="rounded-xl border border-line bg-subtle p-4 font-mono text-xs sm:text-sm text-ptext break-all">
-                Mozilla/5.0 (compatible; PlainsightBot/1.0; +https://plainsight.io/bot)
+                Mozilla/5.0 (compatible; EveryVisitorBot/1.0; +https://everyvisitor.app/bot)
               </div>
               <p className="text-muted text-xs">
-                During headless browser rendering passes (via Chromium), the user agent additionally includes standard headless browser identification while preserving the <code>+https://plainsight.io/bot</code> token.
+                During headless browser rendering passes (via Chromium), the user agent additionally includes standard headless browser identification while preserving the <code>+https://everyvisitor.app/bot</code> token.
               </p>
             </section>
 
@@ -77,13 +77,13 @@ export default function BotPage() {
             <section className="flex flex-col gap-4">
               <h2 className={H2}>robots.txt Compliance</h2>
               <p>
-                PlainsightBot strictly respects the standard Robots Exclusion Protocol (RFC 9309).
+                EveryVisitorBot strictly respects the standard Robots Exclusion Protocol (RFC 9309).
                 Before crawling, our engine fetches and parses your <code>/robots.txt</code> file.
-                Any path disallowed for <code>PlainsightBot</code> or for all robots (<code>*</code>) is immediately excluded from scanning.
+                Any path disallowed for <code>EveryVisitorBot</code> or for all robots (<code>*</code>) is immediately excluded from scanning.
               </p>
               <div className="rounded-xl border border-line bg-subtle p-4 font-mono text-xs text-ink">
-                # Example: Disallow PlainsightBot from crawling admin and checkout paths<br />
-                User-agent: PlainsightBot<br />
+                # Example: Disallow EveryVisitorBot from crawling admin and checkout paths<br />
+                User-agent: EveryVisitorBot<br />
                 Disallow: /checkout/<br />
                 Disallow: /cart/<br />
                 Disallow: /account/
@@ -94,12 +94,12 @@ export default function BotPage() {
             <section className="flex flex-col gap-4">
               <h2 className={H2}>Mandatory Domain Ownership Verification</h2>
               <p>
-                PlainsightBot does <strong>not</strong> blindly scan arbitrary web properties on the internet.
+                EveryVisitorBot does <strong>not</strong> blindly scan arbitrary web properties on the internet.
                 Before any weekly recurring scan or multi-page audit can proceed, the requesting organization must prove ownership through one of three verifiable methods:
               </p>
               <ol className="list-decimal pl-5 flex flex-col gap-2 text-muted">
                 <li><strong className="text-ink">DNS TXT Record:</strong> Adding a unique verification token to the domain&apos;s DNS records.</li>
-                <li><strong className="text-ink">Root Verification File:</strong> Placing a static <code>/plainsight-verify.txt</code> file in the website root directory.</li>
+                <li><strong className="text-ink">Root Verification File:</strong> Placing a static <code>/.well-known/everyvisitor-verify.txt</code> file in the website root directory.</li>
                 <li><strong className="text-ink">Platform App Install:</strong> Installing our verified Shopify App or WordPress Plugin with OAuth handshake.</li>
               </ol>
             </section>
@@ -108,7 +108,7 @@ export default function BotPage() {
             <section className="flex flex-col gap-4">
               <h2 className={H2}>Zero Form Submissions &amp; Safe Execution</h2>
               <p>
-                PlainsightBot performs passive, non-destructive DOM analysis.
+                EveryVisitorBot performs passive, non-destructive DOM analysis.
                 It never submits forms, never adds items to payment gateways, never creates test orders, and never attempts vulnerability penetration testing.
                 It purely extracts public HTML, executes client-side axe-core accessibility audits, and calculates contrast ratios.
               </p>
@@ -118,7 +118,7 @@ export default function BotPage() {
             <section className="flex flex-col gap-4 rounded-2xl border border-line bg-subtle p-6">
               <h2 className="text-xl font-bold text-ink">Need to Allowlist or Report an Issue?</h2>
               <p className="text-muted">
-                If your Web Application Firewall (Cloudflare, AWS WAF, Fastly) is blocking PlainsightBot and preventing scheduled scans, or if you believe PlainsightBot is crawling your site in error, please reach out to our network team:
+                If your Web Application Firewall (Cloudflare, AWS WAF, Fastly) is blocking EveryVisitorBot and preventing scheduled scans, or if you believe EveryVisitorBot is crawling your site in error, please reach out to our network team:
               </p>
               <div className="flex flex-wrap items-center gap-4 mt-2">
                 <a

@@ -5,7 +5,7 @@ Agency Pro orgs can serve their client portal from their own domain (P6-07).
 ## How it works
 
 1. The owner sets a domain in Settings → Branding. The API returns two DNS records:
-   `CNAME <domain> → CUSTOM_DOMAIN_TARGET` and `TXT _plainsight-verify.<domain> = plainsight-verify=<token>`.
+   `CNAME <domain> → CUSTOM_DOMAIN_TARGET` and `TXT _everyvisitor-verify.<domain> = everyvisitor-verify=<token>`.
 2. **Check DNS records** calls `POST /v1/orgs/:org/branding/custom-domain/verify`, which needs both
    records. A flattened CNAME (Cloudflare proxy) passes if the domain resolves to exactly the
    target's addresses.
@@ -23,7 +23,7 @@ Reference Caddy config: `docs/infra/Caddyfile.example`.
 
 | Symptom | Check |
 | --- | --- |
-| Owner's verify keeps failing | `dig CNAME <domain>` and `dig TXT _plainsight-verify.<domain>`. The error message says which is missing |
+| Owner's verify keeps failing | `dig CNAME <domain>` and `dig TXT _everyvisitor-verify.<domain>`. The error message says which is missing |
 | Browser shows a certificate error | `curl -i "http://api:4000/internal/tls-allowed?domain=<domain>"` from the Caddy host must be 200; Caddy logs show the ask result |
 | Certificate issued but portal 404s | `APP_HOSTS` in web env must not include the custom domain; check `proxy.ts` sees the right `Host` header |
 | Client cannot sign in on the custom domain | Caddy must proxy `/v1/*` on that site to the api; Better Auth trusts verified domains automatically |

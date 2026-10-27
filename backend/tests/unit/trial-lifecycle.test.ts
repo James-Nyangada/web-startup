@@ -443,20 +443,20 @@ describe('Chunk P4-05: Trial lifecycle and read-only mode', () => {
       const rendered = renderEmail('E-14', {
         daysLeft: 4,
         orgName: 'Acme Studio',
-        upgradeUrl: 'https://app.plainsight.example.com/settings/billing',
+        upgradeUrl: 'https://app.everyvisitor.example.com/settings/billing',
         trialEndsAt: new Date(Date.now() + 4 * 24 * 60 * 60 * 1000).toISOString(),
       });
 
       expect(rendered.subject).toContain('trial ends in 4 days');
       expect(rendered.html).toContain('Acme Studio');
       expect(rendered.html).toContain('Choose a subscription plan');
-      expect(rendered.text).toContain('https://app.plainsight.example.com/settings/billing');
+      expect(rendered.text).toContain('https://app.everyvisitor.example.com/settings/billing');
     });
 
     it('renders E-15 trial ended email explaining read-only mode and data safety', () => {
       const rendered = renderEmail('E-15', {
         orgName: 'Acme Studio',
-        upgradeUrl: 'https://app.plainsight.example.com/settings/billing',
+        upgradeUrl: 'https://app.everyvisitor.example.com/settings/billing',
       });
 
       expect(rendered.subject).toContain('trial has ended — account in read-only mode');
@@ -471,14 +471,14 @@ describe('Chunk P4-05: Trial lifecycle and read-only mode', () => {
       const rendered = renderEmail('E-20', {
         orgName: 'Acme Studio',
         daysUntilDeletion: 7,
-        reactivateUrl: 'https://app.plainsight.example.com/settings/billing',
-        exportUrl: 'https://app.plainsight.example.com/settings/account#export',
+        reactivateUrl: 'https://app.everyvisitor.example.com/settings/billing',
+        exportUrl: 'https://app.everyvisitor.example.com/settings/account#export',
         deletionDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
       });
 
       expect(rendered.subject).toContain('Data deletion notice for Acme Studio (7 days remaining)');
       expect(rendered.html).toContain('Reactivate subscription');
-      expect(rendered.html).toContain('https://app.plainsight.example.com/settings/account#export');
+      expect(rendered.html).toContain('https://app.everyvisitor.example.com/settings/account#export');
     });
   });
 });

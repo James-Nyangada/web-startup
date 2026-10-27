@@ -8,7 +8,9 @@ import { isIP } from 'node:net';
  * certificate once both checks have passed (GET /internal/tls-allowed).
  */
 
-export const VERIFY_TXT_LABEL = '_plainsight-verify';
+export const VERIFY_TXT_LABEL = '_everyvisitor-verify';
+// Issued before the rename; domains already set up with it must keep verifying.
+const LEGACY_VERIFY_TXT_LABEL = '_plainsight-verify';
 
 export interface DnsResolver {
   resolveCname(host: string): Promise<string[]>;
@@ -57,7 +59,7 @@ export function customDomainProblem(domain: string, ownHosts: string[]): string 
 }
 
 export function newDomainVerifyToken(): string {
-  return `plainsight-verify=${crypto.randomBytes(16).toString('hex')}`;
+  return `everyvisitor-verify=${crypto.randomBytes(16).toString('hex')}`;
 }
 
 export interface DomainCheck {
@@ -80,9 +82,10 @@ export async function checkCustomDomainDns(
   resolver: DnsResolver = systemResolver,
 ): Promise<DomainCheck> {
   const safe = <T>(p: Promise<T>, fallback: T) => p.catch(() => fallback);
-  const [cnames, txtRecords] = await Promise.all([
+  const [cnames, txtRecords, legacyTxtRecords] = await Promise.all([
     safe(resolver.resolveCname(domain), [] as string[]),
     safe(resolver.resolveTxt(`${VERIFY_TXT_LABEL}.${domain}`), [] as string[][]),
+    safe(resolver.resolveTxt(`${LEGACY_VERIFY_TXT_LABEL}.${domain}`), [] as string[][]),
   ]);
 
   const wanted = stripDot(target);
@@ -95,7 +98,7 @@ export async function checkCustomDomainDns(
     cname = mine.length > 0 && theirs.length > 0 && mine.every((ip) => theirs.includes(ip));
   }
 
-  const txtValues = txtRecords.map((chunks) => chunks.join(''));
-  const txt = txtValues.some((v) => v.trim() === token);
+  const txtValues = [...txtRecords, ...legacyTxtRecords].map((chunks) => chunks.join(''));
+  const txt = txtValues.some((v) => v.trim().replace(/^"(.*)"$/, '$1').trim() === token);
   return { cname, txt, verified: cname && txt, found: { cname: cnames, txt: txtValues } };
 }

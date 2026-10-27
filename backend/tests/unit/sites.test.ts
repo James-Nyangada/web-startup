@@ -505,10 +505,10 @@ describe('Sites API (Chunk P2-06 & Section 7.3)', () => {
 
       expect(res.body.data.verifyToken).toBe('ps_test_token');
       expect(res.body.data.methods.meta.tag).toBe(
-        '<meta name="plainsight-verify" content="ps_test_token">',
+        '<meta name="everyvisitor-verify" content="ps_test_token">',
       );
-      expect(res.body.data.methods.dns.value).toBe('plainsight-verify=ps_test_token');
-      expect(res.body.data.methods.file.path).toBe('/.well-known/plainsight-verify.txt');
+      expect(res.body.data.methods.dns.value).toBe('everyvisitor-verify=ps_test_token');
+      expect(res.body.data.methods.file.path).toBe('/.well-known/everyvisitor-verify.txt');
     });
 
     it('returns 404 for cross-org verification info request', async () => {
@@ -562,7 +562,7 @@ describe('Sites API (Chunk P2-06 & Section 7.3)', () => {
       vi.mocked(verifyOwnership).mockResolvedValue({
         ok: false,
         method: 'meta',
-        reason: "No meta tag with name='plainsight-verify' was found on your home page.",
+        reason: "No meta tag with name='everyvisitor-verify' was found on your home page.",
       });
 
       const res = await request(app)
@@ -573,7 +573,7 @@ describe('Sites API (Chunk P2-06 & Section 7.3)', () => {
 
       expect(res.body.error.code).toBe(ErrorCode.VERIFICATION_FAILED);
       expect(res.body.error.message).toContain(
-        "No meta tag with name='plainsight-verify' was found",
+        "No meta tag with name='everyvisitor-verify' was found",
       );
     });
 

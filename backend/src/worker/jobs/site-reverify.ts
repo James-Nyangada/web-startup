@@ -36,7 +36,7 @@ export async function handleSiteReverify(
   const fetcher = createGuardedFetch({
     policy: ctx.scannerPolicy,
     userAgent:
-      ctx.userAgent ?? 'Mozilla/5.0 (compatible; PlainsightBot/1.0; +https://plainsight.app/bot)',
+      ctx.userAgent ?? 'Mozilla/5.0 (compatible; EveryVisitorBot/1.0; +https://everyvisitor.app/bot)',
     timeoutMs: 10_000,
     maxBytes: 2 * 1024 * 1024,
   });

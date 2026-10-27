@@ -3,7 +3,7 @@
 useDefault = true
 
 [[rules]]
-id = "plainsight-api-key"
+id = "everyvisitor-api-key"
 description = "EveryVisitor public API key"
 regex = '''psk_[A-Za-z0-9_-]{43}'''
 keywords = ["psk_"]

@@ -29,11 +29,11 @@ function SignUpContent() {
     if (urlParam) {
       setPendingUrl(urlParam);
       try {
-        localStorage.setItem('plainsight_pending_url', urlParam);
+        localStorage.setItem('everyvisitor_pending_url', urlParam);
       } catch {}
     } else {
       try {
-        const savedUrl = localStorage.getItem('plainsight_pending_url');
+        const savedUrl = localStorage.getItem('everyvisitor_pending_url');
         if (savedUrl) setPendingUrl(savedUrl);
       } catch {}
     }
@@ -41,11 +41,11 @@ function SignUpContent() {
     if (checkIdParam) {
       setPendingCheckId(checkIdParam);
       try {
-        localStorage.setItem('plainsight_pending_check_id', checkIdParam);
+        localStorage.setItem('everyvisitor_pending_check_id', checkIdParam);
       } catch {}
     } else {
       try {
-        const savedCheck = localStorage.getItem('plainsight_pending_check_id');
+        const savedCheck = localStorage.getItem('everyvisitor_pending_check_id');
         if (savedCheck) setPendingCheckId(savedCheck);
       } catch {}
     }

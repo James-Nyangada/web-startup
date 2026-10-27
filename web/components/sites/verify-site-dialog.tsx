@@ -64,13 +64,13 @@ export function VerifySiteDialog({
     );
   }
   const verifyToken = token ?? "";
-  const metaSnippet = `<meta name="plainsight-verify" content="${verifyToken}">`;
-  // The full name matters for subdomain sites: a bare "_plainsight" lands on
+  const metaSnippet = `<meta name="everyvisitor-verify" content="${verifyToken}">`;
+  // The full name matters for subdomain sites: a bare "_everyvisitor" lands on
   // the zone apex, which the backend does not check for shop.example.com.
   const siteHost = new URL(site.rootUrl).hostname.replace(/^www\./, "");
-  const dnsHost = `_plainsight.${siteHost}`;
-  const dnsValue = `plainsight-verify=${verifyToken}`;
-  const filePath = "/.well-known/plainsight-verify.txt";
+  const dnsHost = `_everyvisitor.${siteHost}`;
+  const dnsValue = `everyvisitor-verify=${verifyToken}`;
+  const filePath = "/.well-known/everyvisitor-verify.txt";
   const fileUrl = `${site.rootUrl}${filePath}`;
 
   const copyToClipboard = async (text: string, field: string) => {
@@ -472,7 +472,7 @@ export function VerifySiteDialog({
                   }}
                 >
                   <strong>Note:</strong> If your DNS host adds your domain automatically, enter only the part before it
-                  (for example <code>_plainsight</code> or <code>_plainsight.shop</code>). DNS changes typically take 1–3 minutes to
+                  (for example <code>_everyvisitor</code> or <code>_everyvisitor.shop</code>). DNS changes typically take 1–3 minutes to
                   propagate, but may take longer depending on TTL.
                 </div>
               </div>

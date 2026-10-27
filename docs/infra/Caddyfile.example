@@ -20,14 +20,14 @@
 	}
 }
 
-app.plainsight.io {
+app.everyvisitor.app {
 	import security_headers
 	reverse_proxy web:3000 {
 		health_uri /sign-in
 	}
 }
 
-api.plainsight.io {
+api.everyvisitor.app {
 	import security_headers
 	# The TLS ask endpoint is for Caddy only.
 	@internal path /internal/*
@@ -37,9 +37,9 @@ api.plainsight.io {
 	}
 }
 
-docs.plainsight.io {
+docs.everyvisitor.app {
 	import security_headers
-	# web/proxy.ts serves /developers/api for this host (set DOCS_HOST=docs.plainsight.io).
+	# web/proxy.ts serves /developers/api for this host (set DOCS_HOST=docs.everyvisitor.app).
 	reverse_proxy web:3000
 }
 

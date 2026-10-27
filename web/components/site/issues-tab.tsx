@@ -59,7 +59,7 @@ function statusQuery(status: string, query: URLSearchParams) {
   } else if (status !== "all") query.set("status", status);
 }
 
-const STORAGE_VIEW_KEY = "plainsight_issues_default_view";
+const STORAGE_VIEW_KEY = "everyvisitor_issues_default_view";
 
 interface SavedView {
   groupBy: GroupBy;

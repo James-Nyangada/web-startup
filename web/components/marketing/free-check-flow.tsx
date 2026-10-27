@@ -308,7 +308,7 @@ export function FreeCheckFlow({
               Checking {url}
             </h1>
             <p className="m-0 text-muted">
-              PlainsightBot is evaluating WCAG 2.2 Level AA accessibility rules. This usually takes
+              EveryVisitorBot is evaluating WCAG 2.2 Level AA accessibility rules. This usually takes
               20–45 seconds.
             </p>
           </div>

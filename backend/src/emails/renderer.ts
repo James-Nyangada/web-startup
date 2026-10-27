@@ -230,7 +230,7 @@ export function getSampleTemplateData(templateId: EmailTemplateId): unknown {
         rootUrl: 'https://oakhaus.com',
         method: 'meta',
         failureCount: 3,
-        reason: 'The plainsight-verify meta tag was not found on the home page.',
+        reason: 'The everyvisitor-verify meta tag was not found on the home page.',
         verifyUrl: 'http://localhost:3000/sites/oakhaus/verify',
       };
     case 'E-22':

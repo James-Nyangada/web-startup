@@ -62,7 +62,7 @@ function ScanWatcher({ orgSlug, scanId, onChange }: { orgSlug: string; scanId: s
   );
 }
 
-const STORAGE_KEY = "plainsight_onboarding_v1";
+const STORAGE_KEY = "everyvisitor_onboarding_v1";
 
 const EDUCATIONAL_SLIDES = [
   {
@@ -149,8 +149,8 @@ export default function OnboardingPage() {
 
       if (typeof window !== "undefined") {
         const params = new URLSearchParams(window.location.search);
-        const urlParam = params.get("url") || localStorage.getItem("plainsight_pending_url");
-        const checkIdParam = params.get("checkId") || localStorage.getItem("plainsight_pending_check_id");
+        const urlParam = params.get("url") || localStorage.getItem("everyvisitor_pending_url");
+        const checkIdParam = params.get("checkId") || localStorage.getItem("everyvisitor_pending_check_id");
 
         if (urlParam) {
           let clean = urlParam.trim();
@@ -173,7 +173,7 @@ export default function OnboardingPage() {
         }
 
         if (checkIdParam) {
-          localStorage.setItem("plainsight_free_check_id", checkIdParam);
+          localStorage.setItem("everyvisitor_free_check_id", checkIdParam);
         }
       }
     } catch {
@@ -260,7 +260,7 @@ export default function OnboardingPage() {
 
   const freeCheckId = () => {
     try {
-      return localStorage.getItem("plainsight_free_check_id") || undefined;
+      return localStorage.getItem("everyvisitor_free_check_id") || undefined;
     } catch {
       return undefined;
     }
@@ -324,9 +324,9 @@ export default function OnboardingPage() {
   const handleFinishOnboarding = () => {
     try {
       localStorage.removeItem(STORAGE_KEY);
-      localStorage.removeItem("plainsight_pending_url");
-      localStorage.removeItem("plainsight_pending_check_id");
-      localStorage.removeItem("plainsight_free_check_id");
+      localStorage.removeItem("everyvisitor_pending_url");
+      localStorage.removeItem("everyvisitor_pending_check_id");
+      localStorage.removeItem("everyvisitor_free_check_id");
     } catch {}
     router.push(state.orgSlug && state.siteId ? `/${state.orgSlug}/sites/${state.siteId}` : "/overview");
   };

@@ -59,7 +59,7 @@ export default function TermsPage() {
         <section>
           <h2 className="text-xl font-bold text-ink mb-3">5. Scanner Politeness &amp; Fair Use</h2>
           <p>
-            Our crawler (&quot;PlainsightBot&quot;) is engineered to respect target servers, maintaining a polite request rate (maximum 1 request per second per domain), respecting standard <code>robots.txt</code> directives, and adhering to customer-configured page caps. You agree not to attempt to circumvent page caps, bypass rate limits, or use the scanner as an instrument for denial-of-service or security scanning.
+            Our crawler (&quot;EveryVisitorBot&quot;) is engineered to respect target servers, maintaining a polite request rate (maximum 1 request per second per domain), respecting standard <code>robots.txt</code> directives, and adhering to customer-configured page caps. You agree not to attempt to circumvent page caps, bypass rate limits, or use the scanner as an instrument for denial-of-service or security scanning.
           </p>
         </section>
 

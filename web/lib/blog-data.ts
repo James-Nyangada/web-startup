@@ -197,7 +197,7 @@ export const CHANGELOG_ENTRIES: ChangelogEntry[] = [
     highlights: [
       "Screen For Agencies: Interactive care plan revenue calculator and white-label care plan packages.",
       "Screen Legal Documents: Comprehensive Terms of Service, Privacy Policy (zero tracking cookies), DPA, and Subprocessors Registry.",
-      "PlainsightBot Documentation (/bot): Detailed crawler politeness, 1 req/sec rate caps, and robots.txt compliance specs.",
+      "EveryVisitorBot Documentation (/bot): Detailed crawler politeness, 1 req/sec rate caps, and robots.txt compliance specs.",
       "Machine-readable infrastructure: Automated sitemap.xml and robots.txt generation.",
     ],
   },

@@ -35,7 +35,7 @@ export default function BrandingSettingsPage() {
   const [logoDarkUrl, setLogoDarkUrl] = useState<string | null>(null);
   const [emailSenderName, setEmailSenderName] = useState("");
   const [reportFooter, setReportFooter] = useState("");
-  const [hidePlainsightBranding, setHidePlainsightBranding] = useState(false);
+  const [hideEveryVisitorBranding, setHideEveryVisitorBranding] = useState(false);
   const [customDomain, setCustomDomain] = useState("");
   const onDomainChange = useCallback((d: string | null) => setCustomDomain(d ?? ""), []);
 
@@ -80,7 +80,7 @@ export default function BrandingSettingsPage() {
         }
         setEmailSenderName(b.emailSenderName || "");
         setReportFooter(b.reportFooter || "");
-        setHidePlainsightBranding(Boolean(b.hidePlainsightBranding));
+        setHideEveryVisitorBranding(Boolean(b.hideEveryVisitorBranding));
         setCustomDomain(b.customDomain || "");
       }
     } catch {
@@ -180,7 +180,7 @@ export default function BrandingSettingsPage() {
         primaryColor,
         emailSenderName: emailSenderName.trim() || null,
         reportFooter: reportFooter.trim() || null,
-        hidePlainsightBranding,
+        hideEveryVisitorBranding,
       });
       showToast("White-label branding saved successfully.");
     } catch (err: unknown) {
@@ -468,13 +468,13 @@ export default function BrandingSettingsPage() {
             {/* Hide EveryVisitor Branding Toggle */}
             <div className="flex items-start gap-3 pt-2">
               <input
-                id="hidePlainsight"
+                id="hideEveryVisitor"
                 type="checkbox"
-                checked={hidePlainsightBranding}
-                onChange={(e) => setHidePlainsightBranding(e.target.checked)}
+                checked={hideEveryVisitorBranding}
+                onChange={(e) => setHideEveryVisitorBranding(e.target.checked)}
                 className="mt-1 h-4 w-4 rounded border-line text-primary focus:ring-primary"
               />
-              <label htmlFor="hidePlainsight" className="flex flex-col cursor-pointer">
+              <label htmlFor="hideEveryVisitor" className="flex flex-col cursor-pointer">
                 <span className="text-sm font-medium text-ink">Hide EveryVisitor marks</span>
                 <span className="text-xs text-muted">
                   Removes &apos;Powered by EveryVisitor&apos; branding from client reports, emails, and the client portal.
@@ -600,7 +600,7 @@ export default function BrandingSettingsPage() {
                   <p className="text-[10px] text-neutral-400 m-0 line-clamp-2">
                     {reportFooter || "Automated checks only, not a compliance assessment"}
                   </p>
-                  {!hidePlainsightBranding && (
+                  {!hideEveryVisitorBranding && (
                     <div className="text-[9px] text-neutral-400">
                       Powered by EveryVisitor
                     </div>
@@ -670,7 +670,7 @@ export default function BrandingSettingsPage() {
 
                   {/* Email Footer */}
                   <div className="p-3 bg-neutral-50 border-t border-neutral-100 text-[10px] text-neutral-400 text-center">
-                    {!hidePlainsightBranding ? (
+                    {!hideEveryVisitorBranding ? (
                       <span>Delivered via EveryVisitor White-Label</span>
                     ) : (
                       <span>Sent by {displayName || "Agency Studio"}</span>
@@ -689,7 +689,7 @@ export default function BrandingSettingsPage() {
                   <span className="h-2 w-2 rounded-full bg-neutral-400" />
                   <span className="h-2 w-2 rounded-full bg-neutral-400" />
                   <div className="ml-2 flex-1 rounded bg-white px-2 py-0.5 text-[10px] font-mono text-neutral-500 truncate">
-                    {customDomain ? `https://${customDomain}` : "https://portal.plainsight.app/acme"}
+                    {customDomain ? `https://${customDomain}` : "https://portal.everyvisitor.app/acme"}
                   </div>
                 </div>
 
@@ -750,7 +750,7 @@ export default function BrandingSettingsPage() {
                   {/* Portal footer */}
                   <div className="border-t border-neutral-100 p-2.5 text-center text-[10px] text-neutral-400 flex items-center justify-between px-4">
                     <span>© {new Date().getFullYear()} {displayName || "Agency Studio"}</span>
-                    {!hidePlainsightBranding && (
+                    {!hideEveryVisitorBranding && (
                       <span className="text-neutral-300 text-[9px]">Powered by EveryVisitor</span>
                     )}
                   </div>

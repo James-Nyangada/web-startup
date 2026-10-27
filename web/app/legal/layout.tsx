@@ -7,7 +7,7 @@ const LEGAL_NAV = [
   { href: "/legal/privacy", label: "Privacy Policy" },
   { href: "/legal/dpa", label: "Data Processing Agreement (DPA)" },
   { href: "/legal/subprocessors", label: "Subprocessors Registry" },
-  { href: "/bot", label: "PlainsightBot Crawler" },
+  { href: "/bot", label: "EveryVisitorBot Crawler" },
   { href: "/accessibility-notes", label: "Accessibility Statement" },
 ];
 

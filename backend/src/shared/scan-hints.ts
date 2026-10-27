@@ -35,7 +35,7 @@ export function getScanFailureHint(
       reason:
         'The server or web application firewall (WAF) rate-limited or blocked automated requests (HTTP 429).',
       whatToDo:
-        'Add PlainsightBot to your CDN or firewall allowlist, or lower the scan page limit in site settings.',
+        'Add EveryVisitorBot to your CDN or firewall allowlist, or lower the scan page limit in site settings.',
     };
   }
 
@@ -109,6 +109,6 @@ export function getScanFailureHint(
     reason:
       errorMessage || 'The scan encountered unrecoverable errors while loading or testing pages.',
     whatToDo:
-      'Verify that the website is online and responsive, check robots.txt permissions for PlainsightBot, and retry the scan.',
+      'Verify that the website is online and responsive, check robots.txt permissions for EveryVisitorBot, and retry the scan.',
   };
 }

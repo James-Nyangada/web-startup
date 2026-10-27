@@ -113,7 +113,7 @@ export const authClient = {
   async signOut() {
     // Onboarding progress is stored per browser; don't hand it to the next account.
     try {
-      localStorage.removeItem('plainsight_onboarding_v1');
+      localStorage.removeItem('everyvisitor_onboarding_v1');
     } catch {
       // Ignore storage errors
     }

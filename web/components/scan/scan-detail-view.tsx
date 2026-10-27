@@ -146,7 +146,7 @@ export function ScanDetailView({
         ? {
             reason: errorMessage || "The scan encountered unrecoverable errors while loading pages.",
             whatToDo:
-              "Check that your site is online and responsive, verify robots.txt permissions for PlainsightBot, and retry the scan.",
+              "Check that your site is online and responsive, verify robots.txt permissions for EveryVisitorBot, and retry the scan.",
           }
         : null);
 

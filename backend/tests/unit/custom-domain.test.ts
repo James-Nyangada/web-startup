@@ -11,8 +11,8 @@ import { ErrorCode } from '../../src/shared/errors.js';
 import { buildTestApp, fakeRepos, mockAuth } from '../helpers/fakes.js';
 
 const ORG_ID = '018f0000-0000-7000-8000-0000000000e1';
-const TARGET = 'portal.plainsight.test';
-const TOKEN = 'plainsight-verify=abc123';
+const TARGET = 'portal.everyvisitor.test';
+const TOKEN = 'everyvisitor-verify=abc123';
 
 function resolver(records: {
   cname?: string[];
@@ -44,10 +44,10 @@ describe('P6-07: custom domain validation', () => {
   });
 
   it('requires a subdomain and refuses IPs and our own domains', () => {
-    const own = ['app.plainsight.test'];
+    const own = ['app.everyvisitor.test'];
     expect(customDomainProblem('agency.com', own)).toMatch(/subdomain/);
     expect(customDomainProblem('10.0.0.1', own)).toMatch(/IP/);
-    expect(customDomainProblem('evil.plainsight.test', own)).toMatch(/belongs to us/);
+    expect(customDomainProblem('evil.everyvisitor.test', own)).toMatch(/belongs to us/);
     expect(customDomainProblem('bad_label.agency.com', own)).toMatch(/not a valid/);
     expect(customDomainProblem('reports.agency.com', own)).toBeNull();
   });
@@ -70,7 +70,7 @@ describe('P6-07: DNS check', () => {
       TOKEN,
       TARGET,
       resolver({
-        txt: [['plainsight-verify=', 'abc123']],
+        txt: [['everyvisitor-verify=', 'abc123']],
         a: { 'reports.agency.com': ['203.0.113.7'], [TARGET]: ['203.0.113.7'] },
       }),
     );
@@ -139,8 +139,8 @@ describe('P6-07: custom domain endpoints', () => {
       .set('Cookie', cookie)
       .send({ domain: 'Reports.Brightline.studio' })
       .expect(201);
-    expect(res.body.data.records.txt.host).toBe('_plainsight-verify.reports.brightline.studio');
-    expect(res.body.data.records.txt.value).toMatch(/^plainsight-verify=[0-9a-f]{32}$/);
+    expect(res.body.data.records.txt.host).toBe('_everyvisitor-verify.reports.brightline.studio');
+    expect(res.body.data.records.txt.value).toMatch(/^everyvisitor-verify=[0-9a-f]{32}$/);
     expect(res.body.data.records.cname.host).toBe('reports.brightline.studio');
     expect(repos.branding.upsert).toHaveBeenCalledWith(
       ORG_ID,
@@ -237,11 +237,11 @@ describe('P6-07: Caddy on-demand TLS ask endpoint', () => {
     vi.mocked(repos.branding.findVerifiedDomain).mockImplementation((d: string) =>
       Promise.resolve(d === 'reports.brightline.studio' ? ({} as never) : null),
     );
-    const trusted = customDomainTrustedOrigins(repos, ['https://app.plainsight.test']);
+    const trusted = customDomainTrustedOrigins(repos, ['https://app.everyvisitor.test']);
     const req = (origin: string) => new Request('https://api.test', { headers: { origin } });
     expect(await trusted(req('https://reports.brightline.studio'))).toContain(
       'https://reports.brightline.studio',
     );
-    expect(await trusted(req('https://evil.example.com'))).toEqual(['https://app.plainsight.test']);
+    expect(await trusted(req('https://evil.example.com'))).toEqual(['https://app.everyvisitor.test']);
   });
 });

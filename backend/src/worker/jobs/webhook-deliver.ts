@@ -101,7 +101,7 @@ export async function handleWebhookDeliver(
   let body: string;
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
-    'User-Agent': 'Plainsight-Webhooks/1.0',
+    'User-Agent': 'EveryVisitor-Webhooks/1.0',
   };
 
   if (webhook.kind === 'slack') {

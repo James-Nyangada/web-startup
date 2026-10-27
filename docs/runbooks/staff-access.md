@@ -5,7 +5,7 @@ Internal admin lives at `/staff` (S-70 – S-75, P6-01).
 ## Grant
 
 ```sql
-update users set is_staff = true where email = 'name@plainsight.io';
+update users set is_staff = true where email = 'name@everyvisitor.app';
 ```
 
 The person signs in normally, opens `/staff`, and sets up an authenticator app (TOTP). Every
@@ -16,8 +16,8 @@ session needs a code at most every 12 hours. Five wrong codes lock that session'
 
 ```sql
 update users set is_staff = false, totp_secret_encrypted = null, totp_enabled_at = null
- where email = 'name@plainsight.io';
-delete from sessions where user_id = (select id from users where email = 'name@plainsight.io');
+ where email = 'name@everyvisitor.app';
+delete from sessions where user_id = (select id from users where email = 'name@everyvisitor.app');
 ```
 
 ## Lost authenticator
