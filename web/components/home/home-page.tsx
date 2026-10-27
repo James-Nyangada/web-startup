@@ -96,7 +96,19 @@ export function HomePage() {
               </Link>
             </div>
             <div data-reveal>
-              <Placeholder label="screenshot: agency overview + branded report" className="aspect-[16/10] rounded-xl" />
+              <div className="relative aspect-[16/10] overflow-hidden rounded-2xl border border-line bg-surface shadow-card transition-all duration-300 hover:shadow-lg">
+                <picture>
+                  <source srcSet="/screenshots/agency-composite.webp" type="image/webp" />
+                  <img
+                    src="/screenshots/agency-composite.png"
+                    alt="Agency dashboard listing five client sites worst-first, with a client report in the agency’s own branding on top."
+                    width={1600}
+                    height={1000}
+                    className="h-full w-full object-cover transition-transform duration-300 hover:scale-[1.01]"
+                    loading="lazy"
+                  />
+                </picture>
+              </div>
             </div>
           </div>
         </section>

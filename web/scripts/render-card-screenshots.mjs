@@ -126,8 +126,8 @@ function generateHtml(cardType, theme) {
           ${renderSvg("scan", 20)}
         </div>
         <div>
-          <div style="font-size: 17px; font-weight: 700; color: ${isDark ? "#f8fafc" : "#0f172a"};">Oakhaus Furniture Store</div>
-          <div class="mono" style="font-size: 13px; color: ${isDark ? "#94a3b8" : "#64748b"};">oakhaus-living.myshopify.com</div>
+          <div style="font-size: 17px; font-weight: 700; color: ${isDark ? "#f8fafc" : "#0f172a"};">Juniper & Co.</div>
+          <div class="mono" style="font-size: 13px; color: ${isDark ? "#94a3b8" : "#64748b"};">juniperandco.com</div>
         </div>
       </div>
       <div class="badge badge-primary" style="padding: 6px 14px; font-size: 14px;">

@@ -122,7 +122,7 @@ function MagicLinkContent() {
   return (
     <AuthCard
       title="Sign in with a magic link"
-      description="Enter your email and we'll send you a password-free sign-in link."
+      description="Enter your email and we'll send you a password sign-in link."
       error={errorMessage}
       errorRef={errorRef}
       footer={
