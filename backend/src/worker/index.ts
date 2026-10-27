@@ -33,6 +33,7 @@ export async function startWorker() {
     emailSender: createEmailSender(env()),
     abortSignal: abortController.signal,
     scannerConcurrency: Number(process.env.SCANNER_CONCURRENCY) || 2,
+    scanRunConcurrency: Number(process.env.SCAN_RUN_CONCURRENCY) || 1,
     userAgent: process.env.SCANNER_USER_AGENT,
   };
 

@@ -15,6 +15,8 @@ export interface WorkerContext {
   boss?: PgBoss;
   pool?: pg.Pool;
   scannerConcurrency?: number;
+  /** Scans this worker runs at once (SCAN_RUN_CONCURRENCY, default 1). */
+  scanRunConcurrency?: number;
   userAgent?: string;
   abortSignal?: AbortSignal;
   /** In testing or monolithic execution, run scan.process immediately after scan.run. */

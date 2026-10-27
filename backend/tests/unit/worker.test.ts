@@ -12,6 +12,7 @@ import {
   enqueueScanRun,
   QUEUE_SCAN_PROCESS,
   QUEUE_SCAN_RUN,
+  registerWorkers,
 } from '../../src/worker/boss.js';
 import type { WorkerContext } from '../../src/worker/types.js';
 import { page, rule } from '../helpers/scan-data.js';
@@ -564,6 +565,28 @@ describe('Worker & Queue Engine (Chunk P2-08)', () => {
           retryDelay: 300,
           retryBackoff: true,
         }),
+      );
+    });
+
+    it('scan.run runs one scan at a time by default', async () => {
+      const ctx: WorkerContext = { repos: mockRepos, storage };
+      await registerWorkers(mockBoss as unknown as PgBoss, ctx);
+
+      expect(mockBoss.work).toHaveBeenCalledWith(
+        QUEUE_SCAN_RUN,
+        expect.objectContaining({ localConcurrency: 1 }),
+        expect.any(Function),
+      );
+    });
+
+    it('scan.run runs scanRunConcurrency scans at once when set', async () => {
+      const ctx: WorkerContext = { repos: mockRepos, storage, scanRunConcurrency: 3 };
+      await registerWorkers(mockBoss as unknown as PgBoss, ctx);
+
+      expect(mockBoss.work).toHaveBeenCalledWith(
+        QUEUE_SCAN_RUN,
+        expect.objectContaining({ localConcurrency: 3 }),
+        expect.any(Function),
       );
     });
 

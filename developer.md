@@ -211,6 +211,7 @@ Paddle has a sandbox; staging uses it. Production uses live Paddle.
 | `AI_PROVIDER`, `GEMINI_API_KEY`, `AI_MONTHLY_CAP_PER_ORG` | worker | AI fix suggestions |
 | `SENTRY_DSN_*` | all | One per app |
 | `SCANNER_CONCURRENCY` | worker | Parallel pages (default 2) |
+| `SCAN_RUN_CONCURRENCY` | worker | Scans run at once per worker (default 1) |
 | `SCANNER_USER_AGENT` | worker | e.g. `PRODUCT_NAMEBot/1.0 (+https://example.com/bot)` |
 | `FREE_CHECK_DAILY_CAP` | api | Global daily cap for free checks (default 300) |
 | `ENCRYPTION_KEY` | api, worker | AES-256-GCM key for encrypting webhook URLs and API secrets at rest |
@@ -686,7 +687,7 @@ The free-checker result is rendered client-side from the API; everything else is
 
 | Queue | Payload | Trigger | Concurrency | Retries | Timeout |
 | --- | --- | --- | --- | --- | --- |
-| `scan.run` | `{scanId}` | Scan now, scheduler, onboarding, API | 1 scan at a time per worker; `SCANNER_CONCURRENCY` pages in parallel inside it | 2 (backoff 5 min) | 25 min |
+| `scan.run` | `{scanId}` | Scan now, scheduler, onboarding, API | `SCAN_RUN_CONCURRENCY` scans at a time per worker (default 1); `SCANNER_CONCURRENCY` pages in parallel inside each | 2 (backoff 5 min) | 25 min |
 | `scan.process` | `{scanId}` | End of `scan.run` | 2 | 3 | 5 min |
 | `issue.recheck` | `{issueId}` | Recheck button | 1 | 1 | 5 min |
 | `scan.schedule` (cron, every 10 min) | — | Cron | 1 | — | — | Enqueues `scan.run` for sites with `next_scan_at <= now()`, verified, org not read-only; spreads load (max 20 per tick) |

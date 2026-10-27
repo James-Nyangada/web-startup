@@ -234,10 +234,10 @@ export async function enqueueWebhookDeliver(
  * Registers a worker for every queue.
  */
 export async function registerWorkers(boss: PgBoss, ctx: WorkerContext): Promise<void> {
-  // Concurrency 1 for scan.run
+  // SCAN_RUN_CONCURRENCY scans at once (default 1); each opens its own browser.
   await boss.work<ScanJobPayload>(
     QUEUE_SCAN_RUN,
-    { localConcurrency: 1, batchSize: 1 },
+    { localConcurrency: ctx.scanRunConcurrency ?? 1, batchSize: 1 },
     async (jobs) => {
       const job = jobs[0];
       if (job?.data?.scanId) {
