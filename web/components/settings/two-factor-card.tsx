@@ -20,6 +20,27 @@ function errorText(err: unknown, fallback: string): string {
   return fallback;
 }
 
+function downloadCodes(codes: string[]) {
+  const text = [
+    "EveryVisitor recovery codes",
+    `Generated: ${new Date().toLocaleString()}`,
+    "",
+    "Each code can be used once if you lose access to your authenticator app.",
+    "Keep this file somewhere safe.",
+    "",
+    ...codes,
+    "",
+  ].join("\n");
+  const url = URL.createObjectURL(new Blob([text], { type: "text/plain" }));
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "everyvisitor-recovery-codes.txt";
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
 function RecoveryCodes({ codes, onDone }: { codes: string[]; onDone: () => void }) {
   return (
     <div className="flex flex-col gap-3 rounded-xl border border-line bg-subtle p-4">
@@ -35,6 +56,9 @@ function RecoveryCodes({ codes, onDone }: { codes: string[]; onDone: () => void 
       <div className="flex gap-2">
         <button type="button" className={ghostBtn} onClick={() => void navigator.clipboard?.writeText(codes.join("\n"))}>
           Copy codes
+        </button>
+        <button type="button" className={ghostBtn} onClick={() => downloadCodes(codes)}>
+          Download .txt
         </button>
         <button type="button" className={primaryBtn} onClick={onDone}>
           I&apos;ve saved them
