@@ -449,7 +449,7 @@ export default function BillingSettingsPage() {
                       : billingStatus === "past_due"
                         ? "bg-warn/10 text-warn"
                         : billingStatus === "canceled"
-                          ? "bg-danger/10 text-danger"
+                          ? "bg-crit/10 text-crit"
                           : "bg-primary/10 text-primary"
                   }`}
                 >
@@ -659,7 +659,7 @@ export default function BillingSettingsPage() {
               <button
                 type="button"
                 onClick={() => setCancelModalOpen(true)}
-                className="ease-ui rounded-full border border-danger/30 px-4 py-2 text-xs font-semibold text-danger hover:bg-danger/10 cursor-pointer"
+                className="ease-ui rounded-full border border-crit/30 px-4 py-2 text-xs font-semibold text-crit hover:bg-crit/10 cursor-pointer"
               >
                 Cancel subscription
               </button>
@@ -1075,7 +1075,7 @@ export default function BillingSettingsPage() {
                 type="button"
                 disabled={actionLoading}
                 onClick={handleCancelSubscription}
-                className="ease-ui rounded-full bg-danger px-4 py-2 text-xs font-semibold text-on-primary hover:bg-danger/90 cursor-pointer shadow-card"
+                className="ease-ui rounded-full bg-crit px-4 py-2 text-xs font-semibold text-white hover:bg-crit/90 cursor-pointer shadow-card"
               >
                 {actionLoading ? "Canceling..." : "Confirm cancellation"}
               </button>

@@ -8,6 +8,15 @@ import { useToast } from "@/components/shell/toast-context";
 import { formatMoney, staffApi, type StaffOrgDetail } from "@/lib/admin-api";
 
 const PLANS = ["trial", "store", "growth", "agency", "agency_pro"];
+const CANCEL_REASONS: Record<string, string> = {
+  too_expensive: "Too expensive / reduced budget",
+  missing_features: "Missing features they need",
+  fixed_issues: "Fixed accessibility issues / project completed",
+  hard_to_use: "Hard to use / steep learning curve",
+  switched_tool: "Switched to another tool",
+  other: "Other reason",
+  unspecified: "No reason given",
+};
 const label = (s: string) => s.replace(/_/g, " ").replace(/^\w/, (c) => c.toUpperCase());
 
 function Section({ title, children, count }: { title: string; count?: number; children: React.ReactNode }) {
@@ -196,7 +205,18 @@ export default function StaffOrgDetailPage() {
                     <span className="ml-2 text-xs text-muted">
                       {formatDate(e.createdAt, true)} · {e.actorType}
                     </span>
-                    {typeof e.data?.reason === "string" && <span className="block text-xs text-muted">“{e.data.reason}”</span>}
+                    {e.action === "billing.subscription_cancelled" ? (
+                      <span className="mt-1 block rounded-lg bg-subtle px-3 py-2 text-xs">
+                        <span className="block font-semibold">
+                          Reason: {CANCEL_REASONS[String(e.data?.reason)] ?? String(e.data?.reason ?? "No reason given")}
+                        </span>
+                        {typeof e.data?.feedback === "string" && e.data.feedback && (
+                          <span className="mt-1 block text-muted">“{e.data.feedback}”</span>
+                        )}
+                      </span>
+                    ) : (
+                      typeof e.data?.reason === "string" && <span className="block text-xs text-muted">“{e.data.reason}”</span>
+                    )}
                   </li>
                 ))}
                 {detail.billingEvents.length === 0 && <li className="px-5 py-3 text-sm text-muted">No events.</li>}

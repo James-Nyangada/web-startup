@@ -31,12 +31,22 @@ export function TurnstileWidget({ onVerify, onError, className = "" }: Turnstile
   const containerRef = useRef<HTMLDivElement>(null);
   const widgetIdRef = useRef<string | null>(null);
 
+  // Callers pass inline arrows, so keep the latest handlers in refs. Putting them in the
+  // effect deps would tear down and re-render the widget on every parent render (the
+  // endless "Verifying…" loop), since setting the token re-renders the parent.
+  const onVerifyRef = useRef(onVerify);
+  const onErrorRef = useRef(onError);
+  useEffect(() => {
+    onVerifyRef.current = onVerify;
+    onErrorRef.current = onError;
+  });
+
   useEffect(() => {
     const siteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY;
 
     // In local development or if sitekey is absent, auto-verify with dummy token
     if (!siteKey) {
-      onVerify("dev-token-bypass");
+      onVerifyRef.current("dev-token-bypass");
       return;
     }
 
@@ -51,15 +61,15 @@ export function TurnstileWidget({ onVerify, onError, className = "" }: Turnstile
         widgetIdRef.current = window.turnstile.render(containerRef.current, {
           sitekey: siteKey,
           callback: (token: string) => {
-            if (!isCancelled) onVerify(token);
+            if (!isCancelled) onVerifyRef.current(token);
           },
           "error-callback": (err) => {
-            if (!isCancelled && onError) onError(err);
+            if (!isCancelled) onErrorRef.current?.(err);
           },
           theme: "auto",
         });
       } catch (e) {
-        if (!isCancelled && onError) onError(e);
+        if (!isCancelled) onErrorRef.current?.(e);
       }
     };
 
@@ -88,7 +98,7 @@ export function TurnstileWidget({ onVerify, onError, className = "" }: Turnstile
         clearInterval(checkInterval);
         // Fallback after 4s timeout so users are never permanently blocked
         if (!isCancelled && !widgetIdRef.current) {
-          onVerify("timeout-token-bypass");
+          onVerifyRef.current("timeout-token-bypass");
         }
       }, 4000);
 
@@ -108,7 +118,7 @@ export function TurnstileWidget({ onVerify, onError, className = "" }: Turnstile
         window.turnstile.remove(widgetIdRef.current);
       }
     };
-  }, [onVerify, onError]);
+  }, []);
 
   return (
     <div
