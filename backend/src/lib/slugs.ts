@@ -27,6 +27,7 @@ export const RESERVED_SLUGS = new Set([
   'bot',
   'changelog',
   'check',
+  'checkout',
   'developers',
   'docs',
   'fix',

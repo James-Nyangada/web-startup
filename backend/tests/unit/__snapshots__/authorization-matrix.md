@@ -101,6 +101,7 @@ users of another org get 404, staff impersonation is read-only (writes 403).
 | POST | `…/reports/:id/send` | member |
 | GET | `…/billing/` | owner |
 | POST | `…/billing/checkout` | owner |
+| POST | `…/billing/sync` | owner |
 | POST | `…/billing/change-plan` | owner |
 | POST | `…/billing/cancel` | owner |
 | POST | `…/billing/resume` | owner |

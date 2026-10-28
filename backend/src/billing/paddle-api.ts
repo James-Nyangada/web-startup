@@ -1,6 +1,7 @@
 import { logger } from '../lib/logger.js';
 import { AppError } from '../lib/app-error.js';
 import { ErrorCode } from '../shared/errors.js';
+import type { PaddleEventData } from './paddle.js';
 
 export interface PaddleClientOptions {
   apiKey?: string;
@@ -220,6 +221,18 @@ export class PaddleClient {
       );
       return { url: fallbackUrl };
     }
+  }
+
+  /** Reads a transaction straight from Paddle (raw Paddle payload, snake_case). */
+  async getTransaction(transactionId: string): Promise<PaddleEventData | null> {
+    if (!this.isConfigured()) return null;
+    return this.request<PaddleEventData>('GET', `/transactions/${transactionId}`);
+  }
+
+  /** Reads a subscription straight from Paddle (raw Paddle payload, snake_case). */
+  async getSubscriptionRaw(subscriptionId: string): Promise<PaddleEventData | null> {
+    if (!this.isConfigured()) return null;
+    return this.request<PaddleEventData>('GET', `/subscriptions/${subscriptionId}`);
   }
 
   private async request<T>(

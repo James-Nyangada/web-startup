@@ -187,13 +187,22 @@ export default function BillingSettingsPage() {
         customData: checkoutSettings.customData,
         paddleEnvironment: checkoutSettings.paddleEnvironment,
         clientToken: checkoutSettings.clientToken,
-        onSuccess: async () => {
+        onSuccess: async ({ transactionId }) => {
           setChangePlanOpen(false);
           showToast("Payment received. Activating your plan…", { type: "info" });
-          // The plan is switched by Paddle's webhook, which lands a moment after checkout.
+          // Ask the backend to apply the payment now; Paddle's webhook may land later.
+          // Paddle can take a moment to attach the subscription, so retry briefly.
+          for (let i = 0; transactionId && i < 8; i++) {
+            try {
+              const r = transactionId ? await appApi.syncCheckout(orgSlug, transactionId) : null;
+              if (r?.synced) break;
+            } catch {
+              // Fall through to polling below
+            }
+            await new Promise((res) => setTimeout(res, 1500));
+          }
           const before = billing.plan;
-          for (let i = 0; i < 10; i++) {
-            await new Promise((r) => setTimeout(r, 2000));
+          for (let i = 0; i < 5; i++) {
             const res = await appApi.getBilling(orgSlug).catch(() => null);
             if (res) {
               setBilling(res);
@@ -202,9 +211,10 @@ export default function BillingSettingsPage() {
                 return;
               }
             }
+            await new Promise((r) => setTimeout(r, 2000));
           }
           showToast(
-            "Payment received, but your plan hasn't updated yet. Refresh in a minute.",
+            "Payment received, but your plan hasn't updated yet. Contact support if it doesn't appear shortly.",
             { type: "warning" },
           );
         },

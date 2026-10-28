@@ -249,6 +249,7 @@ export async function processPaddleEvent(
 
         if (targetOrgId) {
           const orgIdScoped = asOrgId(targetOrgId);
+          const priorSub = await repos.subscriptions.findByPaddleSubscriptionId(subId);
           await repos.subscriptions.upsert({
             orgId: orgIdScoped,
             paddleSubscriptionId: subId,
@@ -285,6 +286,29 @@ export async function processPaddleEvent(
               isReplay: options?.isReplay ?? false,
             },
           });
+
+          // Confirm the purchase by email once. The in-app sync and the webhook both land here,
+          // so only the first one to see this subscription/plan sends it.
+          if (!priorSub || priorSub.plan !== planInfo.plan) {
+            try {
+              const owner = await repos.memberships.findOwner(orgIdScoped);
+              const org = await repos.organizations.findById(orgIdScoped);
+              if (owner?.email && org) {
+                const appUrl = options?.appUrl || process.env.APP_URL || 'http://localhost:3000';
+                await dispatchEmail(options, owner.email, 'E-19', {
+                  orgName: org.name,
+                  oldPlanName: priorSub?.plan
+                    ? getPlanDefinition(priorSub.plan as PlanType).name
+                    : undefined,
+                  newPlanName: getPlanDefinition(planInfo.plan).name,
+                  interval: planInfo.interval as 'month' | 'year',
+                  billingUrl: `${appUrl}/settings/billing`,
+                });
+              }
+            } catch (err) {
+              logger.error({ err, eventId }, 'Failed to send plan activation email');
+            }
+          }
 
           // Record compliance evidence event for all sites (P5-01)
           if (repos.evidenceEvents?.record) {

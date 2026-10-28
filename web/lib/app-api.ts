@@ -543,6 +543,13 @@ export const appApi = {
   ) =>
     apiClient<ApiCheckoutSettings>(`/v1/orgs/${org}/billing/checkout`, json(params)),
 
+  /** Applies a just-completed checkout right away instead of waiting for Paddle's webhook. */
+  syncCheckout: (org: string, transactionId: string) =>
+    apiClient<{ synced: boolean; pending?: boolean; plan?: string | null }>(
+      `/v1/orgs/${org}/billing/sync`,
+      json({ transactionId }),
+    ),
+
   previewPlanChange: (
     org: string,
     params: { plan: string; interval?: 'month' | 'year' },

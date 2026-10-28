@@ -1126,7 +1126,7 @@ export function orgsRouter(
   );
 
   // Mount Section 7.9 Billing router under orgScoped
-  orgScoped.use('/billing', orgBillingRouter(repos, paddleClient));
+  orgScoped.use('/billing', orgBillingRouter(repos, paddleClient, { boss: scansOptions?.boss, emailSender }));
 
   // Mount Section 7.9 Invoices router under orgScoped
   orgScoped.use('/invoices', orgInvoicesRouter(repos));

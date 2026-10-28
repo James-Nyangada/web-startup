@@ -54,9 +54,15 @@ const PLAN_TIER_RANK: Record<string, number> = {
   agency_pro: 4,
 };
 
+export interface OrgBillingRouterOptions {
+  boss?: PgBoss;
+  emailSender?: EmailSender;
+}
+
 export function orgBillingRouter(
   repos: Repositories,
   paddleClient: PaddleClient = defaultPaddleClient,
+  options: OrgBillingRouterOptions = {},
 ): Router {
   const router = Router({ mergeParams: true });
   // All billing routes are owner-only per Spec Section 7.9
@@ -191,6 +197,73 @@ export function orgBillingRouter(
         clientToken,
       },
     });
+  });
+
+  // POST /v1/orgs/:orgId/billing/sync - Apply a just-completed checkout without waiting for the
+  // webhook. Reads the transaction from Paddle itself, so the client is never trusted for the
+  // plan; it must belong to this org. The webhook that follows is idempotent.
+  router.post('/sync', async (req: Request, res: Response): Promise<void> => {
+    const parse = z.object({ transactionId: z.string().min(1) }).safeParse(req.body);
+    if (!parse.success) {
+      res.status(400).json({ error: { code: 'VALIDATION_ERROR', message: 'transactionId is required' } });
+      return;
+    }
+    if (!paddleClient.isConfigured()) {
+      res.status(503).json({ error: { code: 'BILLING_UNAVAILABLE', message: 'Billing is not configured' } });
+      return;
+    }
+
+    const txn = await paddleClient.getTransaction(parse.data.transactionId);
+    const txnOrgId = txn?.custom_data?.orgId ?? txn?.custom_data?.org_id;
+    if (!txn || txnOrgId !== req.orgId) {
+      res.status(404).json({ error: { code: 'NOT_FOUND', message: 'Transaction not found' } });
+      return;
+    }
+
+    const subscriptionId = (txn as { subscription_id?: string | null }).subscription_id;
+    if (!subscriptionId || !['completed', 'paid', 'billed'].includes(String(txn.status))) {
+      // Paddle has not attached the subscription yet; the client retries shortly.
+      res.status(202).json({ data: { synced: false, pending: true } });
+      return;
+    }
+
+    const sub = await paddleClient.getSubscriptionRaw(subscriptionId);
+    if (!sub) {
+      res.status(202).json({ data: { synced: false, pending: true } });
+      return;
+    }
+
+    const processOpts = {
+      isReplay: true,
+      boss: options.boss,
+      emailSender: options.emailSender,
+      appUrl: process.env.APP_URL,
+    };
+    const occurredAt = new Date().toISOString();
+    const orgData = { custom_data: { orgId: req.orgId } };
+    await processPaddleEvent(
+      {
+        event_id: `sync_${subscriptionId}`,
+        event_type: 'subscription.activated',
+        occurred_at: occurredAt,
+        data: { ...sub, ...orgData },
+      },
+      repos,
+      processOpts,
+    );
+    await processPaddleEvent(
+      {
+        event_id: `sync_${txn.id}`,
+        event_type: 'transaction.completed',
+        occurred_at: occurredAt,
+        data: { ...txn, ...orgData },
+      },
+      repos,
+      processOpts,
+    );
+
+    const org = await repos.organizations.findById(req.orgId!);
+    res.status(200).json({ data: { synced: true, plan: org?.plan ?? null } });
   });
 
   // POST /v1/orgs/:orgId/billing/change-plan - Upgrade or Downgrade plan

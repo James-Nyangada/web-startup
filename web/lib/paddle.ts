@@ -13,7 +13,7 @@ export interface PaddleCheckoutConfig {
   customData?: Record<string, unknown>;
   paddleEnvironment?: string;
   clientToken?: string;
-  onSuccess?: () => void;
+  onSuccess?: (info: { transactionId?: string }) => void;
   onClose?: () => void;
 }
 
@@ -63,7 +63,7 @@ export async function openPaddleCheckout(config: PaddleCheckoutConfig): Promise<
           token,
           eventCallback: (data: any) => {
             if (data?.name === "checkout.completed") {
-              config.onSuccess?.();
+              config.onSuccess?.({ transactionId: data?.data?.transaction_id });
             } else if (data?.name === "checkout.closed") {
               config.onClose?.();
             }
@@ -123,7 +123,7 @@ export async function openPaddleCheckout(config: PaddleCheckoutConfig): Promise<
       }),
     });
 
-    config.onSuccess?.();
+    config.onSuccess?.({});
   } catch (err) {
     console.error("Sandbox simulation error:", err);
     config.onClose?.();
