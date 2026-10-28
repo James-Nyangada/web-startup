@@ -3,7 +3,7 @@ import type { Platform } from '../scanner/types.js';
 import { ErrorCode } from '../shared/errors.js';
 import { GeminiAdapter } from './gemini-adapter.js';
 import type { AiProvider } from './provider.js';
-import { computeCacheKey, scrubHtmlSnippet, validateAiOutput } from './scrubber.js';
+import { aiCacheScope, computeCacheKey, scrubHtmlSnippet, validateAiOutput } from './scrubber.js';
 
 export interface AiServiceOptions {
   monthlyCap?: number;
@@ -19,6 +19,7 @@ export interface GetAiSuggestionParams {
   ruleDescription?: string | null;
   wcagCriteria?: string[] | null;
   platform: string;
+  framework?: string | null;
   htmlSnippet: string;
   failureSummary?: string | null;
 }
@@ -83,7 +84,8 @@ export class AiService {
     // 2. Normalize and compute cache key
     const scrubbedSnippet = scrubHtmlSnippet(params.htmlSnippet || '');
     const platform = (params.platform || 'generic').toLowerCase() as Platform;
-    const cacheKey = computeCacheKey(params.ruleId, platform, scrubbedSnippet);
+    const cacheScope = aiCacheScope(platform, params.framework);
+    const cacheKey = computeCacheKey(params.ruleId, cacheScope, scrubbedSnippet);
 
     // 3. Cache lookup
     const cached = await this.repos.aiSuggestions.findByCacheKey(cacheKey);
@@ -126,6 +128,7 @@ export class AiService {
       ruleDescription: params.ruleDescription,
       wcagCriteria: params.wcagCriteria,
       platform,
+      framework: params.framework,
       snippet: scrubbedSnippet,
       failureSummary: params.failureSummary,
     });
@@ -147,7 +150,7 @@ export class AiService {
     await this.repos.aiSuggestions.create({
       cacheKey,
       ruleId: params.ruleId,
-      platform,
+      platform: cacheScope as Platform,
       suggestionMd: validation.markdown,
       model: providerResponse.model,
       tokensIn: providerResponse.tokensIn,

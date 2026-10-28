@@ -16,6 +16,7 @@ import { originCheck } from './middleware/csrf.js';
 import { authRouter } from './routes/auth.js';
 import { healthRouter } from './routes/health.js';
 import { meRouter } from './routes/me.js';
+import { mfaRouter } from './routes/mfa.js';
 import { orgsRouter } from './routes/orgs.js';
 import { detectPlatformRouter } from './routes/sites.js';
 import { waitlistRouter } from './routes/public/waitlist.js';
@@ -188,6 +189,7 @@ export function createApp({
   });
   v1.use('/auth', authRouter(auth, verifyTurnstile, config));
   v1.use('/me', meRouter(auth, repos, { boss: scansOptions?.boss, storage, emailSender }));
+  v1.use('/mfa', mfaRouter(auth, repos, { appUrl: config.APP_URL }));
   v1.use('/orgs', orgsRouter(auth, repos, scansOptions, emailSender, storage, paddleClient));
   v1.use('/invitations', invitationsRouter(repos, auth));
   v1.use('/sites', detectPlatformRouter(auth));

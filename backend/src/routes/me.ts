@@ -61,7 +61,21 @@ const changePasswordSchema = z.object({
 
 export function meRouter(auth: Auth, repos: Repositories, options: MeRouterOptions = {}): Router {
   const router = Router();
-  router.use(requireAuth(auth));
+  router.use(requireAuth(auth, { allowMfaPending: true }));
+  // Only the profile read is open to a session that still owes its second factor.
+  router.use((req, res, next) => {
+    if (req.auth!.session.mfaPending && !(req.method === 'GET' && req.path === '/')) {
+      res.status(403).json({
+        error: {
+          code: ErrorCode.MFA_REQUIRED,
+          message: 'Two-step verification is required to continue.',
+          details: {},
+        },
+      });
+      return;
+    }
+    next();
+  });
 
   // GET /v1/me
   router.get('/', async (req: Request, res: Response): Promise<void> => {
@@ -121,6 +135,7 @@ export function meRouter(auth: Auth, repos: Repositories, options: MeRouterOptio
         clientAccess,
         activeOrg,
         impersonation,
+        mfaPending: Boolean(req.auth!.session.mfaPending),
       },
     });
   });

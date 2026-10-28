@@ -84,6 +84,7 @@ describe('Sites API (Chunk P2-06 & Section 7.3)', () => {
     name: 'Oakhaus Furniture',
     rootUrl: 'https://oakhaus.com',
     platform: 'shopify' as const,
+    framework: null,
     clientName: 'Mark Otieno',
     status: 'active' as const,
     verifyMethod: null,

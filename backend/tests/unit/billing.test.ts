@@ -323,6 +323,7 @@ describe('Chunk P4-02: Billing and Paddle Checkout', () => {
         isStaff: false,
         totpSecretEncrypted: null,
         totpEnabledAt: null,
+        lastMfaAt: null,
         lastActiveOrgId: null,
         createdAt: new Date(),
         updatedAt: new Date(),

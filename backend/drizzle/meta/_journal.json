@@ -148,6 +148,20 @@
       "when": 1792871448020,
       "tag": "0020_report_paper",
       "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1793178896741,
+      "tag": "0021_site_framework",
+      "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1793180304587,
+      "tag": "0022_user_mfa",
+      "breakpoints": true
     }
   ]
 }

@@ -32,21 +32,73 @@ const PLATFORMS = ["Shopify", "WordPress", "Generic"] as const;
 type Platform = (typeof PLATFORMS)[number];
 type AiState = "none" | "gen" | "ready" | "reported" | "cap_reached" | "error";
 
+const AI_LANG_LABELS: Record<string, string> = {
+  tsx: "TSX",
+  jsx: "JSX",
+  html: "HTML",
+  vue: "Vue",
+  svelte: "Svelte",
+  astro: "Astro",
+  blade: "Blade",
+  twig: "Twig",
+  django: "Django",
+  erb: "ERB",
+  cshtml: "Razor",
+  php: "PHP",
+  liquid: "Liquid",
+  handlebars: "Handlebars",
+};
+
 function parseAiSuggestion(markdown: string) {
   const codeBlockRegex = /```([a-zA-Z0-9_-]*)\n([\s\S]+?)\n```/;
   const match = codeBlockRegex.exec(markdown);
   if (!match) {
-    return { prose: markdown, code: null, lang: "HTML" };
+    return { before: markdown, after: "", code: null, lang: "HTML" };
   }
   const [fullMatch, detectedLang, extractedCode] = match;
   const parts = markdown.split(fullMatch);
-  const before = parts[0]?.trim() || "";
-  const after = parts[1]?.trim() || "";
-  const prose = [before, after].filter(Boolean).join("\n\n");
-  const normalizedLang = detectedLang
-    ? detectedLang.charAt(0).toUpperCase() + detectedLang.slice(1).toLowerCase()
-    : "HTML";
-  return { prose, code: extractedCode.trim(), lang: normalizedLang };
+  const key = (detectedLang ?? "").toLowerCase();
+  const lang = AI_LANG_LABELS[key] ?? (key ? key.charAt(0).toUpperCase() + key.slice(1) : "HTML");
+  return {
+    before: parts[0]?.trim() || "",
+    after: parts[1]?.trim() || "",
+    code: extractedCode.trim(),
+    lang,
+  };
+}
+
+/** Renders `**Label:** text` paragraphs and `inline code` from the AI answer. */
+function AiProse({ text }: { text: string }) {
+  const paragraphs = text.split(/\n{2,}/).filter(Boolean);
+  const inline = (value: string) =>
+    value.split(/(`[^`]+`)/g).map((part, i) =>
+      part.startsWith("`") && part.endsWith("`") && part.length > 2 ? (
+        <code key={i} className="rounded bg-sunk px-1 py-0.5 font-mono text-[12px]">
+          {part.slice(1, -1)}
+        </code>
+      ) : (
+        part
+      ),
+    );
+  return (
+    <div className="flex flex-col gap-2">
+      {paragraphs.map((paragraph, i) => {
+        const labelled = /^\*\*([^*]+?):?\*\*:?\s*([\s\S]*)$/.exec(paragraph);
+        return (
+          <p key={i} className="m-0 text-sm leading-5 text-pretty text-ink">
+            {labelled ? (
+              <>
+                <span className="font-semibold">{labelled[1]}: </span>
+                {inline(labelled[2] ?? "")}
+              </>
+            ) : (
+              inline(paragraph)
+            )}
+          </p>
+        );
+      })}
+    </div>
+  );
 }
 
 const SECONDARY_SM =
@@ -701,11 +753,7 @@ export function IssueDetailContent({
                     const parsed = parseAiSuggestion(aiSuggestion);
                     return (
                       <>
-                        {parsed.prose && (
-                          <p role="status" className="m-0 text-sm leading-5 text-pretty text-ink">
-                            {parsed.prose}
-                          </p>
-                        )}
+                        {parsed.before && <AiProse text={parsed.before} />}
                         {parsed.code ? (
                           <CodeSnippet
                             code={parsed.code}
@@ -717,6 +765,7 @@ export function IssueDetailContent({
                             {aiSuggestion}
                           </pre>
                         )}
+                        {parsed.after && <AiProse text={parsed.after} />}
                       </>
                     );
                   })()}

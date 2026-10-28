@@ -1,6 +1,7 @@
 import { betterAuth } from 'better-auth';
 import { drizzleAdapter } from 'better-auth/adapters/drizzle';
 import { magicLink } from 'better-auth/plugins';
+import { eq } from 'drizzle-orm';
 import type { Database } from '../db/client.js';
 import * as schema from '../db/schema/index.js';
 import { newId } from './ids.js';
@@ -37,11 +38,42 @@ export const SESSION_IDLE_TIMEOUT_SECONDS = 30 * 60;
 /** Activity slides the expiry forward at most once a minute, to spare the database. */
 const SESSION_REFRESH_INTERVAL_SECONDS = 60;
 
+/** After a second-factor check the user is not asked again for this long. */
+export const MFA_TRUST_WINDOW_MS = 24 * 60 * 60 * 1000;
+
+/** True when a new session must pass a second factor: they have one set up and none in 24 hours. */
+async function sessionNeedsMfa(db: Database, userId: string): Promise<boolean> {
+  const [mfa] = await db
+    .select({ totpEnabledAt: schema.userMfa.totpEnabledAt })
+    .from(schema.userMfa)
+    .where(eq(schema.userMfa.userId, userId))
+    .limit(1);
+  let enabled = Boolean(mfa?.totpEnabledAt);
+  if (!enabled) {
+    const [passkey] = await db
+      .select({ id: schema.userPasskeys.id })
+      .from(schema.userPasskeys)
+      .where(eq(schema.userPasskeys.userId, userId))
+      .limit(1);
+    enabled = Boolean(passkey);
+  }
+  if (!enabled) return false;
+  const [user] = await db
+    .select({ lastMfaAt: schema.users.lastMfaAt })
+    .from(schema.users)
+    .where(eq(schema.users.id, userId))
+    .limit(1);
+  return !user?.lastMfaAt || Date.now() - user.lastMfaAt.getTime() > MFA_TRUST_WINDOW_MS;
+}
+
 export function createAuth(db: Database, options: CreateAuthOptions) {
   return betterAuth({
     session: {
       expiresIn: SESSION_IDLE_TIMEOUT_SECONDS,
       updateAge: SESSION_REFRESH_INTERVAL_SECONDS,
+      additionalFields: {
+        mfaPending: { type: 'boolean', required: false, input: false },
+      },
     },
     database: drizzleAdapter(db, {
       provider: 'pg',
@@ -61,6 +93,15 @@ export function createAuth(db: Database, options: CreateAuthOptions) {
       },
     },
     databaseHooks: {
+      session: {
+        // Every way of signing in (password, magic link, Google) passes through here, so this is
+        // where a session is marked as still owing its second factor.
+        create: {
+          before: async (session) => ({
+            data: { ...session, mfaPending: await sessionNeedsMfa(db, session.userId) },
+          }),
+        },
+      },
       user: {
         // Keep email_verified_at in step with Better Auth's boolean (sign-up via Google, link click).
         create: {

@@ -334,6 +334,7 @@ describe('Plan Limits & Enforcement (Chunk P4-01 & Section 1.4 / 12.3)', () => {
         isStaff: false,
         totpSecretEncrypted: null,
         totpEnabledAt: null,
+        lastMfaAt: null,
         emailVerified: true,
         createdAt: new Date(),
         updatedAt: new Date(),

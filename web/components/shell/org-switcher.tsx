@@ -15,9 +15,41 @@ export interface OrgItem {
   type: "agency" | "store";
   sitesCount: number;
   initials: string;
+  logoUrl?: string | null;
   isCurrent?: boolean;
 }
 
+
+/** Org mark: the uploaded logo when there is one (falling back to initials if it fails to load). */
+function OrgMark({
+  org,
+  className,
+}: {
+  org: OrgItem;
+  className: string;
+}) {
+  const [failed, setFailed] = useState(false);
+  useEffect(() => setFailed(false), [org.logoUrl]);
+
+  if (org.logoUrl && !failed) {
+    return (
+      <span aria-hidden="true" className={`${className} overflow-hidden bg-white border border-line flex-none`}>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={org.logoUrl}
+          alt=""
+          onError={() => setFailed(true)}
+          className="size-full object-contain"
+        />
+      </span>
+    );
+  }
+  return (
+    <span aria-hidden="true" className={`${className} bg-primary font-bold text-on-primary flex-none`}>
+      {org.initials}
+    </span>
+  );
+}
 
 export function OrgSwitcher({
   variant = "topbar",
@@ -48,6 +80,9 @@ export function OrgSwitcher({
           type: m.org.type,
           sitesCount: 0,
           initials: initials(m.org.name) ?? "?",
+          logoUrl: m.org.hasLogo
+            ? `/v1/orgs/${m.org.slug}/branding/logo/light?v=${m.org.logoVersion ?? 0}`
+            : null,
           isCurrent: false,
         }));
         const current =
@@ -109,9 +144,7 @@ export function OrgSwitcher({
           aria-haspopup="true"
           className="ease-ui flex w-full items-center gap-3 rounded-2xl border border-line bg-surface p-2 pr-3 text-left text-ink hover:border-line-strong focus-visible:outline-2 focus-visible:outline-primary"
         >
-          <span aria-hidden="true" className="grid size-8 place-items-center rounded-md bg-primary text-[13px] font-bold text-on-primary">
-            {currentOrg.initials}
-          </span>
+          <OrgMark org={currentOrg} className="grid size-8 place-items-center rounded-md text-[13px]" />
           <span className="flex min-w-0 flex-1 flex-col">
             <span className="truncate text-sm leading-5 font-semibold">{currentOrg.name}</span>
             <span className="truncate text-xs leading-4 text-muted">
@@ -141,9 +174,7 @@ export function OrgSwitcher({
                   o.isCurrent ? "bg-primary-soft font-semibold text-ptext" : "hover:bg-subtle text-ink"
                 }`}
               >
-                <span className="grid size-6 place-items-center rounded bg-primary/20 text-xs font-bold text-primary">
-                  {o.initials}
-                </span>
+                <OrgMark org={o} className="grid size-6 place-items-center rounded text-xs" />
                 <span className="flex-1 truncate">{o.name}</span>
                 {o.isCurrent && <Icon d={I.check} size={16} className="text-primary" />}
               </button>
@@ -174,9 +205,7 @@ export function OrgSwitcher({
         aria-haspopup="true"
         className="ease-ui flex h-9 items-center gap-2 rounded-full border border-line bg-surface px-2.5 text-left text-ink hover:border-line-strong focus-visible:outline-2 focus-visible:outline-primary max-w-[200px] sm:max-w-[240px]"
       >
-        <span aria-hidden="true" className="grid size-5.5 place-items-center rounded bg-primary text-[11px] font-bold text-on-primary flex-none">
-          {currentOrg.initials}
-        </span>
+        <OrgMark org={currentOrg} className="grid size-5.5 place-items-center rounded text-[11px]" />
         <span className="truncate text-xs font-semibold sm:text-sm">{currentOrg.name}</span>
         <span className="sr-only">, switch organisation</span>
         <Icon d={I.chevronsUpDown} size={14} className="text-muted flex-none" />
@@ -201,9 +230,7 @@ export function OrgSwitcher({
                 o.isCurrent ? "bg-primary-soft font-semibold text-ptext" : "hover:bg-subtle text-ink"
               }`}
             >
-              <span className="grid size-6 place-items-center rounded bg-primary/20 text-xs font-bold text-primary flex-none">
-                {o.initials}
-              </span>
+              <OrgMark org={o} className="grid size-6 place-items-center rounded text-xs" />
               <div className="flex min-w-0 flex-1 flex-col">
                 <span className="truncate">{o.name}</span>
                 <span className="text-[11px] text-muted">

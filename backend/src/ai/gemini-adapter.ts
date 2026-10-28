@@ -1,5 +1,10 @@
 import type { AiProvider, AiSuggestionRequest, AiSuggestionResponse } from './provider.js';
-import { buildAiPrompt, scrubHtmlSnippet, validateAiOutput } from './scrubber.js';
+import {
+  buildAiPrompt,
+  resolveStackProfile,
+  scrubHtmlSnippet,
+  validateAiOutput,
+} from './scrubber.js';
 
 export interface GeminiAdapterOptions {
   apiKey?: string;
@@ -31,6 +36,7 @@ export class GeminiAdapter implements AiProvider {
       ruleDescription: request.ruleDescription,
       wcagCriteria: request.wcagCriteria,
       platform: request.platform,
+      framework: request.framework,
       scrubbedSnippet,
       failureSummary: request.failureSummary,
     });
@@ -94,10 +100,7 @@ export class GeminiAdapter implements AiProvider {
     scrubbed: string,
   ): AiSuggestionResponse {
     const rule = request.ruleId.toLowerCase();
-    const platform = request.platform.toLowerCase();
-    let lang = 'html';
-    if (platform === 'shopify') lang = 'liquid';
-    else if (platform === 'wordpress') lang = 'html';
+    const lang = resolveStackProfile(request.platform.toLowerCase(), request.framework).lang;
 
     let codeFix = scrubbed;
     let explanation: string;
@@ -140,7 +143,7 @@ export class GeminiAdapter implements AiProvider {
         'Ensure this interactive element has an accessible name and valid semantic role.';
     }
 
-    const markdown = `${explanation}\n\n\`\`\`${lang}\n${codeFix}\n\`\`\``;
+    const markdown = `**Fix:** ${explanation}\n\n\`\`\`${lang}\n${codeFix}\n\`\`\``;
 
     return {
       markdown,

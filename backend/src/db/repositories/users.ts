@@ -1,6 +1,6 @@
 import { and, eq, isNull, sql } from 'drizzle-orm';
 import type { Database } from '../client.js';
-import { clientAccess, memberships, organizations, sites, users } from '../schema/index.js';
+import { branding, clientAccess, memberships, organizations, sites, users } from '../schema/index.js';
 
 export function usersRepository(db: Database) {
   return {
@@ -58,24 +58,35 @@ export function usersRepository(db: Database) {
             timeZone: organizations.timeZone,
             trialEndsAt: organizations.trialEndsAt,
             updatedAt: organizations.updatedAt,
+            logoKey: branding.logoLightKey,
+            logoDarkKey: branding.logoDarkKey,
+            brandingUpdatedAt: branding.updatedAt,
           },
         })
         .from(memberships)
         .innerJoin(organizations, eq(organizations.id, memberships.orgId))
+        .leftJoin(branding, eq(branding.orgId, organizations.id))
         .where(and(eq(memberships.userId, userId), isNull(organizations.deletedAt)))
         .orderBy(memberships.createdAt);
       // Report the plan the org actually gets, including a live staff override (P6-02).
       const now = Date.now();
-      return rows.map(({ org: { planOverride, planOverrideExpiresAt, ...org }, ...m }) => ({
+      return rows.map(
+        ({
+          org: { planOverride, planOverrideExpiresAt, logoKey, logoDarkKey, brandingUpdatedAt, ...org },
+          ...m
+        }) => ({
         ...m,
         org: {
           ...org,
+          hasLogo: Boolean(logoKey || logoDarkKey),
+          logoVersion: brandingUpdatedAt ? brandingUpdatedAt.getTime() : null,
           plan:
             planOverride && (!planOverrideExpiresAt || planOverrideExpiresAt.getTime() > now)
               ? planOverride
               : org.plan,
         },
-      }));
+      }),
+      );
     },
 
     async listClientAccess(userId: string) {

@@ -5,6 +5,8 @@ import type { Auth } from '../lib/auth.js';
 import { requireAuth } from '../middleware/auth.js';
 import { requireOrgRole } from '../middleware/org.js';
 import { detectPlatform } from '../scanner/platform/detect.js';
+import { detectFramework, type Framework } from '../scanner/platform/framework.js';
+import { refineFramework } from '../scanner/platform/probe-framework.js';
 import { createGuardedFetch } from '../scanner/net/guarded-fetch.js';
 import { rootUrlOf } from '../scanner/url/normalize.js';
 import { PLATFORMS, STANDARDS, type Platform } from '../scanner/types.js';
@@ -105,14 +107,23 @@ export function detectPlatformRouter(auth: Auth): Router {
 
       try {
         const response = await guardedFetch(normalizedRoot);
-        const result = detectPlatform({
-          html: response.text(),
-          headers: response.headers,
-        });
+        const html = response.text();
+        const result = detectPlatform({ html, headers: response.headers });
+        const framework =
+          result.platform === 'custom' || result.platform === 'unknown'
+            ? await refineFramework(
+                detectFramework({ html, headers: response.headers }),
+                html,
+                response.url,
+              )
+            : null;
         res.status(200).json({
           data: {
             platform: result.platform,
             evidence: result.evidence,
+            framework: framework?.framework ?? null,
+            frameworkConfidence: framework?.confidence ?? null,
+            frameworkEvidence: framework?.evidence ?? [],
           },
         });
       } catch {
@@ -233,17 +244,24 @@ export function orgSitesRouter(repos: Repositories): Router {
 
     // Auto-detect platform if omitted or unknown
     let finalPlatform: Platform = platform ?? 'unknown';
-    if (finalPlatform === 'unknown') {
-      try {
-        const probe = await guardedFetch(normalizedRoot);
-        const detected = detectPlatform({
-          html: probe.text(),
-          headers: probe.headers,
-        });
-        finalPlatform = detected.platform;
-      } catch {
-        // Keep as unknown
+    let framework: Framework | null = null;
+    try {
+      const probe = await guardedFetch(normalizedRoot);
+      const html = probe.text();
+      if (finalPlatform === 'unknown') {
+        finalPlatform = detectPlatform({ html, headers: probe.headers }).platform;
       }
+      if (finalPlatform === 'custom' || finalPlatform === 'unknown') {
+        framework = (
+          await refineFramework(
+            detectFramework({ html, headers: probe.headers }),
+            html,
+            probe.url,
+          )
+        ).framework;
+      }
+    } catch {
+      // Keep as unknown
     }
 
     const org = await repos.organizations.findById(req.orgId!);
@@ -251,6 +269,7 @@ export function orgSitesRouter(repos: Repositories): Router {
       name,
       rootUrl: normalizedRoot,
       platform: finalPlatform,
+      framework,
       clientName: clientName ?? null,
       scanFrequency: parse.data.scanFrequency,
       pageLimit: parse.data.pageLimit,

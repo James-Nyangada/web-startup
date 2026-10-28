@@ -15,6 +15,7 @@ import {
 } from 'drizzle-orm';
 import { randomBytes } from 'node:crypto';
 import type { Database } from '../client.js';
+import type { Framework } from '../../scanner/platform/framework.js';
 import type { Platform, Standard } from '../../scanner/types.js';
 import {
   issues,
@@ -51,6 +52,7 @@ export interface CreateSiteInput {
   name: string;
   rootUrl: string;
   platform?: Platform;
+  framework?: Framework | null;
   clientName?: string | null;
   scanFrequency?: ScanFrequency;
   scanDay?: number;
@@ -64,6 +66,7 @@ export interface CreateSiteInput {
 
 export interface UpdateSiteInput {
   name?: string;
+  framework?: Framework | null;
   clientName?: string | null;
   scanFrequency?: ScanFrequency;
   scanDay?: number;
@@ -273,6 +276,7 @@ export function sitesRepository(db: Database) {
           name: input.name,
           rootUrl: input.rootUrl,
           platform: input.platform ?? 'unknown',
+          framework: input.framework ?? null,
           clientName: input.clientName ?? null,
           verifyToken,
           scanFrequency,

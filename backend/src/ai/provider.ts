@@ -4,6 +4,7 @@ export interface AiSuggestionRequest {
   ruleDescription?: string | null;
   wcagCriteria?: string[] | null;
   platform: string;
+  framework?: string | null;
   snippet: string;
   failureSummary?: string | null;
 }

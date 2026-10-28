@@ -47,7 +47,12 @@ async function loadSession(auth: Auth, req: Request, res: Response) {
   return response;
 }
 
-export function requireAuth(auth: Auth) {
+export interface RequireAuthOptions {
+  /** Let a session through that still owes its second factor (the 2FA endpoints and /me). */
+  allowMfaPending?: boolean;
+}
+
+export function requireAuth(auth: Auth, options: RequireAuthOptions = {}) {
   return async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const session = await loadSession(auth, req, res);
@@ -56,6 +61,16 @@ export function requireAuth(auth: Auth) {
           error: {
             code: ErrorCode.UNAUTHENTICATED,
             message: 'You must be signed in to perform this action.',
+            details: {},
+          },
+        });
+        return;
+      }
+      if (session.session.mfaPending && !options.allowMfaPending) {
+        res.status(403).json({
+          error: {
+            code: ErrorCode.MFA_REQUIRED,
+            message: 'Two-step verification is required to continue.',
             details: {},
           },
         });
@@ -88,7 +103,7 @@ export function optionalAuth(auth: Auth) {
   return async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const session = await loadSession(auth, req, res);
-      if (session) {
+      if (session && !session.session.mfaPending) {
         req.auth = session;
       }
       next();

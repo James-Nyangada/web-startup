@@ -28,6 +28,7 @@ import { staffRepository } from './staff.js';
 import { featureFlagsRepository } from './feature-flags.js';
 import { apiKeysRepository } from './api-keys.js';
 import { privacyRepository } from './privacy.js';
+import { mfaRepository } from './mfa.js';
 
 export function createRepositories(db: Database) {
   return {
@@ -60,6 +61,7 @@ export function createRepositories(db: Database) {
     featureFlags: featureFlagsRepository(db),
     apiKeys: apiKeysRepository(db),
     privacy: privacyRepository(db),
+    mfa: mfaRepository(db),
   };
 }
 

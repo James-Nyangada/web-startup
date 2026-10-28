@@ -67,6 +67,7 @@ function createMockAuth() {
     isStaff: false,
     totpSecretEncrypted: null,
     totpEnabledAt: null,
+    lastMfaAt: null,
     lastActiveOrgId: null,
     createdAt: new Date(),
     updatedAt: new Date(),
@@ -444,6 +445,8 @@ describe('profile (/v1/me) endpoints', () => {
           timeZone: 'UTC',
           trialEndsAt: null,
           updatedAt: new Date(),
+          hasLogo: false,
+          logoVersion: null,
         },
       },
     ]);

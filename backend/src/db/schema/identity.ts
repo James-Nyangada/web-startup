@@ -1,8 +1,10 @@
 import { sql } from 'drizzle-orm';
 import {
+  bigint,
   boolean,
   check,
   index,
+  jsonb,
   pgTable,
   text,
   timestamp,
@@ -10,7 +12,7 @@ import {
   uuid,
   type AnyPgColumn,
 } from 'drizzle-orm/pg-core';
-import { citext, id, inList, timestamps } from './columns.js';
+import { citext, createdAt, id, inList, timestamps } from './columns.js';
 import { sites } from './scanning.js';
 
 export const PLANS = ['trial', 'store', 'growth', 'agency', 'agency_pro'] as const;
@@ -46,12 +48,51 @@ export const users = pgTable('users', {
   totpSecretEncrypted: text('totp_secret_encrypted'),
   /** Set once the first code is confirmed; staff sessions require a code from then on. */
   totpEnabledAt: timestamp('totp_enabled_at', { withTimezone: true }),
+  /** When the user last passed a second-factor check; 2FA is skipped for 24 hours after. */
+  lastMfaAt: timestamp('last_mfa_at', { withTimezone: true }),
   lastActiveOrgId: uuid('last_active_org_id').references((): AnyPgColumn => organizations.id, {
     onDelete: 'set null',
   }),
   deletedAt: timestamp('deleted_at', { withTimezone: true }),
   ...timestamps(),
 });
+
+/** A user's own two-step verification (authenticator app + recovery codes). */
+export const userMfa = pgTable('user_mfa', {
+  userId: uuid('user_id')
+    .primaryKey()
+    .references(() => users.id, { onDelete: 'cascade' }),
+  /** AES-GCM encrypted; set while enrolment is pending and kept once confirmed. */
+  totpSecretEncrypted: text('totp_secret_encrypted'),
+  totpEnabledAt: timestamp('totp_enabled_at', { withTimezone: true }),
+  /** SHA-256 hashes of the unused recovery codes. */
+  recoveryCodeHashes: jsonb('recovery_code_hashes').$type<string[]>().notNull().default([]),
+  /** The outstanding WebAuthn challenge for this user, single use. */
+  passkeyChallenge: text('passkey_challenge'),
+  passkeyChallengeExpiresAt: timestamp('passkey_challenge_expires_at', { withTimezone: true }),
+  ...timestamps(),
+});
+
+export const userPasskeys = pgTable(
+  'user_passkeys',
+  {
+    id: id(),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    credentialId: text('credential_id').notNull().unique(),
+    /** COSE public key, base64url. */
+    publicKey: text('public_key').notNull(),
+    counter: bigint('counter', { mode: 'number' }).notNull().default(0),
+    transports: jsonb('transports').$type<string[]>().notNull().default([]),
+    deviceType: text('device_type').notNull().default('singleDevice'),
+    backedUp: boolean('backed_up').notNull().default(false),
+    name: text('name').notNull(),
+    lastUsedAt: timestamp('last_used_at', { withTimezone: true }),
+    createdAt: createdAt(),
+  },
+  (t) => [index('user_passkeys_user_id_idx').on(t.userId)],
+);
 
 export const organizations = pgTable(
   'organizations',
@@ -192,6 +233,8 @@ export const sessions = pgTable(
     expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
     ipAddress: text('ip_address'),
     userAgent: text('user_agent'),
+    /** True while the session still owes a second-factor check; the API refuses it until then. */
+    mfaPending: boolean('mfa_pending').notNull().default(false),
     /** When a staff user passed the TOTP check for this session (P6-01). */
     staffVerifiedAt: timestamp('staff_verified_at', { withTimezone: true }),
     /** Org a staff user is viewing read-only (P6-02). Null when not impersonating. */

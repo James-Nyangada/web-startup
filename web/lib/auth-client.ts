@@ -21,6 +21,8 @@ export interface OrganizationSummary {
   billingStatus?: 'trialing' | 'active' | 'past_due' | 'paused' | 'canceled' | 'read_only';
   trialEndsAt?: string | null;
   updatedAt?: string | null;
+  hasLogo?: boolean;
+  logoVersion?: number | null;
 }
 
 export interface Membership {
@@ -47,6 +49,8 @@ export interface MeResponse {
   activeOrg: OrganizationSummary | null;
   /** Set while a staff user views a customer org read-only (P6-02). */
   impersonation?: { org: { id: string; slug: string | null; name: string } } | null;
+  /** True while the session still owes a second-factor check. */
+  mfaPending?: boolean;
 }
 
 export interface SignUpParams {

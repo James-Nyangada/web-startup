@@ -4,6 +4,7 @@ import React, { Suspense, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { SettingsLayout } from "@/components/settings/settings-layout";
 import { DataExportCard } from "@/components/settings/data-export-card";
+import { TwoFactorCard } from "@/components/settings/two-factor-card";
 import { useToast } from "@/components/shell/toast-context";
 import { Icon, I } from "@/components/icons";
 import { ThemePreferenceRadio } from "@/components/theme";
@@ -512,6 +513,8 @@ export default function AccountSettingsPage() {
             </button>
           </div>
         </form>
+
+        <TwoFactorCard />
 
         {/* Active Sessions Card */}
         <div className="flex flex-col gap-5 rounded-2xl border border-line bg-surface p-6 shadow-card">

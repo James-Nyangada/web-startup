@@ -9,7 +9,9 @@ import type { BulkAction, IssueListFilters } from '../db/repositories/issues.js'
 import type { Impact, IssueStatus, IgnoredReason } from '../db/schema/index.js';
 import { enqueueIssueRecheck } from '../worker/boss.js';
 import { AiService, AiServiceError } from '../ai/service.js';
-import { computeCacheKey, scrubHtmlSnippet } from '../ai/scrubber.js';
+import { aiCacheScope, computeCacheKey, scrubHtmlSnippet } from '../ai/scrubber.js';
+import type { Framework } from '../scanner/platform/framework.js';
+import { isCustomPlatform, probeFramework } from '../scanner/platform/probe-framework.js';
 
 const parseMulti = (val: unknown): string[] => {
   if (!val) return [];
@@ -1322,12 +1324,25 @@ export function orgIssuesRouter(repos: Repositories, options?: IssuesRouterOptio
       return;
     }
 
-    // Determine platform
+    // Determine platform, and for custom-built sites the framework (Next.js, Laravel…)
     let platform = requestedPlatform(req);
-    if (!platform && issue.siteId) {
+    let framework: Framework | null = null;
+    if (issue.siteId) {
       const site = await repos.sites.findById(req.orgId!, issue.siteId);
-      if (site?.platform) {
-        platform = site.platform;
+      if (site) {
+        if (!platform && site.platform) platform = site.platform;
+        if (isCustomPlatform(site.platform)) {
+          framework = site.framework ?? null;
+          // Sites added before framework detection (or whose first probe failed) are
+          // detected on demand once, then remembered on the site.
+          if (!framework) {
+            const probed = await probeFramework(site.rootUrl);
+            if (probed?.framework) {
+              framework = probed.framework;
+              await repos.sites.update(req.orgId!, site.id, { framework });
+            }
+          }
+        }
       }
     }
     if (!platform) {
@@ -1343,6 +1358,7 @@ export function orgIssuesRouter(repos: Repositories, options?: IssuesRouterOptio
         ruleDescription: issue.description,
         wcagCriteria: issue.wcagCriteria,
         platform,
+        framework,
         htmlSnippet: issue.htmlSnippet ?? '',
         failureSummary: issue.failureSummary,
       });
@@ -1401,13 +1417,15 @@ export function orgIssuesRouter(repos: Repositories, options?: IssuesRouterOptio
     let cacheKey = aiRequestBodySchema.parse(req.body).cacheKey;
     if (!cacheKey) {
       let platform = requestedPlatform(req);
-      if (!platform && issue.siteId) {
+      let framework: string | null = null;
+      if (issue.siteId) {
         const site = await repos.sites.findById(req.orgId!, issue.siteId);
-        if (site?.platform) platform = site.platform;
+        if (!platform && site?.platform) platform = site.platform;
+        if (site && isCustomPlatform(site.platform)) framework = site.framework ?? null;
       }
       platform = platform || 'generic';
       const scrubbed = scrubHtmlSnippet(issue.htmlSnippet || '');
-      cacheKey = computeCacheKey(issue.ruleId, platform, scrubbed);
+      cacheKey = computeCacheKey(issue.ruleId, aiCacheScope(platform, framework), scrubbed);
     }
 
     const reportResult = await aiService.reportBadSuggestion(cacheKey);

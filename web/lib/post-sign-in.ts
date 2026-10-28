@@ -13,6 +13,9 @@ export function safeRedirectPath(raw: string | null | undefined): string | null 
 export async function landingPathAfterSignIn(requested?: string | null): Promise<string> {
   const target = safeRedirectPath(requested);
   const me = await authClient.getMe().catch(() => null);
+  if (me?.mfaPending) {
+    return `/sign-in/verify${target ? `?redirect=${encodeURIComponent(target)}` : ''}`;
+  }
   if (me?.user.isStaff) return target?.startsWith('/staff') ? target : '/staff';
   return target ?? '/overview';
 }

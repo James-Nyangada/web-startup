@@ -31,6 +31,7 @@
     "@aws-sdk/client-s3": "3.1146.0",
     "@axe-core/playwright": "4.14.0",
     "@sentry/node": "^11.8.0",
+    "@simplewebauthn/server": "^14.0.3",
     "axe-core": "4.14.0",
     "better-auth": "^1.7.10",
     "cloudinary": "2.11.0",

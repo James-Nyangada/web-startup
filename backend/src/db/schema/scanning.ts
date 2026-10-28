@@ -14,6 +14,7 @@ import {
   uuid,
   type AnyPgColumn,
 } from 'drizzle-orm/pg-core';
+import type { Framework } from '../../scanner/platform/framework.js';
 import { PLATFORMS, STANDARDS, type Platform, type Standard } from '../../scanner/types.js';
 import { createdAt, id, inList, timestamps } from './columns.js';
 import { organizations, users } from './identity.js';
@@ -80,6 +81,8 @@ export const sites = pgTable(
     name: text('name').notNull(),
     rootUrl: text('root_url').notNull(),
     platform: text('platform').$type<Platform>().notNull().default('unknown'),
+    /** What a custom-built site runs on (nextjs, react, laravel…); null until detected. */
+    framework: text('framework').$type<Framework>(),
     clientName: text('client_name'),
     status: text('status').$type<SiteStatus>().notNull().default('pending_verification'),
     verifyMethod: text('verify_method').$type<VerifyMethod>(),

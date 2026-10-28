@@ -77,6 +77,7 @@ describe('Scans API & Onboarding Scans (Section 7.4 & Chunk P2-05)', () => {
     name: 'Oakhaus Furniture',
     rootUrl: 'https://oakhaus.com',
     platform: 'shopify' as const,
+    framework: null,
     clientName: 'Mark Otieno',
     status: 'active' as const,
     verifyMethod: 'meta' as const,

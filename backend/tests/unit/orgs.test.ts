@@ -32,6 +32,7 @@ function createMockAuth(userId = 'user-owner', isStaff = false) {
     isStaff,
     totpSecretEncrypted: null,
     totpEnabledAt: null,
+    lastMfaAt: null,
     lastActiveOrgId: null,
     createdAt: new Date(),
     updatedAt: new Date(),

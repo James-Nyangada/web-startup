@@ -84,6 +84,10 @@ export async function apiFetch<T>(path: string, { background, ...options }: ApiR
       if (res.status === 401 && !AUTH_PATHS.some((p) => path.startsWith(p))) {
         window.dispatchEvent(new CustomEvent(SESSION_EXPIRED_EVENT));
       }
+      if (res.status === 403 && error?.code === 'MFA_REQUIRED' && !window.location.pathname.startsWith('/sign-in')) {
+        const back = encodeURIComponent(window.location.pathname + window.location.search);
+        window.location.assign(`/sign-in/verify?redirect=${back}`);
+      }
       if (res.status === 503 && error?.code === 'MAINTENANCE') {
         window.dispatchEvent(new CustomEvent(MAINTENANCE_EVENT));
       }

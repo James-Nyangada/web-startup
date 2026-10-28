@@ -116,7 +116,7 @@ describe('AI Fix Suggestions (Phase 3 Chunk P3-07, Section 6.10)', () => {
       expect(prompt).toContain('Rule ID: image-alt');
       expect(prompt).toContain('Images must have alternate text');
       expect(prompt).toContain('1.1.1');
-      expect(prompt).toContain('shopify');
+      expect(prompt).toContain('Shopify (Liquid theme)');
       expect(prompt).toContain('<img src="product.jpg">');
       expect(prompt).toContain('fenced code block');
     });

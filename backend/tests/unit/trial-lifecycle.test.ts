@@ -36,6 +36,7 @@ describe('Chunk P4-05: Trial lifecycle and read-only mode', () => {
       isStaff: false,
       totpSecretEncrypted: null,
       totpEnabledAt: null,
+      lastMfaAt: null,
       lastActiveOrgId: orgId,
       createdAt: new Date(),
       updatedAt: new Date(),
