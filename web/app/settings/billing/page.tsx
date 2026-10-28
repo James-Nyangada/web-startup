@@ -188,9 +188,25 @@ export default function BillingSettingsPage() {
         paddleEnvironment: checkoutSettings.paddleEnvironment,
         clientToken: checkoutSettings.clientToken,
         onSuccess: async () => {
-          showToast("Payment confirmed! Your plan is now active.", { type: "info" });
           setChangePlanOpen(false);
-          await fetchBilling();
+          showToast("Payment received. Activating your plan…", { type: "info" });
+          // The plan is switched by Paddle's webhook, which lands a moment after checkout.
+          const before = billing.plan;
+          for (let i = 0; i < 10; i++) {
+            await new Promise((r) => setTimeout(r, 2000));
+            const res = await appApi.getBilling(orgSlug).catch(() => null);
+            if (res) {
+              setBilling(res);
+              if (res.plan !== before) {
+                showToast("Your plan is now active.", { type: "info" });
+                return;
+              }
+            }
+          }
+          showToast(
+            "Payment received, but your plan hasn't updated yet. Refresh in a minute.",
+            { type: "warning" },
+          );
         },
         onClose: () => {
           setActionLoading(false);
