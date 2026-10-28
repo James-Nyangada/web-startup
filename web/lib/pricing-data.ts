@@ -113,7 +113,7 @@ export const COMPARISON_CATEGORIES: PlanFeatureCategory[] = [
         agencyPro: true,
       },
       {
-        name: "Signed PDF Compliance Reports",
+        name: "Dated PDF Reports",
         store: true,
         growth: true,
         agency: true,

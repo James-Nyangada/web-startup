@@ -60,7 +60,7 @@ export default function PrivacyPage() {
           </p>
           <ul className="list-disc pl-5 flex flex-col gap-2">
             <li><strong>PostgreSQL Hosting:</strong> Dedicated managed database infrastructure for persistent application data.</li>
-            <li><strong>Cloudflare:</strong> Turnstile privacy-preserving bot defense (no interactive captchas, no tracking) and R2 object storage for scan artifacts and signed reports.</li>
+            <li><strong>Cloudflare:</strong> Turnstile privacy-preserving bot defense (no interactive captchas, no tracking) and R2 object storage for scan artifacts and PDF reports.</li>
             <li><strong>Resend:</strong> Transactional email delivery for regression alerts, verification emails, and report distribution.</li>
             <li><strong>Paddle:</strong> Payment gateway and Merchant of Record.</li>
             <li><strong>Google Gemini (Optional):</strong> Optional AI fix suggestions if explicitly triggered; all code snippets are scrubbed of emails and phone numbers before transmission.</li>
