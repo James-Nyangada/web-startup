@@ -2,7 +2,6 @@
 
 import React, { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { Icon, I } from "@/components/icons";
 import { useToast } from "./toast-context";
 import { authClient } from "@/lib/auth-client";
@@ -10,7 +9,6 @@ import { resetCurrentUser, useCurrentUser } from "@/lib/use-current-user";
 
 export function UserMenu() {
   const [open, setOpen] = useState(false);
-  const router = useRouter();
   const { showToast } = useToast();
   const user = useCurrentUser();
   const menuRef = useRef<HTMLDivElement>(null);
@@ -46,7 +44,7 @@ export function UserMenu() {
       // The session may already be gone; continue to the sign-in page.
     }
     resetCurrentUser();
-    router.push("/sign-in");
+    window.location.replace("/sign-in");
   };
 
   return (

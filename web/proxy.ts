@@ -21,6 +21,27 @@ const PORTAL_ALLOWED = [
   /^\/maintenance$/,
 ];
 
+/** Pages that need an account. Signed-out requests never reach them (no HTML, no data). */
+const PROTECTED = [
+  /^\/overview(\/|$)/,
+  /^\/sites(\/|$)/,
+  /^\/tasks(\/|$)/,
+  /^\/reports(\/|$)/,
+  /^\/settings(\/|$)/,
+  /^\/staff(\/|$)/,
+  /^\/onboarding(\/|$)/,
+  /^\/portal(\/|$)/,
+  /^\/[^/]+\/sites(\/|$)/,
+];
+
+/** Better Auth session cookie, with the `__Secure-` prefix it adds over https. */
+function hasSessionCookie(request: NextRequest): boolean {
+  return (
+    request.cookies.has("better-auth.session_token") ||
+    request.cookies.has("__Secure-better-auth.session_token")
+  );
+}
+
 function hostOf(url: string | undefined): string | null {
   if (!url) return null;
   try {
@@ -66,6 +87,20 @@ export function proxy(request: NextRequest) {
     if (pathname.startsWith("/sites/")) return NextResponse.rewrite(new URL(`/portal${pathname}`, request.url));
     if (PORTAL_ALLOWED.some((re) => re.test(pathname))) return NextResponse.next();
     return NextResponse.rewrite(new URL("/not-found-page", request.url), { status: 404 });
+  }
+
+  if (PROTECTED.some((re) => re.test(pathname))) {
+    if (!hasSessionCookie(request)) {
+      const url = new URL("/sign-in", request.url);
+      if (pathname !== "/") url.searchParams.set("redirect", pathname + request.nextUrl.search);
+      const res = NextResponse.redirect(url);
+      res.headers.set("Cache-Control", "no-store");
+      return res;
+    }
+    // Signed-in pages must not be kept in the browser cache or back/forward cache.
+    const res = NextResponse.next();
+    res.headers.set("Cache-Control", "no-store, max-age=0, must-revalidate");
+    return res;
   }
 
   return NextResponse.next();

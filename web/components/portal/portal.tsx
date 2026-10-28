@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useParams, useRouter } from "next/navigation";
+import { useParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { Icon, I } from "@/components/icons";
 import { ThemeTextToggle } from "@/components/theme";
@@ -30,7 +30,6 @@ interface PortalFrameProps {
 }
 
 function PortalFrame({ branding, user, header, children }: PortalFrameProps) {
-  const router = useRouter();
   const agencyName = branding?.displayName || "Your Agency";
   const initials = agencyName
     .split(" ")
@@ -60,7 +59,7 @@ function PortalFrame({ branding, user, header, children }: PortalFrameProps) {
     } catch {
       // Continue to sign in
     }
-    router.push("/sign-in");
+    window.location.replace("/sign-in");
   };
 
   return (

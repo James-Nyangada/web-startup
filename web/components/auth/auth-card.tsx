@@ -11,6 +11,8 @@ interface AuthCardProps {
   errorRef?: React.RefObject<HTMLDivElement | null>;
   children: React.ReactNode;
   footer?: React.ReactNode;
+  /** Shows a "Back to home" link under the card. */
+  homeLink?: boolean;
 }
 
 export function AuthCard({
@@ -20,6 +22,7 @@ export function AuthCard({
   errorRef,
   children,
   footer,
+  homeLink,
 }: AuthCardProps) {
   return (
     <main className="min-h-screen bg-page flex flex-col justify-center items-center p-4 sm:p-6 lg:p-8">
@@ -72,6 +75,14 @@ export function AuthCard({
             </footer>
           )}
         </div>
+
+        {homeLink && (
+          <p className="mt-6 text-center text-sm">
+            <Link href="/" className="text-muted hover:text-ink underline underline-offset-2 transition">
+              &larr; Back to home page
+            </Link>
+          </p>
+        )}
       </div>
     </main>
   );

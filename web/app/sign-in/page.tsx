@@ -63,6 +63,7 @@ function SignInContent() {
       description="Welcome back. Enter your credentials to access your dashboard."
       error={errorMessage}
       errorRef={errorRef}
+      homeLink
       footer={
         <p>
           Don&apos;t have an account?{' '}
