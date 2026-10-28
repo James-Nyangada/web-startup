@@ -2,7 +2,7 @@
 
 import React, { useEffect, useRef, useState } from "react";
 import { useToast } from "@/components/shell/toast-context";
-import { appApi } from "@/lib/app-api";
+import { appApi, initials } from "@/lib/app-api";
 import { notifyProfileUpdated } from "@/lib/use-current-user";
 
 /** Fits an image inside 256 × 256 (keeping its shape and transparency) as a PNG data URL. */
@@ -82,7 +82,7 @@ export function OrgLogoField({
     }
   };
 
-  const letters = name.trim().slice(0, 2).toUpperCase() || "?";
+  const letters = initials(name) ?? "?";
 
   return (
     <div className="flex flex-wrap items-center gap-4">

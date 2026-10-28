@@ -96,9 +96,14 @@ function SidebarContent({
             href="/settings/account"
             className="flex items-center gap-3 rounded-2xl border border-transparent p-2 text-left text-ink hover:bg-surface no-underline"
           >
-            <span className="grid size-8 place-items-center rounded-full border border-line bg-sunk text-xs font-semibold flex-none">
-              {user.initials}
-            </span>
+            {user.avatarUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={user.avatarUrl} alt="" className="size-8 flex-none rounded-full border border-line object-cover" />
+            ) : (
+              <span className="grid size-8 place-items-center rounded-full border border-line bg-sunk text-xs font-semibold flex-none">
+                {user.initials}
+              </span>
+            )}
             <div className="flex flex-col min-w-0 flex-1">
               <span className="text-sm leading-5 font-medium truncate">{user.name}</span>
               <span className="text-xs leading-4 text-muted truncate">{user.role}</span>
