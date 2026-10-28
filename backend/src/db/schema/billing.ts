@@ -8,7 +8,7 @@ import {
   timestamp,
   uuid,
 } from 'drizzle-orm/pg-core';
-import { createdAt, id, timestamps } from './columns.js';
+import { id, timestamps } from './columns.js';
 import { organizations } from './identity.js';
 
 export const subscriptions = pgTable(
@@ -41,7 +41,7 @@ export const paddleEvents = pgTable(
   {
     eventId: text('event_id').primaryKey(),
     eventType: text('event_type').notNull(),
-    receivedAt: createdAt(),
+    receivedAt: timestamp('received_at', { withTimezone: true }).notNull().defaultNow(),
     processedAt: timestamp('processed_at', { withTimezone: true }),
     payload: jsonb('payload').notNull(),
     error: text('error'),
