@@ -1,4 +1,4 @@
-import { apiClient } from "./api";
+import { apiBaseUrl, apiClient } from "./api";
 import type { HistoryKind, Issue, IssueStatus, SiteRow } from "./site-data";
 import type { Severity } from "./severity";
 import type { TrendPoint } from "./trend";
@@ -254,6 +254,14 @@ export function formatDayTime(value: string | Date | null | undefined): string {
   if (!value) return "-";
   const d = new Date(value);
   return Number.isNaN(d.getTime()) ? "-" : DAY_TIME.format(d);
+}
+
+/**
+ * The logo is served by the API, which is a different origin from the web app, so the URL must
+ * be absolute. `version` busts the browser cache when the logo is replaced.
+ */
+export function orgLogoUrl(slug: string, type: "light" | "dark" = "light", version: number | string = 0): string {
+  return `${apiBaseUrl()}/v1/orgs/${slug}/branding/logo/${type}?v=${version}`;
 }
 
 export function initials(name: string | null | undefined): string | undefined {

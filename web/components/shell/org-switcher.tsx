@@ -6,7 +6,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { Icon, I } from "@/components/icons";
 import { useToast } from "./toast-context";
 import { authClient } from "@/lib/auth-client";
-import { initials } from "@/lib/app-api";
+import { initials, orgLogoUrl } from "@/lib/app-api";
 import { PROFILE_UPDATED_EVENT } from "@/lib/use-current-user";
 
 export interface OrgItem {
@@ -89,7 +89,7 @@ export function OrgSwitcher({
           sitesCount: 0,
           initials: initials(m.org.name) ?? "?",
           logoUrl: m.org.hasLogo
-            ? `/v1/orgs/${m.org.slug}/branding/logo/light?v=${m.org.logoVersion ?? 0}`
+            ? orgLogoUrl(m.org.slug, "light", m.org.logoVersion ?? 0)
             : null,
           isCurrent: false,
         }));

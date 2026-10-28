@@ -9,6 +9,7 @@ import { useActiveOrg } from "@/lib/use-active-org";
 import { useToast } from "@/components/shell/toast-context";
 import {
   appApi,
+  orgLogoUrl,
   type ApiBranding,
   type ApiBillingInfo,
 } from "@/lib/app-api";
@@ -75,10 +76,10 @@ export default function BrandingSettingsPage() {
         setDisplayName(b.displayName || "");
         if (b.primaryColor) setPrimaryColor(b.primaryColor);
         if (b.logoLightKey) {
-          setLogoLightUrl(`/v1/orgs/${slug}/branding/logo/light`);
+          setLogoLightUrl(orgLogoUrl(slug, "light", Date.now()));
         }
         if (b.logoDarkKey) {
-          setLogoDarkUrl(`/v1/orgs/${slug}/branding/logo/dark`);
+          setLogoDarkUrl(orgLogoUrl(slug, "dark", Date.now()));
         }
         setEmailSenderName(b.emailSenderName || "");
         setReportFooter(b.reportFooter || "");
@@ -106,8 +107,8 @@ export default function BrandingSettingsPage() {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (file.size > 2 * 1024 * 1024) {
-      showToast("Logo file must be smaller than 2 MB.", { type: "error" });
+    if (file.size > 5 * 1024 * 1024) {
+      showToast("Logo file must be smaller than 5 MB.", { type: "error" });
       return;
     }
 
@@ -327,7 +328,7 @@ export default function BrandingSettingsPage() {
           <div className="rounded-2xl border border-line bg-surface p-6 shadow-card flex flex-col gap-5">
             <h2 className="text-base font-semibold m-0 text-ink">Brand Logos</h2>
             <p className="text-xs text-muted m-0">
-              Upload high-resolution PNG, SVG, or WebP files (max 2 MB each). Transparent backgrounds recommended.
+              Upload high-resolution PNG, SVG, or WebP files (max 5 MB each). Transparent backgrounds recommended.
             </p>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

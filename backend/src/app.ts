@@ -140,13 +140,16 @@ export function createApp({
       credentials: true,
     }),
   );
-  app.use(
-    express.json({
-      limit: '100kb',
-      verify: (req, _res, buf) => {
-        req.rawBody = buf;
-      },
-    }),
+  const captureRawBody = (req: express.Request, _res: express.Response, buf: Buffer) => {
+    req.rawBody = buf;
+  };
+  const jsonParser = express.json({ limit: '100kb', verify: captureRawBody });
+  // A logo travels as a base64 data URL, so a 5 MB image needs room for the encoding too.
+  const logoJsonParser = express.json({ limit: '7mb', verify: captureRawBody });
+  app.use((req, res, next) =>
+    req.method === 'POST' && /^\/v1\/orgs\/[^/]+\/branding\/logo\/?$/.test(req.path)
+      ? logoJsonParser(req, res, next)
+      : jsonParser(req, res, next),
   );
 
   app.use(maintenanceMode(Boolean(config.MAINTENANCE_MODE)));

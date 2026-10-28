@@ -2,7 +2,7 @@
 
 import React, { useEffect, useRef, useState } from "react";
 import { useToast } from "@/components/shell/toast-context";
-import { appApi, initials } from "@/lib/app-api";
+import { appApi, initials, orgLogoUrl } from "@/lib/app-api";
 import { notifyProfileUpdated } from "@/lib/use-current-user";
 
 /** Fits an image inside 256 × 256 (keeping its shape and transparency) as a PNG data URL. */
@@ -42,7 +42,7 @@ export function OrgLogoField({
   useEffect(() => {
     appApi
       .getBranding(slug)
-      .then((b) => setLogoUrl(b?.logoLightKey ? `/v1/orgs/${slug}/branding/logo/light?v=${Date.now()}` : null))
+      .then((b) => setLogoUrl(b?.logoLightKey ? orgLogoUrl(slug, "light", Date.now()) : null))
       .catch(() => setLogoUrl(null));
   }, [slug]);
 
@@ -54,11 +54,15 @@ export function OrgLogoField({
       showToast("Choose a PNG, JPEG, WebP or SVG image.", { type: "error" });
       return;
     }
+    if (file.size > 5 * 1024 * 1024) {
+      showToast("Logo file must be smaller than 5 MB.", { type: "error" });
+      return;
+    }
     setBusy(true);
     try {
       const dataUrl = await resizeLogo(file);
       await appApi.uploadLogo(slug, "light", dataUrl);
-      setLogoUrl(`/v1/orgs/${slug}/branding/logo/light?v=${Date.now()}`);
+      setLogoUrl(orgLogoUrl(slug, "light", Date.now()));
       notifyProfileUpdated();
       showToast("Organisation logo updated.");
     } catch (err) {

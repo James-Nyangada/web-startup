@@ -337,10 +337,10 @@ export function orgBrandingRouter(
     }
 
     const buffer = Buffer.from(base64Data, 'base64');
-    // Spec 7.8 / 11.1: at most 1 MB.
-    if (buffer.length > 1024 * 1024) {
+    // At most 5 MB.
+    if (buffer.length > 5 * 1024 * 1024) {
       res.status(400).json({
-        error: { code: 'FILE_TOO_LARGE', message: 'Logo file size exceeds the 1 MB limit.' },
+        error: { code: 'FILE_TOO_LARGE', message: 'Logo file size exceeds the 5 MB limit.' },
       });
       return;
     }
