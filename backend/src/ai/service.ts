@@ -87,7 +87,7 @@ export class AiService {
 
     // 3. Cache lookup
     const cached = await this.repos.aiSuggestions.findByCacheKey(cacheKey);
-    if (cached && !cached.flagged) {
+    if (cached && !cached.flagged && validateAiOutput(cached.suggestionMd).valid) {
       return {
         suggestion: cached.suggestionMd,
         cached: true,
