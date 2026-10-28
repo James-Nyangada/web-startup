@@ -63,17 +63,7 @@ export default function AcceptInvitationPage({
         } else if (code === "INVITATION_REVOKED") {
           setErrorStatus("This invitation was revoked by an organisation administrator.");
         } else {
-          // Demo fallback if testing offline
-          setInvitation({
-            valid: true,
-            orgName: "Brightline Studio",
-            orgSlug: "brightline",
-            email: "colleague@brightline.studio",
-            role: "member",
-            expiresAt: new Date(Date.now() + 6 * 24 * 60 * 60 * 1000).toISOString(),
-            inviterName: "Daniel Mwangi",
-          });
-          setName("Colleague");
+          setErrorStatus("This invitation link is invalid or could not be loaded.");
         }
       });
 

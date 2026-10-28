@@ -5,6 +5,7 @@ import Link from "next/link";
 import { SettingsLayout } from "@/components/settings/settings-layout";
 import { CustomDomainCard } from "@/components/settings/custom-domain-card";
 import { Icon } from "@/components/icons";
+import { useActiveOrg } from "@/lib/use-active-org";
 import { useToast } from "@/components/shell/toast-context";
 import {
   appApi,
@@ -22,7 +23,8 @@ type PreviewTab = "report" | "email" | "portal";
 
 export default function BrandingSettingsPage() {
   const { showToast } = useToast();
-  const [orgSlug, setOrgSlug] = useState<string>("brightline");
+  const { slug, loading: orgLoading } = useActiveOrg();
+  const orgSlug = slug ?? "";
   const [orgPlan, setOrgPlan] = useState<string>("trial");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -91,20 +93,10 @@ export default function BrandingSettingsPage() {
   }, []);
 
   useEffect(() => {
-    apiClient<{ user: unknown; orgs: Array<{ id: string; slug: string }> }>("/v1/me")
-      .then((data) => {
-        if (data?.orgs?.length && data.orgs[0]?.slug) {
-          const currentSlug = data.orgs[0].slug;
-          setOrgSlug(currentSlug);
-          loadData(currentSlug);
-        } else {
-          loadData("brightline");
-        }
-      })
-      .catch(() => {
-        loadData("brightline");
-      });
-  }, [loadData]);
+    if (orgLoading) return;
+    if (slug) loadData(slug);
+    else setLoading(false);
+  }, [slug, orgLoading, loadData]);
 
   // Handle Logo Upload
   const handleLogoFile = async (
@@ -580,7 +572,7 @@ export default function BrandingSettingsPage() {
                         className="font-medium"
                         style={{ color: isColorValid ? primaryColor : "#0F3D3E" }}
                       >
-                        {displayName || "Brightline Studio"}
+                        {displayName || "Your Agency"}
                       </span>
                     </p>
                   </div>
@@ -689,7 +681,7 @@ export default function BrandingSettingsPage() {
                   <span className="h-2 w-2 rounded-full bg-neutral-400" />
                   <span className="h-2 w-2 rounded-full bg-neutral-400" />
                   <div className="ml-2 flex-1 rounded bg-white px-2 py-0.5 text-[10px] font-mono text-neutral-500 truncate">
-                    {customDomain ? `https://${customDomain}` : "https://portal.everyvisitor.app/acme"}
+                    {customDomain ? `https://${customDomain}` : "https://portal.everyvisitor.app/your-agency"}
                   </div>
                 </div>
 
@@ -722,7 +714,7 @@ export default function BrandingSettingsPage() {
                           className="h-2 w-2 rounded-full"
                           style={{ backgroundColor: isColorValid ? primaryColor : "#0F3D3E" }}
                         />
-                        <span className="text-[11px] text-neutral-500 font-medium">Acme Store</span>
+                        <span className="text-[11px] text-neutral-500 font-medium">{displayName || "Your Agency"}</span>
                       </div>
                     </div>
 

@@ -131,7 +131,7 @@ export function PortalHome() {
   }, []);
 
   const branding = data?.branding ?? null;
-  const agencyName = branding?.displayName || "Brightline Studio";
+  const agencyName = branding?.displayName || "Your Agency";
   const user = data?.user ?? null;
   const firstName = user?.name ? user.name.split(" ")[0] : "there";
 

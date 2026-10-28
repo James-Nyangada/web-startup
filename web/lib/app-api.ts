@@ -535,7 +535,7 @@ export const appApi = {
   getBilling: (org: string) => apiClient<ApiBillingInfo>(`/v1/orgs/${org}/billing`),
 
   getPublicPlans: () =>
-    apiClient<{ data: { plans: ApiPublicPlan[] } }>("/v1/public/plans").then((r) => r.data.plans),
+    apiClient<{ plans: ApiPublicPlan[] }>("/v1/public/plans").then((r) => r.plans),
 
   createCheckoutSession: (
     org: string,
@@ -547,10 +547,10 @@ export const appApi = {
     org: string,
     params: { plan: string; interval?: 'month' | 'year' },
   ) =>
-    apiClient<{ data: ApiPlanChangePreview }>(
+    apiClient<ApiPlanChangePreview>(
       `/v1/orgs/${org}/billing/change-plan`,
       json({ ...params, preview: true }),
-    ).then((r) => r.data),
+    ),
 
   changePlan: (
     org: string,
@@ -563,16 +563,14 @@ export const appApi = {
     },
   ) =>
     apiClient<{
-      data: {
-        success: boolean;
-        plan: string;
-        interval: string;
-        isUpgrade: boolean;
-        isDowngrade: boolean;
-        scheduled: boolean;
-        effectiveDate?: string | null;
-      };
-    }>(`/v1/orgs/${org}/billing/change-plan`, json(params)).then((r) => r.data),
+      success: boolean;
+      plan: string;
+      interval: string;
+      isUpgrade: boolean;
+      isDowngrade: boolean;
+      scheduled: boolean;
+      effectiveDate?: string | null;
+    }>(`/v1/orgs/${org}/billing/change-plan`, json(params)),
 
   cancelSubscription: (org: string, params?: { reason?: string; feedback?: string } | string) => {
     const payload = typeof params === 'string' ? { reason: params } : (params ?? {});

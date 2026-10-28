@@ -51,8 +51,8 @@ export default function AccountSettingsPage() {
   // Profile state
   const [loading, setLoading] = useState(true);
   const [savingProfile, setSavingProfile] = useState(false);
-  const [name, setName] = useState("Daniel Mwangi");
-  const [email, setEmail] = useState("daniel@brightline.studio");
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
   const [avatarUrl, setAvatarUrl] = useState<string>("");
   const [timeZone, setTimeZone] = useState("Europe/London");
 
@@ -92,13 +92,13 @@ export default function AccountSettingsPage() {
       try {
         const res = await authClient.getMe();
         if (mounted && res?.user) {
-          setName(res.user.name || "Daniel Mwangi");
-          setEmail(res.user.email || "daniel@brightline.studio");
+          setName(res.user.name || "");
+          setEmail(res.user.email || "");
           setTimeZone(res.user.timeZone || "Europe/London");
           setAvatarUrl(res.user.avatarUrl || "");
         }
       } catch {
-        // Fall back to default mock values in development
+        // Leave the form empty if the profile cannot be loaded
       } finally {
         if (mounted) setLoading(false);
       }

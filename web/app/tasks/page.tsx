@@ -5,6 +5,7 @@ import Link from "next/link";
 import { AppShell } from "@/components/app-shell";
 import { Icon, I } from "@/components/icons";
 import { appApi, type ApiMyTask } from "@/lib/app-api";
+import { useActiveOrg } from "@/lib/use-active-org";
 import { useToast } from "@/components/shell/toast-context";
 
 type TaskGroupKey = "overdue" | "this_week" | "later" | "no_due_date";
@@ -74,72 +75,10 @@ function formatDueDate(dueDate: string | null | undefined): string {
   });
 }
 
-const DEMO_TASKS: ApiMyTask[] = [
-  {
-    id: "task-demo-1",
-    siteId: "oakhaus",
-    siteName: "Oakhaus Furniture",
-    ruleId: "color-contrast",
-    title: "Ensure contrast ratio between text and background meets WCAG AA minimums",
-    impact: "serious",
-    templateKey: "product-detail",
-    status: "open",
-    occurrenceCount: 14,
-    assigneeId: "user-1",
-    dueDate: new Date(Date.now() - 2 * 86400000).toISOString().split("T")[0]!,
-    createdAt: new Date(Date.now() - 10 * 86400000).toISOString(),
-    updatedAt: new Date(Date.now() - 2 * 86400000).toISOString(),
-  },
-  {
-    id: "task-demo-2",
-    siteId: "oakhaus",
-    siteName: "Oakhaus Furniture",
-    ruleId: "image-alt",
-    title: "Images must have alternate text describing visual content",
-    impact: "critical",
-    templateKey: "homepage",
-    status: "open",
-    occurrenceCount: 6,
-    assigneeId: "user-1",
-    dueDate: new Date(Date.now() + 3 * 86400000).toISOString().split("T")[0]!,
-    createdAt: new Date(Date.now() - 5 * 86400000).toISOString(),
-    updatedAt: new Date(Date.now() - 1 * 86400000).toISOString(),
-  },
-  {
-    id: "task-demo-3",
-    siteId: "oakhaus",
-    siteName: "Oakhaus Furniture",
-    ruleId: "button-name",
-    title: "Buttons must have discernible text for assistive technology",
-    impact: "moderate",
-    templateKey: "cart",
-    status: "open",
-    occurrenceCount: 2,
-    assigneeId: "user-1",
-    dueDate: new Date(Date.now() + 18 * 86400000).toISOString().split("T")[0]!,
-    createdAt: new Date(Date.now() - 3 * 86400000).toISOString(),
-    updatedAt: new Date(Date.now() - 1 * 86400000).toISOString(),
-  },
-  {
-    id: "task-demo-4",
-    siteId: "oakhaus",
-    siteName: "Oakhaus Furniture",
-    ruleId: "aria-required-children",
-    title: "Certain ARIA roles must contain specific child elements",
-    impact: "minor",
-    templateKey: "checkout",
-    status: "open",
-    occurrenceCount: 1,
-    assigneeId: "user-1",
-    dueDate: null,
-    createdAt: new Date(Date.now() - 1 * 86400000).toISOString(),
-    updatedAt: new Date(Date.now() - 1 * 86400000).toISOString(),
-  },
-];
-
 export default function MyTasksPage() {
   const { showToast } = useToast();
-  const orgSlug = "brightline";
+  const { slug, org, loading: orgLoading } = useActiveOrg();
+  const orgSlug = slug ?? "";
 
   const [tasks, setTasks] = useState<ApiMyTask[]>([]);
   const [loading, setLoading] = useState(true);
@@ -153,22 +92,19 @@ export default function MyTasksPage() {
 
   // Load tasks from real cross-site endpoint
   useEffect(() => {
+    if (orgLoading) return;
+    if (!orgSlug) {
+      setLoading(false);
+      return;
+    }
     let canceled = false;
     async function loadTasks() {
       try {
         setLoading(true);
         const data = await appApi.listMyTasks(orgSlug);
-        if (!canceled) {
-          if (data && data.length > 0) {
-            setTasks(data);
-          } else {
-            setTasks(DEMO_TASKS);
-          }
-        }
+        if (!canceled) setTasks(data ?? []);
       } catch {
-        if (!canceled) {
-          setTasks(DEMO_TASKS);
-        }
+        if (!canceled) setTasks([]);
       } finally {
         if (!canceled) setLoading(false);
       }
@@ -177,7 +113,7 @@ export default function MyTasksPage() {
     return () => {
       canceled = true;
     };
-  }, [orgSlug]);
+  }, [orgSlug, orgLoading]);
 
   const handleResolve = async (task: ApiMyTask) => {
     try {
@@ -238,7 +174,7 @@ export default function MyTasksPage() {
     <AppShell
       active="tasks"
       crumbs={[
-        { label: "Brightline Studio", href: "/overview" },
+        { label: org?.name ?? "Overview", href: "/overview" },
         { label: "My tasks" },
       ]}
     >

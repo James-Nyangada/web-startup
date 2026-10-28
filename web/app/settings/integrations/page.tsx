@@ -4,6 +4,7 @@ import React, { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { SettingsLayout } from "@/components/settings/settings-layout";
 import { Icon, I } from "@/components/icons";
+import { useActiveOrg } from "@/lib/use-active-org";
 import { useToast } from "@/components/shell/toast-context";
 import {
   appApi,
@@ -38,7 +39,8 @@ const AVAILABLE_EVENTS = [
 
 export default function IntegrationsSettingsPage() {
   const { showToast } = useToast();
-  const [orgSlug, setOrgSlug] = useState<string>("brightline");
+  const { slug, loading: orgLoading } = useActiveOrg();
+  const orgSlug = slug ?? "";
   const [orgPlan, setOrgPlan] = useState<string>("trial");
   const [loading, setLoading] = useState(true);
   const [webhooks, setWebhooks] = useState<ApiWebhook[]>([]);
@@ -96,20 +98,10 @@ export default function IntegrationsSettingsPage() {
   }, []);
 
   useEffect(() => {
-    apiClient<{ user: unknown; orgs: Array<{ id: string; slug: string }> }>("/v1/me")
-      .then((data) => {
-        if (data?.orgs?.length && data.orgs[0]?.slug) {
-          const currentSlug = data.orgs[0].slug;
-          setOrgSlug(currentSlug);
-          loadData(currentSlug);
-        } else {
-          loadData("brightline");
-        }
-      })
-      .catch(() => {
-        loadData("brightline");
-      });
-  }, [loadData]);
+    if (orgLoading) return;
+    if (slug) loadData(slug);
+    else setLoading(false);
+  }, [slug, orgLoading, loadData]);
 
   const handleCreateWebhook = async (e: React.FormEvent) => {
     e.preventDefault();
