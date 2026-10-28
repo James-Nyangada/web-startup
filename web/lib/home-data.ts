@@ -28,7 +28,7 @@ export const HOW = [
   {
     n: "Step 1",
     t: "Scan",
-    d: "We check up to 150 pages every week and group them by template.",
+    d: "We check 250 to 500 pages per scan, depending on your plan, and group them by template.",
     shot: "screenshot: scan progress",
     image: "/screenshots/scan-progress.png",
     imageLight: "/screenshots/scan-progress-light.png",

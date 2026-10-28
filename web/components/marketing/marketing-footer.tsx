@@ -116,11 +116,6 @@ export function MarketingFooter() {
                 </a>
               </li>
               <li>
-                <Link href="/blog" className="text-muted no-underline hover:text-ink">
-                  Engineering Blog
-                </Link>
-              </li>
-              <li>
                 <Link href="/blog/eaa-june-2025-readiness" className="text-muted no-underline hover:text-ink">
                   EAA June 2025 Guide
                 </Link>

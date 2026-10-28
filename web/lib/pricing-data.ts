@@ -156,7 +156,7 @@ export const COMPARISON_CATEGORIES: PlanFeatureCategory[] = [
         agencyPro: true,
       },
       {
-        name: "Custom Portal Domain (status.agency.com)",
+        name: "Custom Portal Domain",
         store: false,
         growth: false,
         agency: false,

@@ -279,7 +279,7 @@ export default function AgenciesPage() {
                     Ideal for small stores wanting ongoing compliance protection without retainers.
                   </p>
                   <ul className="m-0 flex flex-col gap-2 p-0 text-sm list-none border-t border-line pt-4">
-                    <li className="flex items-center gap-2">✓ Weekly automated scan (150 pages)</li>
+                    <li className="flex items-center gap-2">✓ Weekly automated scan (250 pages)</li>
                     <li className="flex items-center gap-2">✓ Instant email regression alerts</li>
                     <li className="flex items-center gap-2">✓ Branded monthly executive PDF</li>
                     <li className="flex items-center gap-2">✓ Read-only client portal view</li>

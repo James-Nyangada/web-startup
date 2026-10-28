@@ -43,7 +43,6 @@ const DEFAULT_PLANS: PlanItem[] = [
     priceMonthly: 79,
     priceAnnual: 790,
     currency: "USD",
-    tag: "Popular for brands",
     who: "Growing brands, 3 sites",
     maxSites: 3,
     maxPagesPerScan: 500,

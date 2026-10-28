@@ -316,7 +316,7 @@ export function FreeCheck() {
             )}
             <section className="flex flex-col gap-3 rounded-2xl bg-ink p-6 text-surface">
               <h2 className="m-0 text-xl leading-7 font-semibold">Monitor your whole site, 14 days free</h2>
-              <p className="m-0 text-sm leading-5">We&apos;ll check up to 150 pages every week, group the problems by template, and alert you when something breaks.</p>
+              <p className="m-0 text-sm leading-5">We&apos;ll check 250 to 500 pages per scan, depending on your plan, group the problems by template, and alert you when something breaks.</p>
               <Link
                 href="/overview"
                 className="ease-ui grid h-11 place-items-center rounded-lg bg-on-primary text-[15px] font-semibold text-ptext no-underline hover:opacity-90"

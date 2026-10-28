@@ -9,6 +9,18 @@ import { lastKnownEmail, resetCurrentUser } from "@/lib/use-current-user";
 
 const AUTH_PAGES = ["/sign-in", "/sign-up", "/magic", "/forgot-password", "/reset-password", "/verify-email", "/maintenance"];
 
+/** Signed-in areas, kept in step with PROTECTED in proxy.ts. Public pages never show the re-sign-in dialog. */
+const APP_PAGES = [
+  /^\/overview(\/|$)/,
+  /^\/sites(\/|$)/,
+  /^\/tasks(\/|$)/,
+  /^\/reports(\/|$)/,
+  /^\/settings(\/|$)/,
+  /^\/staff(\/|$)/,
+  /^\/onboarding(\/|$)/,
+  /^\/[^/]+\/sites(\/|$)/,
+];
+
 /** S-80: tells people when they lose their connection, and when it comes back. */
 function OfflineNotice() {
   const { showToast, dismissToast } = useToast();
@@ -68,6 +80,7 @@ function ReauthDialog() {
   useEffect(() => {
     const onExpired = () => {
       if (AUTH_PAGES.some((p) => pathname?.startsWith(p))) return;
+      if (!APP_PAGES.some((re) => re.test(pathname ?? ""))) return;
       setOpen(true);
     };
     window.addEventListener(SESSION_EXPIRED_EVENT, onExpired);

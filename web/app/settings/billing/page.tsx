@@ -56,7 +56,6 @@ const PLANS_CONFIG = [
     sites: 3,
     pagesPerScan: 500,
     seats: 5,
-    tag: "Popular",
     frequency: "Daily automated scans",
     features: [
       "Up to 3 monitored sites",

@@ -24,7 +24,7 @@ export interface BlogPost {
 export const BLOG_POSTS: BlogPost[] = [
   {
     slug: "eaa-june-2025-readiness",
-    title: "The European Accessibility Act (EAA): What E-commerce Stores Must Know Before June 2025",
+    title: "What the EAA means for online stores now",
     summary:
       "Directive (EU) 2019/882 makes digital accessibility mandatory for e-commerce across the European Union. Here is what every store owner and digital agency needs to audit today.",
     date: "October 14, 2026",
@@ -56,7 +56,7 @@ export const BLOG_POSTS: BlogPost[] = [
       {
         sectionTitle: "Enforcement and Financial Penalties",
         paragraphs: [
-          "Each EU member state has established dedicated market surveillance authorities empowered to audit websites, issue compliance orders, and levy substantial fines. Non-compliant businesses face penalties up to €100,000 or a percentage of annual turnover, alongside potential court injunctions halting sales within member states until code-level remediations are completed.",
+          "Each EU member state has established dedicated market surveillance authorities empowered to audit websites, issue compliance orders, and levy substantial fines. Penalties vary by country: the Directive leaves it to each member state to set \"effective, proportionate and dissuasive\" penalties (Article 30 of Directive (EU) 2019/882), so fines and enforcement powers differ from one national law to the next. Non-compliant businesses may also face potential court injunctions halting sales within member states until code-level remediations are completed.",
         ],
       },
       {
