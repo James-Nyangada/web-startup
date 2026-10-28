@@ -65,7 +65,7 @@ export function MarketingHeader() {
             </nav>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 sm:gap-3">
             <ThemeTextToggle />
 
             <Link
@@ -77,9 +77,10 @@ export function MarketingHeader() {
 
             <Link
               href="/sign-up"
-              className="ease-ui flex h-9 items-center rounded-full bg-primary px-4 text-sm font-semibold text-on-primary no-underline hover:bg-primary-hover hover:text-on-primary"
+              className="ease-ui flex h-9 shrink-0 items-center rounded-full bg-primary px-3.5 text-sm font-semibold whitespace-nowrap text-on-primary no-underline hover:bg-primary-hover hover:text-on-primary sm:px-4"
             >
-              Start free trial
+              <span className="sm:hidden">Free trial</span>
+              <span className="hidden sm:inline">Start free trial</span>
             </Link>
 
             <button
