@@ -133,6 +133,16 @@ export class AiService {
     // 6. Validate output
     const validation = validateAiOutput(providerResponse.markdown);
 
+    // Never cache or bill a failed generation, so a retry can succeed
+    if (!validation.valid) {
+      return {
+        suggestion: validation.markdown,
+        cached: false,
+        cacheKey,
+        model: providerResponse.model,
+      };
+    }
+
     // 7. Store in cache
     await this.repos.aiSuggestions.create({
       cacheKey,

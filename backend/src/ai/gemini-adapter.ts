@@ -8,7 +8,7 @@ export interface GeminiAdapterOptions {
 }
 
 interface GeminiResponse {
-  candidates?: { content?: { parts?: { text?: string }[] } }[];
+  candidates?: { finishReason?: string; content?: { parts?: { text?: string; thought?: boolean }[] } }[];
   usageMetadata?: { promptTokenCount?: number; candidatesTokenCount?: number };
 }
 
@@ -52,7 +52,8 @@ export class GeminiAdapter implements AiProvider {
           ],
           generationConfig: {
             temperature: 0.2,
-            maxOutputTokens: 800,
+            // Thinking models count reasoning tokens against this budget, so leave ample headroom.
+            maxOutputTokens: 4096,
           },
         }),
       });
@@ -64,7 +65,13 @@ export class GeminiAdapter implements AiProvider {
 
       const data = (await res.json()) as GeminiResponse;
       const candidate = data.candidates?.[0];
-      const text = candidate?.content?.parts?.[0]?.text ?? '';
+      const text = (candidate?.content?.parts ?? [])
+        .filter((part) => !part.thought)
+        .map((part) => part.text ?? '')
+        .join('');
+      if (candidate?.finishReason && candidate.finishReason !== 'STOP') {
+        console.warn(`Gemini finished with reason ${candidate.finishReason}`);
+      }
       const tokensIn = data.usageMetadata?.promptTokenCount ?? Math.ceil(prompt.length / 4);
       const tokensOut = data.usageMetadata?.candidatesTokenCount ?? Math.ceil(text.length / 4);
 
@@ -75,7 +82,8 @@ export class GeminiAdapter implements AiProvider {
         tokensIn,
         tokensOut,
       };
-    } catch {
+    } catch (err) {
+      console.error('Gemini suggestion failed, using fallback:', err);
       // In case of transient provider failure, fallback to intelligent deterministic suggestion
       return this.generateMockResponse(request, scrubbedSnippet);
     }
