@@ -13,7 +13,7 @@ import {
 } from "@/lib/app-api";
 import { openPaddleCheckout } from "@/lib/paddle";
 import { useFocusTrap } from "@/components/use-focus-trap";
-import { apiClient } from "@/lib/api";
+import { useActiveOrg } from "@/lib/use-active-org";
 
 const DEFAULT_BILLING: ApiBillingInfo = {
   plan: "trial",
@@ -124,7 +124,7 @@ export default function BillingSettingsPage() {
   const [plans, setPlans] = useState<PlanCard[]>(PLANS_CONFIG);
   const [billing, setBilling] = useState<ApiBillingInfo>(DEFAULT_BILLING);
   const [loading, setLoading] = useState(true);
-  const [orgSlug, setOrgSlug] = useState<string>("brightline");
+  const { slug: orgSlug } = useActiveOrg();
   const [changePlanOpen, setChangePlanOpen] = useState(false);
   const [downgradeModalOpen, setDowngradeModalOpen] = useState(false);
   const [downgradeConfirmOpen, setDowngradeConfirmOpen] = useState(false);
@@ -153,18 +153,8 @@ export default function BillingSettingsPage() {
       .catch(() => {});
   }, []);
 
-  // Resolve current active organisation
-  useEffect(() => {
-    apiClient<{ user: any; orgs: Array<{ id: string; slug: string }> }>("/v1/me")
-      .then((data) => {
-        if (data?.orgs?.length && data.orgs[0]?.slug) {
-          setOrgSlug(data.orgs[0].slug);
-        }
-      })
-      .catch(() => {});
-  }, []);
-
   const fetchBilling = useCallback(async () => {
+    if (!orgSlug) return;
     try {
       setLoading(true);
       const res = await appApi.getBilling(orgSlug);
@@ -183,6 +173,7 @@ export default function BillingSettingsPage() {
   }, [fetchBilling]);
 
   const handleCheckout = async (planId: string) => {
+    if (!orgSlug) return;
     try {
       setActionLoading(true);
       const checkoutSettings = await appApi.createCheckoutSession(orgSlug, {
@@ -214,6 +205,7 @@ export default function BillingSettingsPage() {
   };
 
   const handleSelectPlan = async (planId: string) => {
+    if (!orgSlug) return;
     try {
       setActionLoading(true);
       const preview = await appApi.previewPlanChange(orgSlug, {
@@ -244,6 +236,7 @@ export default function BillingSettingsPage() {
   };
 
   const handleConfirmDowngrade = async (pauseSiteIds: string[] = []) => {
+    if (!orgSlug) return;
     if (!previewData) return;
     try {
       setActionLoading(true);
@@ -275,6 +268,7 @@ export default function BillingSettingsPage() {
   };
 
   const handleCancelSubscription = async () => {
+    if (!orgSlug) return;
     try {
       setActionLoading(true);
       const res = await appApi.cancelSubscription(orgSlug, {
@@ -295,6 +289,7 @@ export default function BillingSettingsPage() {
   };
 
   const handleResumeSubscription = async () => {
+    if (!orgSlug) return;
     try {
       setActionLoading(true);
       const res = await appApi.resumeSubscription(orgSlug);
@@ -308,6 +303,7 @@ export default function BillingSettingsPage() {
   };
 
   const handleOpenPortal = async () => {
+    if (!orgSlug) return;
     try {
       const url = await appApi.getCustomerPortalUrl(orgSlug);
       if (url) {
