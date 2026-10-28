@@ -28,6 +28,7 @@ export default function robots(): MetadataRoute.Robots {
           "/onboarding",
           "/invitations/*",
           "/tasks",
+          "/checkout",
           "/portal/*",
           "/magic",
           "/verify-email",
