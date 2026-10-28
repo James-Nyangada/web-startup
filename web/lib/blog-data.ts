@@ -30,9 +30,9 @@ export const BLOG_POSTS: BlogPost[] = [
     date: "October 14, 2026",
     readingTime: "6 min read",
     author: {
-      name: "Marcus Vance",
-      role: "Head of Accessibility Engineering",
-      avatar: "MV",
+      name: "James Nyangada",
+      role: "Founder",
+      avatar: "JN",
     },
     tags: ["EAA 2025", "Regulation", "E-Commerce", "WCAG 2.2"],
     content: [
@@ -76,9 +76,9 @@ export const BLOG_POSTS: BlogPost[] = [
     date: "October 02, 2026",
     readingTime: "8 min read",
     author: {
-      name: "Daniel Mwangi",
-      role: "Founder & Lead Architect",
-      avatar: "DM",
+      name: "James Nyangada",
+      role: "Founder",
+      avatar: "JN",
     },
     tags: ["Overlays", "Screen Readers", "ADA Lawsuits", "Code Quality"],
     content: [
@@ -119,9 +119,9 @@ export const BLOG_POSTS: BlogPost[] = [
     date: "September 24, 2026",
     readingTime: "5 min read",
     author: {
-      name: "Aisha Kamau",
-      role: "Frontend Accessibility Specialist",
-      avatar: "AK",
+      name: "James Nyangada",
+      role: "Founder",
+      avatar: "JN",
     },
     tags: ["Shopify", "Liquid", "Theme Development", "WCAG 2.2"],
     content: [
