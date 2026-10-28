@@ -10,6 +10,7 @@ import { staffApi, type StaffSession } from "@/lib/admin-api";
 
 const NAV = [
   { href: "/staff/orgs", label: "Organisations", icon: I.building },
+  { href: "/staff/customers", label: "Customer success", icon: I.users },
   { href: "/staff/queues", label: "Queues & system", icon: I.monitor },
   { href: "/staff/leads", label: "Leads", icon: I.mail },
   { href: "/staff/content", label: "Content review", icon: I.fileText },

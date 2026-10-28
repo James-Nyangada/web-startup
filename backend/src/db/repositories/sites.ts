@@ -401,7 +401,8 @@ export function sitesRepository(db: Database) {
             isNotNull(sites.verifiedAt),
             inArray(sites.verifyMethod, ['meta', 'dns', 'file']),
             isNull(organizations.deletedAt),
-            notInArray(organizations.billingStatus, ['read_only', 'paused', 'canceled']),
+            // Trials get two full scans and no scheduled monitoring; paid plans do.
+            notInArray(organizations.billingStatus, ['read_only', 'paused', 'canceled', 'trialing']),
           ),
         );
     },

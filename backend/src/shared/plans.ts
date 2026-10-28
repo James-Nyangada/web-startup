@@ -4,6 +4,9 @@ import { ErrorCode } from './errors.js';
 export const PLANS = ['trial', 'store', 'growth', 'agency', 'agency_pro'] as const;
 export type PlanType = (typeof PLANS)[number];
 
+/** Full scans a trial includes in total. The 10-page onboarding scan does not count. */
+export const TRIAL_FULL_SCAN_LIMIT = 2;
+
 export interface PlanLimits {
   name: string;
   maxSites: number;
@@ -108,14 +111,14 @@ export const PLAN_DEFINITIONS: Record<PlanType, PlanDefinition> = {
     priceMonthly: 0,
     priceAnnual: 0,
     currency: 'USD',
-    who: 'Free 14-day evaluation with full feature preview',
+    who: 'Free 14-day trial: 2 full scans, watermarked reports',
     features: {
       regressionAlerts: true,
       slackWebhook: false,
       whiteLabel: false,
       customDomain: false,
       scheduledClientReports: false,
-      evidencePack: true,
+      evidencePack: false,
       publicApi: false,
     },
   },
@@ -224,6 +227,7 @@ export type PlanFeature =
   | 'scheduled_reports'
   | 'slack_webhook'
   | 'public_api'
+  | 'evidence_pack'
   | 'ai_suggestions';
 
 export function getUpgradeTarget(
@@ -262,6 +266,8 @@ export function getUpgradeTarget(
       if (def.features.slackWebhook) return candidate;
     } else if (feature === 'public_api') {
       if (def.features.publicApi) return candidate;
+    } else if (feature === 'evidence_pack') {
+      if (def.features.evidencePack) return candidate;
     } else if (feature === 'ai_suggestions') {
       if (!value || limits.aiSuggestionsMonthly >= value) return candidate;
     }
@@ -432,6 +438,15 @@ export function assertWithinPlan(
             current: false,
             upgradeTo,
           },
+        );
+      }
+      break;
+    }
+    case 'evidence_pack': {
+      if (!def.features.evidencePack) {
+        throw new PlanLimitError(
+          'Evidence packs are included with a paid plan. Choose a plan to export your evidence log.',
+          { limit: 0, current: 0, upgradeTo: getUpgradeTarget(plan, 'evidence_pack') },
         );
       }
       break;

@@ -93,7 +93,7 @@ export function GlobalBannersRegion({
           <div className="flex items-center gap-2.5">
             <Icon d={I.critical} size={18} stroke="var(--crit)" className="flex-none" />
             <span>
-              Your trial has ended. Your account is currently in <strong>read-only mode</strong>.
+              Your trial has ended. Your account is currently in <strong>read-only mode</strong>. Your scan history, fixes and evidence log will be deleted 30 days after your trial ends unless you choose a plan.
             </span>
           </div>
           <Link
@@ -129,7 +129,7 @@ export function GlobalBannersRegion({
           <div className="flex items-center gap-2.5">
             <Icon d={I.minor} size={18} stroke="var(--primary)" className="flex-none" />
             <span>
-              <strong>{banner.daysLeft ?? 10} days</strong> left in your trial. Upgrade anytime to keep continuous weekly monitoring.
+              <strong>{banner.daysLeft ?? 10} days</strong> left in your trial. Your scan history, fixes and evidence log will be deleted 30 days after your trial ends unless you choose a plan.
             </span>
           </div>
           <div className="flex items-center gap-3">

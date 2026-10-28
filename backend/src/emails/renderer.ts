@@ -21,6 +21,9 @@ import {
   renderSiteVerificationFailing,
   renderDataExportReady,
   renderSecurityNotice,
+  renderPaidWelcome,
+  renderRenewalReminder,
+  renderInactiveCheckIn,
 } from './templates/index.js';
 import type {
   EmailBranding,
@@ -49,6 +52,9 @@ import type {
   SiteVerificationFailingData,
   DataExportReadyData,
   SecurityNoticeData,
+  PaidWelcomeData,
+  RenewalReminderData,
+  InactiveCheckInData,
 } from './types.js';
 
 export function renderEmail<T extends EmailTemplateId>(
@@ -101,6 +107,12 @@ export function renderEmail<T extends EmailTemplateId>(
       return renderDataExportReady(data as DataExportReadyData, branding);
     case 'E-23':
       return renderSecurityNotice(data as SecurityNoticeData, branding);
+    case 'E-24':
+      return renderPaidWelcome(data as PaidWelcomeData, branding);
+    case 'E-25':
+      return renderRenewalReminder(data as RenewalReminderData, branding);
+    case 'E-26':
+      return renderInactiveCheckIn(data as InactiveCheckInData, branding);
     default:
       throw new Error(`Unsupported email template: ${templateId}`);
   }
@@ -248,6 +260,35 @@ export function getSampleTemplateData(templateId: EmailTemplateId): unknown {
         ip: '102.134.12.1',
         userAgent: 'Firefox on macOS',
         accountUrl: 'http://localhost:3000/settings/account',
+      };
+    case 'E-24':
+      return {
+        name: 'Alex Johnson',
+        orgName: 'Brightline Studio',
+        planName: 'Growth',
+        interval: 'year' as const,
+        dashboardUrl: 'http://localhost:3000/overview',
+        addSiteUrl: 'http://localhost:3000/sites',
+        issuesUrl: 'http://localhost:3000/tasks',
+        settingsUrl: 'http://localhost:3000/settings',
+      };
+    case 'E-25':
+      return {
+        orgName: 'Brightline Studio',
+        planName: 'Growth',
+        interval: 'year' as const,
+        daysUntilRenewal: 7,
+        renewsAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+        amountFormatted: '$790.00',
+        billingUrl: 'http://localhost:3000/settings/billing',
+      };
+    case 'E-26':
+      return {
+        name: 'Alex Johnson',
+        orgName: 'Brightline Studio',
+        daysSinceLogin: 16,
+        dashboardUrl: 'http://localhost:3000/overview',
+        supportEmail: 'support@everyvisitor.app',
       };
   }
 }

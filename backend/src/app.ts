@@ -218,6 +218,8 @@ export function createApp({
     staffRouter(auth, repos, {
       queueAdmin:
         queueAdmin ?? (scansOptions?.boss ? pgBossQueueAdmin(scansOptions.boss, pool) : undefined),
+      boss: scansOptions?.boss,
+      emailSender,
     }),
   );
   app.use('/v1', v1);

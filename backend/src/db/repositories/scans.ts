@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, gte, inArray, isNotNull, isNull, ne, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, gte, inArray, isNotNull, isNull, ne, notInArray, sql } from 'drizzle-orm';
 import type { Database } from '../client.js';
 import type { Standard } from '../../scanner/types.js';
 import { scans, sites, type ScanStatus, type ScanTrigger } from '../schema/index.js';
@@ -192,6 +192,21 @@ export function scansRepository(db: Database) {
         .from(scans)
         .where(
           and(eq(scans.orgId, orgId), eq(scans.siteId, siteId), eq(scans.trigger, 'onboarding')),
+        );
+      return row?.count ?? 0;
+    },
+
+    /** Full scans an org has started (everything except the onboarding quick scan). */
+    async countFullScans(orgId: OrgId) {
+      const [row] = await db
+        .select({ count: sql<number>`count(*)::int` })
+        .from(scans)
+        .where(
+          and(
+            eq(scans.orgId, orgId),
+            ne(scans.trigger, 'onboarding'),
+            notInArray(scans.status, ['canceled', 'failed']),
+          ),
         );
       return row?.count ?? 0;
     },

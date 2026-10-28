@@ -24,7 +24,14 @@ const checkoutSchema = z.object({
   plan: z.enum(['store', 'growth', 'agency', 'agency_pro']).optional(),
   interval: z.enum(['month', 'year']).default('month'),
   priceId: z.string().optional(),
+  /** The buyer ticked the box agreeing to the Terms and the Refund Policy. */
+  acceptedPolicies: z.literal(true, { error: 'Accept the Terms and Refund Policy to continue.' }),
 });
+
+/** Dates shown at the top of the policies the buyer agreed to; stored with the acceptance. */
+const POLICY_VERSIONS = { terms: 'terms', refunds: '2026-10-28' } as const;
+
+const pauseSchema = z.object({ months: z.number().int().min(1).max(3) });
 
 const cancelSchema = z.object({
   reason: z
@@ -183,6 +190,24 @@ export function orgBillingRouter(
       res.status(404).json({ error: { code: 'NOT_FOUND', message: 'Organisation not found' } });
       return;
     }
+
+    // Keep proof of what was accepted, when and from where; this backs up a chargeback response.
+    await repos.auditLog.write(req.orgId!, {
+      actorId: req.auth?.user.id,
+      actorType: 'user',
+      action: 'billing.policies_accepted',
+      targetType: 'organization',
+      targetId: req.orgId!,
+      ip: req.ip,
+      userAgent: req.headers['user-agent'],
+      data: {
+        plan: selectedPlan ?? null,
+        interval,
+        priceId,
+        policies: POLICY_VERSIONS,
+        email: req.auth?.user.email ?? null,
+      },
+    });
 
     const customerEmail = req.auth?.user.email;
     const paddleEnv = process.env.PADDLE_ENV || 'sandbox';
@@ -608,6 +633,66 @@ export function orgBillingRouter(
         effectiveAt: sub.currentPeriodEnd ? sub.currentPeriodEnd.toISOString() : null,
         message:
           'Your subscription will remain active until the end of the current billing period.',
+      },
+    });
+  });
+
+  // POST /v1/orgs/:orgId/billing/pause - Offered at cancellation: pause 1-3 months, then resume
+  router.post('/pause', async (req: Request, res: Response): Promise<void> => {
+    const parse = pauseSchema.safeParse(req.body);
+    if (!parse.success) {
+      res.status(400).json({
+        error: { code: 'VALIDATION_ERROR', message: 'Choose a pause of 1, 2 or 3 months.' },
+      });
+      return;
+    }
+    const sub = await repos.subscriptions.findByOrgId(req.orgId!);
+    if (!sub || !sub.currentPeriodEnd || sub.status !== 'active') {
+      res.status(400).json({
+        error: { code: 'NO_SUBSCRIPTION', message: 'No active subscription found to pause' },
+      });
+      return;
+    }
+
+    // The pause starts when the paid period ends, so nothing already paid for is lost.
+    const resumeAt = new Date(sub.currentPeriodEnd);
+    resumeAt.setUTCMonth(resumeAt.getUTCMonth() + parse.data.months);
+
+    if (sub.paddleSubscriptionId) {
+      await paddleClient.pauseSubscription(sub.paddleSubscriptionId, {
+        effectiveFrom: 'next_billing_period',
+        resumeAt: resumeAt.toISOString(),
+      });
+    }
+
+    const scheduledChange = {
+      action: 'pause',
+      months: parse.data.months,
+      effectiveAt: sub.currentPeriodEnd.toISOString(),
+      resumeAt: resumeAt.toISOString(),
+    };
+    await repos.subscriptions.upsert({
+      ...sub,
+      orgId: asOrgId(sub.orgId),
+      scheduledChange,
+    });
+    await repos.auditLog.write(req.orgId!, {
+      actorId: req.auth?.user.id,
+      actorType: 'user',
+      action: 'billing.subscription_pause_scheduled',
+      targetType: 'subscription',
+      targetId: sub.id,
+      ip: req.ip,
+      userAgent: req.headers['user-agent'],
+      data: scheduledChange,
+    });
+
+    res.status(200).json({
+      data: {
+        success: true,
+        pauseStartsAt: scheduledChange.effectiveAt,
+        resumesAt: scheduledChange.resumeAt,
+        message: `Your plan pauses on ${sub.currentPeriodEnd.toISOString().slice(0, 10)} and resumes on ${resumeAt.toISOString().slice(0, 10)}.`,
       },
     });
   });

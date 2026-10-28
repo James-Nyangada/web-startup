@@ -147,6 +147,38 @@ export class PaddleClient {
   }
 
   /**
+   * Pauses a subscription in Paddle, optionally resuming it automatically on `resumeAt`.
+   */
+  async pauseSubscription(
+    subscriptionId: string,
+    params: { effectiveFrom?: 'immediately' | 'next_billing_period'; resumeAt?: string },
+  ): Promise<PaddleSubscriptionResponse> {
+    if (!this.isConfigured()) {
+      logger.info(
+        { subscriptionId, params },
+        'Paddle API key not configured; simulating subscription pause',
+      );
+      return {
+        id: subscriptionId,
+        status: 'active',
+        scheduledChange: {
+          action: 'pause',
+          effectiveAt: new Date(Date.now() + 30 * 86400 * 1000).toISOString(),
+        },
+      };
+    }
+
+    return this.request<PaddleSubscriptionResponse>(
+      'POST',
+      `/subscriptions/${subscriptionId}/pause`,
+      {
+        effective_from: params.effectiveFrom ?? 'next_billing_period',
+        ...(params.resumeAt ? { resume_at: params.resumeAt } : {}),
+      },
+    );
+  }
+
+  /**
    * Resumes a subscription in Paddle by clearing the scheduled cancellation.
    */
   async resumeSubscription(subscriptionId: string): Promise<PaddleSubscriptionResponse> {

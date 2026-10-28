@@ -20,7 +20,10 @@ export type EmailTemplateId =
   | 'E-20' // Data deletion warning (7 days, 1 day)
   | 'E-21' // Webhook disabled after failures
   | 'E-22' // Personal data export ready
-  | 'E-23'; // Security notice: password changed / new sign-in
+  | 'E-23' // Security notice: password changed / new sign-in
+  | 'E-24' // Welcome after first payment + 3 next steps
+  | 'E-25' // Renewal reminder (7 days annual, 5 days monthly)
+  | 'E-26'; // Personal check-in for inactive paying customers
 
 export interface EmailRenderOutput {
   subject: string;
@@ -218,6 +221,35 @@ export interface WebhookDisabledData {
   settingsUrl: string;
 }
 
+export interface PaidWelcomeData {
+  name?: string | null;
+  orgName: string;
+  planName: string;
+  interval: 'month' | 'year';
+  dashboardUrl: string;
+  addSiteUrl: string;
+  issuesUrl: string;
+  settingsUrl: string;
+}
+
+export interface RenewalReminderData {
+  orgName: string;
+  planName: string;
+  interval: 'month' | 'year';
+  daysUntilRenewal: number;
+  renewsAt: string | Date;
+  amountFormatted?: string;
+  billingUrl: string;
+}
+
+export interface InactiveCheckInData {
+  name?: string | null;
+  orgName: string;
+  daysSinceLogin: number;
+  dashboardUrl: string;
+  supportEmail: string;
+}
+
 export type TemplateDataMap = {
   'E-01': VerifyEmailData;
   'E-02': MagicLinkData;
@@ -241,4 +273,7 @@ export type TemplateDataMap = {
   'E-21': WebhookDisabledData;
   'E-22': DataExportReadyData;
   'E-23': SecurityNoticeData;
+  'E-24': PaidWelcomeData;
+  'E-25': RenewalReminderData;
+  'E-26': InactiveCheckInData;
 };

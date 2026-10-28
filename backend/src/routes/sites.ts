@@ -54,7 +54,14 @@ const detectPlatformSchema = z.object({
 });
 
 const verifySiteSchema = z.object({
-  method: z.enum(['meta', 'dns', 'file'] as const),
+  method: z.enum(['meta', 'dns', 'file', 'plugin', 'shopify'] as const),
+});
+
+export const connectSiteSchema = z.object({
+  url: z.string().trim().min(1, 'URL is required'),
+  name: z.string().trim().min(1).max(255).optional(),
+  platform: z.enum(['wordpress', 'shopify']).default('wordpress'),
+  issueKey: z.boolean().optional(),
 });
 
 const pinPageSchema = z
@@ -792,6 +799,36 @@ export function orgSitesRouter(repos: Repositories): Router {
       }
 
       const { method } = parse.data;
+
+      if (method === 'plugin' || method === 'shopify') {
+        const updated = await repos.sites.setVerified(req.orgId!, siteId, method);
+        const actorId = req.auth?.user?.id ?? req.apiKey?.id ?? 'integration';
+        await repos.auditLog.write(req.orgId!, {
+          actorId,
+          actorType: req.auth?.user ? 'user' : 'system',
+          action: 'site.verified',
+          targetId: siteId,
+          targetType: 'site',
+          data: { method, verifiedAt: new Date().toISOString() },
+          ip: req.ip ?? null,
+          userAgent: req.get('user-agent') ?? null,
+        });
+        await repos.evidenceEvents.record(req.orgId!, {
+          siteId,
+          type: 'site_verified',
+          actorId,
+          data: { method, verifiedAt: new Date().toISOString() },
+        });
+        res.status(200).json({
+          data: {
+            ok: true,
+            verified: true,
+            site: updated,
+            method,
+          },
+        });
+        return;
+      }
 
       // Run verification check
       const result = await verifyOwnership(site.rootUrl, site.verifyToken, method, {

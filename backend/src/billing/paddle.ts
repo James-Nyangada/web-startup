@@ -310,6 +310,36 @@ export async function processPaddleEvent(
             }
           }
 
+          // First payment only: the welcome email with the 3 most useful next steps.
+          if (!priorSub) {
+            try {
+              const owner = await repos.memberships.findOwner(orgIdScoped);
+              const org = await repos.organizations.findById(orgIdScoped);
+              if (owner?.email && org) {
+                const appUrl = options?.appUrl || process.env.APP_URL || 'http://localhost:3000';
+                await dispatchEmail(options, owner.email, 'E-24', {
+                  name: owner.name,
+                  orgName: org.name,
+                  planName: getPlanDefinition(planInfo.plan).name,
+                  interval: planInfo.interval as 'month' | 'year',
+                  dashboardUrl: `${appUrl}/overview`,
+                  addSiteUrl: `${appUrl}/sites`,
+                  issuesUrl: `${appUrl}/tasks`,
+                  settingsUrl: `${appUrl}/settings`,
+                });
+                await repos.auditLog.write(orgIdScoped, {
+                  actorType: 'system',
+                  action: 'billing.welcome_email_sent',
+                  targetType: 'organization',
+                  targetId: orgIdScoped,
+                  data: { to: owner.email, plan: planInfo.plan },
+                });
+              }
+            } catch (err) {
+              logger.error({ err, eventId }, 'Failed to send paid welcome email');
+            }
+          }
+
           // Record compliance evidence event for all sites (P5-01)
           if (repos.evidenceEvents?.record) {
             const createdOrgSites = await repos.sites.list(orgIdScoped);

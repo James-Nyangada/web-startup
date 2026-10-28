@@ -202,7 +202,15 @@ export const PRICING_FAQS = [
     a: "We process payments via Paddle, our Merchant of Record. We accept Visa, Mastercard, American Express, Apple Pay, Google Pay, and PayPal. Invoices include full sales tax/VAT compliance for US, EU, and UK business entities.",
   },
   {
+    q: "What happens to my history if I don't choose a plan?",
+    a: "Your scan history, fixes and evidence log will be deleted 30 days after your trial ends unless you choose a plan. Choose a plan at any point in those 30 days and everything you built is still there.",
+  },
+  {
+    q: "What is your refund policy?",
+    a: "Annual plans can be refunded in full within 14 days of the first annual payment, and we always refund double charges, charges after cancelling by our error, and long outages on our side. Monthly payments are not refundable otherwise, because you can try everything free for 14 days first. Full details are in our Refund Policy at /legal/refunds.",
+  },
+  {
     q: "Can I cancel my subscription at any time?",
-    a: "Yes. You can cancel with one click from your account billing dashboard. Your subscription remains active with full access until the end of your current paid billing period, and no further charges will be made.",
+    a: "Yes. You can cancel from your account billing dashboard, or switch to a cheaper plan or pause for 1 to 3 months instead. Your subscription remains active with full access until the end of your current paid billing period, and no further charges will be made.",
   },
 ];

@@ -209,6 +209,35 @@ const qs = (params: Record<string, string | number | boolean | undefined | null>
   return entries.length ? `?${new URLSearchParams(entries.map(([k, v]) => [k, String(v)]))}` : "";
 };
 
+export interface InactiveCustomer {
+  orgId: string;
+  orgName: string;
+  plan: string;
+  ownerEmail: string;
+  ownerName: string | null;
+  lastActiveAt: string;
+  daysInactive: number;
+  lastCheckInAt: string | null;
+}
+
+export interface ActivationRow {
+  orgId: string;
+  orgName: string;
+  plan: string;
+  billingStatus: string;
+  createdAt: string;
+  daysSinceSignup: number;
+  steps: { siteVerified: string | null; fullScanCompleted: string | null; issueFixed: string | null };
+  stepsDone: number;
+  activatedAt: string | null;
+  withinWeek: boolean;
+}
+
+export interface ActivationReport {
+  summary: { orgs: number; activated: number; activatedWithinWeek: number; activationRate: number };
+  items: ActivationRow[];
+}
+
 /* ---------- Staff (S-70 – S-75) ---------- */
 
 export const staffApi = {
@@ -219,6 +248,10 @@ export const staffApi = {
 
   listOrgs: (params: { q?: string; plan?: string; status?: string; includeDeleted?: boolean; cursor?: string | null }) =>
     apiFetch<Page<StaffOrgRow>>(`/v1/staff/orgs${qs({ ...params, limit: 50 })}`),
+  inactiveCustomers: () => apiClient<InactiveCustomer[]>("/v1/staff/inactive-customers"),
+  sendCheckIn: (orgId: string) =>
+    apiClient<{ sent: boolean; to: string }>(`/v1/staff/orgs/${orgId}/check-in`, { method: "POST" }),
+  activation: () => apiClient<ActivationReport>("/v1/staff/activation"),
   getOrg: (id: string) => apiClient<StaffOrgDetail>(`/v1/staff/orgs/${id}`),
   extendTrial: (id: string, days: number, reason: string) =>
     apiClient(`/v1/staff/orgs/${id}/extend-trial`, json({ days, reason })),

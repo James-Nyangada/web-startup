@@ -416,10 +416,14 @@ export async function handleReportRender(
 
       const reportType = report.type === 'scan_summary' ? 'summary' : 'full';
 
+      const reportOrg = ctx.repos.organizations
+        ? await ctx.repos.organizations.findById(asOrgId(report.orgId))
+        : null;
       pdfBuffer = await renderReportPdf(scanResult, {
         type: reportType,
         paper: report.paper,
         branding: reportBranding,
+        watermark: reportOrg?.billingStatus === 'trialing' ? 'TRIAL REPORT' : undefined,
       });
     }
 

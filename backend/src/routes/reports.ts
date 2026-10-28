@@ -77,6 +77,9 @@ export function orgReportsRouter(repos: Repositories, options?: ReportsRouterOpt
     if (branded) {
       assertWithinPlan(req.org, 'white_label');
     }
+    if (type === 'evidence_pack') {
+      assertWithinPlan(req.org, 'evidence_pack');
+    }
     if (type === 'client_monthly') {
       assertWithinPlan(req.org, 'scheduled_reports');
     }

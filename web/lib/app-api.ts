@@ -547,7 +547,7 @@ export const appApi = {
 
   createCheckoutSession: (
     org: string,
-    params: { plan?: string; interval?: 'month' | 'year'; priceId?: string },
+    params: { plan?: string; interval?: 'month' | 'year'; priceId?: string; acceptedPolicies: true },
   ) =>
     apiClient<ApiCheckoutSettings>(`/v1/orgs/${org}/billing/checkout`, json(params)),
 
@@ -586,6 +586,13 @@ export const appApi = {
       scheduled: boolean;
       effectiveDate?: string | null;
     }>(`/v1/orgs/${org}/billing/change-plan`, json(params)),
+
+  /** Pause the plan for 1-3 months from the end of the paid period. */
+  pauseSubscription: (org: string, months: 1 | 2 | 3) =>
+    apiClient<{ success: boolean; pauseStartsAt: string; resumesAt: string; message: string }>(
+      `/v1/orgs/${org}/billing/pause`,
+      json({ months }),
+    ),
 
   cancelSubscription: (org: string, params?: { reason?: string; feedback?: string } | string) => {
     const payload = typeof params === 'string' ? { reason: params } : (params ?? {});

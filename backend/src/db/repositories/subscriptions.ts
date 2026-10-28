@@ -1,4 +1,4 @@
-import { and, eq, sql } from 'drizzle-orm';
+import { and, eq, gte, lte, sql } from 'drizzle-orm';
 import type { Database } from '../client.js';
 import { subscriptions } from '../schema/index.js';
 import type { OrgId } from './org-scope.js';
@@ -75,6 +75,21 @@ export function subscriptionsRepository(db: Database) {
           and(
             sql`${subscriptions.scheduledChange}->>'action' = 'downgrade'`,
             sql`(${subscriptions.scheduledChange}->>'effectiveAt')::timestamptz <= ${now.toISOString()}::timestamptz`,
+          ),
+        );
+    },
+
+    /** Active subscriptions that renew on their own between `from` and `to` (all orgs). */
+    async listRenewingBetween(from: Date, to: Date) {
+      return db
+        .select()
+        .from(subscriptions)
+        .where(
+          and(
+            eq(subscriptions.status, 'active'),
+            eq(subscriptions.cancelAtPeriodEnd, false),
+            gte(subscriptions.currentPeriodEnd, from),
+            lte(subscriptions.currentPeriodEnd, to),
           ),
         );
     },

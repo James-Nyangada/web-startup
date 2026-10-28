@@ -23,6 +23,8 @@ export interface ReportOptions {
   type: ReportType;
   paper?: Paper;
   branding?: ReportBranding;
+  /** Diagonal text printed across every page, e.g. "TRIAL REPORT". */
+  watermark?: string;
 }
 
 /** R-01 / R-02 as a complete HTML document. */
@@ -53,7 +55,12 @@ const footerTemplate = (site: string, branding?: ReportBranding) => {
  * page is rendered offline: every network request is refused.
  */
 export async function renderReportPdf(scan: ScanResult, options: ReportOptions): Promise<Buffer> {
-  const html = renderReportHtml(scan, options.type, options.branding);
+  let html = renderReportHtml(scan, options.type, options.branding);
+  if (options.watermark) {
+    const text = options.watermark.replace(/[<>&"]/g, '');
+    const mark = `<div aria-hidden="true" style="position:fixed;top:42%;left:0;width:100%;text-align:center;transform:rotate(-30deg);font:700 72px Helvetica,Arial,sans-serif;color:rgba(15,61,62,0.08);pointer-events:none;z-index:9999;">${text}</div>`;
+    html = html.replace('</body>', `${mark}</body>`);
+  }
   const browser = await chromium.launch();
   try {
     const context = await browser.newContext({ javaScriptEnabled: false });

@@ -397,13 +397,39 @@ describe('Chunk P4-02: Billing and Paddle Checkout', () => {
 
       const res = await request(app)
         .post(`/v1/orgs/${org.id}/billing/checkout`)
-        .send({ plan: 'growth', interval: 'month' })
+        .send({ plan: 'growth', interval: 'month', acceptedPolicies: true })
         .expect(200);
 
       expect(res.body.data.priceId).toBe('pri_sandbox_growth_monthly');
       expect(res.body.data.customerEmail).toBe(user.email);
       expect(res.body.data.customData.orgId).toBe(org.id);
       expect(res.body.data.paddleEnvironment).toBe('sandbox');
+    });
+
+    it('refuses checkout until the Terms and Refund Policy are accepted', async () => {
+      const { app, org } = setupAuth('owner');
+
+      await request(app)
+        .post(`/v1/orgs/${org.id}/billing/checkout`)
+        .send({ plan: 'growth', interval: 'month' })
+        .expect(400);
+    });
+
+    it('records the policy acceptance with the checkout', async () => {
+      const { app, org, repos } = setupAuth('owner');
+
+      await request(app)
+        .post(`/v1/orgs/${org.id}/billing/checkout`)
+        .send({ plan: 'growth', interval: 'year', acceptedPolicies: true })
+        .expect(200);
+
+      expect(repos.auditLog.write).toHaveBeenCalledWith(
+        org.id,
+        expect.objectContaining({
+          action: 'billing.policies_accepted',
+          data: expect.objectContaining({ plan: 'growth', interval: 'year' }),
+        }),
+      );
     });
 
     it('schedules cancellation on POST /v1/orgs/:orgId/billing/cancel', async () => {

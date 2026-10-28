@@ -9,6 +9,7 @@ import { COMPARISON_CATEGORIES, PRICING_FAQS } from "@/lib/pricing-data";
 import { appApi, planFrequencyLabel } from "@/lib/app-api";
 import { openPaddleCheckout } from "@/lib/paddle";
 import { apiClient } from "@/lib/api";
+import { PolicyConsent } from "@/components/billing/policy-consent";
 
 const H2 = "m-0 font-serif text-[38px] leading-[42px] font-normal sm:text-[48px] sm:leading-[52px]";
 
@@ -74,8 +75,10 @@ const DEFAULT_PLANS: PlanItem[] = [
 ];
 
 export default function PricingPage() {
-  const [billingCycle, setBillingCycle] = useState<"monthly" | "annual">("annual");
+  const [billingCycle, setBillingCycle] = useState<"monthly" | "annual">("monthly");
   const [plans, setPlans] = useState<PlanItem[]>(DEFAULT_PLANS);
+  const [policiesAccepted, setPoliciesAccepted] = useState(false);
+  const [consentError, setConsentError] = useState(false);
   const [openFaq, setOpenFaq] = useState<number | null>(0);
   const [userOrg, setUserOrg] = useState<{ id: string; slug: string } | null>(null);
 
@@ -104,10 +107,15 @@ export default function PricingPage() {
 
   const handlePricingCheckout = async (planId: string) => {
     if (!userOrg) return;
+    if (!policiesAccepted) {
+      setConsentError(true);
+      return;
+    }
     try {
       const checkoutSettings = await appApi.createCheckoutSession(userOrg.slug, {
         plan: planId,
         interval: billingCycle === "annual" ? "year" : "month",
+        acceptedPolicies: true,
       });
       await openPaddleCheckout({
         priceId: checkoutSettings.priceId,
@@ -185,6 +193,18 @@ export default function PricingPage() {
 
         {/* Pricing Cards Grid */}
         <section aria-label="Available subscription tiers" className="mx-auto max-w-[1280px] px-4 pb-20 sm:px-8">
+          {userOrg && (
+            <div className="mb-6">
+              <PolicyConsent
+                checked={policiesAccepted}
+                onChange={(v) => {
+                  setPoliciesAccepted(v);
+                  if (v) setConsentError(false);
+                }}
+                showError={consentError}
+              />
+            </div>
+          )}
           <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4 items-stretch">
             {plans.map((p) => {
               const price = billingCycle === "annual" ? Math.round(p.priceAnnual / 12) : p.priceMonthly;
@@ -308,6 +328,13 @@ export default function PricingPage() {
               );
             })}
           </div>
+          <p className="mx-auto mt-8 max-w-[760px] text-center text-sm text-muted">
+            Page limits are per scan. Automated checks find only part of the accessibility problems on a site, so they are a strong starting point, not a full audit. Your trial history is kept for 30 days after it ends. See our{" "}
+            <Link href="/legal/refunds" className="text-primary underline">
+              Refund Policy
+            </Link>
+            .
+          </p>
         </section>
 
         {/* Feature Comparison Table Section */}

@@ -147,7 +147,7 @@ describe('Chunk P4-05: Trial lifecycle and read-only mode', () => {
       // POST checkout to purchase a subscription
       const checkoutRes = await request(app)
         .post(`/v1/orgs/${org.id}/billing/checkout`)
-        .send({ plan: 'growth', interval: 'month' })
+        .send({ plan: 'growth', interval: 'month', acceptedPolicies: true })
         .expect(200);
       expect(checkoutRes.body.data.priceId).toBe('pri_sandbox_growth_monthly');
     });

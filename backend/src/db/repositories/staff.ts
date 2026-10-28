@@ -4,6 +4,7 @@ import {
   aiSuggestions,
   auditLog,
   fixGuides,
+  issues,
   freeChecks,
   invoices,
   memberships,
@@ -245,6 +246,7 @@ export function staffRepository(db: Database) {
                   ilike(auditLog.action, 'billing.%'),
                   ilike(auditLog.action, 'staff.%'),
                   ilike(auditLog.action, 'trial.%'),
+                  ilike(auditLog.action, 'customer.%'),
                 ),
               ),
             )
@@ -276,6 +278,124 @@ export function staffRepository(db: Database) {
      * Pushes the trial end out. An org that already fell into read-only at the end of its
      * trial goes back to trialing so it can scan again.
      */
+    /**
+     * Paying orgs whose owner has not been active for at least `minDays`, longest-quiet first.
+     * Activity is the owner's latest session update; an owner with no session yet counts from
+     * the day the subscription started. `lastCheckInAt` is the last personal check-in we sent.
+     */
+    async listInactivePaying(minDays: number, limit = 200, onlyOrgId?: string) {
+      const cutoff = new Date(Date.now() - minDays * 24 * 60 * 60 * 1000);
+      const rows = await db.execute<{
+        org_id: string;
+        org_name: string;
+        plan: string;
+        owner_user_id: string;
+        owner_email: string;
+        owner_name: string | null;
+        last_active_at: Date;
+        last_check_in_at: Date | null;
+      }>(sql`
+        select o.id as org_id, o.name as org_name, o.plan, u.id as owner_user_id,
+               u.email::text as owner_email, u.name as owner_name,
+               coalesce((select max(s.updated_at) from ${sessions} s where s.user_id = u.id),
+                        sub.created_at) as last_active_at,
+               (select max(a.created_at) from ${auditLog} a
+                 where a.org_id = o.id and a.action = 'customer.check_in_sent') as last_check_in_at
+        from ${organizations} o
+        join ${subscriptions} sub on sub.org_id = o.id
+        join ${memberships} m on m.org_id = o.id and m.role = 'owner'
+        join ${users} u on u.id = m.user_id
+        where o.deleted_at is null and o.billing_status = 'active'
+          ${onlyOrgId ? sql`and o.id = ${onlyOrgId}::uuid` : sql``}
+          and sub.status = 'active'
+          and coalesce((select max(s.updated_at) from ${sessions} s where s.user_id = u.id),
+                       sub.created_at) <= ${cutoff.toISOString()}::timestamptz
+        order by last_active_at asc
+        limit ${limit}
+      `);
+      const now = Date.now();
+      return rows.rows.map((r) => {
+        const lastActiveAt = new Date(r.last_active_at);
+        return {
+          orgId: r.org_id,
+          orgName: r.org_name,
+          plan: r.plan,
+          ownerUserId: r.owner_user_id,
+          ownerEmail: r.owner_email,
+          ownerName: r.owner_name,
+          lastActiveAt,
+          daysInactive: Math.floor((now - lastActiveAt.getTime()) / (24 * 60 * 60 * 1000)),
+          lastCheckInAt: r.last_check_in_at ? new Date(r.last_check_in_at) : null,
+        };
+      });
+    },
+
+    /**
+     * Activation per organisation. Activated means all three: a verified site, a completed full
+     * scan (not the onboarding quick scan) and at least one fixed issue. `activatedAt` is the
+     * day the last of the three happened; `withinWeek` is true when that was inside the first 7
+     * days after sign-up. Trialing and paying orgs created in the last `sinceDays` days.
+     */
+    async listActivation(sinceDays = 90, limit = 500) {
+      const since = new Date(Date.now() - sinceDays * 24 * 60 * 60 * 1000);
+      const rows = await db.execute<{
+        org_id: string;
+        org_name: string;
+        plan: string;
+        billing_status: string;
+        created_at: Date;
+        verified_at: Date | null;
+        first_full_scan_at: Date | null;
+        first_fix_at: Date | null;
+      }>(sql`
+        select o.id as org_id, o.name as org_name, o.plan, o.billing_status, o.created_at,
+          (select min(si.verified_at) from ${sites} si where si.org_id = o.id and si.deleted_at is null) as verified_at,
+          (select min(sc.finished_at) from ${scans} sc
+            where sc.org_id = o.id and sc.trigger <> 'onboarding' and sc.status in ('completed', 'partial')) as first_full_scan_at,
+          (select min(i.fixed_at) from ${issues} i where i.org_id = o.id and i.status = 'fixed') as first_fix_at
+        from ${organizations} o
+        where o.deleted_at is null and o.created_at >= ${since.toISOString()}::timestamptz
+          and o.billing_status in ('trialing', 'active', 'past_due')
+        order by o.created_at desc
+        limit ${limit}
+      `);
+      const week = 7 * 24 * 60 * 60 * 1000;
+      const items = rows.rows.map((r) => {
+        const createdAt = new Date(r.created_at);
+        const steps = {
+          siteVerified: r.verified_at ? new Date(r.verified_at) : null,
+          fullScanCompleted: r.first_full_scan_at ? new Date(r.first_full_scan_at) : null,
+          issueFixed: r.first_fix_at ? new Date(r.first_fix_at) : null,
+        };
+        const times = Object.values(steps);
+        const activatedAt = times.every((t) => t)
+          ? new Date(Math.max(...times.map((t) => t!.getTime())))
+          : null;
+        return {
+          orgId: r.org_id,
+          orgName: r.org_name,
+          plan: r.plan,
+          billingStatus: r.billing_status,
+          createdAt,
+          daysSinceSignup: Math.floor((Date.now() - createdAt.getTime()) / (24 * 60 * 60 * 1000)),
+          steps,
+          stepsDone: times.filter(Boolean).length,
+          activatedAt,
+          withinWeek: activatedAt ? activatedAt.getTime() - createdAt.getTime() <= week : false,
+        };
+      });
+      const activated = items.filter((i) => i.activatedAt);
+      return {
+        summary: {
+          orgs: items.length,
+          activated: activated.length,
+          activatedWithinWeek: activated.filter((i) => i.withinWeek).length,
+          activationRate: items.length ? activated.length / items.length : 0,
+        },
+        items,
+      };
+    },
+
     async extendTrial(orgId: OrgId, trialEndsAt: Date) {
       const [row] = await db
         .update(organizations)

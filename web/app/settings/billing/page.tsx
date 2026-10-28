@@ -14,6 +14,7 @@ import {
 import { openPaddleCheckout } from "@/lib/paddle";
 import { useFocusTrap } from "@/components/use-focus-trap";
 import { useActiveOrg } from "@/lib/use-active-org";
+import { PolicyConsent } from "@/components/billing/policy-consent";
 
 const DEFAULT_BILLING: ApiBillingInfo = {
   plan: "trial",
@@ -130,6 +131,9 @@ export default function BillingSettingsPage() {
   const [previewData, setPreviewData] = useState<ApiPlanChangePreview | null>(null);
   const [selectedPauseSites, setSelectedPauseSites] = useState<string[]>([]);
   const [cancelModalOpen, setCancelModalOpen] = useState(false);
+  const [policiesAccepted, setPoliciesAccepted] = useState(false);
+  const [consentError, setConsentError] = useState(false);
+  const [pauseMonths, setPauseMonths] = useState<1 | 2 | 3>(1);
   const [cancelReason, setCancelReason] = useState("too_expensive");
   const [cancelFeedback, setCancelFeedback] = useState("");
   const [billingCycle, setBillingCycle] = useState<"month" | "year">("month");
@@ -178,6 +182,7 @@ export default function BillingSettingsPage() {
       const checkoutSettings = await appApi.createCheckoutSession(orgSlug, {
         plan: planId,
         interval: billingCycle,
+        acceptedPolicies: true,
       });
 
       await openPaddleCheckout({
@@ -231,6 +236,10 @@ export default function BillingSettingsPage() {
 
   const handleSelectPlan = async (planId: string) => {
     if (!orgSlug) return;
+    if (!policiesAccepted) {
+      setConsentError(true);
+      return;
+    }
     try {
       setActionLoading(true);
       const preview = await appApi.previewPlanChange(orgSlug, {
@@ -287,6 +296,22 @@ export default function BillingSettingsPage() {
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
       showToast(msg || "Failed to update plan", { type: "warning" });
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handlePauseSubscription = async () => {
+    if (!orgSlug) return;
+    try {
+      setActionLoading(true);
+      const res = await appApi.pauseSubscription(orgSlug, pauseMonths);
+      showToast(res.message, { type: "info" });
+      setCancelModalOpen(false);
+      await fetchBilling();
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      showToast(msg || "Failed to pause subscription", { type: "warning" });
     } finally {
       setActionLoading(false);
     }
@@ -698,6 +723,8 @@ export default function BillingSettingsPage() {
               </button>
             </div>
 
+            <PolicyConsent checked={policiesAccepted} onChange={(v) => { setPoliciesAccepted(v); if (v) setConsentError(false); }} showError={consentError} />
+
             {/* Billing Cycle Toggle */}
             <div className="flex justify-center">
               <div
@@ -1022,6 +1049,48 @@ export default function BillingSettingsPage() {
                 <Icon d={I.close} size={18} />
               </button>
             </div>
+
+            <section aria-labelledby="cancel-alt-title" className="flex flex-col gap-3 rounded-2xl border border-line bg-subtle/50 p-4">
+              <h3 id="cancel-alt-title" className="m-0 text-sm font-bold text-ink">
+                Just need to spend less or take a break?
+              </h3>
+              <button
+                type="button"
+                onClick={() => {
+                  setCancelModalOpen(false);
+                  setChangePlanOpen(true);
+                }}
+                className="ease-ui rounded-full border border-line bg-surface px-4 py-2 text-xs font-semibold text-ink hover:border-primary hover:text-primary cursor-pointer"
+              >
+                Switch to a cheaper plan
+              </button>
+              <div className="flex flex-wrap items-center gap-2">
+                <label htmlFor="pause-months" className="text-xs font-medium text-muted">
+                  Pause my plan for
+                </label>
+                <select
+                  id="pause-months"
+                  value={pauseMonths}
+                  onChange={(e) => setPauseMonths(Number(e.target.value) as 1 | 2 | 3)}
+                  className="rounded-xl border border-line bg-surface px-3 py-2 text-xs text-ink focus:border-primary focus:outline-none"
+                >
+                  <option value={1}>1 month</option>
+                  <option value={2}>2 months</option>
+                  <option value={3}>3 months</option>
+                </select>
+                <button
+                  type="button"
+                  disabled={actionLoading}
+                  onClick={handlePauseSubscription}
+                  className="ease-ui rounded-full border border-line bg-surface px-4 py-2 text-xs font-semibold text-ink hover:border-primary hover:text-primary cursor-pointer"
+                >
+                  Pause plan
+                </button>
+              </div>
+              <p className="m-0 text-xs text-muted">
+                A pause starts when your paid period ends and your plan resumes on its own. Your scan history, fixes and evidence log are kept.
+              </p>
+            </section>
 
             <p className="text-sm text-ink m-0">
               Your subscription will remain active until <strong>{formattedEndDate}</strong>. After this date, your organization will transition to read-only mode.

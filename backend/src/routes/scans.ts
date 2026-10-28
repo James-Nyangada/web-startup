@@ -6,7 +6,7 @@ import { requireOrgRole } from '../middleware/org.js';
 import { ErrorCode } from '../shared/errors.js';
 import { STANDARDS, type Standard } from '../scanner/types.js';
 import { enqueueScanRun } from '../worker/boss.js';
-import { assertWithinPlan } from '../shared/plans.js';
+import { assertWithinPlan, PlanLimitError, TRIAL_FULL_SCAN_LIMIT } from '../shared/plans.js';
 import { getZonedParts, zonedWallClockToUtc } from '../lib/schedule.js';
 import { getScanFailureHint } from '../shared/scan-hints.js';
 
@@ -149,6 +149,17 @@ export function orgScansRouter(repos: Repositories, options?: ScansRouterOptions
       }
 
       const org = await repos.organizations.findById(req.orgId!);
+
+      // A trial includes two full scans in total; the onboarding quick scan is free.
+      if (org?.billingStatus === 'trialing' && trigger !== 'onboarding') {
+        const used = await repos.scans.countFullScans(req.orgId!);
+        if (used >= TRIAL_FULL_SCAN_LIMIT) {
+          throw new PlanLimitError(
+            `Your trial includes ${TRIAL_FULL_SCAN_LIMIT} full scans and you have used them. Choose a plan to keep scanning and monitoring weekly.`,
+            { limit: TRIAL_FULL_SCAN_LIMIT, current: used, upgradeTo: 'store' },
+          );
+        }
+      }
 
       // Enforce daily manual scan limit per site based on org plan (API scans count too)
       if (trigger === 'manual' || trigger === 'api') {

@@ -68,6 +68,11 @@ export function MarketingFooter() {
                 </Link>
               </li>
               <li>
+                <Link href="/legal/refunds" className="text-muted no-underline hover:text-ink">
+                  Refund policy
+                </Link>
+              </li>
+              <li>
                 <Link href="/legal/dpa" className="text-muted no-underline hover:text-ink">
                   Data Processing Agreement (DPA)
                 </Link>

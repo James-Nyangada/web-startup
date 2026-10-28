@@ -14,6 +14,7 @@ import { handleEmailSend } from './jobs/email-send.js';
 import { handleReportRender } from './jobs/report-render.js';
 import { handleFreeCheckRun } from './jobs/free-check-run.js';
 import { handleTrialLifecycle } from './jobs/trial-lifecycle.js';
+import { handleBillingLifecycle } from './jobs/billing-lifecycle.js';
 import { handlePaddleProcess } from './jobs/paddle-process.js';
 import { handleWeeklyDigest } from './jobs/digest-weekly.js';
 import { handleWebhookDeliver } from './jobs/webhook-deliver.js';
@@ -40,6 +41,7 @@ export const QUEUE_REPORT_RENDER = 'report.render';
 export const QUEUE_REPORT_SCHEDULE = 'report.schedule';
 export const QUEUE_FREE_CHECK_RUN = 'free-check.run';
 export const QUEUE_TRIAL_LIFECYCLE = 'trial.lifecycle';
+export const QUEUE_BILLING_LIFECYCLE = 'billing.lifecycle';
 export const QUEUE_PADDLE_PROCESS = 'paddle.process';
 export const QUEUE_DIGEST_WEEKLY = 'digest.weekly';
 export const QUEUE_WEBHOOK_DELIVER = 'webhook.deliver';
@@ -58,6 +60,7 @@ export const ALL_QUEUES = [
   QUEUE_REPORT_SCHEDULE,
   QUEUE_FREE_CHECK_RUN,
   QUEUE_TRIAL_LIFECYCLE,
+  QUEUE_BILLING_LIFECYCLE,
   QUEUE_PADDLE_PROCESS,
   QUEUE_DIGEST_WEEKLY,
   QUEUE_WEBHOOK_DELIVER,
@@ -327,6 +330,11 @@ export async function registerWorkers(boss: PgBoss, ctx: WorkerContext): Promise
     await handleTrialLifecycle(ctx);
   });
 
+  // Concurrency 1 for billing.lifecycle cron (renewal reminders, inactive-customer check-ins)
+  await boss.work(QUEUE_BILLING_LIFECYCLE, { localConcurrency: 1, batchSize: 1 }, async () => {
+    await handleBillingLifecycle(ctx);
+  });
+
   // Concurrency 1 for paddle.process, retries 5 per spec Section 9
   await boss.work<PaddleProcessJobPayload>(
     QUEUE_PADDLE_PROCESS,
@@ -420,6 +428,9 @@ export async function registerSchedules(boss: PgBoss): Promise<void> {
 
   // trial.lifecycle runs hourly (cron: '0 * * * *')
   await boss.schedule(QUEUE_TRIAL_LIFECYCLE, '0 * * * *', {});
+
+  // billing.lifecycle runs daily at 09:00 UTC
+  await boss.schedule(QUEUE_BILLING_LIFECYCLE, '0 9 * * *', {});
 
   // digest.weekly runs hourly to catch Mon 07:00 in each org's time zone (Spec Section 9 & P5-06)
   await boss.schedule(QUEUE_DIGEST_WEEKLY, '0 * * * *', {});

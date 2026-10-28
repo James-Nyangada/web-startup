@@ -12,12 +12,18 @@ import { generateTotpSecret, totpUri, verifyTotp } from '../lib/totp.js';
 import { requireAuth } from '../middleware/auth.js';
 import { loadStaff, requireStaffVerified } from '../middleware/staff.js';
 import { ErrorCode } from '../shared/errors.js';
+import type { PgBoss } from 'pg-boss';
+import { INACTIVE_AFTER_DAYS, sendCheckIn } from '../billing/customer-outreach.js';
+import type { EmailSender } from '../emails/sender.js';
 import { getSystemSnapshot, isKnownQueue, type QueueAdmin } from '../staff/queue-admin.js';
 
 export interface StaffRouterOptions {
   queueAdmin?: QueueAdmin;
   /** Issuer shown in authenticator apps. */
   totpIssuer?: string;
+  /** Used by the "send check-in" button; without either, that button reports an error. */
+  boss?: PgBoss;
+  emailSender?: EmailSender;
 }
 
 const TOTP_ATTEMPTS = 5;
@@ -224,6 +230,39 @@ export function staffRouter(
     const detail = await repos.staff.getOrgDetail(orgIdParam(req));
     if (!detail) throw AppError.notFound('Organisation not found.');
     res.json({ data: detail });
+  });
+
+  /* ---------- Customer success: inactive paying customers ---------- */
+
+  router.get('/inactive-customers', async (req: Request, res: Response) => {
+    const days = z.coerce
+      .number()
+      .int()
+      .min(1)
+      .max(365)
+      .default(INACTIVE_AFTER_DAYS)
+      .parse(req.query.days);
+    res.json({ data: await repos.staff.listInactivePaying(days) });
+  });
+
+  router.get('/activation', async (req: Request, res: Response) => {
+    const days = z.coerce.number().int().min(1).max(365).default(90).parse(req.query.days);
+    res.json({ data: await repos.staff.listActivation(days) });
+  });
+
+  router.post('/orgs/:orgId/check-in', async (req: Request, res: Response) => {
+    const orgId = orgIdParam(req);
+    const row = (await repos.staff.listInactivePaying(0, 1, orgId))[0];
+    if (!row) throw AppError.notFound('No paying owner found for this organisation.');
+    if (!options.boss && !options.emailSender) {
+      throw new AppError(503, ErrorCode.INTERNAL_ERROR, 'Email is not configured.');
+    }
+    await sendCheckIn(
+      repos,
+      { boss: options.boss, emailSender: options.emailSender },
+      { ...row, trigger: 'staff', staffUserId: req.staff!.userId, ip: req.ip ?? null },
+    );
+    res.json({ data: { sent: true, to: row.ownerEmail } });
   });
 
   router.post('/orgs/:orgId/extend-trial', async (req: Request, res: Response) => {

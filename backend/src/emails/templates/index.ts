@@ -24,6 +24,9 @@ import type {
   DataExportReadyData,
   SecurityNoticeData,
   SiteVerificationFailingData,
+  PaidWelcomeData,
+  RenewalReminderData,
+  InactiveCheckInData,
 } from '../types.js';
 
 // E-01: Verify your email
@@ -534,7 +537,7 @@ export function renderTrialEnding(
       To keep automated WCAG monitoring, instant regression email alerts, and continuous verification active, choose a subscription plan before your trial ends.
     </p>
     <p style="margin: 0;">
-      If you choose not to subscribe, your account will enter read-only mode when your trial expires. All historical scans, issues, and reports will remain safe.
+      If you choose not to subscribe, your account will enter read-only mode when your trial expires. Your scan history, fixes and evidence log will be deleted 30 days after your trial ends unless you choose a plan.
     </p>
   `;
 
@@ -558,7 +561,7 @@ Your 14-day free trial for ${data.orgName} will conclude in ${data.daysLeft} day
 To keep automated WCAG monitoring and continuous verification active, choose a subscription plan:
 ${data.upgradeUrl}
 
-If you do not choose a plan, your account will enter read-only mode on expiry. All historical scans and reports remain safe.
+If you do not choose a plan, your account will enter read-only mode on expiry. Your scan history, fixes and evidence log will be deleted 30 days after your trial ends unless you choose a plan.
 
 — The ${brandName} Team`;
 
@@ -609,7 +612,7 @@ Hello,
 The 14-day free trial for ${data.orgName} has ended, and your organization has transitioned to read-only mode.
 
 - Automated scheduled scans and rechecks are paused.
-- All historical scans, issues, and reports remain safely preserved.
+- Your scan history, fixes and evidence log will be deleted 30 days after your trial ends unless you choose a plan.
 
 To resume automated monitoring and team access, choose a plan:
 ${data.upgradeUrl}
@@ -1148,6 +1151,149 @@ export function renderSiteVerificationFailing(
   });
 
   const text = `${subject}\n\nThe ${method} for ${data.siteName} (${data.rootUrl}) could not be confirmed ${data.failureCount} times in a row.\nLast check: ${data.reason}\n\nAdd it back, then run the check again:\n${data.verifyUrl}\n`;
+
+  return { subject, html, text };
+}
+
+// E-24: Welcome after first payment + 3 next steps
+export function renderPaidWelcome(data: PaidWelcomeData, branding?: EmailBranding): EmailRenderOutput {
+  const brandName = branding?.displayName || 'EveryVisitor';
+  const cycle = data.interval === 'year' ? 'yearly' : 'monthly';
+  const subject = `Thank you. Your ${data.planName} plan is active`;
+
+  const contentHtml = `
+    <p style="margin: 0 0 16px 0;">Hello${data.name ? ` ${data.name}` : ''},</p>
+    <p style="margin: 0 0 16px 0;">
+      Thank you for subscribing. <strong>${data.orgName}</strong> is now on the <strong>${data.planName}</strong> plan, billed ${cycle}.
+    </p>
+    <p style="margin: 0 0 12px 0;"><strong>The 3 most useful things to do next:</strong></p>
+    <ol style="margin: 0 0 20px 0; padding-left: 20px; line-height: 24px;">
+      <li style="margin-bottom: 8px;"><a href="${data.addSiteUrl}" style="color: #0F3D3E;"><strong>Add and verify your site</strong></a>, so scheduled scans can start.</li>
+      <li style="margin-bottom: 8px;"><a href="${data.issuesUrl}" style="color: #0F3D3E;"><strong>Fix the worst problems first</strong></a>. Your issues list is sorted by impact, with plain-language fix guides.</li>
+      <li style="margin-bottom: 8px;"><a href="${data.settingsUrl}" style="color: #0F3D3E;"><strong>Turn on alerts and invite your team</strong></a>, so a new problem reaches the right person quickly.</li>
+    </ol>
+    <p style="margin: 0 0 16px 0; color: #635F59; font-size: 14px;">
+      Automated checks find only part of the accessibility problems on a site, so treat them as a strong starting point, not a guarantee. Questions? Reply to this email or write to support@everyvisitor.app.
+    </p>
+  `;
+
+  const html = renderEmailLayout({
+    preheader: `Your ${data.planName} plan is active. Here are 3 steps to get the most from it.`,
+    title: `Welcome to ${data.planName}`,
+    contentHtml,
+    buttonLabel: 'Go to your dashboard',
+    buttonUrl: data.dashboardUrl,
+    branding,
+  });
+
+  const text = `Thank you for subscribing.
+
+${data.orgName} is now on the ${data.planName} plan, billed ${cycle}.
+
+The 3 most useful things to do next:
+1. Add and verify your site: ${data.addSiteUrl}
+2. Fix the worst problems first: ${data.issuesUrl}
+3. Turn on alerts and invite your team: ${data.settingsUrl}
+
+Automated checks find only part of the accessibility problems on a site, so treat them as a strong starting point, not a guarantee.
+
+Dashboard: ${data.dashboardUrl}
+
+Questions? Reply to this email or write to support@everyvisitor.app.
+
+— The ${brandName} Team`;
+
+  return { subject, html, text };
+}
+
+// E-25: Renewal reminder
+export function renderRenewalReminder(
+  data: RenewalReminderData,
+  branding?: EmailBranding,
+): EmailRenderOutput {
+  const brandName = branding?.displayName || 'EveryVisitor';
+  const date = new Date(data.renewsAt).toLocaleDateString('en-US', {
+    month: 'long',
+    day: 'numeric',
+    year: 'numeric',
+  });
+  const cycle = data.interval === 'year' ? 'yearly' : 'monthly';
+  const amount = data.amountFormatted ? ` for ${data.amountFormatted}` : '';
+  const subject = `Your ${data.planName} plan renews on ${date}`;
+
+  const contentHtml = `
+    <p style="margin: 0 0 16px 0;">Hello,</p>
+    <p style="margin: 0 0 16px 0;">
+      A reminder that the ${cycle} <strong>${data.planName}</strong> plan for <strong>${data.orgName}</strong> renews automatically on <strong>${date}</strong>${amount}.
+    </p>
+    <p style="margin: 0 0 16px 0;">
+      Nothing to do if you want to keep going. If you would rather change or stop, you can switch to a cheaper plan, pause for 1 to 3 months, or cancel from your billing page before then.
+    </p>
+    <p style="margin: 0 0 16px 0; color: #635F59; font-size: 14px;">
+      See our <a href="https://everyvisitor.app/legal/refunds" style="color: #0F3D3E;">Refund Policy</a> for how refunds work.
+    </p>
+  `;
+
+  const html = renderEmailLayout({
+    preheader: `Your plan renews in ${data.daysUntilRenewal} days. Change or cancel any time before then.`,
+    title: 'Your plan renews soon',
+    contentHtml,
+    buttonLabel: 'Manage your plan',
+    buttonUrl: data.billingUrl,
+    branding,
+  });
+
+  const text = `Hello,
+
+The ${cycle} ${data.planName} plan for ${data.orgName} renews automatically on ${date}${amount}.
+
+Nothing to do if you want to keep going. If you would rather change or stop, you can switch to a cheaper plan, pause for 1 to 3 months, or cancel from your billing page before then:
+${data.billingUrl}
+
+Refund Policy: https://everyvisitor.app/legal/refunds
+
+— The ${brandName} Team`;
+
+  return { subject, html, text };
+}
+
+// E-26: Personal check-in for inactive paying customers
+export function renderInactiveCheckIn(
+  data: InactiveCheckInData,
+  branding?: EmailBranding,
+): EmailRenderOutput {
+  const brandName = branding?.displayName || 'EveryVisitor';
+  const subject = `Can I help you get more from ${brandName}?`;
+
+  const contentHtml = `
+    <p style="margin: 0 0 16px 0;">Hello${data.name ? ` ${data.name}` : ''},</p>
+    <p style="margin: 0 0 16px 0;">
+      I noticed nobody from <strong>${data.orgName}</strong> has signed in for about ${data.daysSinceLogin} days, so I wanted to check that everything is working for you.
+    </p>
+    <p style="margin: 0 0 16px 0;">
+      If something is unclear, a scan result looks wrong, or the product is not quite what you expected, just reply to this email. I read every reply, and I am happy to walk you through your results or set things up with you.
+    </p>
+    <p style="margin: 0 0 16px 0;">— James, founder of ${brandName}</p>
+  `;
+
+  const html = renderEmailLayout({
+    preheader: 'Just checking in. Reply and I will help.',
+    title: 'Checking in',
+    contentHtml,
+    buttonLabel: 'Open your dashboard',
+    buttonUrl: data.dashboardUrl,
+    branding,
+  });
+
+  const text = `Hello${data.name ? ` ${data.name}` : ''},
+
+I noticed nobody from ${data.orgName} has signed in for about ${data.daysSinceLogin} days, so I wanted to check that everything is working for you.
+
+If something is unclear, a scan result looks wrong, or the product is not quite what you expected, just reply to this email or write to ${data.supportEmail}. I read every reply, and I am happy to walk you through your results.
+
+Dashboard: ${data.dashboardUrl}
+
+— James, founder of ${brandName}`;
 
   return { subject, html, text };
 }

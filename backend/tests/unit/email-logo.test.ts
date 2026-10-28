@@ -4,7 +4,7 @@ import type { EmailTemplateId } from '../../src/emails/types.js';
 
 const TEMPLATE_IDS: EmailTemplateId[] = [
   'E-01', 'E-02', 'E-03', 'E-04', 'E-05', 'E-06', 'E-07', 'E-08', 'E-09', 'E-10', 'E-11',
-  'E-12', 'E-13', 'E-14', 'E-15', 'E-17', 'E-18', 'E-19', 'E-20', 'E-21', 'E-22', 'E-23',
+  'E-12', 'E-13', 'E-14', 'E-15', 'E-17', 'E-18', 'E-19', 'E-20', 'E-21', 'E-22', 'E-23', 'E-24', 'E-25', 'E-26',
 ];
 
 // Templates the preview sample data doesn't cover.
