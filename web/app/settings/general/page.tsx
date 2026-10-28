@@ -7,6 +7,7 @@ import { useToast } from "@/components/shell/toast-context";
 import { apiClient } from "@/lib/api";
 import { useActiveOrg } from "@/lib/use-active-org";
 import { resetCurrentUser } from "@/lib/use-current-user";
+import { OrgLogoField } from "@/components/settings/org-logo-field";
 import { appApi, type ApiMember } from "@/lib/app-api";
 
 const field =
@@ -175,6 +176,8 @@ export default function GeneralSettingsPage() {
         <form onSubmit={save} className="flex flex-col gap-5 rounded-2xl border border-line bg-surface p-6 shadow-card" noValidate>
           <h2 className="m-0 text-base font-semibold text-ink">Organisation profile</h2>
           {!canEdit && role && <p className="m-0 text-sm text-muted">Only owners and admins can change these settings.</p>}
+
+          {org && activeSlug && <OrgLogoField slug={activeSlug} name={org.name} canEdit={canEdit} />}
 
           <div className="flex flex-col gap-1.5">
             <label htmlFor="orgName" className="text-sm font-medium text-ink">

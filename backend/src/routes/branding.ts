@@ -294,8 +294,6 @@ export function orgBrandingRouter(
       return;
     }
 
-    assertWithinPlan(org, 'white_label');
-
     const parseRes = uploadLogoSchema.safeParse(req.body);
     if (!parseRes.success) {
       res.status(400).json({
@@ -308,6 +306,9 @@ export function orgBrandingRouter(
     }
 
     const { type, dataUrl } = parseRes.data;
+
+    // Any organisation can set its profile logo (the light one); the dark variant is white-label.
+    if (type === 'dark') assertWithinPlan(org, 'white_label');
 
     // Parse Data URL: data:image/png;base64,iVBORw0KGgo...
     const matches = dataUrl.match(/^data:([a-zA-Z0-9/+-]+);base64,(.+)$/);

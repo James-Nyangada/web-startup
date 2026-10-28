@@ -12,23 +12,37 @@ export function lastKnownEmail(): string {
   return lastEmail;
 }
 
+/** Fired on `window` after a profile photo or organisation logo changes, so the shell refetches. */
+export const PROFILE_UPDATED_EVENT = "everyvisitor:profile-updated";
+
+/** Drop the cached user and tell mounted shell components (menu, org switcher) to reload. */
+export function notifyProfileUpdated() {
+  pending = null;
+  window.dispatchEvent(new Event(PROFILE_UPDATED_EVENT));
+}
+
 /** The signed-in user, loaded once per page load and shared by the shell components. */
 export function useCurrentUser() {
   const [me, setMe] = useState<MeResponse | null>(null);
 
   useEffect(() => {
-    pending ??= authClient.getMe();
     let cancelled = false;
-    pending
-      .then((res) => {
-        lastEmail = res.user.email;
-        if (!cancelled) setMe(res);
-      })
-      .catch(() => {
-        pending = null;
-      });
+    const load = () => {
+      pending ??= authClient.getMe();
+      pending
+        .then((res) => {
+          lastEmail = res.user.email;
+          if (!cancelled) setMe(res);
+        })
+        .catch(() => {
+          pending = null;
+        });
+    };
+    load();
+    window.addEventListener(PROFILE_UPDATED_EVENT, load);
     return () => {
       cancelled = true;
+      window.removeEventListener(PROFILE_UPDATED_EVENT, load);
     };
   }, []);
 
@@ -39,6 +53,7 @@ export function useCurrentUser() {
     name,
     email: me?.user.email ?? "",
     initials: initials(name) ?? "",
+    avatarUrl: me?.user.avatarUrl ?? null,
     role: role ? role.charAt(0).toUpperCase() + role.slice(1) : "",
   };
 }

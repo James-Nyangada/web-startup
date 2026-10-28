@@ -59,7 +59,12 @@ export function UserMenu() {
         aria-haspopup="true"
         className="ease-ui flex size-9 items-center justify-center rounded-full border border-line bg-surface text-ink hover:border-line-strong focus-visible:outline-2 focus-visible:outline-primary"
       >
-        <span aria-hidden="true" className="text-xs font-bold">{user.initials}</span>
+        {user.avatarUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={user.avatarUrl} alt="" className="size-full rounded-full object-cover" />
+        ) : (
+          <span aria-hidden="true" className="text-xs font-bold">{user.initials}</span>
+        )}
         <span className="sr-only">Account menu for {user.name}</span>
       </button>
 
@@ -71,9 +76,14 @@ export function UserMenu() {
         >
           {/* User profile header */}
           <div className="flex items-center gap-3 px-3 py-2.5">
-            <span className="grid size-9 place-items-center rounded-full border border-line bg-sunk text-xs font-bold">
-              {user.initials}
-            </span>
+            {user.avatarUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={user.avatarUrl} alt="" className="size-9 rounded-full border border-line object-cover" />
+            ) : (
+              <span className="grid size-9 place-items-center rounded-full border border-line bg-sunk text-xs font-bold">
+                {user.initials}
+              </span>
+            )}
             <div className="flex min-w-0 flex-1 flex-col">
               <span className="truncate text-sm font-semibold">{user.name}</span>
               <span className="truncate text-xs text-muted">{user.email}</span>

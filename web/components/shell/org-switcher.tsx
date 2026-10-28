@@ -7,6 +7,7 @@ import { Icon, I } from "@/components/icons";
 import { useToast } from "./toast-context";
 import { authClient } from "@/lib/auth-client";
 import { initials } from "@/lib/app-api";
+import { PROFILE_UPDATED_EVENT } from "@/lib/use-current-user";
 
 export interface OrgItem {
   id: string;
@@ -66,6 +67,13 @@ export function OrgSwitcher({
   const menuRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
 
+  const [reloadKey, setReloadKey] = useState(0);
+  useEffect(() => {
+    const reload = () => setReloadKey((k) => k + 1);
+    window.addEventListener(PROFILE_UPDATED_EVENT, reload);
+    return () => window.removeEventListener(PROFILE_UPDATED_EVENT, reload);
+  }, []);
+
   // The org in the URL wins; otherwise the user's last active org.
   useEffect(() => {
     authClient
@@ -92,7 +100,7 @@ export function OrgSwitcher({
         setOrgs(list.map((o) => ({ ...o, isCurrent: o.id === current?.id })));
       })
       .catch(() => setOrgs([]));
-  }, [pathname]);
+  }, [pathname, reloadKey]);
 
   const currentOrg = orgs.find((o) => o.isCurrent) ?? orgs[0];
 

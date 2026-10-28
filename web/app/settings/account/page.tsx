@@ -11,6 +11,7 @@ import { ThemePreferenceRadio } from "@/components/theme";
 import { useFocusTrap } from "@/components/use-focus-trap";
 import { TimeZoneCombobox } from "@/components/settings/time-zone-combobox";
 import { authClient, type ActiveSession, type User, ApiException } from "@/lib/auth-client";
+import { notifyProfileUpdated } from "@/lib/use-current-user";
 import { describeUserAgent } from "@/lib/user-agent";
 
 function lastActiveLabel(sess: ActiveSession): string {
@@ -137,6 +138,7 @@ export default function AccountSettingsPage() {
         timeZone,
         avatarUrl: avatarUrl.trim() || null,
       });
+      notifyProfileUpdated();
       showToast("Profile details updated successfully.");
     } catch (err: any) {
       showToast(err.message || "Failed to update profile.", { type: "error" });
@@ -158,6 +160,7 @@ export default function AccountSettingsPage() {
     try {
       const res = await authClient.uploadAvatar(await resizeAvatar(file));
       setAvatarUrl(res.user.avatarUrl || "");
+      notifyProfileUpdated();
       showToast("Profile picture updated.");
     } catch (err: any) {
       showToast(err.message || "Failed to upload profile picture.", { type: "error" });
@@ -171,6 +174,7 @@ export default function AccountSettingsPage() {
     try {
       await authClient.removeAvatar();
       setAvatarUrl("");
+      notifyProfileUpdated();
       showToast("Avatar reset to your initials.");
     } catch (err: any) {
       showToast(err.message || "Failed to remove profile picture.", { type: "error" });
