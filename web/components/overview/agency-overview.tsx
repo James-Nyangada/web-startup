@@ -25,13 +25,6 @@ function useOverview() {
   return { ...data, siteHref };
 }
 
-const LAYOUTS = [
-  { id: "1a", label: "Worst-first table", hint: "Dense, scannable table with client grouping and persistent filters." },
-  { id: "1b", label: "Triage lanes", hint: "Sites sorted into what to do this week." },
-  { id: "1c", label: "Grouped by client", hint: "Mirrors how agencies bill." },
-] as const;
-type LayoutId = (typeof LAYOUTS)[number]["id"];
-
 export type SortKey = "score" | "crit_ser" | "regressions" | "name" | "lastScan";
 
 interface OverviewUserPrefs {
@@ -39,7 +32,6 @@ interface OverviewUserPrefs {
   sortDir: "asc" | "desc";
   clientFilter: string;
   groupByClient: boolean;
-  layout: LayoutId;
 }
 
 const STORAGE_KEY = "everyvisitor_overview_prefs";
@@ -49,7 +41,6 @@ const DEFAULT_PREFS: OverviewUserPrefs = {
   sortDir: "asc", // worst-first (lowest score first)
   clientFilter: "all",
   groupByClient: false,
-  layout: "1a",
 };
 
 const CARD = "rounded-2xl border border-line bg-surface shadow-card";
@@ -647,119 +638,6 @@ function TableLayout({
   );
 }
 
-/* ---------- 1b - Triage lanes ---------- */
-function LanesLayout() {
-  const { sites: SITES, siteHref } = useOverview();
-  const lanes = [
-    { id: "regressed", title: "Regressions", filter: (s: SiteRow) => (s.regressions ?? 0) > 0 },
-    { id: "critical", title: "High priority (< 70)", filter: (s: SiteRow) => s.score !== null && s.score < 70 },
-    { id: "good", title: "Stable (≥ 70)", filter: (s: SiteRow) => (s.score ?? 0) >= 70 },
-  ];
-
-  return (
-    <div data-layout className="flex flex-col gap-6">
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <h1 className={H1}>Overview · Triage Lanes</h1>
-      </div>
-      <div className="grid gap-6 md:grid-cols-3">
-        {lanes.map((l) => {
-          const sitesInLane = SITES.filter(l.filter);
-          return (
-            <div key={l.id} className={`${CARD} flex flex-col p-4`}>
-              <div className="flex items-center justify-between pb-3 border-b border-line mb-3">
-                <h2 className="text-sm font-semibold text-ink m-0">{l.title}</h2>
-                <span className="text-xs text-muted bg-subtle px-2 py-0.5 rounded-full">{sitesInLane.length}</span>
-              </div>
-              <div className="flex flex-col gap-2.5">
-                {sitesInLane.map((s) => (
-                  <Link
-                    key={s.id}
-                    href={siteHref(s)}
-                    className="p-3 rounded-xl border border-line bg-surface hover:bg-subtle/50 no-underline text-ink transition-colors block"
-                  >
-                    <div className="flex items-center justify-between">
-                      <span className="font-semibold text-sm">{s.name}</span>
-                      <Score r={s} size="text-sm" />
-                    </div>
-                    <div className="mt-1 text-xs text-muted flex items-center justify-between">
-                      <span>{s.client}</span>
-                      <span>{s.crit} crit · {s.ser} ser</span>
-                    </div>
-                  </Link>
-                ))}
-              </div>
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
-/* ---------- 1c - Grouped by client + common problems ---------- */
-function ClientsLayout() {
-  const { sites: SITES, siteHref, commonIssues } = useOverview();
-  const groups = [...new Set(SITES.map((s) => s.client))].map((c) => ({
-    name: c,
-    items: SITES.filter((s) => s.client === c),
-  }));
-
-  return (
-    <div data-layout className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_340px]">
-      <div className="flex flex-col gap-5">
-        <h1 className={H1}>Overview · By Client</h1>
-        {groups.map((g) => (
-          <section key={g.name} aria-labelledby={`cl-${g.name}`} className={`${CARD} overflow-hidden`}>
-            <h2 id={`cl-${g.name}`} className="m-0 flex justify-between bg-subtle px-4 py-3 text-base font-semibold">
-              <span>{g.name}</span>
-              <span className="text-sm font-normal text-muted">
-                {g.items.length} {g.items.length === 1 ? "site" : "sites"}
-              </span>
-            </h2>
-            {g.items.map((r) => (
-              <div
-                key={r.id}
-                className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-1 border-t border-line px-4 py-3 text-sm md:grid-cols-[minmax(0,1fr)_120px_180px_110px]"
-              >
-                <span>
-                  <Link href={siteHref(r)} className="font-semibold text-ink no-underline hover:text-primary">
-                    {r.name}
-                  </Link>
-                  <span className="block text-muted text-xs">{r.url} · {r.platform}</span>
-                </span>
-                <Score r={r} />
-                <span className="tnum text-xs">
-                  {r.crit} critical · {r.ser} serious
-                </span>
-                <span className={`text-xs ${deltaCls(r)}`}>{r.delta}</span>
-              </div>
-            ))}
-          </section>
-        ))}
-      </div>
-      <aside className="flex flex-col gap-4">
-        <section className={`${CARD} flex flex-col gap-3 p-5`}>
-          <h2 className="m-0 text-xl leading-7 font-semibold">Most common problems</h2>
-          <p className="m-0 text-sm leading-5 text-muted">Fix once in a shared theme, help many clients.</p>
-          {commonIssues.map((p) => (
-            <div key={p.ruleId} className="flex justify-between gap-3 border-t border-line py-2 text-sm text-ink">
-              <span>{p.title}</span>
-              <span className="whitespace-nowrap text-muted text-xs font-semibold">{p.affectedSitesCount} sites</span>
-            </div>
-          ))}
-        </section>
-        <section className={`${CARD} flex flex-col gap-2 p-5`}>
-          <h2 className="m-0 text-base font-semibold">This week</h2>
-          <span className="text-sm">2 regressions · 31 problems fixed · 1 failed scan</span>
-          <Link href="/reports" className="text-sm font-semibold text-primary hover:underline">
-            View on-demand reports →
-          </Link>
-        </section>
-      </aside>
-    </div>
-  );
-}
-
 export interface AgencyOverviewProps {
   orgSlug: string;
 }
@@ -829,8 +707,7 @@ export function AgencyOverview({ orgSlug }: AgencyOverviewProps) {
     });
   };
 
-  const scope = useEntrance<HTMLDivElement>([prefs.layout], "[data-layout] > *, [data-rows] > tr");
-  const currentLayout = LAYOUTS.find((l) => l.id === prefs.layout) ?? LAYOUTS[0];
+  const scope = useEntrance<HTMLDivElement>([], "[data-layout] > *, [data-rows] > tr");
 
   if (loadError) {
     return (
@@ -854,36 +731,9 @@ export function AgencyOverview({ orgSlug }: AgencyOverviewProps) {
 
   return (
     <AppShell active="overview" crumbs={[{ label: "Overview" }]}>
-      {/* Design layout switch bar */}
-      <div className="mb-6 flex flex-wrap items-center gap-3 rounded-full border border-dashed border-line-strong py-2 pr-4 pl-2 text-sm">
-        <div role="radiogroup" aria-label="Design layout option" className="inline-flex gap-1">
-          {LAYOUTS.map((l) => (
-            <button
-              key={l.id}
-              type="button"
-              role="radio"
-              aria-checked={prefs.layout === l.id}
-              onClick={() => updatePrefs({ layout: l.id })}
-              className={`ease-ui rounded-full border-0 px-3 py-1 font-bold ${
-                prefs.layout === l.id ? "bg-primary text-on-primary" : "bg-transparent text-ink hover:bg-subtle"
-              }`}
-            >
-              {l.id}
-              <span className="sr-only">: {l.label}</span>
-            </button>
-          ))}
-        </div>
-        <span className="font-semibold text-ink">{currentLayout.label}</span>
-        <span className="text-muted text-xs sm:text-sm">{currentLayout.hint}</span>
-      </div>
-
       <div ref={scope}>
         <OverviewContext.Provider value={data}>
-          {prefs.layout === "1a" && (
-            <TableLayout prefs={prefs} onUpdatePrefs={updatePrefs} />
-          )}
-          {prefs.layout === "1b" && <LanesLayout />}
-          {prefs.layout === "1c" && <ClientsLayout />}
+          <TableLayout prefs={prefs} onUpdatePrefs={updatePrefs} />
         </OverviewContext.Provider>
       </div>
     </AppShell>
