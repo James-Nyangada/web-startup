@@ -151,7 +151,7 @@ async function notifyPaymentFailedInApp(
     });
 }
 
-async function dispatchEmail<T extends EmailTemplateId>(
+export async function dispatchEmail<T extends EmailTemplateId>(
   options: ProcessPaddleEventOptions | undefined,
   to: string,
   templateId: T,

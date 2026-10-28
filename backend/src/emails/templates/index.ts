@@ -723,13 +723,14 @@ export function renderSubscriptionCanceled(
   branding?: EmailBranding,
 ): EmailRenderOutput {
   const brandName = branding?.displayName || 'EveryVisitor';
-  const subject = `Your subscription for ${data.orgName} has been canceled`;
-
   const formattedDate = new Date(data.effectiveDate).toLocaleDateString('en-US', {
     month: 'short',
     day: 'numeric',
     year: 'numeric',
   });
+  const subject = data.isImmediate
+    ? `Your subscription for ${data.orgName} has been canceled`
+    : `Your subscription for ${data.orgName} is canceled and stays active until ${formattedDate}`;
 
   const contentHtml = `
     <p style="margin: 0 0 16px 0;">Hello,</p>
@@ -749,7 +750,9 @@ export function renderSubscriptionCanceled(
   `;
 
   const html = renderEmailLayout({
-    preheader: `Your subscription for ${data.orgName} has been canceled.`,
+    preheader: data.isImmediate
+      ? `Your subscription for ${data.orgName} has been canceled.`
+      : `Your subscription for ${data.orgName} stays active until ${formattedDate}.`,
     title: 'Subscription canceled',
     contentHtml,
     buttonLabel: 'Reactivate subscription',

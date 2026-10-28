@@ -10,7 +10,11 @@ import {
   getPriceIdForPlan,
   getPlanForPriceId,
 } from '../shared/plans.js';
-import { processPaddleEvent, verifyPaddleWebhookSignature } from '../billing/paddle.js';
+import {
+  dispatchEmail,
+  processPaddleEvent,
+  verifyPaddleWebhookSignature,
+} from '../billing/paddle.js';
 import { type PaddleClient, defaultPaddleClient } from '../billing/paddle-api.js';
 import { enqueuePaddleProcess } from '../worker/boss.js';
 import { logger } from '../lib/logger.js';
@@ -576,6 +580,25 @@ export function orgBillingRouter(
       userAgent: req.headers['user-agent'],
       data: scheduledChange,
     });
+
+    // Confirm by email now; the "access ended" email follows when Paddle's cancel takes effect.
+    if (sub.currentPeriodEnd) {
+      try {
+        const owner = await repos.memberships.findOwner(req.orgId!);
+        const org = await repos.organizations.findById(req.orgId!);
+        if (owner?.email && org) {
+          const appUrl = process.env.APP_URL || 'http://localhost:3000';
+          await dispatchEmail(options, owner.email, 'E-18', {
+            orgName: org.name,
+            effectiveDate: sub.currentPeriodEnd,
+            reactivateUrl: `${appUrl}/settings/billing`,
+            isImmediate: false,
+          });
+        }
+      } catch (err) {
+        logger.error({ err }, 'Failed to send cancellation confirmation email');
+      }
+    }
 
     res.status(200).json({
       data: {
