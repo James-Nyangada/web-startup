@@ -21,6 +21,7 @@ const createKeySchema = z.object({
       set.add('read');
       return [...set];
     }),
+  siteIds: z.array(z.string().uuid()).optional(),
 });
 
 /** S-47 API keys, mounted at `/v1/orgs/:orgId/api-keys` (owners only, spec 7.8). */
@@ -34,8 +35,11 @@ export function orgApiKeysRouter(repos: Repositories): Router {
   });
 
   router.post('/', async (req: Request, res: Response) => {
-    assertWithinPlan(req.org, 'public_api');
     const body = createKeySchema.parse(req.body);
+    const isIntegrationKey = body.scopes.includes('plugin');
+    if (!isIntegrationKey) {
+      assertWithinPlan(req.org, 'public_api');
+    }
     if ((await repos.apiKeys.countActive(req.orgId!)) >= MAX_ACTIVE_API_KEYS) {
       throw new AppError(
         422,
@@ -46,6 +50,7 @@ export function orgApiKeysRouter(repos: Repositories): Router {
     const { key, secret } = await repos.apiKeys.create(req.orgId!, {
       name: body.name,
       scopes: body.scopes,
+      siteIds: body.siteIds,
       createdBy: req.auth!.user.id,
     });
     await repos.auditLog.write(req.orgId!, {

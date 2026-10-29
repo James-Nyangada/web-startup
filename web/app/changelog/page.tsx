@@ -3,6 +3,12 @@ import Link from "next/link";
 import { MarketingHeader } from "@/components/marketing/marketing-header";
 import { MarketingFooter } from "@/components/marketing/marketing-footer";
 import { CHANGELOG_ENTRIES } from "@/lib/blog-data";
+import { getChangelog } from "@/lib/cms";
+import { Markdown } from "@/components/marketing/markdown";
+
+export const revalidate = 300;
+
+const TYPE_LABEL = { new: "New", improved: "Improved", fixed: "Fixed" } as const;
 
 export const metadata: Metadata = {
   title: "Product Changelog",
@@ -11,7 +17,8 @@ export const metadata: Metadata = {
 
 const H2 = "m-0 font-serif text-[42px] leading-[46px] font-normal sm:text-[56px] sm:leading-[60px]";
 
-export default function ChangelogPage() {
+export default async function ChangelogPage() {
+  const cms = await getChangelog();
   return (
     <div className="min-h-screen bg-page text-ink flex flex-col justify-between">
       <MarketingHeader />
@@ -31,7 +38,24 @@ export default function ChangelogPage() {
           </div>
 
           <div className="flex flex-col gap-12 relative before:absolute before:top-2 before:bottom-2 before:left-[17px] sm:before:left-[147px] before:w-[2px] before:bg-line">
-            {CHANGELOG_ENTRIES.map((entry) => (
+            {cms !== null && cms.length === 0 && <p className="ml-8 text-muted">No updates have been published yet.</p>}
+            {cms?.map((entry) => (
+              <div key={entry.id} className="relative flex flex-col sm:flex-row gap-6 sm:gap-10 items-start">
+                <div className="hidden sm:flex flex-col items-end w-[120px] pt-1 text-right shrink-0">
+                  <time dateTime={entry.date} className="text-xs font-mono font-semibold text-muted">{entry.date}</time>
+                </div>
+                <div className="absolute left-2 sm:left-[140px] top-1.5 size-4 rounded-full border-2 border-primary bg-page z-10 shrink-0" />
+                <div className="ml-8 sm:ml-0 flex-1 rounded-2xl border border-line bg-surface p-6 sm:p-8 shadow-card">
+                  <div className="flex flex-wrap items-center gap-3 mb-2">
+                    <time dateTime={entry.date} className="sm:hidden text-xs font-mono font-semibold text-muted">{entry.date}</time>
+                    <span className="rounded bg-subtle px-2.5 py-0.5 text-xs font-semibold text-ptext">{TYPE_LABEL[entry.type]}</span>
+                  </div>
+                  <h2 className="m-0 text-xl font-bold text-ink mb-3">{entry.title}</h2>
+                  <div className="text-sm leading-relaxed text-ink/90"><Markdown>{entry.bodyMd}</Markdown></div>
+                </div>
+              </div>
+            ))}
+            {cms === null && CHANGELOG_ENTRIES.map((entry) => (
               <div key={entry.version} className="relative flex flex-col sm:flex-row gap-6 sm:gap-10 items-start">
                 {/* Date column (Desktop) */}
                 <div className="hidden sm:flex flex-col items-end w-[120px] pt-1 text-right shrink-0">

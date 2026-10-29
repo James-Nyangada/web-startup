@@ -6,9 +6,9 @@ import { handleReportRender } from './report-render.js';
 import type { EmailBranding, MonthlyClientReportData } from '../../emails/types.js';
 import { EmailSender } from '../../emails/sender.js';
 import { signReportDownloadToken } from '../../reports/token.js';
-import type { ReportScheduleRow, organizations, sites } from '../../db/schema/index.js';
+import type { ReportScheduleRow, sites } from '../../db/schema/index.js';
+import type { OrgRow } from '../../db/repositories/organizations.js';
 
-type OrgRow = typeof organizations.$inferSelect;
 type SiteRow = typeof sites.$inferSelect;
 type DueScheduleItem = { schedule: ReportScheduleRow; org: OrgRow; site: SiteRow };
 

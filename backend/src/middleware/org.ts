@@ -1,7 +1,8 @@
 import type { NextFunction, Request, Response } from 'express';
 import type { Repositories } from '../db/repositories/index.js';
+import type { OrgRow } from '../db/repositories/organizations.js';
 import { asOrgId, type OrgId } from '../db/repositories/org-scope.js';
-import type { memberships, organizations, OrgRole, Plan } from '../db/schema/index.js';
+import type { memberships, OrgRole, Plan } from '../db/schema/index.js';
 import { isStaffVerified } from '../db/repositories/staff.js';
 import { ErrorCode } from '../shared/errors.js';
 
@@ -23,7 +24,7 @@ declare global {
   namespace Express {
     interface Request {
       /** `basePlan` is the billed plan when a staff override replaces `plan` (P6-02). */
-      org?: typeof organizations.$inferSelect & { basePlan?: Plan };
+      org?: OrgRow & { basePlan?: Plan };
       /** Set when a staff user is viewing this org read-only (P6-02). */
       impersonation?: boolean;
       orgId?: OrgId;

@@ -8,6 +8,7 @@ import { CodeSnippet } from "./code-snippet";
 import { getWcagUnderstandingUrl } from "@/lib/wcag";
 import { GuideRenderer } from "@/components/marketing/guide-renderer";
 import { getFixGuideByRuleAndPlatform } from "@/lib/fix-guides-data";
+import { getPlatformDeepLinks } from "@/lib/platform-deep-links";
 import { apiClient, ApiException } from "@/lib/api";
 import { appApi, formatDayTime, type ApiMember } from "@/lib/app-api";
 import { DRAWER_TABS, type HistoryKind, type Issue } from "@/lib/site-data";
@@ -123,6 +124,7 @@ export interface IssueNoteItem {
 export interface IssueDetailContentProps {
   issue: Issue;
   sitePlatform?: string;
+  siteRootUrl?: string;
   orgSlug?: string;
   rechecking: boolean;
   onRecheck: () => void;
@@ -140,6 +142,7 @@ export interface IssueDetailContentProps {
 export function IssueDetailContent({
   issue,
   sitePlatform,
+  siteRootUrl,
   orgSlug,
   rechecking,
   onRecheck,
@@ -161,6 +164,12 @@ export function IssueDetailContent({
       ? "Shopify"
       : "Generic";
   const [pf, setPf] = useState<Platform>(initialPlatform);
+
+  const deepLink = getPlatformDeepLinks({
+    platform: pf !== "Generic" ? pf : sitePlatform,
+    rootUrl: siteRootUrl,
+    template: issue.template,
+  });
   const [copiedLink, setCopiedLink] = useState(false);
   const [aiState, setAiState] = useState<AiState>("none");
   const [aiSuggestion, setAiSuggestion] = useState<string | null>(issue.ai ?? null);
@@ -474,6 +483,18 @@ export function IssueDetailContent({
               <Icon d={I.ignored} />
               Ignore
             </button>
+            {deepLink?.editorUrl && (
+              <a
+                href={deepLink.editorUrl}
+                target="_blank"
+                rel="noreferrer"
+                className={`${SECONDARY_SM} inline-flex items-center gap-1.5 no-underline text-ink hover:text-primary`}
+                title={deepLink.description}
+              >
+                <span>{deepLink.label}</span>
+                <Icon d={I.external} size={14} />
+              </a>
+            )}
           </div>
         )}
 
@@ -657,6 +678,50 @@ export function IssueDetailContent({
                 ))}
               </div>
             </div>
+
+            {deepLink && (deepLink.editorUrl || deepLink.codeEditorUrl) && (
+              <div className="flex flex-col gap-2 rounded-xl border border-line bg-subtle p-3.5">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="font-semibold text-sm">
+                      {deepLink.platform === "shopify" ? "Shopify Theme" : "WordPress Editor"}
+                    </span>
+                    {deepLink.likelyFile && (
+                      <code className="rounded bg-surface px-1.5 py-0.5 font-mono text-[12px] text-muted">
+                        {deepLink.likelyFile}
+                      </code>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {deepLink.editorUrl && (
+                      <a
+                        href={deepLink.editorUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="ease-ui inline-flex h-7 items-center gap-1 rounded-full border border-line-strong bg-surface px-2.5 text-xs font-semibold text-ink hover:bg-subtle no-underline"
+                      >
+                        <span>{deepLink.platform === "shopify" ? "Customizer" : "Site Editor"}</span>
+                        <Icon d={I.external} size={12} />
+                      </a>
+                    )}
+                    {deepLink.codeEditorUrl && (
+                      <a
+                        href={deepLink.codeEditorUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="ease-ui inline-flex h-7 items-center gap-1 rounded-full border border-line-strong bg-surface px-2.5 text-xs font-semibold text-ink hover:bg-subtle no-underline"
+                      >
+                        <span>Code Editor</span>
+                        <Icon d={I.external} size={12} />
+                      </a>
+                    )}
+                  </div>
+                </div>
+                <p className="m-0 text-xs text-muted">
+                  {deepLink.description}
+                </p>
+              </div>
+            )}
 
             {(() => {
               const matchedGuide = pf !== "Generic" ? getFixGuideByRuleAndPlatform(issue.rule, pf) : undefined;

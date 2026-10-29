@@ -2,7 +2,9 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { MarketingHeader } from "@/components/marketing/marketing-header";
 import { MarketingFooter } from "@/components/marketing/marketing-footer";
-import { BLOG_POSTS } from "@/lib/blog-data";
+import { loadBlogPosts } from "@/lib/blog-source";
+
+export const revalidate = 300;
 
 export const metadata: Metadata = {
   title: "Accessibility Engineering Blog",
@@ -11,7 +13,8 @@ export const metadata: Metadata = {
 
 const H2 = "m-0 font-serif text-[42px] leading-[46px] font-normal sm:text-[56px] sm:leading-[60px]";
 
-export default function BlogIndexPage() {
+export default async function BlogIndexPage() {
+  const posts = await loadBlogPosts();
   return (
     <div className="min-h-screen bg-page text-ink flex flex-col justify-between">
       <MarketingHeader />
@@ -30,8 +33,9 @@ export default function BlogIndexPage() {
             </p>
           </div>
 
+          {posts.length === 0 && <p className="text-muted">No articles are published yet.</p>}
           <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-3">
-            {BLOG_POSTS.map((post) => (
+            {posts.map((post) => (
               <article
                 key={post.slug}
                 className="flex flex-col justify-between rounded-2xl border border-line bg-surface p-6 shadow-card transition-all hover:-translate-y-1 hover:shadow-lg"
@@ -70,7 +74,7 @@ export default function BlogIndexPage() {
                     <span>{post.author.name}</span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <span>{post.date}</span>
+                    <span>{post.dateLabel}</span>
                     <span>·</span>
                     <span>{post.readingTime}</span>
                   </div>

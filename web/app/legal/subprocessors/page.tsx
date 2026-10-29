@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { CmsLegal, loadLegalPage } from "@/components/legal/cms-legal";
 
 export const metadata: Metadata = {
   title: "Subprocessors Registry",
@@ -64,7 +65,7 @@ const SUBPROCESSORS = [
   },
 ];
 
-export default function SubprocessorsPage() {
+function BuiltSubprocessorsPage() {
   return (
     <div className="prose prose-slate max-w-none text-ink">
       <div className="border-b border-line pb-6 mb-8">
@@ -118,4 +119,13 @@ export default function SubprocessorsPage() {
       </div>
     </div>
   );
+}
+
+export const revalidate = 300;
+
+/** Shows the version published from the staff area; until one is published, the built-in text. */
+export default async function SubprocessorsPage() {
+  const cms = await loadLegalPage("subprocessors");
+  if (cms) return <CmsLegal slug="subprocessors" page={cms} />;
+  return <BuiltSubprocessorsPage />;
 }

@@ -1,11 +1,12 @@
 import type { Metadata } from "next";
+import { CmsLegal, loadLegalPage } from "@/components/legal/cms-legal";
 
 export const metadata: Metadata = {
   title: "Privacy Policy",
   description: "EveryVisitor Privacy Policy: Zero third-party cookies, privacy-by-design, and GDPR compliance.",
 };
 
-export default function PrivacyPage() {
+function BuiltPrivacyPage() {
   return (
     <div className="prose prose-slate max-w-none text-ink">
       <div className="border-b border-line pb-6 mb-8">
@@ -92,4 +93,13 @@ export default function PrivacyPage() {
       </div>
     </div>
   );
+}
+
+export const revalidate = 300;
+
+/** Shows the version published from the staff area; until one is published, the built-in text. */
+export default async function PrivacyPage() {
+  const cms = await loadLegalPage("privacy");
+  if (cms) return <CmsLegal slug="privacy" page={cms} />;
+  return <BuiltPrivacyPage />;
 }

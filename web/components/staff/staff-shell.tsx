@@ -8,14 +8,43 @@ import { ThemeIconToggle } from "@/components/theme";
 import { ApiException } from "@/lib/api";
 import { staffApi, type StaffSession } from "@/lib/admin-api";
 
-const NAV = [
-  { href: "/staff/orgs", label: "Organisations", icon: I.building },
-  { href: "/staff/customers", label: "Customer success", icon: I.users },
-  { href: "/staff/queues", label: "Queues & system", icon: I.monitor },
-  { href: "/staff/leads", label: "Leads", icon: I.mail },
-  { href: "/staff/content", label: "Content review", icon: I.fileText },
-  { href: "/staff/flags", label: "Feature flags", icon: I.settings },
+export const MAIN_NAV = [
+  { href: "/staff", label: "Dashboard", icon: I.monitor, exact: true },
+  { href: "/staff/analytics/business", matchPrefix: "/staff/analytics", label: "Analytics", icon: I.globe },
+  { href: "/staff/customers", matchPrefix: "/staff/customers", label: "Customers", icon: I.users },
+  { href: "/staff/leads", matchPrefix: "/staff/leads", label: "Leads", icon: I.mail },
+  { href: "/staff/content/posts", matchPrefix: ["/staff/content", "/staff/media", "/staff/banners"], label: "Content", icon: I.fileText },
+  { href: "/staff/queues", matchPrefix: ["/staff/queues", "/staff/content-review", "/staff/flags", "/staff/settings", "/staff/members", "/staff/audit"], label: "System", icon: I.settings },
 ];
+
+export const SUB_NAV: Record<string, { href: string; label: string }[]> = {
+  analytics: [
+    { href: "/staff/analytics/business", label: "Business" },
+    { href: "/staff/analytics/traffic", label: "Website traffic" },
+    { href: "/staff/analytics/product", label: "Product usage" },
+    { href: "/staff/analytics/funnel", label: "Funnel & retention" },
+  ],
+  customers: [
+    { href: "/staff/customers", label: "Directory & health" },
+    { href: "/staff/orgs", label: "All organisations" },
+  ],
+  content: [
+    { href: "/staff/content/posts", label: "Blog posts" },
+    { href: "/staff/content/guides", label: "Fix guides" },
+    { href: "/staff/content/changelog", label: "Changelog" },
+    { href: "/staff/content/pages", label: "Site pages" },
+    { href: "/staff/media", label: "Media library" },
+    { href: "/staff/banners", label: "Banners" },
+  ],
+  system: [
+    { href: "/staff/queues", label: "Queues" },
+    { href: "/staff/content-review", label: "Content review" },
+    { href: "/staff/flags", label: "Feature flags" },
+    { href: "/staff/settings", label: "Site settings" },
+    { href: "/staff/members", label: "Staff & roles" },
+    { href: "/staff/audit", label: "Audit log" },
+  ],
+};
 
 /* Shared styles for staff screens, matching the app's tokens. */
 export const btn = {
@@ -259,10 +288,20 @@ export function StaffShell({
               <span className="hidden text-sm text-muted sm:inline">{s.email}</span>
               <ThemeIconToggle />
             </div>
-            <nav aria-label="Staff" className="mx-auto max-w-[1344px] overflow-x-auto px-4 sm:px-8">
+            <nav aria-label="Staff main navigation" className="mx-auto max-w-[1344px] overflow-x-auto px-4 sm:px-8">
               <ul className="m-0 flex list-none gap-1 p-0">
-                {NAV.map((n) => {
-                  const on = pathname?.startsWith(n.href);
+                {MAIN_NAV.map((n) => {
+                  let on = false;
+                  if (n.exact) {
+                    on = pathname === n.href;
+                  } else if (Array.isArray(n.matchPrefix)) {
+                    on = n.matchPrefix.some((p) => pathname?.startsWith(p));
+                  } else if (n.matchPrefix) {
+                    on = pathname?.startsWith(n.matchPrefix);
+                  } else {
+                    on = pathname?.startsWith(n.href);
+                  }
+
                   return (
                     <li key={n.href}>
                       <Link
@@ -280,6 +319,52 @@ export function StaffShell({
                 })}
               </ul>
             </nav>
+
+            {/* Sub-navigation bar when in a module */}
+            {(() => {
+              let activeSubKey: keyof typeof SUB_NAV | null = null;
+              if (pathname?.startsWith("/staff/analytics")) activeSubKey = "analytics";
+              else if (pathname?.startsWith("/staff/customers") || pathname?.startsWith("/staff/orgs")) activeSubKey = "customers";
+              else if (pathname?.startsWith("/staff/content") || pathname?.startsWith("/staff/media") || pathname?.startsWith("/staff/banners")) activeSubKey = "content";
+              else if (
+                pathname?.startsWith("/staff/queues") ||
+                pathname?.startsWith("/staff/content-review") ||
+                pathname?.startsWith("/staff/flags") ||
+                pathname?.startsWith("/staff/settings") ||
+                pathname?.startsWith("/staff/members") ||
+                pathname?.startsWith("/staff/audit")
+              )
+                activeSubKey = "system";
+
+              if (!activeSubKey || !SUB_NAV[activeSubKey]) return null;
+
+              return (
+                <div className="border-t border-line/60 bg-subtle/40">
+                  <nav aria-label="Staff sub navigation" className="mx-auto max-w-[1344px] overflow-x-auto px-4 py-1.5 sm:px-8">
+                    <ul className="m-0 flex list-none items-center gap-2 p-0">
+                      {SUB_NAV[activeSubKey].map((sub) => {
+                        const active = pathname === sub.href || (sub.href !== "/staff/customers" && pathname?.startsWith(sub.href));
+                        return (
+                          <li key={sub.href}>
+                            <Link
+                              href={sub.href}
+                              aria-current={active ? "page" : undefined}
+                              className={`rounded-lg px-2.5 py-1 text-xs font-medium transition-colors ${
+                                active
+                                  ? "bg-surface font-semibold text-primary shadow-xs border border-line"
+                                  : "text-muted hover:text-ink hover:bg-surface/50"
+                              }`}
+                            >
+                              {sub.label}
+                            </Link>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  </nav>
+                </div>
+              );
+            })()}
           </header>
           <main id="main" tabIndex={-1} className="mx-auto w-full max-w-[1344px] px-4 pb-16 pt-6 outline-none sm:px-8">
             <div className="mb-6 flex flex-wrap items-end justify-between gap-3">

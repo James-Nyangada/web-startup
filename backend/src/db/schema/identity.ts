@@ -113,6 +113,14 @@ export const organizations = pgTable(
     planOverrideExpiresAt: timestamp('plan_override_expires_at', { withTimezone: true }),
     planOverrideReason: text('plan_override_reason'),
     timeZone: text('time_zone').notNull().default('UTC'),
+    /** First-touch UTM parameters captured at signup (P8-16). */
+    firstUtm: jsonb('first_utm').$type<{
+      source?: string;
+      medium?: string;
+      campaign?: string;
+      term?: string;
+      content?: string;
+    }>(),
     deletedAt: timestamp('deleted_at', { withTimezone: true }),
     ...timestamps(),
   },

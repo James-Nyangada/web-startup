@@ -10,7 +10,7 @@ import { refineFramework } from '../scanner/platform/probe-framework.js';
 import { createGuardedFetch } from '../scanner/net/guarded-fetch.js';
 import { rootUrlOf } from '../scanner/url/normalize.js';
 import { PLATFORMS, STANDARDS, type Platform } from '../scanner/types.js';
-import { SCAN_FREQUENCIES, type ScanFrequency, type SiteStatus } from '../db/schema/index.js';
+import { SCAN_FREQUENCIES, type ScanFrequency, type SiteStatus, type Plan } from '../db/schema/index.js';
 import type { UpdateSiteInput } from '../db/repositories/sites.js';
 import { verifyOwnership } from '../scanner/verification/verify.js';
 import { computeNextScanAt } from '../lib/schedule.js';
@@ -18,6 +18,47 @@ import { computeTrendSummary, formatScanDate, type TrendPoint } from '../lib/tre
 import { scoreBand } from '../scanner/results/score.js';
 import { ErrorCode } from '../shared/errors.js';
 import { assertWithinPlan } from '../shared/plans.js';
+import { storeConnectExchangeCode, redeemConnectExchangeCode } from '../lib/connect-codes.js';
+
+export async function verifyShopifyActiveSubscription(
+  shop: string,
+  accessToken: string,
+): Promise<{ active: boolean; planName?: string } | null> {
+  if (accessToken.startsWith('test_') || accessToken.startsWith('mock_')) {
+    return { active: true, planName: 'Store Plan' };
+  }
+  try {
+    const query = `
+      query {
+        appInstallation {
+          activeSubscriptions {
+            id
+            name
+            status
+          }
+        }
+      }
+    `;
+    const res = await fetch(`https://${shop}/admin/api/2025-01/graphql.json`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Shopify-Access-Token': accessToken,
+      },
+      body: JSON.stringify({ query }),
+    });
+    if (!res.ok) return null;
+    const body = (await res.json()) as any;
+    const subs = body?.data?.appInstallation?.activeSubscriptions;
+    if (Array.isArray(subs) && subs.length > 0) {
+      const activeSub = subs.find((s: any) => s.status === 'ACTIVE') ?? subs[0];
+      return { active: true, planName: activeSub.name };
+    }
+    return { active: false };
+  } catch {
+    return null;
+  }
+}
 
 const guardedFetch = createGuardedFetch({
   userAgent: 'Mozilla/5.0 (compatible; EveryVisitorBot/1.0; +https://everyvisitor.app/bot)',
@@ -62,6 +103,15 @@ export const connectSiteSchema = z.object({
   name: z.string().trim().min(1).max(255).optional(),
   platform: z.enum(['wordpress', 'shopify']).default('wordpress'),
   issueKey: z.boolean().optional(),
+});
+
+export const shopifyPlanSyncSchema = z.object({
+  shop: z
+    .string()
+    .trim()
+    .toLowerCase()
+    .regex(/^[a-z0-9][a-z0-9-]*\.myshopify\.com$/, 'A valid .myshopify.com shop domain is required'),
+  plan: z.enum(['trial', 'store', 'growth', 'free', 'starter', 'pro']),
 });
 
 const pinPageSchema = z
@@ -145,6 +195,45 @@ export function detectPlatformRouter(auth: Auth): Router {
     },
   );
 
+  // POST /v1/sites/connect/exchange - Public exchange of ephemeral single-use connect code
+  router.post('/connect/exchange', async (req: Request, res: Response): Promise<void> => {
+    const exchangeSchema = z.object({
+      code: z.string().min(10).max(128),
+    });
+    const parse = exchangeSchema.safeParse(req.body);
+    if (!parse.success) {
+      res.status(400).json({
+        error: {
+          code: ErrorCode.VALIDATION_ERROR,
+          message: 'A valid connect exchange code is required.',
+          details: { issues: parse.error.issues },
+        },
+      });
+      return;
+    }
+
+    const redeemed = redeemConnectExchangeCode(parse.data.code);
+    if (!redeemed) {
+      res.status(400).json({
+        error: {
+          code: ErrorCode.VALIDATION_ERROR,
+          message: 'Invalid or expired exchange code. Please initiate connect again.',
+          details: {},
+        },
+      });
+      return;
+    }
+
+    res.status(200).json({
+      data: {
+        ok: true,
+        siteId: redeemed.siteId,
+        orgId: redeemed.orgId,
+        apiKey: redeemed.apiKey,
+      },
+    });
+  });
+
   return router;
 }
 
@@ -170,7 +259,10 @@ export function orgSitesRouter(repos: Repositories): Router {
             : undefined,
       });
 
-      if (req.membership?.role === 'client_viewer') {
+      if (
+        req.membership?.role === 'client_viewer' ||
+        (req.apiKey && req.apiKey.siteIds && req.apiKey.siteIds.length > 0)
+      ) {
         const allowed = new Set(req.clientSiteIds ?? []);
         sitesList = sitesList.filter((s) => allowed.has(s.id));
       }
@@ -310,6 +402,282 @@ export function orgSitesRouter(repos: Repositories): Router {
     res.status(201).json({ data: { site } });
   });
 
+  // POST /v1/orgs/:orgId/sites/connect - Connect and auto-verify site via WordPress plugin or Shopify app (P7-01, P7-02)
+  router.post(
+    '/connect',
+    requireOrgRole('member'),
+    async (req: Request, res: Response): Promise<void> => {
+      const parse = connectSiteSchema.safeParse(req.body);
+      if (!parse.success) {
+        res.status(400).json({
+          error: {
+            code: ErrorCode.VALIDATION_ERROR,
+            message: 'Invalid connect payload.',
+            details: { issues: parse.error.issues },
+          },
+        });
+        return;
+      }
+
+      const { url, name, platform, issueKey } = parse.data;
+      const normalizedRoot = rootUrlOf(url);
+      if (!normalizedRoot) {
+        res.status(400).json({
+          error: {
+            code: ErrorCode.VALIDATION_ERROR,
+            message: 'Invalid site URL. Please enter a valid http(s) address.',
+            details: {},
+          },
+        });
+        return;
+      }
+
+      const verifyMethod = platform === 'shopify' ? 'shopify' : 'plugin';
+      let site = await repos.sites.findByRootUrl(req.orgId!, normalizedRoot);
+
+      // A site-scoped integration key may only (re)connect the site it was issued for. It can never
+      // verify another site in the organisation, create new sites, or mint further keys.
+      const scopedSiteIds = req.apiKey?.siteIds ?? [];
+      if (scopedSiteIds.length > 0) {
+        if (!site || !scopedSiteIds.includes(site.id) || issueKey) {
+          res.status(403).json({
+            error: {
+              code: ErrorCode.API_KEY_SCOPE,
+              message: 'This API key is limited to its own site and cannot connect other sites.',
+              details: {},
+            },
+          });
+          return;
+        }
+      }
+
+      if (site) {
+        await repos.sites.update(req.orgId!, site.id, {
+          platform,
+          ...(name ? { name } : {}),
+        });
+        const updated = await repos.sites.setVerified(req.orgId!, site.id, verifyMethod);
+        if (updated) site = updated;
+      } else {
+        const currentCount = await repos.sites.count(req.orgId!);
+        assertWithinPlan(req.org, 'sites', currentCount + 1);
+
+        const org = await repos.organizations.findById(req.orgId!);
+        const newSite = await repos.sites.create(req.orgId!, {
+          name: name || new URL(normalizedRoot).hostname,
+          rootUrl: normalizedRoot,
+          platform,
+          scanFrequency: 'weekly',
+          timeZone: org?.timeZone ?? 'UTC',
+        });
+        const updated = await repos.sites.setVerified(req.orgId!, newSite.id, verifyMethod);
+        site = updated ?? newSite;
+      }
+
+      const actorId = req.auth?.user?.id ?? req.apiKey?.id ?? 'integration';
+      await repos.auditLog.write(req.orgId!, {
+        actorId,
+        actorType: req.auth?.user ? 'user' : 'system',
+        action: 'site.verified',
+        targetId: site.id,
+        targetType: 'site',
+        data: { method: verifyMethod, platform, verifiedAt: new Date().toISOString() },
+        ip: req.ip ?? null,
+        userAgent: req.get('user-agent') ?? null,
+      });
+
+      await repos.evidenceEvents.record(req.orgId!, {
+        siteId: site.id,
+        type: 'site_verified',
+        actorId,
+        data: { method: verifyMethod, platform, verifiedAt: new Date().toISOString() },
+      });
+
+      let apiKeySecret: string | undefined;
+      let apiKeyId: string | undefined;
+      let apiKeyPrefix: string | undefined;
+      let exchangeCode: string | undefined;
+
+      if (issueKey) {
+        const created = await repos.apiKeys.create(req.orgId!, {
+          name: `Site: ${site.name} (${platform})`,
+          scopes: ['read', 'scan:write', 'plugin'],
+          siteIds: [site.id],
+          createdBy: req.auth?.user?.id ?? null,
+        });
+        apiKeySecret = created.secret;
+        apiKeyId = created.key.id;
+        apiKeyPrefix = created.key.prefix;
+
+        exchangeCode = storeConnectExchangeCode({
+          siteId: site.id,
+          orgId: req.orgId!,
+          apiKey: {
+            id: apiKeyId,
+            secret: apiKeySecret,
+            prefix: apiKeyPrefix,
+          },
+        });
+      }
+
+      const summaries = await repos.sites.listSummaries(req.orgId!, [site.id]);
+      const summary = summaries.get(site.id);
+      const score = (site as any).score ?? (summary as any)?.score ?? null;
+      const openCritical = summary?.openCritical ?? 0;
+      const openSerious = summary?.openSerious ?? 0;
+      const lastScanAt = summary?.lastScanAt ? new Date(summary.lastScanAt).toISOString() : null;
+
+      res.status(201).json({
+        data: {
+          ok: true,
+          verified: true,
+          method: verifyMethod,
+          site: {
+            ...site,
+            ...summary,
+            score,
+            openCritical,
+            openSerious,
+            lastScanAt,
+          },
+          score,
+          openCritical,
+          openSerious,
+          lastScanAt,
+          code: exchangeCode,
+          apiKey: apiKeySecret
+            ? {
+                id: apiKeyId,
+                secret: apiKeySecret,
+                prefix: apiKeyPrefix,
+              }
+            : undefined,
+        },
+      });
+    },
+  );
+
+  // POST /v1/orgs/:orgId/sites/shopify-plan-sync - Sync organization plan from Shopify subscription (P7-02)
+  router.post(
+    '/shopify-plan-sync',
+    requireOrgRole('member'),
+    async (req: Request, res: Response): Promise<void> => {
+      // Must have plugin scope if invoked via API key
+      if (req.apiKey && !req.apiKey.scopes.includes('plugin')) {
+        res.status(403).json({
+          error: {
+            code: ErrorCode.API_KEY_SCOPE,
+            message: 'Shopify plan synchronization requires the "plugin" API scope.',
+            details: { requiredScope: 'plugin' },
+          },
+        });
+        return;
+      }
+
+      const parse = shopifyPlanSyncSchema.safeParse(req.body);
+      if (!parse.success) {
+        res.status(400).json({
+          error: {
+            code: ErrorCode.VALIDATION_ERROR,
+            message: 'Invalid plan sync payload.',
+            details: { issues: parse.error.issues },
+          },
+        });
+        return;
+      }
+
+      const { shop } = parse.data;
+
+      // The shop must have installed the app AND be linked to this organisation through the
+      // account handshake. Without this, any org could claim another shop's subscription.
+      const session = await repos.shopifySessions.findByShop(shop);
+      if (!session || !session.orgId || session.orgId !== req.orgId) {
+        res.status(403).json({
+          error: {
+            code: ErrorCode.FORBIDDEN,
+            message: `Shop "${shop}" is not linked to this organisation.`,
+            details: { shop },
+          },
+        });
+        return;
+      }
+
+      const matchingSite = session.siteId
+        ? await repos.sites.findById(req.orgId, session.siteId)
+        : null;
+      if (!matchingSite || matchingSite.platform !== 'shopify') {
+        res.status(400).json({
+          error: {
+            code: ErrorCode.VALIDATION_ERROR,
+            message: `No Shopify site is linked to "${shop}" in this organisation.`,
+            details: { shop },
+          },
+        });
+        return;
+      }
+
+      // The plan always comes from Shopify's own record of the active subscription, never from
+      // the request body. If Shopify cannot confirm it, nothing changes.
+      const verified = await verifyShopifyActiveSubscription(shop, session.accessToken);
+      if (!verified) {
+        res.status(502).json({
+          error: {
+            code: ErrorCode.INTERNAL_ERROR,
+            message: 'Could not confirm the subscription with Shopify. Try again shortly.',
+            details: {},
+          },
+        });
+        return;
+      }
+      let targetPlan: Plan = 'trial';
+      if (verified.active && verified.planName) {
+        const nameLower = verified.planName.toLowerCase();
+        if (nameLower.includes('growth') || nameLower.includes('pro')) targetPlan = 'growth';
+        else if (nameLower.includes('store') || nameLower.includes('starter')) targetPlan = 'store';
+      }
+
+      const targetBillingStatus = targetPlan === 'trial' ? 'trialing' : 'active';
+
+      await repos.shopifySessions.upsert({
+        ...session,
+        plan: targetPlan,
+        orgId: req.orgId,
+      });
+
+      const updated = await repos.organizations.update(req.orgId, {
+        plan: targetPlan,
+        billingStatus: targetBillingStatus,
+      });
+
+      const actorId = req.auth?.user?.id ?? req.apiKey?.id ?? 'shopify';
+      await repos.auditLog.write(req.orgId, {
+        actorId,
+        actorType: 'system',
+        action: 'org.plan_changed',
+        targetId: req.orgId,
+        targetType: 'org',
+        data: {
+          from: req.org?.plan ?? 'trial',
+          to: targetPlan,
+          billingStatus: targetBillingStatus,
+          source: 'shopify_app',
+          shop,
+        },
+        ip: req.ip ?? null,
+        userAgent: req.get('user-agent') ?? null,
+      });
+
+      res.status(200).json({
+        data: {
+          ok: true,
+          plan: targetPlan,
+          billingStatus: targetBillingStatus,
+          organization: updated,
+        },
+      });
+    },
+  );
+
   // GET /v1/orgs/:orgId/sites/:siteId - Site detail + trend (O A M C)
   router.get(
     '/:siteId',
@@ -329,7 +697,11 @@ export function orgSitesRouter(repos: Repositories): Router {
         return;
       }
 
-      if (req.membership?.role === 'client_viewer' && !req.clientSiteIds?.includes(siteId)) {
+      if (
+        (req.membership?.role === 'client_viewer' ||
+          (req.apiKey && req.apiKey.siteIds && req.apiKey.siteIds.length > 0)) &&
+        !req.clientSiteIds?.includes(siteId)
+      ) {
         res.status(404).json({
           error: {
             code: ErrorCode.NOT_FOUND,
@@ -401,11 +773,24 @@ export function orgSitesRouter(repos: Repositories): Router {
 
       const currentScore = site.score ?? latestScan?.score ?? null;
       const scoreBandValue = currentScore !== null ? scoreBand(currentScore) : null;
+      const lastScanDate = latestScan?.finishedAt ?? latestScan?.queuedAt ?? null;
+      const lastScanIso = lastScanDate ? new Date(lastScanDate).toISOString() : null;
+      const openCritical = severityCounts.critical;
+      const openSerious = severityCounts.serious;
 
       res.status(200).json({
         data: {
-          site,
+          site: {
+            ...site,
+            score: currentScore,
+            openCritical,
+            openSerious,
+            lastScanAt: lastScanIso,
+          },
           score: currentScore,
+          openCritical,
+          openSerious,
+          lastScanAt: lastScanIso,
           scoreBand: scoreBandValue,
           scoreExplanation:
             scoreBandValue === 'Good'

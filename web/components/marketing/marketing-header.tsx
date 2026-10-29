@@ -6,6 +6,8 @@ import { useState } from "react";
 import { Logo } from "@/components/logo";
 import { ThemeTextToggle } from "@/components/theme";
 import { Icon } from "@/components/icons";
+import { GlobalBannersRegion } from "@/components/shell/global-banners";
+import { useCmsBanner } from "@/lib/banners";
 
 interface NavItem {
   href: string;
@@ -24,6 +26,7 @@ const NAV: NavItem[] = [
 export function MarketingHeader() {
   const pathname = usePathname();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const siteBanner = useCmsBanner("site", { loggedIn: false });
 
   return (
     <>
@@ -34,6 +37,7 @@ export function MarketingHeader() {
         Skip to content
       </a>
 
+      {siteBanner && <GlobalBannersRegion banners={[siteBanner]} />}
       <header className="sticky top-0 z-40 border-b border-line bg-page/90 backdrop-blur-md transition-colors">
         <div className="mx-auto flex max-w-[1280px] items-center justify-between gap-4 px-4 py-3.5 sm:px-8">
           <div className="flex items-center gap-8">

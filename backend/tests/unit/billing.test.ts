@@ -461,6 +461,8 @@ describe('Chunk P4-02: Billing and Paddle Checkout', () => {
         org.id,
         expect.objectContaining({ action: 'billing.subscription_cancelled' }),
       );
+      // The survey answer is stored for the business dashboard as given.
+      expect(repos.staff.recordCancellationReason).toHaveBeenCalledWith(org.id, 'Too expensive', null);
     });
 
     it('resumes scheduled cancellation on POST /v1/orgs/:orgId/billing/resume', async () => {

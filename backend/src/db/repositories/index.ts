@@ -29,6 +29,7 @@ import { featureFlagsRepository } from './feature-flags.js';
 import { apiKeysRepository } from './api-keys.js';
 import { privacyRepository } from './privacy.js';
 import { mfaRepository } from './mfa.js';
+import { shopifySessionsRepository } from './shopify-sessions.js';
 
 export function createRepositories(db: Database) {
   return {
@@ -62,6 +63,7 @@ export function createRepositories(db: Database) {
     apiKeys: apiKeysRepository(db),
     privacy: privacyRepository(db),
     mfa: mfaRepository(db),
+    shopifySessions: shopifySessionsRepository(db),
   };
 }
 

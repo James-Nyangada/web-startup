@@ -8,6 +8,7 @@
     "start": "next start",
     "typecheck": "tsc --noEmit",
     "test:a11y": "node tests/a11y/axe-audit.mjs",
+    "test:urls": "node tests/e2e/url-check.mjs",
     "test:e2e": "node tests/e2e/core-flow.mjs"
   },
   "dependencies": {
@@ -17,7 +18,9 @@
     "next": "^16.4.1",
     "qrcode": "^1.5.4",
     "react": "^19.3.1",
-    "react-dom": "^19.3.1"
+    "react-dom": "^19.3.1",
+    "react-markdown": "^10.1.0",
+    "remark-gfm": "^4.0.1"
   },
   "devDependencies": {
     "@axe-core/playwright": "4.14.0",

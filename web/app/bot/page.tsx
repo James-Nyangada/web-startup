@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { MarketingHeader } from "@/components/marketing/marketing-header";
 import { MarketingFooter } from "@/components/marketing/marketing-footer";
+import { CmsLegal, loadLegalPage } from "@/components/legal/cms-legal";
 
 export const metadata: Metadata = {
   title: "EveryVisitorBot Crawler & Scanner",
@@ -10,7 +11,7 @@ export const metadata: Metadata = {
 
 const H2 = "m-0 font-serif text-[32px] leading-[36px] font-normal sm:text-[40px] sm:leading-[44px]";
 
-export default function BotPage() {
+function BuiltBotPage() {
   return (
     <div className="min-h-screen bg-page text-ink flex flex-col justify-between">
       <MarketingHeader />
@@ -136,6 +137,25 @@ export default function BotPage() {
         </div>
       </main>
 
+      <MarketingFooter />
+    </div>
+  );
+}
+
+export const revalidate = 300;
+
+/** Shows the version published from the staff area; until one is published, the built-in text. */
+export default async function BotPageEntry() {
+  const cms = await loadLegalPage("bot");
+  if (!cms) return <BuiltBotPage />;
+  return (
+    <div className="min-h-screen bg-page text-ink flex flex-col justify-between">
+      <MarketingHeader />
+      <main id="main-content" tabIndex={-1} className="outline-none flex-1">
+        <div className="mx-auto max-w-[960px] px-4 py-16 sm:px-8">
+          <CmsLegal slug="bot" page={cms} />
+        </div>
+      </main>
       <MarketingFooter />
     </div>
   );

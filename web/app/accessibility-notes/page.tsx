@@ -1,5 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { MarketingHeader } from "@/components/marketing/marketing-header";
+import { MarketingFooter } from "@/components/marketing/marketing-footer";
+import { CmsLegal, loadLegalPage } from "@/components/legal/cms-legal";
 
 export const metadata: Metadata = { title: "Accessibility notes" };
 
@@ -59,7 +62,7 @@ const FILES = [
   ["/portal", "Client portal"],
 ];
 
-export default function Page() {
+function BuiltPage() {
   return (
     <main className="mx-auto flex max-w-[880px] flex-col gap-10 px-4 pt-12 pb-20 text-base leading-6 sm:px-8">
       <header className="flex flex-col gap-3">
@@ -91,5 +94,24 @@ export default function Page() {
         </section>
       ))}
     </main>
+  );
+}
+
+export const revalidate = 300;
+
+/** Shows the version published from the staff area; until one is published, the built-in text. */
+export default async function PageEntry() {
+  const cms = await loadLegalPage("accessibility");
+  if (!cms) return <BuiltPage />;
+  return (
+    <div className="min-h-screen bg-page text-ink flex flex-col justify-between">
+      <MarketingHeader />
+      <main id="main-content" tabIndex={-1} className="outline-none flex-1">
+        <div className="mx-auto max-w-[960px] px-4 py-16 sm:px-8">
+          <CmsLegal slug="accessibility" page={cms} />
+        </div>
+      </main>
+      <MarketingFooter />
+    </div>
   );
 }

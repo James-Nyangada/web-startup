@@ -19,6 +19,13 @@ export interface StorageService {
    */
   putPublicImage?(key: string, data: Buffer): Promise<string>;
   deletePublicImage?(key: string): Promise<void>;
+  /**
+   * Publicly served files of any type (staff media library: images, video, PDF). Returns the
+   * public URL. `publicFiles` is true only when the backend can serve them.
+   */
+  readonly publicFiles?: boolean;
+  putPublicFile?(key: string, data: Buffer, contentType: string): Promise<string>;
+  deletePublicFile?(key: string, contentType: string): Promise<void>;
 }
 
 export class MemoryStorageService implements StorageService {
@@ -48,6 +55,27 @@ export class MemoryStorageService implements StorageService {
   deletePublicImage(key: string): Promise<void> {
     this.store.delete(`public/${key}`);
     return Promise.resolve();
+  }
+
+  readonly publicFiles = true;
+
+  putPublicFile(key: string, data: Buffer, _contentType?: string): Promise<string> {
+    this.store.set(`public/${key}`, Buffer.from(data));
+    return Promise.resolve(`https://media.test/${key}`);
+  }
+
+  deletePublicFile(key: string): Promise<void> {
+    this.store.delete(`public/${key}`);
+    return Promise.resolve();
+  }
+
+  hasPublicFile(key: string): boolean {
+    return this.store.has(`public/${key}`);
+  }
+
+  /** Public file keys under a prefix (for tests). */
+  listPublicKeys(prefix: string): string[] {
+    return [...this.store.keys()].filter((k) => k.startsWith(`public/${prefix}`));
   }
 
   clear(): void {
@@ -100,17 +128,41 @@ export interface R2Options {
   accessKeyId: string;
   secretAccessKey: string;
   bucket: string;
+  /** Public base URL of the bucket (custom domain or r2.dev). Needed for the media library. */
+  publicBaseUrl?: string;
 }
 
 /** Cloudflare R2 through its S3-compatible API (spec section 2). */
 export class R2StorageService implements StorageService {
   private readonly client: S3Client;
 
+  readonly publicFiles: boolean;
+
   constructor(
     private readonly bucket: string,
     client: S3Client,
+    private readonly publicBaseUrl?: string,
   ) {
     this.client = client;
+    this.publicFiles = Boolean(publicBaseUrl);
+  }
+
+  async putPublicFile(key: string, data: Buffer, contentType: string): Promise<string> {
+    if (!this.publicBaseUrl) throw new Error('R2_PUBLIC_URL is not set.');
+    await this.client.send(
+      new PutObjectCommand({
+        Bucket: this.bucket,
+        Key: key,
+        Body: data,
+        ContentType: contentType,
+        CacheControl: 'public, max-age=31536000, immutable',
+      }),
+    );
+    return `${this.publicBaseUrl.replace(/\/+$/, '')}/${key}`;
+  }
+
+  async deletePublicFile(key: string): Promise<void> {
+    await this.deleteObject(key);
   }
 
   static fromOptions(options: R2Options): R2StorageService {
@@ -122,7 +174,7 @@ export class R2StorageService implements StorageService {
         secretAccessKey: options.secretAccessKey,
       },
     });
-    return new R2StorageService(options.bucket, client);
+    return new R2StorageService(options.bucket, client, options.publicBaseUrl);
   }
 
   async putObject(key: string, data: string | Buffer, contentType?: string): Promise<string> {
@@ -260,6 +312,32 @@ export class CloudinaryStorageService implements StorageService {
   async deletePublicImage(key: string): Promise<void> {
     await this.client.destroy(this.publicId(key), PUBLIC_IMAGE);
   }
+
+  readonly publicFiles = true;
+
+  private resourceType(contentType: string): 'image' | 'video' | 'raw' {
+    if (contentType.startsWith('image/') && contentType !== 'image/svg+xml') return 'image';
+    if (contentType.startsWith('video/')) return 'video';
+    return 'raw';
+  }
+
+  async putPublicFile(key: string, data: Buffer, contentType: string): Promise<string> {
+    const result = await this.client.upload(data, {
+      resource_type: this.resourceType(contentType),
+      type: 'upload',
+      public_id: this.publicId(key),
+      overwrite: true,
+      invalidate: true,
+    });
+    return result.secure_url;
+  }
+
+  async deletePublicFile(key: string, contentType: string): Promise<void> {
+    await this.client.destroy(this.publicId(key), {
+      resource_type: this.resourceType(contentType),
+      type: 'upload',
+    });
+  }
 }
 
 let defaultStorage: StorageService | undefined;
@@ -272,6 +350,7 @@ function r2OptionsFromEnv(): R2Options | undefined {
     accessKeyId: R2_ACCESS_KEY_ID,
     secretAccessKey: R2_SECRET_ACCESS_KEY,
     bucket: R2_BUCKET,
+    publicBaseUrl: process.env.R2_PUBLIC_URL,
   };
 }
 

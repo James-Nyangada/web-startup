@@ -2,6 +2,7 @@ import type { NextFunction, Request, Response } from 'express';
 import type { Repositories } from '../db/repositories/index.js';
 import { isStaffVerified, type StaffSessionState } from '../db/repositories/staff.js';
 import { ErrorCode } from '../shared/errors.js';
+import { hasPermission, type StaffPermission } from '../shared/staff-permissions.js';
 
 declare global {
   // eslint-disable-next-line @typescript-eslint/no-namespace
@@ -13,7 +14,7 @@ declare global {
 }
 
 /**
- * Loads the staff state for the signed-in session (P6-01). Staff status is read from the
+ * Loads the staff state for the signed-in session (P6-01 / P8-01). Staff status is read from the
  * database, never trusted from the session payload. Non-staff get 404 so the admin area is
  * not discoverable.
  */
@@ -54,4 +55,22 @@ export function requireStaffVerified(req: Request, res: Response, next: NextFunc
     return;
   }
   next();
+}
+
+/** Requires a specific staff role permission (P8-01). */
+export function requireStaffPermission(permission: StaffPermission) {
+  return (req: Request, res: Response, next: NextFunction): void => {
+    const role = req.staff?.role ?? 'owner';
+    if (!role || !hasPermission(role, permission)) {
+      res.status(403).json({
+        error: {
+          code: ErrorCode.FORBIDDEN,
+          message: 'You do not have permission to perform this action.',
+          details: { requiredPermission: permission, role },
+        },
+      });
+      return;
+    }
+    next();
+  };
 }

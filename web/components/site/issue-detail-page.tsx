@@ -153,6 +153,7 @@ export function IssueDetailPage({ issueId, siteId, orgSlug }: IssueDetailPagePro
           issue={issue}
           orgSlug={orgSlug}
           sitePlatform={site?.platform}
+          siteRootUrl={site?.rootUrl}
           members={members}
           rechecking={rechecking}
           onRecheck={onRecheck}

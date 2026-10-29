@@ -595,6 +595,13 @@ export function orgBillingRouter(
     });
     await repos.subscriptions.setCancelAtPeriodEnd(req.orgId!, true);
 
+    try {
+      await repos.staff.recordCancellationReason(req.orgId!, reason, feedback);
+    } catch (err) {
+      // The survey answer is analytics only; it must never block a cancellation.
+      console.error('[billing] could not record the cancellation reason:', err);
+    }
+
     await repos.auditLog.write(req.orgId!, {
       actorId: req.auth?.user.id,
       actorType: 'user',

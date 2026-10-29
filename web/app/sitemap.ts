@@ -1,7 +1,10 @@
 import type { MetadataRoute } from "next";
-import { BLOG_POSTS } from "@/lib/blog-data";
+import { loadBlogPosts } from "@/lib/blog-source";
+import { loadGuides } from "@/lib/guide-source";
 
-export default function sitemap(): MetadataRoute.Sitemap {
+export const revalidate = 3600;
+
+export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://everyvisitor.app";
   const now = new Date();
 
@@ -80,12 +83,21 @@ export default function sitemap(): MetadataRoute.Sitemap {
     },
   ];
 
-  const blogRoutes: MetadataRoute.Sitemap = BLOG_POSTS.map((post) => ({
-    url: `${baseUrl}/blog/${post.slug}`,
-    lastModified: now,
+  const [posts, guides] = await Promise.all([loadBlogPosts(), loadGuides()]);
+  const blogRoutes: MetadataRoute.Sitemap = posts
+    .filter((post) => !post.noindex)
+    .map((post) => ({
+      url: `${baseUrl}/blog/${post.slug}`,
+      lastModified: post.dateIso ? new Date(post.dateIso) : now,
+      changeFrequency: "monthly",
+      priority: 0.8,
+    }));
+  const guideRoutes: MetadataRoute.Sitemap = guides.map((g) => ({
+    url: `${baseUrl}/fix/${g.platform}/${g.slug}`,
+    lastModified: new Date(g.reviewedAt),
     changeFrequency: "monthly",
-    priority: 0.8,
+    priority: 0.7,
   }));
 
-  return [...staticRoutes, ...blogRoutes];
+  return [...staticRoutes, { url: `${baseUrl}/fix`, lastModified: now, changeFrequency: "weekly", priority: 0.8 }, ...blogRoutes, ...guideRoutes];
 }

@@ -32,6 +32,16 @@ const createOrgSchema = z.object({
   type: z.enum(['agency', 'store']).default('store'),
   timeZone: z.string().min(1).max(50).default('UTC'),
   freeCheckId: z.string().uuid().optional(),
+  /** First-touch UTM from the visit that led to sign-up (staff spec P8-16). */
+  utm: z
+    .object({
+      source: z.string().trim().max(100).optional(),
+      medium: z.string().trim().max(100).optional(),
+      campaign: z.string().trim().max(100).optional(),
+      term: z.string().trim().max(100).optional(),
+      content: z.string().trim().max(100).optional(),
+    })
+    .optional(),
 });
 
 const patchOrgSchema = z.object({
@@ -105,6 +115,7 @@ export function orgsRouter(
           type,
           timeZone,
           trialEndsAt,
+          firstUtm: parse.data.utm && Object.keys(parse.data.utm).length > 0 ? parse.data.utm : undefined,
         },
         userId,
       );

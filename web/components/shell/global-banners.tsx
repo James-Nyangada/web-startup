@@ -10,7 +10,8 @@ export type BannerKind =
   | "past_due"
   | "trial"
   | "verification"
-  | "email";
+  | "email"
+  | "announcement";
 
 export interface GlobalBannerData {
   kind: BannerKind;
@@ -23,6 +24,10 @@ export interface GlobalBannerData {
   href?: string;
   daysRemaining?: number;
   daysLeft?: number;
+  message?: string;
+  linkUrl?: string;
+  style?: "info" | "success" | "warning";
+  dismissible?: boolean;
   onAction?: () => void;
   onDismiss?: () => void;
 }
@@ -34,6 +39,7 @@ const PRIORITY_ORDER: Record<BannerKind, number> = {
   trial: 4,
   verification: 5,
   email: 6,
+  announcement: 7,
 };
 
 export function GlobalBannersRegion({
@@ -192,6 +198,45 @@ export function GlobalBannersRegion({
             >
               <Icon d={I.close} size={14} />
             </button>
+          </div>
+        </div>
+      )}
+
+      {banner.kind === "announcement" && (
+        <div
+          className={`flex flex-wrap items-center justify-between gap-3 px-4 py-2.5 sm:px-8 text-xs font-semibold ${
+            banner.style === "success"
+              ? "bg-ok text-on-primary"
+              : banner.style === "warning"
+              ? "bg-amber-500 text-ink"
+              : "bg-primary text-on-primary"
+          }`}
+        >
+          <div className="flex items-center gap-2.5">
+            <Icon d={I.info} size={16} className="flex-none" />
+            <span>{banner.message}</span>
+          </div>
+          <div className="flex items-center gap-3">
+            {banner.linkUrl && (
+              <a
+                href={banner.linkUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="underline underline-offset-2 font-bold hover:opacity-90"
+              >
+                Learn more
+              </a>
+            )}
+            {banner.dismissible !== false && (
+              <button
+                type="button"
+                onClick={handleDismiss}
+                aria-label="Dismiss announcement banner"
+                className="grid size-6 place-items-center opacity-80 hover:opacity-100 border-0 bg-transparent cursor-pointer"
+              >
+                <Icon d={I.close} size={14} />
+              </button>
+            )}
           </div>
         </div>
       )}

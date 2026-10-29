@@ -77,8 +77,12 @@ export function apiKeyAuth(repos: Repositories, limiter = new MemoryRateLimiter(
     res.setHeader('X-RateLimit-Remaining', String(Math.max(0, limit.remaining - 1)));
 
     const org = withEffectivePlan(found.org);
-    // Keys keep working only while the org is on a plan with API access.
-    if (!getPlanDefinition(org.plan).features.publicApi) {
+    const hasPluginScope = found.key.scopes.includes('plugin');
+    const isPublicApiAllowed = getPlanDefinition(org.plan).features.publicApi;
+
+    // Keys with 'plugin' scope are site-scoped platform integration keys (WordPress, Shopify)
+    // that work on any active or trialing plan. General developer keys require Agency Pro.
+    if (!isPublicApiAllowed && !hasPluginScope) {
       res.status(403).json({
         error: {
           code: ErrorCode.PLAN_LIMIT,
@@ -90,6 +94,9 @@ export function apiKeyAuth(repos: Repositories, limiter = new MemoryRateLimiter(
     }
 
     req.apiKey = found.key;
+    if (found.key.siteIds && found.key.siteIds.length > 0) {
+      req.clientSiteIds = found.key.siteIds;
+    }
     req.org = org;
     req.orgId = asOrgId(org.id);
     req.membership = {

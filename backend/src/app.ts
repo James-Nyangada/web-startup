@@ -21,6 +21,7 @@ import { orgsRouter } from './routes/orgs.js';
 import { detectPlatformRouter } from './routes/sites.js';
 import { waitlistRouter } from './routes/public/waitlist.js';
 import { publicPlansRouter } from './routes/public/plans.js';
+import { publicContentRouter, publicBannersRouter } from './routes/public/content.js';
 import {
   freeChecksPublicRouter,
   type FreeChecksRouterOptions,
@@ -200,6 +201,8 @@ export function createApp({
   v1.use('/webhooks/paddle', paddleWebhookRouter(repos, paddleWebhookOpts));
   v1.use('/public', waitlistRouter(repos, verifyTurnstile));
   v1.use('/public', publicPlansRouter());
+  v1.use('/public', publicContentRouter(repos));
+  v1.use('/public', publicBannersRouter(repos));
   v1.use('/public/portal-domains', portalDomainsRouter(repos));
   v1.use(
     '/public',
@@ -220,6 +223,7 @@ export function createApp({
         queueAdmin ?? (scansOptions?.boss ? pgBossQueueAdmin(scansOptions.boss, pool) : undefined),
       boss: scansOptions?.boss,
       emailSender,
+      storage,
     }),
   );
   app.use('/v1', v1);

@@ -8,7 +8,9 @@ import { FreeCheck } from "./free-check";
 import { Collapse } from "@/components/disclosure";
 import { useReveal } from "@/components/reveal";
 import { useTheme } from "@/components/theme";
-import { COMPARE, FACTS, FAQ, HOW, PLANS } from "@/lib/home-data";
+import { PLANS } from "@/lib/home-data";
+import type { HomeContent } from "@/lib/home-content";
+import { Markdown } from "@/components/marketing/markdown";
 
 const H2 = "m-0 font-serif text-[40px] leading-[44px] font-normal sm:text-[52px] sm:leading-[56px]";
 
@@ -22,7 +24,8 @@ function Placeholder({ label, className = "" }: { label: string; className?: str
   );
 }
 
-export function HomePage() {
+export function HomePage({ content }: { content: HomeContent }) {
+  const { facts: FACTS, how: HOW, compare: COMPARE, faq: FAQ, agency, hero } = content;
   const [faq, setFaq] = useState(0);
   const scope = useReveal<HTMLDivElement>();
   const { theme } = useTheme();
@@ -33,7 +36,7 @@ export function HomePage() {
       <MarketingHeader />
 
       <main id="main-content" tabIndex={-1} className="outline-none flex-1">
-        <FreeCheck />
+        <FreeCheck hero={hero} />
 
         <section aria-labelledby="facts-h" className="border-y border-line bg-subtle">
           <div className="mx-auto flex max-w-[1280px] flex-col gap-8 px-4 py-16 sm:px-8">
@@ -44,7 +47,15 @@ export function HomePage() {
               {FACTS.map((f) => (
                 <div key={f.fact} className="flex flex-col gap-2">
                   <strong className="text-xl leading-7">{f.fact}</strong>
-                  <span className="text-sm text-muted">{f.source}</span>
+                  <span className="text-sm text-muted">
+                    {"url" in f && f.url ? (
+                      <a href={f.url} className="underline underline-offset-2 hover:text-ink" rel="noopener noreferrer">
+                        {f.source}
+                      </a>
+                    ) : (
+                      f.source
+                    )}
+                  </span>
                 </div>
               ))}
             </div>
@@ -83,13 +94,19 @@ export function HomePage() {
           <div className="mx-auto grid max-w-[1280px] items-center gap-12 px-4 py-20 sm:px-8 [grid-template-columns:repeat(auto-fit,minmax(min(100%,420px),1fr))]">
             <div data-reveal className="flex flex-col gap-4">
               <h2 id="ag-h" className={H2}>
-                Built for <em>agencies</em> and freelancers
+                {agency ? agency.headline : <>Built for <em>agencies</em> and freelancers</>}
               </h2>
-              <p className="m-0 text-lg leading-7 text-muted">Turn accessibility into a monthly care plan your clients understand.</p>
+              <p className="m-0 text-lg leading-7 text-muted">
+                {agency ? agency.subtext : "Turn accessibility into a monthly care plan your clients understand."}
+              </p>
               <ul className="m-0 flex flex-col gap-2 pl-5">
-                <li>Every client site on one screen, worst first</li>
-                <li>Monthly reports with your logo and colours</li>
-                <li>A calm client portal, no rule IDs, no jargon</li>
+                {(agency?.bullets ?? [
+                  "Every client site on one screen, worst first",
+                  "Monthly reports with your logo and colours",
+                  "A calm client portal, no rule IDs, no jargon",
+                ]).map((b) => (
+                  <li key={b}>{b}</li>
+                ))}
               </ul>
               <Link href="/agencies" className="font-semibold text-primary hover:text-primary-hover no-underline">
                 See agency plans →
@@ -98,10 +115,10 @@ export function HomePage() {
             <div data-reveal>
               <div className="relative aspect-[16/10] overflow-hidden rounded-2xl border border-line bg-surface shadow-card transition-all duration-300 hover:shadow-lg">
                 <picture>
-                  <source srcSet="/screenshots/agency-composite.webp" type="image/webp" />
+                  {!agency?.imageUrl && <source srcSet="/screenshots/agency-composite.webp" type="image/webp" />}
                   <img
-                    src="/screenshots/agency-composite.png"
-                    alt="Agency dashboard listing five client sites worst-first, with a client report in the agency’s own branding on top."
+                    src={agency?.imageUrl ?? "/screenshots/agency-composite.png"}
+                    alt={agency?.imageAlt ?? "Agency dashboard listing five client sites worst-first, with a client report in the agency’s own branding on top."}
                     width={1600}
                     height={1000}
                     className="h-full w-full object-cover transition-transform duration-300 hover:scale-[1.01]"
@@ -206,7 +223,7 @@ export function HomePage() {
                       </button>
                     </h3>
                     <Collapse open={open}>
-                      <p className="mt-0 mb-4 text-pretty text-muted">{f.a}</p>
+                      <div className="mt-0 mb-4 text-pretty text-muted">{f.markdown ? <Markdown>{f.a}</Markdown> : <p className="m-0">{f.a}</p>}</div>
                     </Collapse>
                   </div>
                 );

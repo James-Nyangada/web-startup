@@ -8,3 +8,4 @@ export * from './system.js';
 export * from './billing.js';
 export * from './evidence.js';
 export * from './integrations.js';
+export * from './staff.js';

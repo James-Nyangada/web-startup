@@ -1,6 +1,7 @@
 import { and, eq, gte, lte, sql } from 'drizzle-orm';
 import type { Database } from '../client.js';
-import { subscriptions } from '../schema/index.js';
+import { subscriptionChanges, subscriptions } from '../schema/index.js';
+import { subscriptionMrrChangeCents } from '../../shared/metrics.js';
 import type { OrgId } from './org-scope.js';
 
 export interface UpsertSubscriptionInput {
@@ -32,6 +33,7 @@ export function subscriptionsRepository(db: Database) {
     },
 
     async upsert(data: UpsertSubscriptionInput) {
+      const [prev] = await db.select().from(subscriptions).where(eq(subscriptions.orgId, data.orgId));
       const [row] = await db
         .insert(subscriptions)
         .values({
@@ -63,6 +65,19 @@ export function subscriptionsRepository(db: Database) {
         })
         .returning();
       if (!row) throw new Error('Failed to upsert subscription');
+
+      // A paying subscription that changed plan or interval is an upgrade or downgrade.
+      const delta = subscriptionMrrChangeCents(prev, data);
+      if (prev && delta !== null) {
+        await db.insert(subscriptionChanges).values({
+          orgId: data.orgId,
+          fromPlan: prev.plan,
+          fromInterval: prev.interval,
+          toPlan: data.plan,
+          toInterval: data.interval,
+          mrrDeltaCents: delta,
+        });
+      }
       return row;
     },
 

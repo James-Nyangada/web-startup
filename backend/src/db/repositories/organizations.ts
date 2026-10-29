@@ -20,9 +20,24 @@ export interface CreateOrgData {
   plan?: Plan;
   billingStatus?: BillingStatus;
   trialEndsAt?: Date | null;
+  firstUtm?: {
+    source?: string;
+    medium?: string;
+    campaign?: string;
+    term?: string;
+    content?: string;
+  };
 }
 
-type OrgRow = typeof organizations.$inferSelect;
+export type OrgRow = Omit<typeof organizations.$inferSelect, 'firstUtm'> & {
+  firstUtm?: {
+    source?: string;
+    medium?: string;
+    campaign?: string;
+    term?: string;
+    content?: string;
+  } | null;
+};
 
 /**
  * A staff plan override (P6-02) replaces `plan` everywhere limits are read, until it
@@ -41,7 +56,7 @@ export function withEffectivePlan<T extends OrgRow>(
 
 export function organizationsRepository(db: Database) {
   return {
-    async create(data: CreateOrgData) {
+    async create(data: CreateOrgData): Promise<OrgRow> {
       const [row] = await db
         .insert(organizations)
         .values({
@@ -55,30 +70,30 @@ export function organizationsRepository(db: Database) {
         })
         .returning();
 
-      return row;
+      return row as OrgRow;
     },
 
-    async findById(id: string) {
+    async findById(id: string): Promise<(OrgRow & { basePlan?: Plan }) | null> {
       const [row] = await db
         .select()
         .from(organizations)
         .where(and(eq(organizations.id, id), isNull(organizations.deletedAt)))
         .limit(1);
 
-      return row ? withEffectivePlan(row) : null;
+      return row ? withEffectivePlan(row as OrgRow) : null;
     },
 
-    async findBySlug(slug: string) {
+    async findBySlug(slug: string): Promise<(OrgRow & { basePlan?: Plan }) | null> {
       const [row] = await db
         .select()
         .from(organizations)
         .where(and(eq(organizations.slug, slug), isNull(organizations.deletedAt)))
         .limit(1);
 
-      return row ? withEffectivePlan(row) : null;
+      return row ? withEffectivePlan(row as OrgRow) : null;
     },
 
-    async findByIdOrSlug(idOrSlug: string) {
+    async findByIdOrSlug(idOrSlug: string): Promise<(OrgRow & { basePlan?: Plan }) | null> {
       if (UUID_REGEX.test(idOrSlug)) {
         const byId = await this.findById(idOrSlug);
         if (byId) return byId;
@@ -86,7 +101,7 @@ export function organizationsRepository(db: Database) {
       return this.findBySlug(idOrSlug);
     },
 
-    async findByPaddleCustomerId(paddleCustomerId: string) {
+    async findByPaddleCustomerId(paddleCustomerId: string): Promise<OrgRow | null> {
       const [row] = await db
         .select()
         .from(organizations)
@@ -98,7 +113,7 @@ export function organizationsRepository(db: Database) {
         )
         .limit(1);
 
-      return row ?? null;
+      return (row as OrgRow) ?? null;
     },
 
     async update(
@@ -115,24 +130,24 @@ export function organizationsRepository(db: Database) {
           | 'pastDueSince'
         >
       >,
-    ) {
+    ): Promise<OrgRow | null> {
       const [row] = await db
         .update(organizations)
         .set(data)
         .where(and(eq(organizations.id, orgId), isNull(organizations.deletedAt)))
         .returning();
 
-      return row ?? null;
+      return (row as OrgRow) ?? null;
     },
 
-    async softDelete(orgId: OrgId) {
+    async softDelete(orgId: OrgId): Promise<OrgRow | null> {
       const [row] = await db
         .update(organizations)
         .set({ deletedAt: new Date() })
         .where(and(eq(organizations.id, orgId), isNull(organizations.deletedAt)))
         .returning();
 
-      return row ?? null;
+      return (row as OrgRow) ?? null;
     },
 
     async isSlugAvailable(slug: string, excludeOrgId?: string): Promise<boolean> {
@@ -158,7 +173,7 @@ export function organizationsRepository(db: Database) {
       data: CreateOrgData,
       userId: string,
     ): Promise<{
-      org: typeof organizations.$inferSelect;
+      org: OrgRow;
       membership: typeof memberships.$inferSelect;
     }> {
       return db.transaction(async (tx) => {
@@ -172,6 +187,7 @@ export function organizationsRepository(db: Database) {
             plan: data.plan ?? 'trial',
             billingStatus: data.billingStatus ?? 'trialing',
             trialEndsAt: data.trialEndsAt,
+            firstUtm: data.firstUtm,
           })
           .returning();
 
@@ -194,12 +210,12 @@ export function organizationsRepository(db: Database) {
 
         await tx.update(users).set({ lastActiveOrgId: org.id }).where(eq(users.id, userId));
 
-        return { org, membership };
+        return { org: org, membership };
       });
     },
 
-    async findDueForTrialLifecycle() {
-      return db
+    async findDueForTrialLifecycle(): Promise<OrgRow[]> {
+      const rows = await db
         .select()
         .from(organizations)
         .where(
@@ -208,9 +224,10 @@ export function organizationsRepository(db: Database) {
             sql`(${organizations.billingStatus} = 'trialing' OR ${organizations.billingStatus} = 'past_due' OR ${organizations.billingStatus} = 'read_only' OR ${organizations.billingStatus} = 'canceled')`,
           ),
         );
+      return rows;
     },
 
-    async listAllActive() {
+    async listAllActive(): Promise<(OrgRow & { basePlan?: Plan })[]> {
       const rows = await db
         .select()
         .from(organizations)
@@ -220,7 +237,7 @@ export function organizationsRepository(db: Database) {
             notInArray(organizations.billingStatus, ['read_only', 'canceled']),
           ),
         );
-      return rows.map((row) => withEffectivePlan(row));
+      return rows.map((row) => withEffectivePlan(row as OrgRow));
     },
   };
 }

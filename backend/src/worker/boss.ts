@@ -22,6 +22,19 @@ import { handleReportSchedule } from './jobs/report-schedule.js';
 import { handleRetentionPrune } from './jobs/retention-prune.js';
 import { handleSiteReverify, handleSiteReverifySweep } from './jobs/site-reverify.js';
 import { handleDataExport } from './jobs/data-export.js';
+import {
+  handleContentPublishScheduled,
+  handleMetricsComputeDaily,
+  handleMetricsComputeToday,
+  handleOrgsHealth,
+  handleSiteDeployStatus,
+  handleSiteRebuild,
+  handleUmamiSync,
+  type MetricsComputePayload,
+} from './jobs/phase8.js';
+import { QUEUE_SITE_DEPLOY_STATUS, QUEUE_SITE_REBUILD } from '../lib/site-rebuild.js';
+import { handleLegalNotice, type LegalNoticePayload } from './jobs/legal-notice.js';
+import { handleChangelogDigest, type ChangelogDigestPayload } from './jobs/changelog-digest.js';
 import type {
   DataExportJobPayload,
   DigestWeeklyJobPayload,
@@ -49,6 +62,14 @@ export const QUEUE_RETENTION_PRUNE = 'retention.prune';
 export const QUEUE_SITE_REVERIFY = 'site.reverify';
 export const QUEUE_SITE_REVERIFY_SWEEP = 'site.reverify.sweep';
 export const QUEUE_PRIVACY_EXPORT = 'privacy.export';
+export const QUEUE_CONTENT_PUBLISH_SCHEDULED = 'content.publish-scheduled';
+export const QUEUE_METRICS_COMPUTE_DAILY = 'metrics.compute-daily';
+export const QUEUE_METRICS_COMPUTE_TODAY = 'metrics.compute-today';
+export const QUEUE_UMAMI_SYNC = 'analytics.umami-sync';
+export const QUEUE_ORGS_HEALTH = 'orgs.health';
+export const QUEUE_LEGAL_NOTICE = 'legal.notice';
+export const QUEUE_CHANGELOG_DIGEST = 'changelog.digest';
+export { QUEUE_SITE_DEPLOY_STATUS, QUEUE_SITE_REBUILD };
 
 export const ALL_QUEUES = [
   QUEUE_SCAN_RUN,
@@ -68,6 +89,15 @@ export const ALL_QUEUES = [
   QUEUE_SITE_REVERIFY,
   QUEUE_SITE_REVERIFY_SWEEP,
   QUEUE_PRIVACY_EXPORT,
+  QUEUE_CONTENT_PUBLISH_SCHEDULED,
+  QUEUE_METRICS_COMPUTE_DAILY,
+  QUEUE_METRICS_COMPUTE_TODAY,
+  QUEUE_UMAMI_SYNC,
+  QUEUE_ORGS_HEALTH,
+  QUEUE_LEGAL_NOTICE,
+  QUEUE_CHANGELOG_DIGEST,
+  QUEUE_SITE_REBUILD,
+  QUEUE_SITE_DEPLOY_STATUS,
 ] as const;
 
 /** pg-boss refuses to send to or schedule on a queue that does not exist. Idempotent. */
@@ -325,6 +355,47 @@ export async function registerWorkers(boss: PgBoss, ctx: WorkerContext): Promise
     },
   );
 
+  // Phase 8 staff jobs (staff spec section 8)
+  await boss.work(QUEUE_CONTENT_PUBLISH_SCHEDULED, { localConcurrency: 1, batchSize: 1 }, async () => {
+    await handleContentPublishScheduled(ctx);
+  });
+  await boss.work(QUEUE_SITE_REBUILD, { localConcurrency: 1, batchSize: 1 }, async () => {
+    await handleSiteRebuild(ctx);
+  });
+  await boss.work(QUEUE_SITE_DEPLOY_STATUS, { localConcurrency: 1, batchSize: 1 }, async () => {
+    await handleSiteDeployStatus(ctx);
+  });
+  await boss.work<MetricsComputePayload>(
+    QUEUE_METRICS_COMPUTE_DAILY,
+    { localConcurrency: 1, batchSize: 1 },
+    async (jobs) => {
+      await handleMetricsComputeDaily(jobs[0]?.data, ctx);
+    },
+  );
+  await boss.work(QUEUE_METRICS_COMPUTE_TODAY, { localConcurrency: 1, batchSize: 1 }, async () => {
+    await handleMetricsComputeToday(ctx);
+  });
+  await boss.work(QUEUE_UMAMI_SYNC, { localConcurrency: 1, batchSize: 1 }, async () => {
+    await handleUmamiSync(ctx);
+  });
+  await boss.work<LegalNoticePayload>(
+    QUEUE_LEGAL_NOTICE,
+    { localConcurrency: 1, batchSize: 1 },
+    async (jobs) => {
+      if (jobs[0]?.data) await handleLegalNotice(jobs[0].data, ctx);
+    },
+  );
+  await boss.work<ChangelogDigestPayload>(
+    QUEUE_CHANGELOG_DIGEST,
+    { localConcurrency: 1, batchSize: 1 },
+    async (jobs) => {
+      await handleChangelogDigest(jobs[0]?.data, ctx);
+    },
+  );
+  await boss.work(QUEUE_ORGS_HEALTH, { localConcurrency: 1, batchSize: 1 }, async () => {
+    await handleOrgsHealth(ctx);
+  });
+
   // Concurrency 1 for trial.lifecycle cron
   await boss.work(QUEUE_TRIAL_LIFECYCLE, { localConcurrency: 1, batchSize: 1 }, async () => {
     await handleTrialLifecycle(ctx);
@@ -449,6 +520,29 @@ export async function registerSchedules(boss: PgBoss): Promise<void> {
 
   // retention.prune runs daily at 02:00 UTC (Spec Section 9 & P5-10)
   await boss.schedule(QUEUE_RETENTION_PRUNE, '0 2 * * *', {});
+
+  // Staff spec section 8
+  const retry = { retryLimit: 3, retryDelay: 5 * 60, retryBackoff: true };
+  await boss.schedule(QUEUE_CONTENT_PUBLISH_SCHEDULED, '*/5 * * * *', {});
+  // Sweeps queued rebuilds once the 2-minute debounce has passed, and keeps status polling alive.
+  await boss.schedule(QUEUE_SITE_REBUILD, '* * * * *', {});
+  await boss.schedule(QUEUE_SITE_DEPLOY_STATUS, '*/5 * * * *', {});
+  await boss.schedule(QUEUE_METRICS_COMPUTE_DAILY, '0 1 * * *', {}, retry);
+  await boss.schedule(QUEUE_METRICS_COMPUTE_TODAY, '5 * * * *', {}, retry);
+  await boss.schedule(QUEUE_UMAMI_SYNC, '10 * * * *', {}, retry);
+  await boss.schedule(QUEUE_ORGS_HEALTH, '30 2 * * *', {}, retry);
+  // Monthly product-updates email: the 1st at 10:00 UTC, covering last month's changelog.
+  await boss.schedule(QUEUE_CHANGELOG_DIGEST, '0 10 1 * *', {}, retry);
+}
+
+/** Queue a history backfill of metrics_daily (used by the backfill script). */
+export async function enqueueMetricsBackfill(
+  boss: PgBoss,
+  backfillDays: number,
+): Promise<string | null> {
+  return boss.send(QUEUE_METRICS_COMPUTE_DAILY, { backfillDays } satisfies MetricsComputePayload, {
+    expireInSeconds: 30 * 60,
+  });
 }
 
 export async function enqueueRetentionPrune(
@@ -464,5 +558,15 @@ export async function enqueueDataExport(boss: PgBoss, exportId: string): Promise
     expireInSeconds: 5 * 60,
     retryLimit: 2,
     retryDelay: 60,
+  });
+}
+
+/** legal.notice: resumable, so retry generously. */
+export async function enqueueLegalNotice(boss: PgBoss, noticeId: string): Promise<string | null> {
+  return boss.send(QUEUE_LEGAL_NOTICE, { noticeId } satisfies LegalNoticePayload, {
+    retryLimit: 5,
+    retryDelay: 120,
+    retryBackoff: true,
+    expireInSeconds: 6 * 60 * 60,
   });
 }

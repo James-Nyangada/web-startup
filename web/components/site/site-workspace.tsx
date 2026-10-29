@@ -635,6 +635,7 @@ export function SiteWorkspace({
         siteHref={siteHref}
         orgSlug={orgSlug}
         sitePlatform={site.platform}
+        siteRootUrl={site.rootUrl}
         members={members}
         onAssign={assign}
         onSetDue={setDue}

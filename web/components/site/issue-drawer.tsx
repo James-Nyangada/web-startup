@@ -24,6 +24,7 @@ export function IssueDrawer({
   siteHref,
   orgSlug,
   sitePlatform,
+  siteRootUrl,
   members,
   onAssign,
   onSetDue,
@@ -39,6 +40,7 @@ export function IssueDrawer({
   siteHref?: string;
   orgSlug?: string;
   sitePlatform?: string;
+  siteRootUrl?: string;
   members?: ApiMember[];
   onAssign?: (assigneeId: string | null) => void;
   onSetDue?: (dueDate: string | null) => void;
@@ -131,6 +133,7 @@ export function IssueDrawer({
           issue={shown}
           orgSlug={orgSlug}
           sitePlatform={sitePlatform}
+          siteRootUrl={siteRootUrl}
           members={members}
           onAssign={onAssign}
           onSetDue={onSetDue}

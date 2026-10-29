@@ -9,8 +9,9 @@ import {
   timestamp,
   uuid,
 } from 'drizzle-orm/pg-core';
-import { id, inList, timestamps } from './columns.js';
+import { id, inList, timestamps, citext } from './columns.js';
 import { organizations, users } from './identity.js';
+import { sites } from './scanning.js';
 
 export const WEBHOOK_KINDS = ['slack', 'generic'] as const;
 export type WebhookKind = (typeof WEBHOOK_KINDS)[number];
@@ -72,7 +73,7 @@ export const webhookDeliveries = pgTable(
 
 export type WebhookDeliveryRow = typeof webhookDeliveries.$inferSelect;
 
-export const API_KEY_SCOPES = ['read', 'scan:write'] as const;
+export const API_KEY_SCOPES = ['read', 'scan:write', 'plugin'] as const;
 export type ApiKeyScope = (typeof API_KEY_SCOPES)[number];
 
 /** Public REST API keys (Agency Pro, P6-06). Only the SHA-256 hash of the secret is stored. */
@@ -88,6 +89,11 @@ export const apiKeys = pgTable(
     prefix: text('prefix').notNull(),
     keyHash: text('key_hash').notNull().unique(),
     scopes: text('scopes').array().$type<ApiKeyScope[]>().notNull(),
+    /** Site IDs this key is restricted to. Empty array means org-wide key. */
+    siteIds: uuid('site_ids')
+      .array()
+      .notNull()
+      .default(sql`'{}'::uuid[]`),
     lastUsedAt: timestamp('last_used_at', { withTimezone: true }),
     revokedAt: timestamp('revoked_at', { withTimezone: true }),
     createdBy: uuid('created_by').references(() => users.id, { onDelete: 'set null' }),
@@ -97,3 +103,27 @@ export const apiKeys = pgTable(
 );
 
 export type ApiKeyRow = typeof apiKeys.$inferSelect;
+
+/** Shopify app sessions (P7-02). Stored in DB to survive multi-instance & container restarts. */
+export const shopifySessions = pgTable(
+  'shopify_sessions',
+  {
+    shop: citext('shop').primaryKey(),
+    accessToken: text('access_token').notNull(),
+    scope: text('scope').notNull(),
+    siteId: uuid('site_id').references(() => sites.id, { onDelete: 'set null' }),
+    apiKey: text('api_key'),
+    orgId: uuid('org_id').references(() => organizations.id, { onDelete: 'cascade' }),
+    plan: text('plan').notNull().default('trial'),
+    subscriptionId: text('subscription_id'),
+    installedAt: timestamp('installed_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    index('shopify_sessions_org_id_idx').on(t.orgId),
+    index('shopify_sessions_site_id_idx').on(t.siteId),
+  ],
+);
+
+export type ShopifySessionRow = typeof shopifySessions.$inferSelect;
+export type NewShopifySessionRow = typeof shopifySessions.$inferInsert;

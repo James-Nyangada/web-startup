@@ -1,11 +1,12 @@
 import type { Metadata } from "next";
+import { CmsLegal, loadLegalPage } from "@/components/legal/cms-legal";
 
 export const metadata: Metadata = {
   title: "Refund Policy",
   description: "EveryVisitor Refund Policy: 14-day free trial, how refunds work for monthly and annual plans, and when we always refund.",
 };
 
-export default function RefundPolicyPage() {
+function BuiltRefundPolicyPage() {
   return (
     <div className="prose prose-slate max-w-none text-ink">
       <div className="border-b border-line pb-6 mb-8">
@@ -92,4 +93,13 @@ export default function RefundPolicyPage() {
       </div>
     </div>
   );
+}
+
+export const revalidate = 300;
+
+/** Shows the version published from the staff area; until one is published, the built-in text. */
+export default async function RefundPolicyPage() {
+  const cms = await loadLegalPage("refunds");
+  if (cms) return <CmsLegal slug="refunds" page={cms} />;
+  return <BuiltRefundPolicyPage />;
 }

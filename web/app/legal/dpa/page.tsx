@@ -1,13 +1,14 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { DPA_SECTIONS, DPA_UPDATED } from "@/lib/legal/dpa";
+import { CmsLegal, loadLegalPage } from "@/components/legal/cms-legal";
 
 export const metadata: Metadata = {
   title: "Data Processing Agreement (DPA)",
   description: "EveryVisitor Data Processing Agreement under Article 28 of the GDPR and UK GDPR.",
 };
 
-export default function DpaPage() {
+function BuiltDpaPage() {
   return (
     <div className="prose prose-slate max-w-none text-ink">
       <div className="border-b border-line pb-6 mb-8">
@@ -63,4 +64,13 @@ export default function DpaPage() {
       </div>
     </div>
   );
+}
+
+export const revalidate = 300;
+
+/** Shows the version published from the staff area; until one is published, the built-in text. */
+export default async function DpaPage() {
+  const cms = await loadLegalPage("dpa");
+  if (cms) return <CmsLegal slug="dpa" page={cms} />;
+  return <BuiltDpaPage />;
 }

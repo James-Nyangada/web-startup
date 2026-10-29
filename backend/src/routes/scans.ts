@@ -11,7 +11,7 @@ import { getZonedParts, zonedWallClockToUtc } from '../lib/schedule.js';
 import { getScanFailureHint } from '../shared/scan-hints.js';
 
 export const createScanSchema = z.object({
-  trigger: z.enum(['manual', 'onboarding']).default('manual'),
+  trigger: z.enum(['manual', 'onboarding', 'plugin', 'api']).default('manual'),
   standard: z.enum(STANDARDS as unknown as [Standard, ...Standard[]]).optional(),
   pagesPlanned: z.number().int().min(1).max(100).optional(),
 });
@@ -102,8 +102,8 @@ export function orgScansRouter(repos: Repositories, options?: ScansRouterOptions
       }
 
       const { standard, pagesPlanned } = parse.data;
-      // Scans started with an API key (P6-06) are recorded as such, never as onboarding.
-      const trigger = req.apiKey ? 'api' : parse.data.trigger;
+      // Plugin scans and API scans recorded accordingly; API keys default to 'api'
+      const trigger = parse.data.trigger === 'plugin' ? 'plugin' : req.apiKey ? 'api' : parse.data.trigger;
 
       // Ownership verification check:
       // Spec Section 6.9: "Unverified sites: user may run one onboarding scan limited to 10 pages
@@ -161,8 +161,8 @@ export function orgScansRouter(repos: Repositories, options?: ScansRouterOptions
         }
       }
 
-      // Enforce daily manual scan limit per site based on org plan (API scans count too)
-      if (trigger === 'manual' || trigger === 'api') {
+      // Enforce daily manual scan limit per site based on org plan (API and plugin scans count too)
+      if (trigger === 'manual' || trigger === 'api' || trigger === 'plugin') {
         const timeZone = org?.timeZone ?? 'UTC';
 
         const currentParts = getZonedParts(new Date(), timeZone);

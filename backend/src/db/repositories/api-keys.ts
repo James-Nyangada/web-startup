@@ -28,6 +28,7 @@ const publicColumns = {
   name: apiKeys.name,
   prefix: apiKeys.prefix,
   scopes: apiKeys.scopes,
+  siteIds: apiKeys.siteIds,
   lastUsedAt: apiKeys.lastUsedAt,
   revokedAt: apiKeys.revokedAt,
   createdBy: apiKeys.createdBy,
@@ -40,6 +41,7 @@ export type PublicApiKey = {
   name: string;
   prefix: string;
   scopes: ApiKeyScope[];
+  siteIds: string[];
   lastUsedAt: Date | null;
   revokedAt: Date | null;
   createdBy: string | null;
@@ -50,7 +52,12 @@ export function apiKeysRepository(db: Database) {
   return {
     async create(
       orgId: OrgId,
-      input: { name: string; scopes: ApiKeyScope[]; createdBy: string | null },
+      input: {
+        name: string;
+        scopes: ApiKeyScope[];
+        siteIds?: string[];
+        createdBy: string | null;
+      },
     ): Promise<{ key: PublicApiKey; secret: string }> {
       const { secret, prefix, keyHash } = generateApiKeySecret();
       const [row] = await db
@@ -59,6 +66,7 @@ export function apiKeysRepository(db: Database) {
           orgId,
           name: input.name,
           scopes: input.scopes,
+          siteIds: input.siteIds ?? [],
           createdBy: input.createdBy,
           prefix,
           keyHash,

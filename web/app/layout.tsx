@@ -3,6 +3,7 @@ import { Instrument_Serif, JetBrains_Mono, Manrope } from "next/font/google";
 import { ThemeProvider } from "@/components/theme";
 import { ToastProvider } from "@/components/shell/toast-context";
 import { EdgeListeners } from "@/components/shell/edge-listeners";
+import { UtmCapture } from "@/components/shell/utm-capture";
 import "./globals.css";
 
 const serif = Instrument_Serif({
@@ -97,6 +98,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <ToastProvider>
             {children}
             <EdgeListeners />
+            <UtmCapture />
           </ToastProvider>
         </ThemeProvider>
       </body>

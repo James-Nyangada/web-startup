@@ -2,12 +2,17 @@ import { apiClient, apiFetch } from "./api";
 
 /* ---------- Shapes (backend/src/routes/staff.ts, api-keys.ts, orgs.ts, branding.ts, me.ts) ---------- */
 
+export type StaffRole = "owner" | "admin" | "editor" | "support" | "analyst";
+
 export interface StaffSession {
   email: string;
   totpEnrolled: boolean;
   verified: boolean;
   verifiedAt: string | null;
   impersonatingOrgId: string | null;
+  role?: StaffRole;
+  displayName?: string | null;
+  staffMemberId?: string | null;
 }
 
 export interface StaffOrgRow {
@@ -25,6 +30,7 @@ export interface StaffOrgRow {
   siteCount: number;
   lastActivityAt: string | null;
   mrrCents: number;
+  health?: { score: number; band: "good" | "at_risk" | "poor"; reasons?: any } | null;
 }
 
 export interface StaffOrgDetail {
@@ -58,6 +64,7 @@ export interface StaffOrgDetail {
   billingEvents: AuditEntry[];
   invoices: { id: string; amountCents: number; currency: string; status: string; billedAt: string; invoiceUrl: string | null }[];
   subscription: { plan: string; interval: string; status: string; currentPeriodEnd: string | null; cancelAtPeriodEnd: boolean } | null;
+  health?: { score: number; band: "good" | "at_risk" | "poor"; reasons: string[]; computedAt: string } | null;
   mrrCents: number;
 }
 
@@ -238,6 +245,221 @@ export interface ActivationReport {
   items: ActivationRow[];
 }
 
+/* ---------- Phase 8 Models (CMS, Analytics, Customer additions) ---------- */
+
+export interface StaffMember {
+  id: string;
+  userId: string;
+  role: StaffRole;
+  displayName: string | null;
+  jobTitle: string | null;
+  bio: string | null;
+  avatarKey: string | null;
+  active: boolean;
+  createdAt: string;
+  email?: string;
+}
+
+export interface ContentPost {
+  id: string;
+  type: "blog" | "guide";
+  slug: string;
+  title: string;
+  excerpt?: string | null;
+  bodyMd: string;
+  bodyHtml?: string;
+  coverMediaId?: string | null;
+  coverAlt?: string | null;
+  authorStaffId: string;
+  author?: { id: string; displayName: string | null; jobTitle: string | null; bio: string | null };
+  tags: string[];
+  seoTitle?: string | null;
+  seoDescription?: string | null;
+  ogMediaId?: string | null;
+  canonicalUrl?: string | null;
+  noindex: boolean;
+  status: "draft" | "scheduled" | "published" | "archived";
+  publishAt?: string | null;
+  publishedAt?: string | null;
+  ruleId?: string | null;
+  platform?: string | null;
+  sections?: Record<string, any> | null;
+  reviewedAt?: string | null;
+  reviewedBy?: string | null;
+  updatedBy?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ContentRevision {
+  id: string;
+  postId?: string | null;
+  pageKey?: string | null;
+  version: number;
+  data: any;
+  note?: string | null;
+  createdBy: string;
+  createdAt: string;
+}
+
+export interface ContentPage {
+  id: string;
+  pageKey: string;
+  data: any;
+  status: "draft" | "published";
+  publishedVersion?: number | null;
+  effectiveDate?: string | null;
+  publishedAt?: string | null;
+  publishedBy?: string | null;
+  updatedAt: string;
+}
+
+export interface ChangelogEntry {
+  id: string;
+  date: string;
+  title: string;
+  type: "new" | "improved" | "fixed";
+  bodyMd: string;
+  bodyHtml?: string;
+  showInApp: boolean;
+  status: "draft" | "published";
+  publishedAt?: string | null;
+  createdAt: string;
+}
+
+export interface MediaAsset {
+  id: string;
+  key: string;
+  filename: string;
+  mime: string;
+  size: number;
+  width?: number | null;
+  height?: number | null;
+  variants?: any;
+  altText?: string | null;
+  isDecorative: boolean;
+  caption?: string | null;
+  credit?: string | null;
+  uploadedBy: string;
+  url: string | null;
+  createdAt: string;
+}
+
+export interface Banner {
+  id: string;
+  surface: "site" | "app" | "both";
+  message: string;
+  linkUrl?: string | null;
+  style: "info" | "success" | "warning";
+  audience?: any;
+  startsAt?: string | null;
+  endsAt?: string | null;
+  dismissible: boolean;
+  active: boolean;
+  createdAt: string;
+}
+
+export interface SiteSettings {
+  id: string;
+  supportEmail: string;
+  bannedWords: string[];
+  maintenanceMode: boolean;
+  deployHookConfigured: boolean;
+}
+
+export interface SiteDeploy {
+  id: string;
+  trigger: "publish" | "manual" | "schedule";
+  requestedBy?: string | null;
+  cfDeploymentId?: string | null;
+  status: "queued" | "building" | "live" | "failed";
+  startedAt: string;
+  finishedAt?: string | null;
+  error?: string | null;
+}
+
+export interface OrgNote {
+  id: string;
+  orgId: string;
+  staffMemberId: string;
+  bodyMd: string;
+  authorName?: string;
+  createdAt: string;
+}
+
+export interface OrgTag {
+  id: string;
+  orgId: string;
+  tag: string;
+  createdAt: string;
+}
+
+export interface OrgHealth {
+  id: string;
+  orgId: string;
+  score: number;
+  band: "good" | "at_risk" | "poor";
+  reasons: { factor: string; description: string; impact: number }[];
+  computedAt: string;
+}
+
+export interface StaffEmail {
+  id: string;
+  orgId: string;
+  toEmail: string;
+  template: string;
+  subject: string;
+  bodyMd: string;
+  sentBy: string;
+  status: string;
+  createdAt: string;
+}
+
+export interface SavedSegment {
+  id: string;
+  name: string;
+  filterConfig: any;
+  createdBy: string;
+  createdAt: string;
+}
+
+export interface DashboardCard {
+  label: string;
+  format: "currency" | "number" | "percent";
+  /** null until the first snapshot has data for this figure. */
+  value: number | null;
+  changePct: number | null;
+}
+
+export interface DashboardData {
+  statCards: Record<string, DashboardCard>;
+  mrrMonthly: { month: string; mrrCents: number }[];
+  signupsWeekly: { week: string; signups: number; converted: number }[];
+  visitorsDaily: { date: string; visitors: number }[];
+  needsAttention: { id: string; type: string; title: string; description: string; href: string; severity: "crit" | "warn" | "info" }[];
+  recentActivity: { id: string; type: string; text: string; date: string; orgId?: string }[];
+  /** False until UMAMI_API_URL, UMAMI_API_TOKEN and UMAMI_WEBSITE_ID are set. */
+  trafficConnected: boolean;
+}
+
+export interface TrafficReport {
+  configured: true;
+  fetchedAt: string;
+  totals: { visitors: number; pageViews: number; bounces: number; visits: number; totalTimeSeconds: number };
+  daily: { date: string; visitors: number; pageViews: number }[];
+  pages: { path: string; visitors: number }[];
+  referrers: { name: string; visitors: number }[];
+  countries: { name: string; visitors: number }[];
+  devices: { name: string; visitors: number }[];
+  campaigns: { name: string; visitors: number }[];
+  checker: { checks: number; withEmail: number; startedTrial: number };
+}
+
+export interface FunnelData {
+  steps: { name: string; count: number; conversionPct: number; dropOffPct: number }[];
+  bySource: { source: string; signups: number; activated: number; paid: number }[];
+}
+
 /* ---------- Staff (S-70 – S-75) ---------- */
 
 export const staffApi = {
@@ -246,7 +468,7 @@ export const staffApi = {
   confirm: (code: string) => apiClient<{ verified: boolean }>("/v1/staff/totp/confirm", json({ code })),
   verify: (code: string) => apiClient<{ verified: boolean }>("/v1/staff/totp/verify", json({ code })),
 
-  listOrgs: (params: { q?: string; plan?: string; status?: string; includeDeleted?: boolean; cursor?: string | null }) =>
+  listOrgs: (params: { q?: string; plan?: string; status?: string; healthBand?: string; includeDeleted?: boolean; cursor?: string | null }) =>
     apiFetch<Page<StaffOrgRow>>(`/v1/staff/orgs${qs({ ...params, limit: 50 })}`),
   inactiveCustomers: () => apiClient<InactiveCustomer[]>("/v1/staff/inactive-customers"),
   sendCheckIn: (orgId: string) =>
@@ -291,6 +513,151 @@ export const staffApi = {
   saveFlag: (key: string, enabled: boolean, orgIds: string[]) =>
     apiClient<{ flag: FeatureFlag }>(`/v1/staff/feature-flags/${encodeURIComponent(key)}`, json({ enabled, orgIds }, "PUT")),
   deleteFlag: (key: string) => apiClient(`/v1/staff/feature-flags/${encodeURIComponent(key)}`, { method: "DELETE" }),
+
+  /* ---------- Phase 8: Dashboards and Analytics ---------- */
+  dashboard: () => apiClient<DashboardData>("/v1/staff/dashboard"),
+  metrics: (params: { metric: string; from: string; to: string; granularity?: string; dimension?: string; compare?: boolean }) =>
+    apiClient<{ metric: string; from: string; to: string; points: { date: string; value: number }[]; comparison?: { date: string; value: number }[] }>(
+      `/v1/staff/metrics${qs(params)}`,
+    ),
+  traffic: (params: { from?: string; to?: string }) =>
+    apiClient<TrafficReport | { configured: false }>(`/v1/staff/analytics/traffic${qs(params)}`),
+  funnel: (params: { from?: string; to?: string }) =>
+    apiClient<FunnelData>(`/v1/staff/analytics/funnel${qs(params)}`),
+  cohorts: () =>
+    apiClient<{ cohorts: { cohort: string; size: number; retention: number[] }[] }>("/v1/staff/analytics/cohorts"),
+  businessInsights: (params: { from?: string; to?: string }) =>
+    apiClient<{
+      cancellations: { label: string; value: number }[];
+      plans: { plan: string; count: number; mrrCents: number }[];
+      topCustomers: { id: string; name: string; slug: string | null; plan: string; billingStatus: string; mrrCents: number }[];
+    }>(`/v1/staff/analytics/business${qs(params)}`),
+  productInsights: (params: { from?: string; to?: string }) =>
+    apiClient<{
+      adoption: { totalPaying: number; items: { label: string; value: number }[] };
+      issueTrend: { week: string; found: number; fixed: number }[];
+      aiTrend: { week: string; generated: number; flagged: number }[];
+    }>(`/v1/staff/analytics/product${qs(params)}`),
+  activationDistribution: (params: { from?: string; to?: string }) =>
+    apiClient<{ label: string; value: number }[]>(`/v1/staff/analytics/activation${qs(params)}`),
+  metricsCsvPath: (params: Record<string, any>) => `/v1/staff/metrics/export.csv${qs(params)}`,
+
+  /* ---------- Phase 8: Content Posts & Guides ---------- */
+  listPosts: (params?: { type?: string; status?: string; tag?: string; q?: string; cursor?: string | null }) =>
+    apiFetch<Page<ContentPost>>(`/v1/staff/content/posts${qs({ ...params, limit: 50 })}`),
+  getPost: (id: string) => apiClient<ContentPost>(`/v1/staff/content/posts/${id}`),
+  createPost: (data: Partial<ContentPost>) => apiClient<ContentPost>("/v1/staff/content/posts", json(data)),
+  updatePost: (id: string, data: Partial<ContentPost>) =>
+    apiClient<ContentPost>(`/v1/staff/content/posts/${id}`, json(data, "PATCH")),
+  deletePost: (id: string) => apiClient(`/v1/staff/content/posts/${id}`, { method: "DELETE" }),
+  publishPost: (id: string) => apiClient<ContentPost>(`/v1/staff/content/posts/${id}/publish`, { method: "POST" }),
+  unpublishPost: (id: string) => apiClient<ContentPost>(`/v1/staff/content/posts/${id}/unpublish`, { method: "POST" }),
+  schedulePost: (id: string, publishAt: string) =>
+    apiClient<ContentPost>(`/v1/staff/content/posts/${id}/schedule`, json({ publishAt })),
+  getPostRevisions: (id: string) => apiClient<ContentRevision[]>(`/v1/staff/content/posts/${id}/revisions`),
+  restoreRevision: (id: string, version: number) =>
+    apiClient<ContentPost>(`/v1/staff/content/posts/${id}/restore/${version}`, { method: "POST" }),
+  previewLink: (id: string) =>
+    apiClient<{ token: string; previewUrl: string; expiresAt: string }>(
+      `/v1/staff/content/posts/${id}/preview-link`,
+      { method: "POST" },
+    ),
+  checkContent: (data: { title?: string; bodyMd?: string; excerpt?: string }) =>
+    apiClient<{ warnings: { type: string; message: string; detail?: string }[] }>("/v1/staff/content/check", json(data)),
+  coverage: () =>
+    apiClient<{ rules: { ruleId: string; title: string; occurrences: number; guides: Record<string, string | null> }[]; totalPublished: number }>(
+      "/v1/staff/content/coverage",
+    ),
+
+  /* ---------- Phase 8: Content Pages ---------- */
+  listPages: () => apiClient<ContentPage[]>("/v1/staff/content/pages"),
+  getPage: (key: string) => apiClient<ContentPage>(`/v1/staff/content/pages/${key}`),
+  savePage: (key: string, data: any, effectiveDate?: string) =>
+    apiClient<ContentPage>(`/v1/staff/content/pages/${key}`, json({ data, effectiveDate }, "PUT")),
+  publishPage: (key: string, customerNotice?: { notifyAllCustomers: boolean; summary?: string }) =>
+    apiClient<ContentPage>(`/v1/staff/content/pages/${key}/publish`, json({ customerNotice })),
+
+  /* ---------- Phase 8: Changelog ---------- */
+  listChangelog: (params?: { status?: string }) =>
+    apiClient<ChangelogEntry[]>(`/v1/staff/content/changelog${qs(params ?? {})}`),
+  createChangelog: (data: Partial<ChangelogEntry>) =>
+    apiClient<ChangelogEntry>("/v1/staff/content/changelog", json(data)),
+  updateChangelog: (id: string, data: Partial<ChangelogEntry>) =>
+    apiClient<ChangelogEntry>(`/v1/staff/content/changelog/${id}`, json(data, "PATCH")),
+  deleteChangelog: (id: string) => apiClient(`/v1/staff/content/changelog/${id}`, { method: "DELETE" }),
+
+  /* ---------- Phase 8: Media Library ---------- */
+  listMedia: (params?: { q?: string; mime?: string; cursor?: string | null }) =>
+    apiFetch<Page<MediaAsset>>(`/v1/staff/media${qs({ ...params, limit: 50 })}`),
+  /** Multipart upload: the server checks the real file type, makes WebP/AVIF copies and stores them. */
+  uploadMedia: (file: File, meta: { altText?: string; isDecorative: boolean; caption?: string; credit?: string }) => {
+    const form = new FormData();
+    form.append("file", file);
+    if (meta.altText) form.append("altText", meta.altText);
+    form.append("isDecorative", String(meta.isDecorative));
+    if (meta.caption) form.append("caption", meta.caption);
+    if (meta.credit) form.append("credit", meta.credit);
+    return apiClient<MediaAsset>("/v1/staff/media", { method: "POST", body: form });
+  },
+  mediaUsage: (id: string) =>
+    apiClient<{ type: string; id: string; title: string }[]>(`/v1/staff/media/${id}/usage`),
+  updateMedia: (id: string, data: Partial<MediaAsset>) =>
+    apiClient<{ data: MediaAsset }>(`/v1/staff/media/${id}`, json(data, "PATCH")).then((r) => (r as any).data ?? r),
+  deleteMedia: (id: string) => apiClient(`/v1/staff/media/${id}`, { method: "DELETE" }),
+
+  /* ---------- Phase 8: Banners ---------- */
+  listBanners: (surface?: string) => apiClient<Banner[]>(`/v1/staff/banners${qs({ surface })}`),
+  createBanner: (data: Partial<Banner>) => apiClient<Banner>("/v1/staff/banners", json(data)),
+  updateBanner: (id: string, data: Partial<Banner>) =>
+    apiClient<Banner>(`/v1/staff/banners/${id}`, json(data, "PATCH")),
+  deleteBanner: (id: string) => apiClient(`/v1/staff/banners/${id}`, { method: "DELETE" }),
+
+  /* ---------- Phase 8: Site Settings & Deploys ---------- */
+  getSettings: () => apiClient<SiteSettings>("/v1/staff/site/settings"),
+  updateSettings: (data: Partial<SiteSettings>) =>
+    apiClient<SiteSettings>("/v1/staff/site/settings", json(data, "PATCH")),
+  listDeploys: (limit = 20) => apiClient<SiteDeploy[]>(`/v1/staff/site/deploys${qs({ limit })}`),
+  triggerDeploy: () => apiClient<{ queued: boolean }>("/v1/staff/site/deploys", { method: "POST" }),
+
+  /* ---------- Phase 8: Staff Members ---------- */
+  listAuthors: () =>
+    apiClient<{ id: string; displayName: string; jobTitle: string | null }[]>("/v1/staff/content/authors"),
+  markGuideReviewed: (id: string) => apiClient<ContentPost>(`/v1/staff/content/posts/${id}/review`, { method: "POST" }),
+  slugAvailable: (params: { type: string; slug: string; excludeId?: string }) =>
+    apiClient<{ available: boolean }>(`/v1/staff/content/posts/slug-available${qs(params)}`),
+  listMembers: () => apiClient<StaffMember[]>("/v1/staff/members"),
+  createMember: (data: { userId: string; role: StaffRole; displayName?: string; jobTitle?: string; bio?: string }) =>
+    apiClient<StaffMember>("/v1/staff/members", json(data)),
+  updateMember: (id: string, data: Partial<StaffMember>) =>
+    apiClient<StaffMember>(`/v1/staff/members/${id}`, json(data, "PATCH")),
+  deleteMember: (id: string) => apiClient(`/v1/staff/members/${id}`, { method: "DELETE" }),
+
+  /* ---------- Phase 8: Customer Additions (Notes, Tags, Timeline, Email, Segments) ---------- */
+  notes: (orgId: string) => apiClient<OrgNote[]>(`/v1/staff/orgs/${orgId}/notes`),
+  addNote: (orgId: string, bodyMd: string) =>
+    apiClient<OrgNote>(`/v1/staff/orgs/${orgId}/notes`, json({ bodyMd })),
+  deleteNote: (orgId: string, noteId: string) =>
+    apiClient(`/v1/staff/orgs/${orgId}/notes/${noteId}`, { method: "DELETE" }),
+  tags: (orgId: string) => apiClient<OrgTag[]>(`/v1/staff/orgs/${orgId}/tags`),
+  addTag: (orgId: string, tag: string) =>
+    apiClient<{ added: boolean; tag: string }>(`/v1/staff/orgs/${orgId}/tags`, json({ tag })),
+  removeTag: (orgId: string, tag: string) =>
+    apiClient<{ removed: boolean; tag: string }>(`/v1/staff/orgs/${orgId}/tags/${encodeURIComponent(tag)}`, { method: "DELETE" }),
+  timeline: (orgId: string) =>
+    apiClient<{ type: string; title: string; description: string; date: string }[]>(`/v1/staff/orgs/${orgId}/timeline`),
+  sendEmail: (orgId: string, data: { toEmail: string; template: string; subject: string; bodyMd: string }) =>
+    apiClient<StaffEmail>(`/v1/staff/orgs/${orgId}/email`, json(data)),
+  segments: () => apiClient<SavedSegment[]>("/v1/staff/segments"),
+  saveSegment: (name: string, filterConfig: any) =>
+    apiClient<SavedSegment>("/v1/staff/segments", json({ name, filterConfig })),
+  deleteSegment: (id: string) => apiClient(`/v1/staff/segments/${id}`, { method: "DELETE" }),
+  segmentCsvPath: (id: string) => `/v1/staff/segments/${id}/export.csv`,
+  utmLink: (params: { url: string; source: string; medium: string; campaign: string; term?: string; content?: string }) =>
+    apiClient<{ taggedUrl: string }>(`/v1/staff/tools/utm${qs(params)}`),
+  auditLog: (params: { action?: string; actorType?: string; staffOnly?: boolean; q?: string; cursor?: string | null }) =>
+    apiFetch<Page<AuditEntry>>(`/v1/staff/audit${qs({ ...params, limit: 50 })}`),
+  auditCsvPath: (params: { action?: string; actorType?: string; staffOnly?: boolean; q?: string }) =>
+    `/v1/staff/audit/export.csv${qs(params)}`,
 };
 
 /* ---------- Org settings: S-47 API keys, S-51 audit log, S-43 custom domain ---------- */

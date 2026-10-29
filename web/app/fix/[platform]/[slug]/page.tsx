@@ -4,12 +4,11 @@ import type { Metadata } from "next";
 import { MarketingHeader } from "@/components/marketing/marketing-header";
 import { MarketingFooter } from "@/components/marketing/marketing-footer";
 import { GuideRenderer } from "@/components/marketing/guide-renderer";
-import {
-  getAllFixGuides,
-  getFixGuideBySlug,
-  getFixGuidesByPlatform,
-  type FixGuideItem,
-} from "@/lib/fix-guides-data";
+import type { FixGuideItem } from "@/lib/fix-guides-data";
+import { loadGuide, loadGuides } from "@/lib/guide-source";
+
+export const revalidate = 300;
+export const dynamicParams = true;
 
 interface FixGuidePageProps {
   params: Promise<{
@@ -19,7 +18,7 @@ interface FixGuidePageProps {
 }
 
 export async function generateStaticParams() {
-  const guides = getAllFixGuides();
+  const guides = await loadGuides();
   return guides.map((g) => ({
     platform: g.platform,
     slug: g.slug,
@@ -28,7 +27,7 @@ export async function generateStaticParams() {
 
 export async function generateMetadata({ params }: FixGuidePageProps): Promise<Metadata> {
   const { slug } = await params;
-  const guide = getFixGuideBySlug(slug);
+  const guide = await loadGuide(slug);
 
   if (!guide) {
     return { title: "Fix Guide Not Found | EveryVisitor" };
@@ -48,14 +47,15 @@ export async function generateMetadata({ params }: FixGuidePageProps): Promise<M
 
 export default async function FixGuideArticlePage({ params }: FixGuidePageProps) {
   const { slug, platform } = await params;
-  const guide = getFixGuideBySlug(slug);
+  const guide = await loadGuide(slug);
 
   if (!guide || guide.platform !== platform) {
     notFound();
   }
 
   const platformName = guide.platform === "shopify" ? "Shopify" : "WordPress";
-  const relatedGuides = getFixGuidesByPlatform(guide.platform)
+  const relatedGuides = (await loadGuides())
+    .filter((g) => g.platform === guide.platform)
     .filter((g) => g.slug !== guide.slug)
     .slice(0, 3);
 

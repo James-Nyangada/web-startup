@@ -19,6 +19,18 @@ export interface PublicApiRoute {
 /** Spec 7.11: the only operations an API key can reach. Everything else is 404. */
 export const PUBLIC_API_ROUTES: PublicApiRoute[] = [
   { method: 'GET', path: '/sites', pattern: /^\/sites\/?$/, scope: 'read' },
+  {
+    method: 'POST',
+    path: '/sites/connect',
+    pattern: /^\/sites\/connect\/?$/,
+    scope: 'scan:write',
+  },
+  {
+    method: 'POST',
+    path: '/sites/shopify-plan-sync',
+    pattern: /^\/sites\/shopify-plan-sync\/?$/,
+    scope: 'plugin',
+  },
   { method: 'GET', path: '/sites/{siteId}', pattern: /^\/sites\/[^/]+\/?$/, scope: 'read' },
   {
     method: 'GET',
@@ -74,6 +86,68 @@ export function publicApiRouter(repos: Repositories, scansOptions?: ScansRouterO
     requireScope(route.scope)(req, res, next);
   });
   router.use(enforceReadOnlyOrg);
+
+  // Enforce site-scoped keys (Spec 7.11 / P7-01): keys with non-empty siteIds can only access their assigned sites.
+  router.use(async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    if (!req.apiKey?.siteIds || req.apiKey.siteIds.length === 0) {
+      return next();
+    }
+    const allowed = new Set(req.apiKey.siteIds);
+
+    // /sites/:siteId...
+    const siteMatch = /^\/sites\/([^/]+)/.exec(req.path);
+    if (siteMatch) {
+      const siteId = siteMatch[1]!;
+      if (siteId !== 'connect' && siteId !== 'shopify-plan-sync') {
+        if (!allowed.has(siteId)) {
+          res.status(404).json({
+            error: {
+              code: ErrorCode.NOT_FOUND,
+              message: 'Site not found.',
+              details: {},
+            },
+          });
+          return;
+        }
+      }
+    }
+
+    // /scans/:scanId
+    const scanMatch = /^\/scans\/([^/]+)/.exec(req.path);
+    if (scanMatch) {
+      const scanId = scanMatch[1]!;
+      const scan = await repos.scans.findById(req.orgId!, scanId);
+      if (!scan || !allowed.has(scan.siteId)) {
+        res.status(404).json({
+          error: {
+            code: ErrorCode.NOT_FOUND,
+            message: 'Scan not found.',
+            details: {},
+          },
+        });
+        return;
+      }
+    }
+
+    // /issues/:issueId
+    const issueMatch = /^\/issues\/([^/]+)/.exec(req.path);
+    if (issueMatch) {
+      const issueId = issueMatch[1]!;
+      const issue = await repos.issues.findById(req.orgId!, issueId);
+      if (!issue || !allowed.has(issue.siteId)) {
+        res.status(404).json({
+          error: {
+            code: ErrorCode.NOT_FOUND,
+            message: 'Issue not found.',
+            details: {},
+          },
+        });
+        return;
+      }
+    }
+
+    next();
+  });
 
   router.use('/sites', orgSitesRouter(repos));
   router.use(orgScansRouter(repos, scansOptions));

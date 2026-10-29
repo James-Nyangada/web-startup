@@ -417,3 +417,112 @@ describe('MRR', () => {
     expect(monthlyRevenueCents({ plan: 'agency', interval: 'month', status: 'canceled' })).toBe(0);
   });
 });
+
+describe('Phase 8: Staff & CMS 2.0', () => {
+  const STAFF_UUID = '018f0000-0000-7000-8000-0000000000b1';
+
+  it('enforces role-based permissions: analyst cannot create content posts', async () => {
+    const { app, cookie } = setup(staffState({ role: 'analyst' }));
+    const res = await request(app)
+      .post('/v1/staff/content/posts')
+      .set('Cookie', cookie)
+      .send({
+        type: 'blog',
+        title: 'Unauthorized Post',
+        slug: 'unauthorized-post',
+        bodyMd: 'Test body',
+        authorStaffId: STAFF_UUID,
+      })
+      .expect(403);
+    expect(res.body.error.code).toBe(ErrorCode.FORBIDDEN);
+  });
+
+  it('allows editor to create content posts and write audit log', async () => {
+    const { app, cookie, repos } = setup(staffState({ role: 'editor', staffMemberId: STAFF_UUID }));
+    vi.mocked(repos.staff.createContentPost).mockResolvedValue({
+      id: 'post-1',
+      type: 'blog',
+      title: 'Accessible Fonts',
+      slug: 'accessible-fonts',
+      status: 'draft',
+      bodyMd: 'Hello world',
+      bodyHtml: '<p>Hello world</p>',
+      authorStaffId: STAFF_UUID,
+    } as never);
+
+    const res = await request(app)
+      .post('/v1/staff/content/posts')
+      .set('Cookie', cookie)
+      .send({
+        type: 'blog',
+        title: 'Accessible Fonts',
+        slug: 'accessible-fonts',
+        bodyMd: 'Hello world',
+        authorStaffId: STAFF_UUID,
+      })
+      .expect(201);
+
+    expect(res.body.data.id).toBe('post-1');
+    expect(repos.auditLog.write).toHaveBeenCalledWith(
+      null,
+      expect.objectContaining({ action: 'content.post_created', actorType: 'staff' }),
+    );
+  });
+
+  it('runs content quality and SEO checks', async () => {
+    const { app, cookie } = setup(staffState({ role: 'editor' }));
+    const res = await request(app)
+      .post('/v1/staff/content/check')
+      .set('Cookie', cookie)
+      .send({
+        title: 'A Post Title',
+        bodyMd: 'Here is some content with an image ![](https://example.com/img.png)',
+      })
+      .expect(200);
+
+    expect(Array.isArray(res.body.data.warnings)).toBe(true);
+    expect(res.body.data.warnings.some((w: any) => w.type === 'image_alt_missing')).toBe(true);
+  });
+
+  it('protects against removing the last active staff owner', async () => {
+    const { app, cookie, repos } = setup(staffState({ role: 'owner', staffMemberId: STAFF_UUID }));
+    vi.mocked(repos.staff.findStaffMemberById).mockResolvedValue({ id: STAFF_UUID, role: 'owner', active: true } as never);
+    vi.mocked(repos.staff.canDemoteOrRemoveOwner).mockResolvedValue(false);
+
+    const res = await request(app)
+      .delete(`/v1/staff/members/${STAFF_UUID}`)
+      .set('Cookie', cookie)
+      .expect(400);
+
+    expect(res.body.error.message).toMatch(/last active owner/i);
+  });
+
+  it('allows owner to add customer note and tag on an organization', async () => {
+    const { app, cookie, repos } = setup(staffState({ role: 'owner', staffMemberId: STAFF_UUID }));
+    vi.mocked(repos.staff.addOrgNote).mockResolvedValue({
+      id: 'note-1',
+      orgId: ORG_ID,
+      staffMemberId: STAFF_UUID,
+      bodyMd: 'Customer called about custom enterprise billing.',
+      createdAt: new Date(),
+    } as never);
+
+    const noteRes = await request(app)
+      .post(`/v1/staff/orgs/${ORG_ID}/notes`)
+      .set('Cookie', cookie)
+      .send({
+        bodyMd: 'Customer called about custom enterprise billing.',
+      })
+      .expect(201);
+    expect(noteRes.body.data.id).toBe('note-1');
+
+    const tagRes = await request(app)
+      .post(`/v1/staff/orgs/${ORG_ID}/tags`)
+      .set('Cookie', cookie)
+      .send({
+        tag: 'vip',
+      })
+      .expect(200);
+    expect(tagRes.body.data.tag).toBe('vip');
+  });
+});

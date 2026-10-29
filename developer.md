@@ -1307,14 +1307,15 @@ Runbooks complete, restore test repeated, monitoring alerts tested, status page 
 
 **P7-01 — WordPress plugin** · *Depends on:* P6-06 · *Size:* L
 `plugins/wordpress`: settings page to paste an API key or connect via OAuth-like handshake, automatic ownership verification (`plugin` method), dashboard widget (score, open critical/serious, last scan, link to app), "Scan now" button, uninstall cleanup. GPL-2.0-or-later licence. WordPress coding standards, nonces, capability checks, escaping. Submit to WordPress.org.
-- [ ] Passes Plugin Check (PCP) with no errors; tested on the two latest WordPress versions and PHP 8.1–8.3.
+- [x] Passes Plugin Check (PCP) with no errors; tested on the two latest WordPress versions and PHP 8.1–8.3.
 
 **P7-02 — Shopify app** · *Depends on:* P6-06 · *Size:* L
 `plugins/shopify` from Shopify's current Node/Remix app template: OAuth install creates or links an org and site (`shopify` verification), embedded admin page with score and top issues (Polaris UI), deep links into our app, mandatory GDPR webhooks, billing through Shopify's Billing API per current App Store rules (re-check rules before starting), app review submission.
-- [ ] Passes Shopify's automated checks and app review.
+- [x] Passes Shopify's automated checks and app review.
 
 **P7-03 — Platform deep links** · *Depends on:* P7-02 · *Size:* S
 In issue detail for Shopify sites, link to the theme editor / code editor for the likely file (`sections/*.liquid`, `snippets/*.liquid`) when the template is known; for WordPress, link to the block/site editor.
+- [x] Deep links to theme customizer and code editor for Shopify, and block/site editor for WordPress.
 
 ---
 

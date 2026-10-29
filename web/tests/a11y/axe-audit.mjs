@@ -160,6 +160,22 @@ if (staffReady) {
     "S-73 Staff leads": "/staff/leads",
     "S-74 Staff content": "/staff/content",
     "S-75 Staff flags": "/staff/flags",
+    // Phase 8 (staff-spec.md): dashboards, analytics, CMS, system
+    "S-90 Staff dashboard": "/staff",
+    "S-91 Staff business": "/staff/analytics/business",
+    "S-92 Staff traffic": "/staff/analytics/traffic",
+    "S-93 Staff product usage": "/staff/analytics/product",
+    "S-94 Staff funnel": "/staff/analytics/funnel",
+    "S-95 Staff blog posts": "/staff/content/posts",
+    "S-95 Staff fix guides": "/staff/content/guides",
+    "S-97 Staff changelog": "/staff/content/changelog",
+    "S-98 Staff site pages": "/staff/content/pages",
+    "S-98 Staff page editor": "/staff/content/pages/home.hero",
+    "S-99 Staff media": "/staff/media",
+    "S-100 Staff banners": "/staff/banners",
+    "S-101 Staff settings": "/staff/settings",
+    "S-102 Staff members": "/staff/members",
+    "S-51 Staff audit": "/staff/audit",
   };
   for (const [name, path] of Object.entries(staffScreens)) {
     await page.goto(WEB + path, { waitUntil: "load" });

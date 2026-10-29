@@ -17,10 +17,18 @@ const HEADLINE: { w: string; em?: boolean }[] = [
   ..."stop people buying,".split(" ").map((w) => ({ w, em: true })),
   ..."and fix them in order.".split(" ").map((w) => ({ w })),
 ];
-const HEADLINE_TEXT = HEADLINE.map((h) => h.w).join(" ");
 
 /** S-01 hero + S-03 free checker (input · progress · result). */
-export function FreeCheck() {
+export interface HeroContent {
+  headline: string;
+  subheadline: string;
+  ctaLabel: string;
+  trustLine: string;
+}
+
+export function FreeCheck({ hero = null }: { hero?: HeroContent | null }) {
+  const HEADLINE_WORDS = hero ? hero.headline.split(/\s+/).filter(Boolean).map((w) => ({ w, em: false })) : HEADLINE;
+  const HEADLINE_TEXT = HEADLINE_WORDS.map((h) => h.w).join(" ");
   const router = useRouter();
   const [phase, setPhase] = useState<Phase>("input");
   const [url, setUrl] = useState("soraskin.co");
@@ -117,7 +125,7 @@ export function FreeCheck() {
           >
             <span className="sr-only">{HEADLINE_TEXT}</span>
             <span aria-hidden="true">
-              {HEADLINE.map((h, i) => (
+              {HEADLINE_WORDS.map((h, i) => (
                 <span key={i} className="inline-block overflow-hidden pb-[0.08em] align-bottom">
                   <span data-hero="word" className={`inline-block ${h.em ? "italic" : ""}`}>
                     {h.w}
@@ -128,8 +136,9 @@ export function FreeCheck() {
             </span>
           </h1>
           <p data-hero="rest" className="m-0 max-w-[680px] text-lg leading-7 text-pretty text-muted">
-            Weekly checks for Shopify and WordPress sites, plain-language fix guides, and a record of your progress. Built for the ADA in the US and the
-            European Accessibility Act, in force since June 2025.
+            {hero
+              ? hero.subheadline
+              : "Weekly checks for Shopify and WordPress sites, plain-language fix guides, and a record of your progress. Built for the ADA in the US and the European Accessibility Act, in force since June 2025."}
           </p>
           <form data-hero="rest" onSubmit={submit} noValidate className="flex max-w-[640px] flex-col gap-2">
             <label htmlFor="url" className="text-sm font-semibold">
@@ -155,7 +164,7 @@ export function FreeCheck() {
                 />
               </div>
               <button type="submit" className="ease-ui h-12 rounded-full border-0 bg-primary px-6 text-base font-semibold text-on-primary hover:bg-primary-hover">
-                Check your site free
+                {hero?.ctaLabel ?? "Check your site free"}
               </button>
             </div>
             {err && (
@@ -165,7 +174,7 @@ export function FreeCheck() {
               </span>
             )}
             <span id="url-help" className="text-sm text-muted">
-              We check one page. We don&apos;t store personal data. No overlay, no script on your site.
+              {hero?.trustLine ?? "We check one page. We don't store personal data. No overlay, no script on your site."}
             </span>
           </form>
         </>

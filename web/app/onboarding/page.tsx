@@ -7,6 +7,7 @@ import { Icon, I } from "@/components/icons";
 import { Lockup } from "@/components/logo";
 import { VerifySiteDialog } from "@/components/sites/verify-site-dialog";
 import { apiClient, ApiException } from "@/lib/api";
+import { readFirstUtm } from "@/lib/utm";
 import { appApi } from "@/lib/app-api";
 import { useScanProgress, type ScanCounts } from "@/lib/use-scan-progress";
 import { band } from "@/lib/severity";
@@ -281,7 +282,7 @@ export default function OnboardingPage() {
     try {
       const { org } = await apiClient<{ org: { id: string; slug: string } }>("/v1/orgs", {
         method: "POST",
-        body: JSON.stringify({ name: state.orgName.trim(), type: state.orgType, freeCheckId: freeCheckId() }),
+        body: JSON.stringify({ name: state.orgName.trim(), type: state.orgType, freeCheckId: freeCheckId(), utm: readFirstUtm() }),
       });
       updateState({ orgId: org.id, orgSlug: org.slug, step: 2 });
     } catch (err) {

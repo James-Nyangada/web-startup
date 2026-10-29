@@ -175,6 +175,14 @@ export default function BillingSettingsPage() {
     fetchBilling();
   }, [fetchBilling]);
 
+  // Open the plan picker on the cycle the customer actually pays on.
+  const subscribedInterval = billing.subscription?.interval;
+  useEffect(() => {
+    if (subscribedInterval === "month" || subscribedInterval === "year") {
+      setBillingCycle(subscribedInterval);
+    }
+  }, [subscribedInterval]);
+
   const handleCheckout = async (planId: string) => {
     if (!orgSlug) return;
     try {
@@ -767,7 +775,7 @@ export default function BillingSettingsPage() {
             {/* Plan Cards Grid */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               {plans.map((p) => {
-                const isCurrent = plan === p.id;
+                const isCurrent = plan === p.id && (!subscription?.interval || subscription.interval === billingCycle);
                 const price = billingCycle === "year" ? Math.round(p.priceAnnual / 12) : p.priceMonthly;
 
                 return (

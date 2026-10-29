@@ -5,3 +5,6 @@ node_modules/
 dist/
 .next/
 *.log
+.storage/
+plugins/shopify/node_modules/
+plugins/shopify/.storage/

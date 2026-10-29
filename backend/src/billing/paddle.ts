@@ -301,7 +301,7 @@ export async function processPaddleEvent(
                     ? getPlanDefinition(priorSub.plan as PlanType).name
                     : undefined,
                   newPlanName: getPlanDefinition(planInfo.plan).name,
-                  interval: planInfo.interval as 'month' | 'year',
+                  interval: planInfo.interval,
                   billingUrl: `${appUrl}/settings/billing`,
                 });
               }
@@ -321,7 +321,7 @@ export async function processPaddleEvent(
                   name: owner.name,
                   orgName: org.name,
                   planName: getPlanDefinition(planInfo.plan).name,
-                  interval: planInfo.interval as 'month' | 'year',
+                  interval: planInfo.interval,
                   dashboardUrl: `${appUrl}/overview`,
                   addSiteUrl: `${appUrl}/sites`,
                   issuesUrl: `${appUrl}/tasks`,

@@ -162,6 +162,27 @@
       "when": 1793180304587,
       "tag": "0022_user_mfa",
       "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1793200000000,
+      "tag": "0023_distribution_shopify_sessions",
+      "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1793250000000,
+      "tag": "0024_phase8_staff_and_cms",
+      "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1793336400000,
+      "tag": "0025_legal_versions_and_notices",
+      "breakpoints": true
     }
   ]
 }

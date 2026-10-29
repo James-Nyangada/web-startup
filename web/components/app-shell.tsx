@@ -7,6 +7,8 @@ import { ThemeIconToggle } from "./theme";
 import { gsap, useGSAP, MOTION, prefersReducedMotion } from "@/lib/gsap";
 import { useFocusTrap } from "./use-focus-trap";
 import { GlobalBannersRegion, type GlobalBannerData } from "./shell/global-banners";
+import { useCmsBanner } from "@/lib/banners";
+import { useWhatsNew } from "@/lib/whats-new";
 import { CommandPalette } from "./shell/command-palette";
 import { OrgSwitcher } from "./shell/org-switcher";
 import { UserMenu } from "./shell/user-menu";
@@ -235,6 +237,13 @@ export function AppShell({ active, crumbs = [], banners, children }: AppShellPro
   const impersonation = userContext.me?.impersonation;
   const router = useRouter();
 
+  const { unseen: whatsNew, markSeen: markWhatsNewSeen } = useWhatsNew();
+  const cmsBanner = useCmsBanner("app", {
+    loggedIn: true,
+    billingStatus: activeOrg?.billingStatus,
+    plan: activeOrg?.plan,
+  });
+
   const derivedBanners = React.useMemo(() => {
     if (banners) return banners;
     const result: GlobalBannerData[] = [];
@@ -295,6 +304,12 @@ export function AppShell({ active, crumbs = [], banners, children }: AppShellPro
 
     return result;
   }, [banners, activeOrg, impersonation, router]);
+
+  // Staff announcements rank last, so billing and security notices always win.
+  const allBanners = React.useMemo(
+    () => (cmsBanner ? [...derivedBanners, cmsBanner] : derivedBanners),
+    [derivedBanners, cmsBanner],
+  );
 
   const handleCloseDrawer = () => {
     setDrawerOpen(false);
@@ -402,6 +417,24 @@ export function AppShell({ active, crumbs = [], banners, children }: AppShellPro
               </kbd>
             </button>
 
+            {/* What's new: a dot for 14 days after a changelog entry marked "show in app" */}
+            <Link
+              href="/changelog"
+              onClick={markWhatsNewSeen}
+              className="ease-ui relative flex h-9 items-center gap-1.5 rounded-full border border-line bg-surface px-3 text-sm text-muted no-underline hover:border-line-strong hover:text-ink"
+            >
+              <Icon d={I.info} size={16} />
+              <span className="sr-only sm:not-sr-only">What&apos;s new</span>
+              {whatsNew.length > 0 && (
+                <>
+                  <span aria-hidden="true" className="absolute -top-0.5 -right-0.5 size-2.5 rounded-full bg-primary" />
+                  <span className="sr-only">
+                    , {whatsNew.length} new update{whatsNew.length === 1 ? "" : "s"}
+                  </span>
+                </>
+              )}
+            </Link>
+
             {/* Theme Toggle */}
             <ThemeIconToggle />
 
@@ -413,7 +446,7 @@ export function AppShell({ active, crumbs = [], banners, children }: AppShellPro
           </header>
 
           {/* S-82 Global Banners Region */}
-          <GlobalBannersRegion banners={derivedBanners} />
+          <GlobalBannersRegion banners={allBanners} />
 
           {/* S-81 Command Palette Dialog */}
           <CommandPalette

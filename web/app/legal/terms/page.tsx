@@ -1,11 +1,12 @@
 import type { Metadata } from "next";
+import { CmsLegal, loadLegalPage } from "@/components/legal/cms-legal";
 
 export const metadata: Metadata = {
   title: "Terms of Service",
   description: "Terms of Service and Customer Agreement for EveryVisitor Accessibility Monitoring.",
 };
 
-export default function TermsPage() {
+function BuiltTermsPage() {
   return (
     <div className="prose prose-slate max-w-none text-ink">
       <div className="border-b border-line pb-6 mb-8">
@@ -96,4 +97,13 @@ export default function TermsPage() {
       </div>
     </div>
   );
+}
+
+export const revalidate = 300;
+
+/** Shows the version published from the staff area; until one is published, the built-in text. */
+export default async function TermsPage() {
+  const cms = await loadLegalPage("terms");
+  if (cms) return <CmsLegal slug="terms" page={cms} />;
+  return <BuiltTermsPage />;
 }

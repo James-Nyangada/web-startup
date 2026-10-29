@@ -23,6 +23,15 @@ const envSchema = z.object({
   TURNSTILE_SECRET_KEY: z.string().optional(),
   /** Resend. When unset, emails are logged (development) instead of sent. */
   RESEND_API_KEY: z.string().optional(),
+  /** Umami (self-hosted) for the staff traffic dashboards. All three are needed. */
+  UMAMI_API_URL: z.string().optional(),
+  UMAMI_API_TOKEN: z.string().optional(),
+  UMAMI_WEBSITE_ID: z.string().optional(),
+  /** Cloudflare Pages: deploy hook to rebuild the marketing site, and API access to read build status. */
+  CF_PAGES_DEPLOY_HOOK_URL: z.string().optional(),
+  CF_API_TOKEN: z.string().optional(),
+  CF_ACCOUNT_ID: z.string().optional(),
+  CF_PAGES_PROJECT: z.string().optional(),
   EMAIL_FROM: z.string().default('EveryVisitor <no-reply@everyvisitor.app>'),
   EMAIL_REPLY_TO: z.string().optional(),
   ENCRYPTION_KEY: z.string().min(16).default('dev_encryption_key_32_characters_long_for_aes_256'),

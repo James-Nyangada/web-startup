@@ -66,6 +66,7 @@ export interface CreateSiteInput {
 
 export interface UpdateSiteInput {
   name?: string;
+  platform?: Platform;
   framework?: Framework | null;
   clientName?: string | null;
   scanFrequency?: ScanFrequency;

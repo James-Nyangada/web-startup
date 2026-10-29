@@ -232,6 +232,105 @@ const operations: Record<string, Record<string, unknown>> = {
       },
     },
   },
+  'POST /sites/connect': {
+    operationId: 'connectSite',
+    summary: 'Connect and verify a site',
+    description:
+      'Connects a site via the WordPress plugin or Shopify app, auto-verifying ownership.',
+    requestBody: {
+      required: true,
+      content: json(
+        {
+          type: 'object',
+          properties: {
+            url: { type: 'string', format: 'uri' },
+            name: { type: 'string' },
+            platform: { type: 'string', enum: ['wordpress', 'shopify'] },
+            issueKey: { type: 'boolean' },
+          },
+          required: ['url'],
+        },
+        { url: 'https://example.com', name: 'My Site', platform: 'wordpress' },
+      ),
+    },
+    responses: {
+      '201': {
+        description: 'Site connected and verified.',
+        content: json(
+          envelope({
+            ok: { type: 'boolean' },
+            verified: { type: 'boolean' },
+            method: { type: 'string' },
+            site: ref('Site'),
+          }),
+          {
+            data: {
+              ok: true,
+              verified: true,
+              method: 'plugin',
+              site: exampleSite,
+            },
+          },
+        ),
+      },
+    },
+  },
+  'POST /sites/shopify-plan-sync': {
+    operationId: 'syncShopifyPlan',
+    summary: 'Sync organization plan from Shopify subscription',
+    description:
+      'Updates the EveryVisitor organization plan to match the active Shopify App subscription.',
+    requestBody: {
+      required: true,
+      content: json(
+        {
+          type: 'object',
+          properties: {
+            shop: { type: 'string' },
+            plan: { type: 'string', enum: ['trial', 'store', 'growth', 'free', 'starter', 'pro'] },
+          },
+          required: ['shop', 'plan'],
+        },
+        { shop: 'my-store.myshopify.com', plan: 'starter' },
+      ),
+    },
+    responses: {
+      '200': {
+        description: 'Plan synced successfully.',
+        content: json(
+          envelope({
+            ok: { type: 'boolean' },
+            plan: { type: 'string' },
+            billingStatus: { type: 'string' },
+          }),
+          {
+            data: {
+              ok: true,
+              plan: 'store',
+              billingStatus: 'active',
+            },
+          },
+        ),
+      },
+      '201': {
+        description: 'Plan synced successfully.',
+        content: json(
+          envelope({
+            ok: { type: 'boolean' },
+            plan: { type: 'string' },
+            billingStatus: { type: 'string' },
+          }),
+          {
+            data: {
+              ok: true,
+              plan: 'store',
+              billingStatus: 'active',
+            },
+          },
+        ),
+      },
+    },
+  },
   'GET /sites/{siteId}': {
     operationId: 'getSite',
     summary: 'Get a site',

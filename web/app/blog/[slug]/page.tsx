@@ -3,39 +3,46 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { MarketingHeader } from "@/components/marketing/marketing-header";
 import { MarketingFooter } from "@/components/marketing/marketing-footer";
-import { BLOG_POSTS } from "@/lib/blog-data";
+import { loadBlogPost, loadBlogPosts } from "@/lib/blog-source";
+import { Markdown } from "@/components/marketing/markdown";
+
+export const revalidate = 300;
+export const dynamicParams = true;
 
 interface PageProps {
   params: Promise<{ slug: string }>;
 }
 
 export async function generateStaticParams() {
-  return BLOG_POSTS.map((post) => ({
-    slug: post.slug,
-  }));
+  return (await loadBlogPosts()).map((post) => ({ slug: post.slug }));
 }
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { slug } = await params;
-  const post = BLOG_POSTS.find((p) => p.slug === slug);
+  const post = await loadBlogPost(slug);
   if (!post) {
     return { title: "Article Not Found" };
   }
+  const title = post.seoTitle || post.title;
+  const description = post.seoDescription || post.summary;
   return {
-    title: post.title,
-    description: post.summary,
+    title,
+    description,
+    ...(post.canonicalUrl ? { alternates: { canonical: post.canonicalUrl } } : {}),
+    ...(post.noindex ? { robots: { index: false, follow: false } } : {}),
     openGraph: {
-      title: post.title,
-      description: post.summary,
+      title,
+      description,
       type: "article",
-      publishedTime: post.date,
+      ...(post.dateIso ? { publishedTime: post.dateIso } : {}),
+      ...(post.ogUrl || post.coverUrl ? { images: [{ url: (post.ogUrl || post.coverUrl)! }] } : {}),
     },
   };
 }
 
 export default async function BlogPostPage({ params }: PageProps) {
   const { slug } = await params;
-  const post = BLOG_POSTS.find((p) => p.slug === slug);
+  const post = await loadBlogPost(slug);
 
   if (!post) {
     notFound();
@@ -92,16 +99,26 @@ export default async function BlogPostPage({ params }: PageProps) {
                 </div>
               </div>
               <div className="flex items-center gap-3 text-xs">
-                <time dateTime={post.date}>{post.date}</time>
+                <time dateTime={post.dateIso ?? undefined}>{post.dateLabel}</time>
                 <span>·</span>
                 <span>{post.readingTime}</span>
               </div>
             </div>
           </header>
 
+          {post.coverUrl && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={post.coverUrl} alt={post.coverAlt ?? ""} className="mb-10 w-full rounded-2xl border border-line" />
+          )}
+
           {/* Article Content */}
+          {post.bodyMd !== null ? (
+            <div className="text-base leading-relaxed text-ink/90">
+              <Markdown>{post.bodyMd}</Markdown>
+            </div>
+          ) : post.legacy ? (
           <div className="flex flex-col gap-10 text-base leading-relaxed text-ink/90">
-            {post.content.map((section, idx) => (
+            {post.legacy.content.map((section, idx) => (
               <section key={idx} className="flex flex-col gap-4">
                 <h2 className="m-0 font-serif text-2xl sm:text-3xl font-normal text-ink">
                   {section.sectionTitle}
@@ -127,6 +144,7 @@ export default async function BlogPostPage({ params }: PageProps) {
               </section>
             ))}
           </div>
+          ) : null}
 
           {/* Article Footer & Call to Action */}
           <section className="mt-16 rounded-2xl border border-line bg-subtle p-8 text-center flex flex-col items-center gap-4">

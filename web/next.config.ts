@@ -50,9 +50,28 @@ const securityHeaders = [
   ...(isHttps ? [{ key: "Strict-Transport-Security", value: "max-age=63072000; includeSubDomains; preload" }] : []),
 ];
 
+/**
+ * Slug-change redirects made in the CMS (staff spec 3.2). Read when the server starts or the
+ * site is built; if the API cannot be reached the site still starts, without them.
+ */
+async function cmsRedirects() {
+  const base = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+  try {
+    const res = await fetch(`${base}/v1/public/content/redirects`, { signal: AbortSignal.timeout(5000) });
+    if (!res.ok) return [];
+    const body = (await res.json()) as { data: { fromPath: string; toPath: string; statusCode: number }[] };
+    return body.data
+      .filter((r) => r.fromPath.startsWith("/") && r.toPath.startsWith("/") && r.fromPath !== r.toPath)
+      .map((r) => ({ source: r.fromPath, destination: r.toPath, permanent: r.statusCode === 301 }));
+  } catch {
+    return [];
+  }
+}
+
 const nextConfig: NextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
+  redirects: cmsRedirects,
   async headers() {
     return [{ source: "/:path*", headers: securityHeaders }];
   },

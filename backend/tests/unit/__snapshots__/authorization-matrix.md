@@ -26,6 +26,8 @@ users of another org get 404, staff impersonation is read-only (writes 403).
 | GET | `…/audit-log/export.csv` | admin |
 | GET | `…/sites/` | client_viewer |
 | POST | `…/sites/` | member |
+| POST | `…/sites/connect` | member |
+| POST | `…/sites/shopify-plan-sync` | member |
 | GET | `…/sites/:siteId` | client_viewer |
 | PATCH | `…/sites/:siteId` | admin |
 | POST | `…/sites/:siteId/pause` | admin |

@@ -149,6 +149,22 @@ export class EmailSender implements AuthMailer {
     });
   }
 
+  async sendRaw(message: {
+    to: string;
+    subject: string;
+    html: string;
+    text?: string;
+    from?: string;
+  }): Promise<{ id: string; ok: boolean }> {
+    return this.transport.send({
+      to: message.to,
+      subject: message.subject,
+      html: message.html,
+      text: message.text || message.html,
+      from: message.from || this.defaultFrom,
+    });
+  }
+
   // AuthMailer implementations for Better Auth
   async sendVerificationEmail(data: EmailData): Promise<void> {
     await this.send({
