@@ -85,8 +85,8 @@ export function createDashboardRouter(config: AppConfig): Router {
         sessionStore.set(shop, session);
       }
     }
-    const planId = session?.plan || 'free';
-    const activePlan = SHOPIFY_PLANS[planId] || SHOPIFY_PLANS.free!;
+    let planId = session?.plan || 'free';
+    let activePlan = SHOPIFY_PLANS[planId] || SHOPIFY_PLANS.free!;
 
     let score: number | null = null;
     let criticalCount = 0;
@@ -119,6 +119,13 @@ export function createDashboardRouter(config: AppConfig): Router {
       } catch {
         loadError = true;
       }
+    }
+
+    // The organisation's own plan (returned by EveryVisitor) is the source of truth; the saved
+    // session plan can be stale, e.g. for an agency account connected from Shopify.
+    if (billing?.plan && SHOPIFY_PLANS[billing.plan]) {
+      planId = billing.plan;
+      activePlan = SHOPIFY_PLANS[planId]!;
     }
 
     const BILLING_STATUS_LABELS: Record<string, { label: string; tone: 'good' | 'warn' | 'bad'; hint: string }> = {
