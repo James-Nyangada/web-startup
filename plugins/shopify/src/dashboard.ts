@@ -94,6 +94,7 @@ export function createDashboardRouter(config: AppConfig): Router {
     let lastScanAt: string | null = null;
     let topIssues: Array<{ title?: string; ruleId?: string; impact?: string; templateKey?: string | null }> = [];
     let loadError = false;
+    let billing: { plan?: string | null; billingStatus?: string | null; trialEndsAt?: string | null } | null = null;
 
     const apiKey = session?.apiKey;
     const connected = Boolean(siteId && apiKey);
@@ -108,6 +109,7 @@ export function createDashboardRouter(config: AppConfig): Router {
           score = data.score ?? data.site?.score ?? null;
           criticalCount = data.severityCounts?.critical ?? 0;
           seriousCount = data.severityCounts?.serious ?? 0;
+          billing = data.billing ?? null;
           const finished = data.latestScanSummary?.finishedAt ?? data.site?.lastScanAt;
           if (finished) lastScanAt = new Date(finished).toLocaleString();
           topIssues = Array.isArray(data.topIssues) ? data.topIssues.slice(0, 5) : [];
@@ -118,6 +120,33 @@ export function createDashboardRouter(config: AppConfig): Router {
         loadError = true;
       }
     }
+
+    const BILLING_STATUS_LABELS: Record<string, { label: string; tone: 'good' | 'warn' | 'bad'; hint: string }> = {
+      trialing: { label: 'Free trial', tone: 'good', hint: 'Your trial is running.' },
+      active: { label: 'Active', tone: 'good', hint: 'Your subscription is in good standing.' },
+      past_due: { label: 'Payment overdue', tone: 'bad', hint: 'The last payment failed. Update your payment method to avoid interruption.' },
+      paused: { label: 'Paused', tone: 'warn', hint: 'Your subscription is paused. Scans are not running.' },
+      canceled: { label: 'Canceled', tone: 'bad', hint: 'Your subscription was canceled.' },
+      read_only: { label: 'Read-only', tone: 'bad', hint: 'Your account is read-only. Renew to run new scans.' },
+    };
+    const billingInfo = billing?.billingStatus ? BILLING_STATUS_LABELS[billing.billingStatus] : undefined;
+    const trialEndsText =
+      billing?.billingStatus === 'trialing' && billing.trialEndsAt
+        ? new Date(billing.trialEndsAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })
+        : null;
+    const billingBadgeColor =
+      billingInfo?.tone === 'bad' ? '#8e1f0b' : billingInfo?.tone === 'warn' ? '#6a4b00' : '#0b5d3a';
+    const billingBadgeBg =
+      billingInfo?.tone === 'bad' ? '#fde8e4' : billingInfo?.tone === 'warn' ? '#fff3cd' : '#e3f6ec';
+    const billingStatusHtml =
+      connected && billingInfo
+        ? `<p style="margin: 6px 0 0 0; font-size: 13px; color: #6d7175;">
+            Account billing status:
+            <span style="display:inline-block; padding: 2px 10px; border-radius: 999px; font-weight: 600; background: ${billingBadgeBg}; color: ${billingBadgeColor};">${escapeHtml(billingInfo.label)}</span>
+            ${trialEndsText ? ` &middot; trial ends ${escapeHtml(trialEndsText)}` : ''}
+          </p>
+          ${billingInfo.tone === 'good' ? '' : `<p role="alert" style="margin: 6px 0 0 0; font-size: 13px; color: ${billingBadgeColor};">${escapeHtml(billingInfo.hint)}</p>`}`
+        : '';
 
     const fullAppUrl = siteId
       ? `${config.appUrl}/sites/${siteId}`
@@ -347,6 +376,7 @@ export function createDashboardRouter(config: AppConfig): Router {
           <p style="margin: 4px 0 0 0; color: #6d7175; font-size: 13px;">
             Current plan: <strong>${activePlan.name}</strong> ${planId === 'agency' || planId === 'agency_pro' ? '(no Shopify charge)' : `($${activePlan.price}/month billed via Shopify)`}
           </p>
+          ${billingStatusHtml}
         </div>
         ${
           !connected

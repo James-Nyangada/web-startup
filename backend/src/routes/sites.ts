@@ -802,6 +802,12 @@ export function orgSitesRouter(repos: Repositories): Router {
           openCritical,
           openSerious,
           lastScanAt: lastScanIso,
+          // Lets plugins show the account's real billing state without a second call.
+          billing: {
+            plan: req.org?.plan ?? null,
+            billingStatus: req.org?.billingStatus ?? null,
+            trialEndsAt: req.org?.trialEndsAt ? new Date(req.org.trialEndsAt).toISOString() : null,
+          },
           scoreBand: scoreBandValue,
           scoreExplanation:
             scoreBandValue === 'Good'
