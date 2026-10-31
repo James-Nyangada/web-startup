@@ -38,8 +38,8 @@ This plugin relies on the external cloud service **EveryVisitor** (https://every
 1. Upload the `everyvisitor` folder to your `/wp-content/plugins/` directory, or install it directly via the WordPress Plugins menu.
 2. Activate the plugin through the **Plugins** screen in WordPress.
 3. Navigate to **Settings > EveryVisitor**.
-4. Paste your API key from your [EveryVisitor account](https://everyvisitor.app/settings/api).
-5. Click **Connect & Verify Site**. Your site is verified immediately and the dashboard widget is active.
+4. Click **Connect with EveryVisitor**, sign in or create an account, and click **Authorize & Connect**. Your site is verified immediately and the dashboard widget is active.
+5. Prefer a manual setup? Paste an API key from your [EveryVisitor account](https://everyvisitor.app/settings/api-keys) and click **Save Key & Connect**.
 
 == Frequently Asked Questions ==
 
@@ -47,7 +47,7 @@ This plugin relies on the external cloud service **EveryVisitor** (https://every
 No. EveryVisitor never injects scripts, toolbars, or overlays into your visitors' browsers. All scans are performed externally by our cloud scanner.
 
 = Where do I get an API key? =
-Log in to your EveryVisitor account at https://everyvisitor.app and navigate to Settings > API to generate a public API key.
+Log in to your EveryVisitor account at https://everyvisitor.app and navigate to Settings > API keys to generate a key. Or skip the key and use the one-click **Connect with EveryVisitor** button.
 
 = How often does EveryVisitor scan my site? =
 In addition to on-demand scans triggered via the "Scan now" button in your WordPress dashboard, EveryVisitor runs automated scheduled scans according to your organization's plan settings (e.g., weekly or daily).

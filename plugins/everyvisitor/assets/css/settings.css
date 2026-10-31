@@ -1,0 +1,112 @@
+/**
+ * EveryVisitor Settings Page Styles
+ */
+
+.everyvisitor-settings-wrap {
+	max-width: 860px;
+}
+
+.everyvisitor-card {
+	background: #ffffff;
+	border: 1px solid #c3c4c7;
+	border-radius: 8px;
+	padding: 24px;
+	margin-top: 16px;
+	box-shadow: 0 1px 1px rgba(0, 0, 0, 0.04);
+}
+
+.everyvisitor-connected-header {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	border-bottom: 1px solid #f0f0f1;
+	padding-bottom: 16px;
+	margin-bottom: 20px;
+}
+
+.everyvisitor-badge-verified {
+	display: inline-block;
+	background: #e7f7ed;
+	color: #047857;
+	font-weight: 600;
+	font-size: 12px;
+	padding: 4px 10px;
+	border-radius: 9999px;
+	text-transform: uppercase;
+	letter-spacing: 0.5px;
+}
+
+.everyvisitor-site-title {
+	margin: 8px 0 4px 0;
+	font-size: 20px;
+}
+
+.everyvisitor-site-meta {
+	margin: 0;
+	color: #64748b;
+	font-size: 13px;
+}
+
+.everyvisitor-stats-grid {
+	display: grid;
+	grid-template-columns: repeat(3, 1fr);
+	gap: 16px;
+	margin-bottom: 24px;
+}
+
+.everyvisitor-stat-card {
+	background: #f8fafc;
+	border: 1px solid #e2e8f0;
+	border-radius: 6px;
+	padding: 16px;
+	text-align: center;
+}
+
+.everyvisitor-stat-label {
+	font-size: 12px;
+	font-weight: 600;
+	color: #64748b;
+	text-transform: uppercase;
+}
+
+.everyvisitor-stat-val {
+	font-size: 32px;
+	font-weight: 700;
+	margin-top: 4px;
+}
+
+.everyvisitor-code-box {
+	padding: 6px 12px;
+	background: #f1f5f9;
+	border-radius: 4px;
+	font-size: 13px;
+}
+
+.everyvisitor-card-footer {
+	margin-top: 24px;
+	padding-top: 20px;
+	border-top: 1px solid #f0f0f1;
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+}
+
+.everyvisitor-handshake-box {
+	background: #f8fafc;
+	border: 1px solid #cbd5e1;
+	border-radius: 8px;
+	padding: 20px;
+	margin-bottom: 24px;
+	text-align: center;
+}
+
+.everyvisitor-disclosure-box {
+	margin-top: 20px;
+	padding: 16px;
+	background: #f8fafc;
+	border: 1px solid #e2e8f0;
+	border-radius: 6px;
+	font-size: 13px;
+	color: #64748b;
+	line-height: 1.5;
+}
