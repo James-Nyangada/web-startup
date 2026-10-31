@@ -1,7 +1,7 @@
 import { Router, type Request, type Response } from 'express';
 import type { AppConfig } from './config.js';
 import { sessionStore, verifyAppBridgeToken, verifyOAuthHmac, isValidShopDomain } from './shopify.js';
-import { SHOPIFY_PLANS } from './billing.js';
+import { SHOPIFY_PLANS, syncPlanWithEveryVisitor } from './billing.js';
 import { escapeHtml, shopifyThemeLinks } from './deep-links.js';
 
 export function createDashboardRouter(config: AppConfig): Router {
@@ -10,12 +10,14 @@ export function createDashboardRouter(config: AppConfig): Router {
   router.get('/', async (req: Request, res: Response): Promise<void> => {
     const query = req.query as Record<string, string>;
     let shop = '';
+    let tokenVerified = false;
 
     // Verify via App Bridge id_token
     if (query.id_token) {
       const verified = verifyAppBridgeToken(query.id_token, config.apiSecret, config.apiKey);
       if (verified.valid && verified.shop) {
         shop = verified.shop;
+        tokenVerified = true;
       }
     }
 
@@ -30,10 +32,59 @@ export function createDashboardRouter(config: AppConfig): Router {
       res.status(401).send('Unauthorized: Shopify Admin authentication required.');
       return;
     }
-    const session = shop ? await sessionStore.findInDb(shop) : undefined;
+    let session = await sessionStore.findInDb(shop);
+
+    // Managed installation never calls /api/auth/callback, so exchange the App Bridge
+    // session token for an offline access token the first time the app loads.
+    if (!session && tokenVerified) {
+      try {
+        const tokenRes = await fetch(`https://${shop}/admin/oauth/access_token`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+          body: JSON.stringify({
+            client_id: config.apiKey,
+            client_secret: config.apiSecret,
+            grant_type: 'urn:ietf:params:oauth:grant-type:token-exchange',
+            subject_token: query.id_token,
+            subject_token_type: 'urn:ietf:params:oauth:token-type:id_token',
+            requested_token_type: 'urn:shopify:params:oauth:token-type:offline-access-token',
+          }),
+        });
+        if (tokenRes.ok) {
+          const tokenData = (await tokenRes.json()) as { access_token: string; scope: string };
+          session = {
+            shop,
+            accessToken: tokenData.access_token,
+            scope: tokenData.scope,
+            plan: 'free',
+            installedAt: new Date().toISOString(),
+          };
+          sessionStore.set(shop, session);
+        } else {
+          console.error(`Token exchange failed for ${shop}: HTTP ${tokenRes.status}`);
+        }
+      } catch (err) {
+        console.error('Token exchange error:', err);
+      }
+    }
+
+    // Opened with only signed OAuth params and no session: use classic OAuth.
+    if (!session && !tokenVerified) {
+      res.redirect(`/api/auth?shop=${encodeURIComponent(shop)}`);
+      return;
+    }
 
     const shopName = shop ? shop.replace('.myshopify.com', '') : 'My Store';
     const siteId = session?.siteId;
+    // A connected store still on the trial may have been upgraded elsewhere (e.g. an agency
+    // account): ask the backend, which is the source of truth for the plan.
+    if (session && session.apiKey && session.siteId && (!session.plan || session.plan === 'free' || session.plan === 'trial')) {
+      const synced = await syncPlanWithEveryVisitor(config, shop, session.plan || 'trial');
+      if (synced && synced !== session.plan) {
+        session.plan = synced;
+        sessionStore.set(shop, session);
+      }
+    }
     const planId = session?.plan || 'free';
     const activePlan = SHOPIFY_PLANS[planId] || SHOPIFY_PLANS.free!;
 
@@ -294,12 +345,14 @@ export function createDashboardRouter(config: AppConfig): Router {
         <div>
           <h2 style="font-size: 16px; font-weight: 600; margin: 0;">Shopify App Subscription</h2>
           <p style="margin: 4px 0 0 0; color: #6d7175; font-size: 13px;">
-            Current plan: <strong>${activePlan.name}</strong> ($${activePlan.price}/month billed via Shopify)
+            Current plan: <strong>${activePlan.name}</strong> ${planId === 'agency' || planId === 'agency_pro' ? '(no Shopify charge)' : `($${activePlan.price}/month billed via Shopify)`}
           </p>
         </div>
         ${
           !connected
             ? `<span style="font-size: 13px; color: #6d7175;">Connect your account to choose a plan.</span>`
+            : planId === 'agency' || planId === 'agency_pro'
+            ? `<span class="badge badge-good" style="padding: 6px 12px; font-size: 13px;">Included in your EveryVisitor plan</span>`
             : planId === 'trial' || planId === 'free'
             ? `<button class="btn btn-primary" onclick="subscribePlan('store')">Upgrade to Store ($29/mo)</button>`
             : planId === 'store' || planId === 'starter'

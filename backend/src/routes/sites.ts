@@ -616,6 +616,17 @@ export function orgSitesRouter(repos: Repositories): Router {
         return;
       }
 
+      // Agency plans are bought through EveryVisitor, not Shopify. Connecting a store must never
+      // downgrade them to the Shopify trial, so the org is left as it is.
+      const currentPlan = req.org?.plan;
+      if (currentPlan === 'agency' || currentPlan === 'agency_pro') {
+        await repos.shopifySessions.upsert({ ...session, plan: currentPlan, orgId: req.orgId });
+        res.status(200).json({
+          data: { ok: true, plan: currentPlan, billingStatus: req.org?.billingStatus ?? 'active', organization: req.org },
+        });
+        return;
+      }
+
       // The plan always comes from Shopify's own record of the active subscription, never from
       // the request body. If Shopify cannot confirm it, nothing changes.
       const verified = await verifyShopifyActiveSubscription(shop, session.accessToken);

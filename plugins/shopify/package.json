@@ -6,6 +6,7 @@
   "type": "module",
   "scripts": {
     "dev": "tsx watch src/index.ts",
+    "start:staging": "ENV_FILE=.env.staging node dist/index.js",
     "build": "tsc",
     "start": "node dist/index.js",
     "test": "vitest run"

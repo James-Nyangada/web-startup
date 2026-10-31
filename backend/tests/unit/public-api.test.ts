@@ -406,7 +406,7 @@ describe('P6-06: public REST API', () => {
     afterEach(() => vi.unstubAllGlobals());
 
     it('takes the plan from Shopify, never from the request body', async () => {
-      const { app, repos } = setup({ scopes: PLUGIN });
+      const { app, repos } = setup({ scopes: PLUGIN, plan: 'trial' });
       linked(repos);
       // The caller asks for "pro"; Shopify's confirmed subscription (test token) is the Store plan.
       const res = await sync(app).expect(200);
@@ -425,7 +425,7 @@ describe('P6-06: public REST API', () => {
     });
 
     it('maps a confirmed Growth subscription to the growth plan', async () => {
-      const { app, repos } = setup({ scopes: PLUGIN });
+      const { app, repos } = setup({ scopes: PLUGIN, plan: 'trial' });
       linked(repos, { accessToken: 'shpat_real' });
       vi.stubGlobal(
         'fetch',
@@ -441,7 +441,7 @@ describe('P6-06: public REST API', () => {
     });
 
     it('drops to trial when Shopify reports no active subscription', async () => {
-      const { app, repos } = setup({ scopes: PLUGIN });
+      const { app, repos } = setup({ scopes: PLUGIN, plan: 'trial' });
       linked(repos, { accessToken: 'shpat_real' });
       vi.stubGlobal(
         'fetch',
@@ -456,36 +456,45 @@ describe('P6-06: public REST API', () => {
     });
 
     it('changes nothing when Shopify cannot confirm the subscription (fails closed)', async () => {
-      const { app, repos } = setup({ scopes: PLUGIN });
+      const { app, repos } = setup({ scopes: PLUGIN, plan: 'trial' });
       linked(repos, { accessToken: 'shpat_real' });
       vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, json: async () => ({}) }));
       await sync(app).expect(502);
       expect(repos.organizations.update).not.toHaveBeenCalled();
     });
 
+    it('never downgrades an agency organisation (agency plans are billed by EveryVisitor)', async () => {
+      const { app, repos } = setup({ scopes: PLUGIN, plan: 'agency_pro' });
+      linked(repos, { accessToken: 'shpat_real' });
+      vi.stubGlobal('fetch', vi.fn());
+      const res = await sync(app).expect(200);
+      expect(res.body.data.plan).toBe('agency_pro');
+      expect(repos.organizations.update).not.toHaveBeenCalled();
+    });
+
     it('refuses a shop that is linked to a different organisation', async () => {
-      const { app, repos } = setup({ scopes: PLUGIN });
+      const { app, repos } = setup({ scopes: PLUGIN, plan: 'trial' });
       linked(repos, { orgId: '018f0000-0000-7000-8000-00000000ffff' });
       await sync(app).expect(403);
       expect(repos.organizations.update).not.toHaveBeenCalled();
     });
 
     it('refuses a shop that has not completed the account link', async () => {
-      const { app, repos } = setup({ scopes: PLUGIN });
+      const { app, repos } = setup({ scopes: PLUGIN, plan: 'trial' });
       linked(repos, { orgId: null });
       await sync(app).expect(403);
       expect(repos.organizations.update).not.toHaveBeenCalled();
     });
 
     it('refuses an unknown shop', async () => {
-      const { app, repos } = setup({ scopes: PLUGIN });
+      const { app, repos } = setup({ scopes: PLUGIN, plan: 'trial' });
       vi.mocked(repos.shopifySessions.findByShop).mockResolvedValue(null);
       await sync(app).expect(403);
       expect(repos.organizations.update).not.toHaveBeenCalled();
     });
 
     it('refuses when the linked site is not a Shopify site in this organisation', async () => {
-      const { app, repos } = setup({ scopes: PLUGIN });
+      const { app, repos } = setup({ scopes: PLUGIN, plan: 'trial' });
       linked(repos);
       vi.mocked(repos.sites.findById).mockResolvedValue(null);
       await sync(app).expect(400);
@@ -493,7 +502,7 @@ describe('P6-06: public REST API', () => {
     });
 
     it('rejects shop values that are not .myshopify.com domains', async () => {
-      const { app, repos } = setup({ scopes: PLUGIN });
+      const { app, repos } = setup({ scopes: PLUGIN, plan: 'trial' });
       linked(repos);
       for (const shop of ['evil.example.com', 'a.myshopify.com.evil.com', 'localhost:3000/x', '']) {
         await sync(app, { shop, plan: 'store' }).expect(400);
@@ -501,7 +510,7 @@ describe('P6-06: public REST API', () => {
     });
 
     it('rejects an invalid plan or a missing shop', async () => {
-      const { app } = setup({ scopes: PLUGIN });
+      const { app } = setup({ scopes: PLUGIN, plan: 'trial' });
       await sync(app, { shop: SHOP, plan: 'enterprise' }).expect(400);
       await sync(app, { plan: 'store' }).expect(400);
     });

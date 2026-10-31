@@ -1,0 +1,50 @@
+# EveryVisitor Accessibility Shopify App Configuration
+# https://shopify.dev/docs/apps/tools/cli/configuration
+
+client_id = "c3edceb6c6b262802574e2de926a102c"
+name = "EveryVisitor Accessibility"
+handle = "everyvisitor-accessibility"
+application_url = "https://shopify.everyvisitor.app"
+embedded = true
+
+[build]
+automatically_update_urls_on_dev = true
+dev_store_url = "every-visitor.myshopify.com"
+
+[access_scopes]
+scopes = "read_themes"
+use_legacy_install_flow = false
+
+[auth]
+redirect_urls = [
+  "https://shopify.everyvisitor.app/api/auth/callback"
+]
+
+[webhooks]
+api_version = "2024-10"
+
+  [[webhooks.subscriptions]]
+  compliance_topics = [ "customers/data_request" ]
+  uri = "https://shopify.everyvisitor.app/api/webhooks/customers/data_request"
+
+  [[webhooks.subscriptions]]
+  compliance_topics = [ "customers/redact" ]
+  uri = "https://shopify.everyvisitor.app/api/webhooks/customers/redact"
+
+  [[webhooks.subscriptions]]
+  compliance_topics = [ "shop/redact" ]
+  uri = "https://shopify.everyvisitor.app/api/webhooks/shop/redact"
+
+  [[webhooks.subscriptions]]
+  topics = [ "app/uninstalled" ]
+  uri = "https://shopify.everyvisitor.app/api/webhooks/app/uninstalled"
+
+  [[webhooks.subscriptions]]
+  topics = [ "app_subscriptions/update" ]
+  uri = "https://shopify.everyvisitor.app/api/webhooks/app_subscriptions/update"
+
+[pos]
+embedded = false
+
+[app_preferences]
+url = "https://app.everyvisitor.app/settings"

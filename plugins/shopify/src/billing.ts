@@ -52,6 +52,20 @@ export const SHOPIFY_PLANS: Record<string, BillingPlan> = {
       'Evidence pack export',
     ],
   },
+  agency: {
+    id: 'agency',
+    name: 'Agency Plan (billed by EveryVisitor)',
+    price: 0,
+    interval: 'EVERY_30_DAYS',
+    features: ['Included with your EveryVisitor agency account'],
+  },
+  agency_pro: {
+    id: 'agency_pro',
+    name: 'Agency Pro (billed by EveryVisitor)',
+    price: 0,
+    interval: 'EVERY_30_DAYS',
+    features: ['Included with your EveryVisitor agency account'],
+  },
 };
 
 // Aliases for backwards compatibility

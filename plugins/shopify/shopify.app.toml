@@ -1,15 +1,15 @@
 # EveryVisitor Accessibility Shopify App Configuration
 # https://shopify.dev/docs/apps/tools/cli/configuration
 
-client_id = "b5b82df1f245c03c5d6c813be6e680a1"
+client_id = "c3edceb6c6b262802574e2de926a102c"
 name = "EveryVisitor Accessibility"
 handle = "everyvisitor-accessibility"
-application_url = "https://app.everyvisitor.app"
+application_url = "https://shopify.everyvisitor.app"
 embedded = true
 
 [build]
 automatically_update_urls_on_dev = true
-dev_store_url = "everyvisitor-dev.myshopify.com"
+dev_store_url = "every-visitor.myshopify.com"
 
 [access_scopes]
 scopes = "read_themes"
@@ -17,31 +17,31 @@ use_legacy_install_flow = false
 
 [auth]
 redirect_urls = [
-  "https://app.everyvisitor.app/api/auth/callback"
+  "https://shopify.everyvisitor.app/api/auth/callback"
 ]
 
 [webhooks]
 api_version = "2024-10"
 
   [[webhooks.subscriptions]]
-  topics = [ "customers/data_request" ]
-  uri = "https://app.everyvisitor.app/api/webhooks/customers/data_request"
+  compliance_topics = [ "customers/data_request" ]
+  uri = "https://shopify.everyvisitor.app/api/webhooks/customers/data_request"
 
   [[webhooks.subscriptions]]
-  topics = [ "customers/redact" ]
-  uri = "https://app.everyvisitor.app/api/webhooks/customers/redact"
+  compliance_topics = [ "customers/redact" ]
+  uri = "https://shopify.everyvisitor.app/api/webhooks/customers/redact"
 
   [[webhooks.subscriptions]]
-  topics = [ "shop/redact" ]
-  uri = "https://app.everyvisitor.app/api/webhooks/shop/redact"
+  compliance_topics = [ "shop/redact" ]
+  uri = "https://shopify.everyvisitor.app/api/webhooks/shop/redact"
 
   [[webhooks.subscriptions]]
   topics = [ "app/uninstalled" ]
-  uri = "https://app.everyvisitor.app/api/webhooks/app/uninstalled"
+  uri = "https://shopify.everyvisitor.app/api/webhooks/app/uninstalled"
 
   [[webhooks.subscriptions]]
   topics = [ "app_subscriptions/update" ]
-  uri = "https://app.everyvisitor.app/api/webhooks/app_subscriptions/update"
+  uri = "https://shopify.everyvisitor.app/api/webhooks/app_subscriptions/update"
 
 [pos]
 embedded = false
