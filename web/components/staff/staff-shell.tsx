@@ -202,16 +202,11 @@ function TotpGate({ session, onDone }: { session: StaffSession; onDone: () => Pr
   );
 }
 
-export function StaffShell({
-  title,
-  actions,
-  children,
-}: {
-  title: string;
-  actions?: React.ReactNode;
-  children: React.ReactNode;
-}) {
-  const pathname = usePathname();
+/**
+ * Loads the staff session and holds back every staff page until the second factor has been passed.
+ * Pages fetch on mount, so they must not mount before this resolves or they cache a 403.
+ */
+export function StaffGate({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<StaffSession | null>(null);
   const [state, setState] = useState<"loading" | "denied" | "ready" | "error">("loading");
 
@@ -227,10 +222,6 @@ export function StaffShell({
   useEffect(() => {
     void refresh();
   }, [refresh]);
-
-  useEffect(() => {
-    document.title = `${title} · Staff · EveryVisitor`;
-  }, [title]);
 
   if (state === "loading") {
     return (
@@ -269,8 +260,27 @@ export function StaffShell({
     );
   }
 
+  return <StaffContext.Provider value={{ session: s, refresh }}>{children}</StaffContext.Provider>;
+}
+
+export function StaffShell({
+  title,
+  actions,
+  children,
+}: {
+  title: string;
+  actions?: React.ReactNode;
+  children: React.ReactNode;
+}) {
+  const pathname = usePathname();
+  const { session: s } = useStaffSession();
+
+  useEffect(() => {
+    document.title = `${title} · Staff · EveryVisitor`;
+  }, [title]);
+
   return (
-    <StaffContext.Provider value={{ session: s, refresh }}>
+    <>
         <div className="min-h-screen bg-page text-ink antialiased">
           <a
             href="#main"
@@ -377,7 +387,7 @@ export function StaffShell({
             {children}
           </main>
         </div>
-    </StaffContext.Provider>
+    </>
   );
 }
 

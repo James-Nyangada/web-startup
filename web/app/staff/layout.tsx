@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { AuthGate } from "@/components/auth/auth-gate";
+import { StaffGate } from "@/components/staff/staff-shell";
 
 export const metadata: Metadata = {
   title: "Staff",
@@ -7,5 +8,7 @@ export const metadata: Metadata = {
 };
 
 export default function StaffLayout({ children }: { children: React.ReactNode }) {
-  return <AuthGate>{children}</AuthGate>;
+  return <AuthGate>
+      <StaffGate>{children}</StaffGate>
+    </AuthGate>;
 }
