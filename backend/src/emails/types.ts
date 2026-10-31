@@ -60,6 +60,8 @@ export interface InvitationEmailData {
   inviterName?: string | null;
   orgName: string;
   role: 'admin' | 'member' | 'client_viewer';
+  /** Set for staff-portal invitations; `orgName` and `role` are then ignored. */
+  staffRole?: string;
   inviteUrl: string;
   expiresInDays?: number;
 }

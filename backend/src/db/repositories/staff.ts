@@ -30,6 +30,7 @@ import {
   sites,
   siteSettings,
   staffEmails,
+  staffInvitations,
   staffMembers,
   subscriptions,
   users,
@@ -52,6 +53,8 @@ import { composeGuideBody } from '../../lib/guide-markdown.js';
 import { slugChangeRedirect } from '../../shared/content-schemas.js';
 import { PLATFORMS, type Platform } from '../../scanner/types.js';
 import type { OrgId } from './org-scope.js';
+import { hashInvitationToken } from './invitations.js';
+import { randomBytes } from 'node:crypto';
 
 /** How long a TOTP check keeps a staff session unlocked. */
 export const STAFF_VERIFICATION_TTL_MS = 12 * 60 * 60 * 1000;
@@ -364,6 +367,114 @@ export function staffRepository(db: Database) {
 
       await db.delete(staffMembers).where(eq(staffMembers.id, id));
       return true;
+    },
+
+    /* ---------- Staff email invitations ---------- */
+
+    /** Replaces any open invitation for the email, then returns the new one with its raw token. */
+    async createStaffInvitation(data: {
+      email: string;
+      role: StaffRole;
+      displayName?: string;
+      jobTitle?: string;
+      bio?: string;
+      invitedBy: string;
+    }) {
+      const email = data.email.toLowerCase().trim();
+      await db
+        .update(staffInvitations)
+        .set({ revokedAt: new Date() })
+        .where(
+          and(
+            eq(staffInvitations.email, email),
+            isNull(staffInvitations.acceptedAt),
+            isNull(staffInvitations.revokedAt),
+          ),
+        );
+      const rawToken = randomBytes(32).toString('hex');
+      const [row] = await db
+        .insert(staffInvitations)
+        .values({
+          email,
+          role: data.role,
+          displayName: data.displayName,
+          jobTitle: data.jobTitle,
+          bio: data.bio,
+          invitedBy: data.invitedBy,
+          tokenHash: hashInvitationToken(rawToken),
+          expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+        })
+        .returning();
+      if (!row) throw new Error('Failed to create staff invitation.');
+      return { invitation: row, rawToken };
+    },
+
+    async listPendingStaffInvitations() {
+      return db
+        .select({
+          id: staffInvitations.id,
+          email: staffInvitations.email,
+          role: staffInvitations.role,
+          displayName: staffInvitations.displayName,
+          jobTitle: staffInvitations.jobTitle,
+          expiresAt: staffInvitations.expiresAt,
+          createdAt: staffInvitations.createdAt,
+        })
+        .from(staffInvitations)
+        .where(
+          and(
+            isNull(staffInvitations.acceptedAt),
+            isNull(staffInvitations.revokedAt),
+            gte(staffInvitations.expiresAt, new Date()),
+          ),
+        )
+        .orderBy(desc(staffInvitations.createdAt));
+    },
+
+    async findStaffInvitationById(id: string) {
+      const [row] = await db
+        .select()
+        .from(staffInvitations)
+        .where(eq(staffInvitations.id, id))
+        .limit(1);
+      return row ?? null;
+    },
+
+    async findStaffInvitationByToken(rawToken: string) {
+      const [row] = await db
+        .select()
+        .from(staffInvitations)
+        .where(eq(staffInvitations.tokenHash, hashInvitationToken(rawToken)))
+        .limit(1);
+      if (!row) return null;
+      const isExpired = row.expiresAt.getTime() <= Date.now();
+      const isAccepted = row.acceptedAt !== null;
+      const isRevoked = row.revokedAt !== null;
+      return { invitation: row, isExpired, isAccepted, isRevoked };
+    },
+
+    async revokeStaffInvitation(id: string) {
+      const [row] = await db
+        .update(staffInvitations)
+        .set({ revokedAt: new Date() })
+        .where(and(eq(staffInvitations.id, id), isNull(staffInvitations.acceptedAt)))
+        .returning();
+      return row ?? null;
+    },
+
+    /** The invitation link went to this address, so following it verifies the email. */
+    async markUserEmailVerified(userId: string) {
+      await db
+        .update(users)
+        .set({ emailVerified: true, emailVerifiedAt: new Date() })
+        .where(and(eq(users.id, userId), eq(users.emailVerified, false)));
+    },
+
+    async markStaffInvitationAccepted(id: string) {
+      await db
+        .update(staffInvitations)
+        .set({ acceptedAt: new Date() })
+        .where(eq(staffInvitations.id, id));
     },
 
     async canDemoteOrRemoveOwner(id: string): Promise<boolean> {

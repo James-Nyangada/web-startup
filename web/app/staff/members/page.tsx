@@ -2,7 +2,7 @@
 
 import React, { useCallback, useEffect, useState } from "react";
 import { StaffShell, btn, card, formatDate, input, td, th, useStaffSession } from "@/components/staff/staff-shell";
-import { staffApi, type StaffMember, type StaffRole } from "@/lib/admin-api";
+import { staffApi, type StaffInvitation, type StaffMember, type StaffRole } from "@/lib/admin-api";
 import { Icon, I } from "@/components/icons";
 
 const ROLE_COLORS: Record<StaffRole, string> = {
@@ -31,12 +31,18 @@ export default function StaffMembersPage() {
   const [isNew, setIsNew] = useState(false);
   const [saving, setSaving] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [invitations, setInvitations] = useState<StaffInvitation[]>([]);
+  const [notice, setNotice] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setState("loading");
     try {
-      const data = await staffApi.listMembers();
+      const [data, pending] = await Promise.all([
+        staffApi.listMembers(),
+        staffApi.listMemberInvitations(),
+      ]);
       setMembers(data);
+      setInvitations(pending);
       setState("ready");
     } catch {
       setState("error");
@@ -53,6 +59,7 @@ export default function StaffMembersPage() {
     setIsNew(true);
     setEditingMember({
       userId: "",
+      email: "",
       role: "editor",
       displayName: "",
       jobTitle: "",
@@ -60,6 +67,7 @@ export default function StaffMembersPage() {
       active: true,
     });
     setErrorMsg(null);
+    setNotice(null);
   };
 
   const handleOpenEdit = (m: StaffMember) => {
@@ -71,8 +79,8 @@ export default function StaffMembersPage() {
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingMember) return;
-    if (isNew && !editingMember.userId?.trim()) {
-      setErrorMsg("User ID is required.");
+    if (isNew && !editingMember.email?.trim()) {
+      setErrorMsg("Email address is required.");
       return;
     }
 
@@ -80,13 +88,15 @@ export default function StaffMembersPage() {
     setErrorMsg(null);
     try {
       if (isNew) {
-        await staffApi.createMember({
-          userId: editingMember.userId!.trim(),
+        const email = editingMember.email!.trim();
+        await staffApi.inviteMember({
+          email,
           role: editingMember.role as StaffRole,
           displayName: editingMember.displayName?.trim() || undefined,
           jobTitle: editingMember.jobTitle?.trim() || undefined,
           bio: editingMember.bio?.trim() || undefined,
         });
+        setNotice(`Invitation sent to ${email}.`);
       } else if (editingMember.id) {
         await staffApi.updateMember(editingMember.id, {
           role: editingMember.role,
@@ -122,16 +132,41 @@ export default function StaffMembersPage() {
     }
   };
 
+  const handleResend = async (inv: StaffInvitation) => {
+    try {
+      await staffApi.resendMemberInvitation(inv.id);
+      setNotice(`Invitation re-sent to ${inv.email}.`);
+      await load();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Failed to resend invitation.");
+    }
+  };
+
+  const handleRevoke = async (inv: StaffInvitation) => {
+    if (!confirm(`Revoke the invitation for ${inv.email}?`)) return;
+    try {
+      await staffApi.revokeMemberInvitation(inv.id);
+      await load();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Failed to revoke invitation.");
+    }
+  };
+
   return (
     <StaffShell
       title="Staff &amp; Roles"
       actions={
         <button type="button" className={btn.primary} onClick={handleOpenNew}>
           <Icon d={I.plus} size={16} />
-          Add staff member
+          Invite staff member
         </button>
       }
     >
+      {notice && (
+        <div role="status" className="mb-4 rounded-xl border border-ok/30 bg-ok-soft p-3 text-xs text-ok">
+          {notice}
+        </div>
+      )}
       <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <p className="m-0 text-sm text-muted">
           Staff member authentication, roles, and granular permissions. Two-factor TOTP authentication
@@ -256,6 +291,42 @@ export default function StaffMembersPage() {
         )}
       </div>
 
+      {invitations.length > 0 && (
+        <div className="mt-8 overflow-hidden rounded-2xl border border-line bg-surface shadow-card">
+          <h2 className="m-0 border-b border-line bg-subtle px-4 py-3 text-sm font-bold text-ink">
+            Pending invitations
+          </h2>
+          <ul className="m-0 list-none divide-y divide-line p-0">
+            {invitations.map((inv) => (
+              <li key={inv.id} className="flex flex-wrap items-center justify-between gap-3 px-4 py-3">
+                <div>
+                  <div className="text-sm font-semibold text-ink">{inv.displayName || inv.email}</div>
+                  <div className="text-xs text-muted">
+                    {inv.email} · <span className="capitalize">{inv.role}</span> · expires {formatDate(inv.expiresAt)}
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    className={btn.secondary}
+                    onClick={() => void handleResend(inv)}
+                  >
+                    Resend
+                  </button>
+                  <button
+                    type="button"
+                    className={btn.secondary}
+                    onClick={() => void handleRevoke(inv)}
+                  >
+                    Revoke
+                  </button>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
       {/* Member Modal */}
       {editingMember && (
         <div
@@ -267,7 +338,7 @@ export default function StaffMembersPage() {
           <div className="w-full max-w-lg rounded-2xl border border-line bg-surface p-6 shadow-2xl my-8">
             <div className="mb-4 flex items-center justify-between border-b border-line pb-3">
               <h2 id="member-modal-title" className="m-0 text-lg font-bold text-ink">
-                {isNew ? "Add staff member" : "Edit staff member"}
+                {isNew ? "Invite staff member" : "Edit staff member"}
               </h2>
               <button
                 type="button"
@@ -288,20 +359,20 @@ export default function StaffMembersPage() {
             <form onSubmit={handleSave} className="space-y-4">
               {isNew ? (
                 <div>
-                  <label htmlFor="member-userid" className="mb-1 block text-xs font-semibold text-muted">
-                    User ID (UUID from users table)
+                  <label htmlFor="member-email" className="mb-1 block text-xs font-semibold text-muted">
+                    Email address
                   </label>
                   <input
-                    id="member-userid"
-                    type="text"
+                    id="member-email"
+                    type="email"
                     required
-                    placeholder="e.g. 7f83b1a2-..."
-                    value={editingMember.userId || ""}
-                    onChange={(e) => setEditingMember({ ...editingMember, userId: e.target.value })}
+                    placeholder="e.g. jane@company.com"
+                    value={editingMember.email || ""}
+                    onChange={(e) => setEditingMember({ ...editingMember, email: e.target.value })}
                     className={input}
                   />
                   <p className="mt-1 text-xs text-muted">
-                    The user must already have a registered account on the platform.
+                    We will email an invitation link. They create their account and open the staff portal from it.
                   </p>
                 </div>
               ) : (
@@ -393,7 +464,7 @@ export default function StaffMembersPage() {
                   Cancel
                 </button>
                 <button type="submit" className={btn.primary} disabled={saving}>
-                  {saving ? "Saving…" : isNew ? "Add member" : "Save changes"}
+                  {saving ? "Saving…" : isNew ? "Send invitation" : "Save changes"}
                 </button>
               </div>
             </form>

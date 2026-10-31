@@ -247,6 +247,16 @@ export interface ActivationReport {
 
 /* ---------- Phase 8 Models (CMS, Analytics, Customer additions) ---------- */
 
+export interface StaffInvitation {
+  id: string;
+  email: string;
+  role: StaffRole;
+  displayName: string | null;
+  jobTitle: string | null;
+  expiresAt: string;
+  createdAt: string;
+}
+
 export interface StaffMember {
   id: string;
   userId: string;
@@ -626,8 +636,12 @@ export const staffApi = {
   slugAvailable: (params: { type: string; slug: string; excludeId?: string }) =>
     apiClient<{ available: boolean }>(`/v1/staff/content/posts/slug-available${qs(params)}`),
   listMembers: () => apiClient<StaffMember[]>("/v1/staff/members"),
-  createMember: (data: { userId: string; role: StaffRole; displayName?: string; jobTitle?: string; bio?: string }) =>
-    apiClient<StaffMember>("/v1/staff/members", json(data)),
+  inviteMember: (data: { email: string; role: StaffRole; displayName?: string; jobTitle?: string; bio?: string }) =>
+    apiClient<{ id: string; email: string; role: StaffRole; invited: boolean }>("/v1/staff/members", json(data)),
+  listMemberInvitations: () => apiClient<StaffInvitation[]>("/v1/staff/member-invitations"),
+  resendMemberInvitation: (id: string) =>
+    apiClient<{ invited: boolean }>(`/v1/staff/member-invitations/${id}/resend`, { method: "POST" }),
+  revokeMemberInvitation: (id: string) => apiClient(`/v1/staff/member-invitations/${id}`, { method: "DELETE" }),
   updateMember: (id: string, data: Partial<StaffMember>) =>
     apiClient<StaffMember>(`/v1/staff/members/${id}`, json(data, "PATCH")),
   deleteMember: (id: string) => apiClient(`/v1/staff/members/${id}`, { method: "DELETE" }),

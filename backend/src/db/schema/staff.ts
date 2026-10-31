@@ -12,7 +12,7 @@ import {
   uniqueIndex,
   uuid,
 } from 'drizzle-orm/pg-core';
-import { id, timestamps, createdAt } from './columns.js';
+import { id, timestamps, createdAt, citext } from './columns.js';
 import { organizations, users } from './identity.js';
 import { rules } from './knowledge.js';
 
@@ -59,6 +59,32 @@ export const staffMembers = pgTable(
   (t) => [
     check(
       'staff_members_role_check',
+      sql`${t.role} in ('owner', 'admin', 'editor', 'support', 'analyst')`,
+    ),
+  ],
+);
+
+/** Pending email invitations to join staff; the account is created when the link is accepted. */
+export const staffInvitations = pgTable(
+  'staff_invitations',
+  {
+    id: id(),
+    email: citext('email').notNull(),
+    role: text('role').$type<StaffRole>().notNull(),
+    displayName: text('display_name'),
+    jobTitle: text('job_title'),
+    bio: text('bio'),
+    tokenHash: text('token_hash').notNull().unique(),
+    invitedBy: uuid('invited_by').references(() => users.id, { onDelete: 'set null' }),
+    expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+    acceptedAt: timestamp('accepted_at', { withTimezone: true }),
+    revokedAt: timestamp('revoked_at', { withTimezone: true }),
+    ...timestamps(),
+  },
+  (t) => [
+    index('staff_invitations_email_idx').on(t.email),
+    check(
+      'staff_invitations_role_check',
       sql`${t.role} in ('owner', 'admin', 'editor', 'support', 'analyst')`,
     ),
   ],

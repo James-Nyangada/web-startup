@@ -158,6 +158,47 @@ This link expires in 1 hour. If you didn't request a password reset, you can saf
   return { subject, html, text };
 }
 
+function renderStaffInvitation(
+  data: InvitationEmailData,
+  staffRole: string,
+  brandName: string,
+  inviter: string,
+): EmailRenderOutput {
+  const days = data.expiresInDays ?? 7;
+  const subject = `${inviter} invited you to the ${brandName} staff portal`;
+  const contentHtml = `
+    <p style="margin: 0 0 16px 0;">
+      <strong>${inviter}</strong> has invited you to join the ${brandName} team with the <strong>${staffRole}</strong> role.
+    </p>
+    <p style="margin: 0 0 16px 0;">
+      Accept the invitation to set up your account and open the staff portal. You will be asked to set up an authenticator app the first time you sign in.
+    </p>
+    <p style="margin: 0;">
+      This invitation is single-use and will expire in ${days} days.
+    </p>
+  `;
+  const html = renderEmailLayout({
+    preheader: subject,
+    title: 'You\'re invited to the staff portal',
+    contentHtml,
+    buttonLabel: 'Accept invitation',
+    buttonUrl: data.inviteUrl,
+    secondaryLinkText: 'Direct invitation link',
+    secondaryLinkUrl: data.inviteUrl,
+  });
+  const text = `You're invited to the ${brandName} staff portal
+
+${inviter} has invited you to join the ${brandName} team with the ${staffRole} role.
+
+Accept your invitation by visiting the link below:
+${data.inviteUrl}
+
+This invitation is single-use and expires in ${days} days.
+
+— The ${brandName} Team`;
+  return { subject, html, text };
+}
+
 // E-04: Invitation to organisation
 export function renderInvitationEmail(
   data: InvitationEmailData,
@@ -171,6 +212,8 @@ export function renderInvitationEmail(
       : data.role === 'client_viewer'
         ? 'a Client Viewer'
         : 'a Member';
+
+  if (data.staffRole) return renderStaffInvitation(data, data.staffRole, brandName, inviter);
 
   const subject = `${inviter} invited you to join ${data.orgName} on ${brandName}`;
 

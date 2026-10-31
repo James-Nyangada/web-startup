@@ -30,6 +30,7 @@ import type { ScansRouterOptions } from './routes/scans.js';
 import { EmailSender } from './emails/sender.js';
 import { createEmailPreviewRouter } from './emails/preview-router.js';
 import { invitationsRouter } from './routes/invitations.js';
+import { staffInvitationsRouter } from './routes/staff-invitations.js';
 import { reportsPublicRouter } from './routes/reports.js';
 import { manualChecksPublicRouter } from './routes/manual-checks.js';
 import { statementsPublicRouter } from './routes/statements.js';
@@ -196,6 +197,7 @@ export function createApp({
   v1.use('/mfa', mfaRouter(auth, repos, { appUrl: config.APP_URL }));
   v1.use('/orgs', orgsRouter(auth, repos, scansOptions, emailSender, storage, paddleClient));
   v1.use('/invitations', invitationsRouter(repos, auth));
+  v1.use('/staff-invitations', staffInvitationsRouter(repos, auth));
   v1.use('/sites', detectPlatformRouter(auth));
   const paddleWebhookOpts = { boss: scansOptions?.boss, emailSender };
   v1.use('/webhooks/paddle', paddleWebhookRouter(repos, paddleWebhookOpts));

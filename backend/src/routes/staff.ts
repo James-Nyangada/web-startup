@@ -262,12 +262,11 @@ export function staffRouter(
   /* ---------- P8-01: Staff & roles (S-102) ---------- */
 
   const staffMemberCreateSchema = z.object({
-    userId: z.uuid(),
+    email: z.string().trim().toLowerCase().pipe(z.email()),
     role: z.enum(STAFF_ROLES),
     displayName: z.string().trim().max(100).optional(),
     jobTitle: z.string().trim().max(100).optional(),
     bio: z.string().trim().max(500).optional(),
-    avatarKey: z.string().optional(),
   });
 
   const staffMemberUpdateSchema = z.object({
@@ -283,15 +282,74 @@ export function staffRouter(
     res.json({ data: await repos.staff.listStaffMembers() });
   });
 
+  const staffInviteUrl = (rawToken: string) =>
+    `${process.env.APP_URL || 'http://localhost:3000'}/staff-invite/${rawToken}`;
+
+  const sendStaffInvite = async (
+    req: Request,
+    email: string,
+    role: string,
+    rawToken: string,
+  ) => {
+    await options.emailSender?.send({
+      to: email,
+      templateId: 'E-04',
+      data: {
+        inviterName: req.staff!.displayName || req.staff!.email,
+        orgName: '',
+        role: 'member',
+        staffRole: role,
+        inviteUrl: staffInviteUrl(rawToken),
+        expiresInDays: 7,
+      },
+    });
+  };
+
+  // Invites someone by email; their account and staff record are created when they accept.
   router.post('/members', requireStaffPermission('manage_staff'), async (req: Request, res: Response) => {
     const body = staffMemberCreateSchema.parse(req.body);
-    const existing = await repos.staff.findStaffMemberByUserId(body.userId);
-    if (existing) {
-      throw new AppError(409, ErrorCode.CONFLICT, 'This user is already a staff member.');
+    const user = await repos.users.findByEmail(body.email);
+    if (user && (await repos.staff.findStaffMemberByUserId(user.id))) {
+      throw new AppError(409, ErrorCode.CONFLICT, 'This person is already a staff member.');
     }
-    const member = await repos.staff.createStaffMember(body);
-    await audit(req, null, 'staff.member_created', { userId: body.userId, role: body.role });
-    res.status(201).json({ data: member });
+    const { invitation, rawToken } = await repos.staff.createStaffInvitation({
+      ...body,
+      invitedBy: req.staff!.userId,
+    });
+    await sendStaffInvite(req, invitation.email, invitation.role, rawToken);
+    await audit(req, null, 'staff.member_invited', { email: body.email, role: body.role });
+    res.status(201).json({
+      data: { id: invitation.id, email: invitation.email, role: invitation.role, invited: true },
+    });
+  });
+
+  router.get('/member-invitations', requireStaffPermission('manage_staff'), async (_req: Request, res: Response) => {
+    res.json({ data: await repos.staff.listPendingStaffInvitations() });
+  });
+
+  router.post('/member-invitations/:id/resend', requireStaffPermission('manage_staff'), async (req: Request, res: Response) => {
+    const id = uuidParam.parse(param(req, 'id'));
+    const current = await repos.staff.findStaffInvitationById(id);
+    if (!current || current.acceptedAt) throw AppError.notFound('Invitation not found.');
+    const { invitation, rawToken } = await repos.staff.createStaffInvitation({
+      email: current.email,
+      role: current.role,
+      displayName: current.displayName ?? undefined,
+      jobTitle: current.jobTitle ?? undefined,
+      bio: current.bio ?? undefined,
+      invitedBy: req.staff!.userId,
+    });
+    await sendStaffInvite(req, invitation.email, invitation.role, rawToken);
+    await audit(req, null, 'staff.member_invite_resent', { email: invitation.email });
+    res.json({ data: { id: invitation.id, invited: true } });
+  });
+
+  router.delete('/member-invitations/:id', requireStaffPermission('manage_staff'), async (req: Request, res: Response) => {
+    const id = uuidParam.parse(param(req, 'id'));
+    const revoked = await repos.staff.revokeStaffInvitation(id);
+    if (!revoked) throw AppError.notFound('Invitation not found.');
+    await audit(req, null, 'staff.member_invite_revoked', { id });
+    res.json({ data: { revoked: true } });
   });
 
   router.patch('/members/:id', requireStaffPermission('manage_staff'), async (req: Request, res: Response) => {
