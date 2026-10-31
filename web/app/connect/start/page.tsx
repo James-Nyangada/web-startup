@@ -127,7 +127,8 @@ export default function ConnectStartPage({
     }
   };
 
-  const signInReturnTo = typeof window !== "undefined" ? window.location.href : "/connect/start";
+  // Same-site path only: sign-in/up send the user back here after authenticating.
+  const signInReturnTo = typeof window !== "undefined" ? `${window.location.pathname}${window.location.search}` : "/connect/start";
 
   if (loading) {
     return (
@@ -153,13 +154,13 @@ export default function ConnectStartPage({
           </p>
           <div className="mt-6 flex flex-col gap-3">
             <Link
-              href={`/sign-in?returnTo=${encodeURIComponent(signInReturnTo)}`}
+              href={`/sign-in?redirect=${encodeURIComponent(signInReturnTo)}`}
               className="ease-ui flex h-10 w-full items-center justify-center rounded-full bg-primary text-sm font-semibold text-on-primary hover:bg-primary-hover no-underline"
             >
               Sign In
             </Link>
             <Link
-              href={`/sign-up?returnTo=${encodeURIComponent(signInReturnTo)}`}
+              href={`/sign-up?redirect=${encodeURIComponent(signInReturnTo)}`}
               className="ease-ui flex h-10 w-full items-center justify-center rounded-full border border-line-strong bg-surface text-sm font-semibold text-ink hover:bg-subtle no-underline"
             >
               Create Account

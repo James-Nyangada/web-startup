@@ -282,7 +282,7 @@ export function createDashboardRouter(config: AppConfig): Router {
         <strong>Connect your EveryVisitor account</strong>
         <div style="font-size: 13px; color: #6d7175;">Sign in or create an account to start monitoring this store. No code changes needed.</div>
       </div>
-      <a href="${connectUrl}" target="_top" class="btn btn-primary">Connect account &rarr;</a>
+      <a href="${connectUrl}" target="_blank" rel="noopener" class="btn btn-primary">Connect account &rarr;</a>
     </div>`
     }
 

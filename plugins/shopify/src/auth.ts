@@ -123,7 +123,8 @@ export function createAuthRouter(config: AppConfig): Router {
     }
 
     const state = crypto.randomBytes(16).toString('hex');
-    res.cookie('ev_link_state', state, {
+    // One cookie per attempt, so a second click or tab cannot invalidate the first.
+    res.cookie(`ev_link_${state}`, '1', {
       httpOnly: true,
       sameSite: 'lax',
       secure: config.host.startsWith('https'),
@@ -150,12 +151,11 @@ export function createAuthRouter(config: AppConfig): Router {
       return;
     }
 
-    const savedState = req.cookies?.ev_link_state;
-    if (!savedState || !state || savedState !== state) {
+    if (!state || !/^[A-Za-z0-9_-]{1,64}$/.test(state) || req.cookies?.[`ev_link_${state}`] !== '1') {
       res.status(400).send('Invalid handshake state. Please start the connection again.');
       return;
     }
-    res.clearCookie('ev_link_state');
+    res.clearCookie(`ev_link_${state}`);
 
     const session = await sessionStore.findInDb(shop);
     if (!session) {

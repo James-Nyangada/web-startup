@@ -2,15 +2,24 @@ import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { and, eq, inArray } from 'drizzle-orm';
 import { closeDb, getDb, type Database } from '../index.js';
-import { contentPosts, rules, staffMembers } from '../schema/index.js';
+import { changelogEntries, contentPosts, rules, staffMembers } from '../schema/index.js';
 import { loadAllFixGuides } from '../../fix-guides/loader.js';
 import { parseGuideSections } from '../../lib/guide-markdown.js';
-import { blogPostToMarkdown, parseBlogDate, type StaticBlogPost } from '../../lib/content-import.js';
+import {
+  blogPostToMarkdown,
+  changelogDay,
+  changelogToMarkdown,
+  changelogTypeFor,
+  parseBlogDate,
+  type StaticBlogPost,
+  type StaticChangelogEntry,
+} from '../../lib/content-import.js';
 
 export interface ImportResult {
   guidesImported: number;
   guidesSkipped: string[];
   blogImported: number;
+  changelogImported: number;
   existing: number;
 }
 
@@ -22,6 +31,7 @@ export interface ImportResult {
 export async function importContent(
   db: Database,
   blogPosts: StaticBlogPost[],
+  changelog: StaticChangelogEntry[] = [],
   log: (msg: string) => void = console.log,
 ): Promise<ImportResult> {
   const [owner] = await db
@@ -35,7 +45,7 @@ export async function importContent(
   const authorFor = (name: string) =>
     staff.find((s) => s.name?.trim().toLowerCase() === name.trim().toLowerCase())?.id ?? owner.id;
 
-  const result: ImportResult = { guidesImported: 0, guidesSkipped: [], blogImported: 0, existing: 0 };
+  const result: ImportResult = { guidesImported: 0, guidesSkipped: [], blogImported: 0, changelogImported: 0, existing: 0 };
 
   const guides = loadAllFixGuides();
   const knownRules = new Set(
@@ -91,8 +101,28 @@ export async function importContent(
     else result.existing++;
   }
 
+  // Changelog rows have no slug, so an entry counts as existing when the same day + title is there.
+  const have = await db.select({ date: changelogEntries.date, title: changelogEntries.title }).from(changelogEntries);
+  for (const e of changelog) {
+    const date = changelogDay(e.date);
+    if (have.some((h) => h.date === date && h.title === e.title)) {
+      result.existing++;
+      continue;
+    }
+    await db.insert(changelogEntries).values({
+      date,
+      title: e.title,
+      type: changelogTypeFor(e.badge),
+      bodyMd: changelogToMarkdown(e),
+      showInApp: false,
+      status: 'published',
+      publishedAt: parseBlogDate(e.date),
+    });
+    result.changelogImported++;
+  }
+
   log(
-    `Imported ${result.guidesImported} guides and ${result.blogImported} blog posts; ${result.existing} already existed.`,
+    `Imported ${result.guidesImported} guides, ${result.blogImported} blog posts and ${result.changelogImported} changelog entries; ${result.existing} already existed.`,
   );
   for (const s of result.guidesSkipped) log(`Skipped guide: ${s}`);
   return result;
@@ -101,8 +131,11 @@ export async function importContent(
 if (import.meta.url === `file://${process.argv[1]}`) {
   try {
     const blogPath = path.resolve(process.cwd(), process.argv[2] ?? '../web/lib/blog-data.ts');
-    const mod = (await import(pathToFileURL(blogPath).href)) as { BLOG_POSTS: StaticBlogPost[] };
-    await importContent(getDb().db, mod.BLOG_POSTS);
+    const mod = (await import(pathToFileURL(blogPath).href)) as {
+      BLOG_POSTS: StaticBlogPost[];
+      CHANGELOG_ENTRIES: StaticChangelogEntry[];
+    };
+    await importContent(getDb().db, mod.BLOG_POSTS, mod.CHANGELOG_ENTRIES);
   } catch (error) {
     console.error('Import failed:', error);
     process.exitCode = 1;

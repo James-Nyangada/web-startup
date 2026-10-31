@@ -34,3 +34,26 @@ export function parseBlogDate(text: string): Date {
   if (Number.isNaN(parsed.getTime())) throw new Error(`Cannot read the date "${text}".`);
   return parsed;
 }
+
+export interface StaticChangelogEntry {
+  version: string;
+  date: string;
+  title: string;
+  badge: 'Major' | 'Feature' | 'Improvement' | 'Security';
+  summary: string;
+  highlights: string[];
+}
+
+/** The CMS changelog has three types; the old static badges map onto them. */
+export function changelogTypeFor(badge: StaticChangelogEntry['badge']): 'new' | 'improved' | 'fixed' {
+  return badge === 'Major' || badge === 'Feature' ? 'new' : 'improved';
+}
+
+/** "October 18, 2026" -> "2026-10-18" (the CMS stores changelog dates as plain days). */
+export function changelogDay(text: string): string {
+  return parseBlogDate(text).toISOString().slice(0, 10);
+}
+
+export function changelogToMarkdown(entry: StaticChangelogEntry): string {
+  return [`**${entry.version}** — ${entry.summary}`, entry.highlights.map((h) => `- ${h}`).join('\n')].join('\n\n');
+}

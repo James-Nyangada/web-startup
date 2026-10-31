@@ -67,7 +67,10 @@ function SignInContent() {
       footer={
         <p>
           Don&apos;t have an account?{' '}
-          <Link href="/sign-up" className="text-ink font-semibold hover:underline">
+          <Link
+            href={requestedRedirect ? `/sign-up?redirect=${encodeURIComponent(requestedRedirect)}` : '/sign-up'}
+            className="text-ink font-semibold hover:underline"
+          >
             Create an account
           </Link>
         </p>

@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { AuthCard } from '@/components/auth/auth-card';
 import { authClient, ApiException } from '@/lib/auth-client';
 import { Icon, I } from '@/components/icons';
+import { safeRedirectPath } from '@/lib/post-sign-in';
 
 function SignUpContent() {
   const router = useRouter();
@@ -14,6 +15,8 @@ function SignUpContent() {
 
   const urlParam = searchParams.get('url') || '';
   const checkIdParam = searchParams.get('checkId') || '';
+  const redirectParam = safeRedirectPath(searchParams.get('redirect'));
+  const signInHref = redirectParam ? `/sign-in?redirect=${encodeURIComponent(redirectParam)}` : '/sign-in';
 
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -110,7 +113,9 @@ function SignUpContent() {
   const continueQuery = new URLSearchParams();
   if (pendingUrl) continueQuery.set('url', pendingUrl);
   if (pendingCheckId) continueQuery.set('checkId', pendingCheckId);
-  const continueUrl = pendingUrl
+  const continueUrl = redirectParam
+    ? signInHref
+    : pendingUrl
     ? `/sign-in?continue=${encodeURIComponent(`/onboarding?${continueQuery.toString()}`)}`
     : '/sign-in';
 
@@ -147,7 +152,7 @@ function SignUpContent() {
       footer={
         <p>
           Already have an account?{' '}
-          <Link href="/sign-in" className="text-ink font-semibold hover:underline">
+          <Link href={signInHref} className="text-ink font-semibold hover:underline">
             Sign in
           </Link>
         </p>

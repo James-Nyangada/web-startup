@@ -514,7 +514,7 @@ describe('Shopify App (P7-02)', () => {
 
         const res = await request(app)
           .get(`/api/connect-callback?shop=${shop}&code=ev_code_abcdefghij&state=s1`)
-          .set('Cookie', 'ev_link_state=s1');
+          .set('Cookie', 'ev_link_s1=1');
 
         expect(res.status).toBe(302);
         expect(fetchMock.mock.calls[0]![0]).toBe(`${mockConfig.everyvisitorApiUrl}/v1/sites/connect/exchange`);
@@ -526,7 +526,7 @@ describe('Shopify App (P7-02)', () => {
         vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, json: async () => ({}) }));
         const res = await request(app)
           .get(`/api/connect-callback?shop=${shop}&code=ev_code_expired000&state=s1`)
-          .set('Cookie', 'ev_link_state=s1');
+          .set('Cookie', 'ev_link_s1=1');
         expect(res.status).toBe(502);
         expect(sessionStore.get(shop)?.apiKey).toBeUndefined();
       });
