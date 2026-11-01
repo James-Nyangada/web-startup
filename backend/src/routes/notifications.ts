@@ -9,6 +9,7 @@ const updatePreferencesSchema = z.object({
   scanCompleted: z.enum(['all', 'issues_only', 'off']).optional(),
   regressions: z.boolean().optional(),
   weeklyDigest: z.boolean().optional(),
+  productUpdates: z.boolean().optional(),
   billing: z.boolean().optional(),
 });
 
@@ -273,6 +274,7 @@ export function globalNotificationsRouter(repos: Repositories): Router {
             scanCompleted: 'all',
             regressions: true,
             weeklyDigest: true,
+            productUpdates: true,
             billing: true,
           },
         },

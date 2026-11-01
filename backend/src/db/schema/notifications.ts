@@ -28,6 +28,7 @@ export const notificationPreferences = pgTable(
     scanCompleted: text('scan_completed').$type<ScanCompletedPref>().notNull().default('all'),
     regressions: boolean('regressions').notNull().default(true),
     weeklyDigest: boolean('weekly_digest').notNull().default(true),
+    productUpdates: boolean('product_updates').notNull().default(true),
     billing: boolean('billing').notNull().default(true),
     ...timestamps(),
   },

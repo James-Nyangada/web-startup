@@ -20,7 +20,7 @@ export default function LegalLayout({ children }: { children: React.ReactNode })
         <div className="mx-auto max-w-[1280px] px-4 py-16 sm:px-8">
           <div className="grid gap-12 lg:grid-cols-12 items-start">
             {/* Sidebar navigation */}
-            <aside aria-label="Legal documents navigation" className="lg:col-span-3 sticky top-24">
+            <aside aria-label="Legal documents navigation" className="order-last lg:order-none lg:col-span-3 lg:sticky lg:top-24">
               <div className="rounded-2xl border border-line bg-surface p-6 shadow-card">
                 <span className="text-xs font-bold tracking-wider uppercase text-muted">
                   Legal & Trust

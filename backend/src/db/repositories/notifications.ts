@@ -31,6 +31,7 @@ export interface UserNotificationPreferences {
   scanCompleted: ScanCompletedPref;
   regressions: boolean;
   weeklyDigest: boolean;
+  productUpdates: boolean;
   billing: boolean;
 }
 
@@ -161,6 +162,7 @@ export function notificationsRepository(db: Database) {
           scanCompleted: 'all',
           regressions: true,
           weeklyDigest: true,
+          productUpdates: true,
           billing: true,
         };
       }
@@ -169,6 +171,7 @@ export function notificationsRepository(db: Database) {
         scanCompleted: row.scanCompleted,
         regressions: row.regressions,
         weeklyDigest: row.weeklyDigest,
+        productUpdates: row.productUpdates,
         billing: row.billing,
       };
     },
@@ -186,6 +189,7 @@ export function notificationsRepository(db: Database) {
           scanCompleted: prefs.scanCompleted ?? 'all',
           regressions: prefs.regressions ?? true,
           weeklyDigest: prefs.weeklyDigest ?? true,
+          productUpdates: prefs.productUpdates ?? true,
           billing: prefs.billing ?? true,
         })
         .onConflictDoUpdate({
@@ -194,6 +198,7 @@ export function notificationsRepository(db: Database) {
             ...(prefs.scanCompleted !== undefined ? { scanCompleted: prefs.scanCompleted } : {}),
             ...(prefs.regressions !== undefined ? { regressions: prefs.regressions } : {}),
             ...(prefs.weeklyDigest !== undefined ? { weeklyDigest: prefs.weeklyDigest } : {}),
+            ...(prefs.productUpdates !== undefined ? { productUpdates: prefs.productUpdates } : {}),
             ...(prefs.billing !== undefined ? { billing: prefs.billing } : {}),
             updatedAt: new Date(),
           },
@@ -204,6 +209,7 @@ export function notificationsRepository(db: Database) {
         scanCompleted: row!.scanCompleted,
         regressions: row!.regressions,
         weeklyDigest: row!.weeklyDigest,
+        productUpdates: row!.productUpdates,
         billing: row!.billing,
       };
     },

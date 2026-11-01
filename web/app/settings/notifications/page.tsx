@@ -9,6 +9,7 @@ interface PreferencesData {
   scanCompleted: "all" | "issues_only" | "off";
   regressions: boolean;
   weeklyDigest: boolean;
+  productUpdates: boolean;
   billing: boolean;
 }
 
@@ -22,6 +23,7 @@ export default function NotificationsSettingsPage() {
   >("all");
   const [regressions, setRegressions] = useState(true);
   const [weeklyDigest, setWeeklyDigest] = useState(true);
+  const [productUpdates, setProductUpdates] = useState(true);
   const [billing, setBilling] = useState(true);
 
   useEffect(() => {
@@ -36,6 +38,7 @@ export default function NotificationsSettingsPage() {
           setScanCompleted(p.scanCompleted || "all");
           setRegressions(p.regressions ?? true);
           setWeeklyDigest(p.weeklyDigest ?? true);
+          setProductUpdates(p.productUpdates ?? true);
           setBilling(p.billing ?? true);
         }
       })
@@ -62,6 +65,7 @@ export default function NotificationsSettingsPage() {
           scanCompleted,
           regressions,
           weeklyDigest,
+          productUpdates,
           billing,
         }),
       });
@@ -99,6 +103,27 @@ export default function NotificationsSettingsPage() {
               type="checkbox"
               checked={weeklyDigest}
               onChange={(e) => setWeeklyDigest(e.target.checked)}
+              className="mt-1 size-4 rounded border-line text-primary focus:ring-primary"
+            />
+          </label>
+
+          <div className="h-px bg-line" />
+
+          {/* Product updates */}
+          <label className="flex items-start justify-between gap-4 cursor-pointer">
+            <div className="flex flex-col">
+              <span className="text-sm font-semibold text-ink">
+                Product updates
+              </span>
+              <span className="text-xs text-muted">
+                Sent on the 1st of each month with what we shipped in the
+                changelog. Only sent to account owners and admins.
+              </span>
+            </div>
+            <input
+              type="checkbox"
+              checked={productUpdates}
+              onChange={(e) => setProductUpdates(e.target.checked)}
               className="mt-1 size-4 rounded border-line text-primary focus:ring-primary"
             />
           </label>

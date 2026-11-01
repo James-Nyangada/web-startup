@@ -583,6 +583,7 @@ export function fakeRepos() {
         scanCompleted: 'all',
         regressions: true,
         weeklyDigest: true,
+        productUpdates: true,
         billing: true,
       }),
       updatePreferences: vi.fn().mockImplementation((_orgId, _userId, prefs) =>
@@ -590,6 +591,7 @@ export function fakeRepos() {
           scanCompleted: prefs.scanCompleted ?? 'all',
           regressions: prefs.regressions ?? true,
           weeklyDigest: prefs.weeklyDigest ?? true,
+          productUpdates: prefs.productUpdates ?? true,
           billing: prefs.billing ?? true,
         }),
       ),

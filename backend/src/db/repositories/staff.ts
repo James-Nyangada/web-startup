@@ -1473,7 +1473,7 @@ export function staffRepository(db: Database) {
 
     /**
      * Owners and admins of live organisations for the monthly product-updates email. Anyone
-     * who turned digests off in any of their organisations is left out.
+     * who turned product updates off in any of their organisations is left out.
      */
     async listChangelogDigestRecipients(): Promise<string[]> {
       const rows = await db.execute<{ email: string }>(sql`
@@ -1485,7 +1485,7 @@ export function staffRepository(db: Database) {
         where o.deleted_at is null and m.role in ('owner', 'admin')
           and u.email is not null and u.email_verified = true and u.deleted_at is null
         group by 1
-        having bool_and(coalesce(np.weekly_digest, true))
+        having bool_and(coalesce(np.product_updates, true))
         order by 1
       `);
       return rows.rows.map((r) => r.email);

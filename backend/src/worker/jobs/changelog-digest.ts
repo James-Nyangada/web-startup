@@ -54,7 +54,7 @@ export function renderChangelogDigest(
 
 /**
  * changelog.digest (1st of the month): emails last month's published changelog entries to
- * account owners and admins who have not turned digests off. Progress is saved after each
+ * account owners and admins who have not turned product updates off. Progress is saved after each
  * send, so a retry resumes and a month is never sent twice.
  */
 export async function handleChangelogDigest(
