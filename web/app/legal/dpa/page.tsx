@@ -27,7 +27,7 @@ function BuiltDpaPage() {
           </Link>
         </div>
         <p className="mt-2 text-xs text-muted">
-          The download opens in any browser and prints to PDF, with signature blocks for both parties. Agencies can also
+          The download is a PDF with signature blocks for both parties. Agencies can also
           email info@everyvisitor.app for a countersigned copy.
         </p>
       </div>

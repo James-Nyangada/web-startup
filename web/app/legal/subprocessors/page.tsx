@@ -81,7 +81,29 @@ function BuiltSubprocessorsPage() {
           To deliver our continuous accessibility monitoring service, EveryVisitor engages third-party service providers (&quot;subprocessors&quot;) to perform technical, infrastructure, and payment processing functions. Prior to engaging any subprocessor, EveryVisitor conducts due diligence to evaluate their security posture, confidentiality obligations, and data protection compliance.
         </p>
 
-        <div className="overflow-x-auto rounded-xl border border-line">
+        {/* Phones: one card per subprocessor, since four columns do not fit. */}
+        <ul className="m-0 flex list-none flex-col gap-4 p-0 md:hidden">
+          {SUBPROCESSORS.map((s) => (
+            <li key={s.name} className="m-0 rounded-xl border border-line bg-surface p-4">
+              <h2 className="m-0 text-base font-semibold text-ink">{s.name}</h2>
+              <p className="m-0 mt-0.5 text-xs text-muted">{s.entity}</p>
+              <p className="m-0 mt-3 text-sm font-semibold text-ink">{s.service}</p>
+              <p className="m-0 mt-1 text-sm text-muted">{s.purpose}</p>
+              <dl className="m-0 mt-3 flex flex-col gap-2 border-t border-line pt-3 text-xs">
+                <div>
+                  <dt className="font-semibold text-ink">Location</dt>
+                  <dd className="m-0 mt-0.5 text-muted">{s.location}</dd>
+                </div>
+                <div>
+                  <dt className="font-semibold text-ink">Transfer mechanism</dt>
+                  <dd className="m-0 mt-0.5 text-muted">{s.transfer}</dd>
+                </div>
+              </dl>
+            </li>
+          ))}
+        </ul>
+
+        <div className="hidden overflow-x-auto rounded-xl border border-line md:block">
           <table className="w-full text-left text-xs border-collapse">
             <thead>
               <tr className="border-b border-line bg-subtle">

@@ -46,7 +46,7 @@ export default function LegalLayout({ children }: { children: React.ReactNode })
             </aside>
 
             {/* Document body */}
-            <article className="lg:col-span-9 max-w-[800px] rounded-2xl border border-line bg-surface p-8 sm:p-12 shadow-card">
+            <article className="min-w-0 lg:col-span-9 max-w-[800px] rounded-2xl border border-line bg-surface p-8 sm:p-12 shadow-card">
               {children}
             </article>
           </div>
