@@ -1,5 +1,6 @@
 "use client";
 
+import { platformWithStack } from "@/lib/platforms";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AppShell } from "@/components/app-shell";
@@ -23,7 +24,6 @@ import {
   formatDay,
   formatDayTime,
   loadIssue,
-  platformLabel,
   recheckAndWait,
   recheckMessage,
   toIssue,
@@ -391,7 +391,7 @@ export function SiteWorkspace({
               <Icon d={I.external} size={14} />
               <span className="sr-only">(opens in new tab)</span>
             </a>
-            <span>{platformLabel(site.platform)}</span>
+            <span>{platformWithStack(site.platform, site.framework)}</span>
             {site.clientName && <span>Client: {site.clientName}</span>}
             {site.status === "paused" && (
               <span className="inline-flex items-center gap-1 rounded-full bg-warn/15 px-2 py-0.5 text-xs font-semibold text-warn">
@@ -635,6 +635,7 @@ export function SiteWorkspace({
         siteHref={siteHref}
         orgSlug={orgSlug}
         sitePlatform={site.platform}
+        siteFramework={site.framework}
         siteRootUrl={site.rootUrl}
         members={members}
         onAssign={assign}

@@ -15,7 +15,7 @@ interface FooterGroup {
 }
 
 const DEFAULT_TAGLINE =
-  "Continuous accessibility monitoring for Shopify and WordPress sites. Plain-language fix guides, worst-first prioritization, and verifiable progress records.";
+  "Accessibility checks for any website, built especially for online stores. Plain-language fix guides for Shopify, WordPress or your own code, worst-first priorities, and a dated record of your progress.";
 
 const STATUS_URL = process.env.NEXT_PUBLIC_STATUS_URL;
 

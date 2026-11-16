@@ -6,10 +6,11 @@ import { MarketingHeader } from "@/components/marketing/marketing-header";
 import { MarketingFooter } from "@/components/marketing/marketing-footer";
 import { Icon, I } from "@/components/icons";
 import type { FixGuideItem } from "@/lib/fix-guides-data";
+import { GUIDE_PLATFORM_LABEL, guideHref, type GuidePlatform } from "@/lib/platforms";
 
 export function FixGuidesIndex({ allGuides }: { allGuides: FixGuideItem[] }) {
 
-  const [platformFilter, setPlatformFilter] = useState<"all" | "shopify" | "wordpress">("all");
+  const [platformFilter, setPlatformFilter] = useState<"all" | GuidePlatform>("all");
   const [searchQuery, setSearchQuery] = useState("");
 
   const filteredGuides = useMemo(() => {
@@ -38,14 +39,15 @@ export function FixGuidesIndex({ allGuides }: { allGuides: FixGuideItem[] }) {
           {/* Header */}
           <div className="flex max-w-[800px] flex-col gap-4">
             <span className="text-xs font-bold tracking-[0.12em] text-muted uppercase">
-              Ecommerce Accessibility Fix Guides
+              Accessibility fix guides
             </span>
             <h1 className="m-0 font-serif text-[42px] leading-[46px] font-normal tracking-[-0.01em] sm:text-[54px] sm:leading-[58px]">
-              Step-by-step fix guides for <em>Shopify</em> &amp; <em>WordPress</em>
+              Step-by-step fixes for <em>your platform</em>
             </h1>
             <p className="m-0 text-lg leading-7 text-pretty text-muted">
-              Clear code changes and checking instructions for the top 25 accessibility rules. Written
-              for store developers and agencies, with zero jargon.
+              Clear changes and checking instructions for the top 25 accessibility rules, on Shopify,
+              WordPress, or your own code (HTML, CSS, React, Vue and more). Written for store owners,
+              developers and agencies, in plain language.
             </p>
           </div>
 
@@ -61,6 +63,7 @@ export function FixGuidesIndex({ allGuides }: { allGuides: FixGuideItem[] }) {
                   ["all", `All (${allGuides.length})`],
                   ["shopify", `Shopify (${allGuides.filter((g) => g.platform === "shopify").length})`],
                   ["wordpress", `WordPress (${allGuides.filter((g) => g.platform === "wordpress").length})`],
+                  ["custom", `Custom code (${allGuides.filter((g) => g.platform === "custom").length})`],
                 ] as const
               ).map(([p, label]) => (
                 <button
@@ -122,7 +125,7 @@ export function FixGuidesIndex({ allGuides }: { allGuides: FixGuideItem[] }) {
               {filteredGuides.map((guide: FixGuideItem) => (
                 <Link
                   key={guide.slug}
-                  href={`/fix/${guide.platform}/${guide.slug}`}
+                  href={guideHref(guide)}
                   className="ease-ui group flex flex-col justify-between rounded-2xl border border-line bg-surface p-6 shadow-card hover:-translate-y-1 hover:border-primary/50 no-underline"
                 >
                   <div className="flex flex-col gap-3">
@@ -131,10 +134,12 @@ export function FixGuidesIndex({ allGuides }: { allGuides: FixGuideItem[] }) {
                         className={`rounded px-2.5 py-0.5 text-xs font-bold uppercase tracking-wider ${
                           guide.platform === "shopify"
                             ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400"
-                            : "bg-blue-500/10 text-blue-700 dark:text-blue-400"
+                            : guide.platform === "wordpress"
+                              ? "bg-blue-500/10 text-blue-700 dark:text-blue-400"
+                              : "bg-violet-500/10 text-violet-700 dark:text-violet-300"
                         }`}
                       >
-                        {guide.platform}
+                        {GUIDE_PLATFORM_LABEL[guide.platform]}
                       </span>
                       <span className="font-mono text-xs text-muted">{guide.ruleId}</span>
                     </div>
@@ -161,7 +166,7 @@ export function FixGuidesIndex({ allGuides }: { allGuides: FixGuideItem[] }) {
           <section className="mt-8 flex flex-col items-center justify-between gap-6 rounded-2xl bg-ink p-8 text-surface shadow-card sm:flex-row sm:p-10">
             <div className="flex max-w-[640px] flex-col gap-2">
               <h2 className="m-0 font-serif text-2xl font-normal leading-8 text-surface sm:text-3xl">
-                Check your store for these 25 accessibility issues
+                Check your site for these 25 accessibility issues
               </h2>
               <p className="m-0 text-base leading-6 text-surface/80">
                 Run a free, instant 30-second audit on any page. No installation or account required.

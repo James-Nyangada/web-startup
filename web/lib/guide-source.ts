@@ -6,12 +6,19 @@ function codeSection(s: NonNullable<CmsPost["sections"]>): string {
   const parts: string[] = [];
   if (s.codeExample?.incorrect) parts.push(`### Incorrect\n\`\`\`${lang}\n${s.codeExample.incorrect}\n\`\`\``);
   if (s.codeExample?.correct) parts.push(`### Correct\n\`\`\`${lang}\n${s.codeExample.correct}\n\`\`\``);
+  // Framework and CSS versions of the fix (Custom code guides).
+  for (const x of s.extraExamples ?? []) parts.push(`### ${x.label}\n\`\`\`${x.language ?? ""}\n${x.code}\n\`\`\``);
   return parts.join("\n\n");
 }
 
 /** A CMS guide in the shape the guide pages already render. */
 export function toGuideItem(p: CmsPost): FixGuideItem | null {
-  const platform = p.platform === "shopify" || p.platform === "wordpress" ? p.platform : null;
+  const platform =
+    p.platform === "shopify" || p.platform === "wordpress" || p.platform === "custom"
+      ? p.platform
+      : p.platform === "generic"
+        ? "custom"
+        : null;
   if (!platform || !p.ruleId || !p.sections) return null;
   return {
     ruleId: p.ruleId,

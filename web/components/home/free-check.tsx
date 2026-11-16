@@ -13,10 +13,30 @@ import { gsap, useGSAP, MOTION_OK, MOTION_REDUCED } from "@/lib/gsap";
 type Phase = "input" | "progress" | "result";
 
 const HEADLINE: { w: string; em?: boolean }[] = [
-  ..."Find the accessibility problems that".split(" ").map((w) => ({ w })),
-  ..."stop people buying,".split(" ").map((w) => ({ w, em: true })),
-  ..."and fix them in order.".split(" ").map((w) => ({ w })),
+  ..."Make your website work for".split(" ").map((w) => ({ w })),
+  ..."every visitor.".split(" ").map((w) => ({ w, em: true })),
 ];
+
+const PLATFORM_NAMES = ["Shopify", "WordPress", "WooCommerce", "Wix", "Webflow"];
+
+/** Hero platform line (spec 3.1, 3.6): names in text, not logos, so no trademark artwork is used. */
+function PlatformLine() {
+  return (
+    <p data-hero="rest" className="m-0 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted">
+      <span className="font-semibold">Works with</span>
+      {PLATFORM_NAMES.map((name) => (
+        <span key={name} className="flex items-center gap-2">
+          {name}
+          <span aria-hidden="true">·</span>
+        </span>
+      ))}
+      <span className="flex items-center gap-1">
+        <span aria-hidden="true" className="font-mono text-xs">&lt;/&gt;</span>
+        Custom code
+      </span>
+    </p>
+  );
+}
 
 /** S-01 hero + S-03 free checker (input · progress · result). */
 export interface HeroContent {
@@ -117,7 +137,7 @@ export function FreeCheck({ hero = null }: { hero?: HeroContent | null }) {
       {phase === "input" && (
         <>
           <span data-hero="eyebrow" className="text-xs font-bold tracking-[0.12em] text-muted uppercase">
-            Accessibility monitoring for online stores
+            Built for online stores. Works on any website.
           </span>
           <h1
             id="hero-h"
@@ -130,7 +150,7 @@ export function FreeCheck({ hero = null }: { hero?: HeroContent | null }) {
                   <span data-hero="word" className={`inline-block ${h.em ? "italic" : ""}`}>
                     {h.w}
                   </span>
-                  {i < HEADLINE.length - 1 && " "}
+                  {i < HEADLINE_WORDS.length - 1 && " "}
                 </span>
               ))}
             </span>
@@ -138,7 +158,7 @@ export function FreeCheck({ hero = null }: { hero?: HeroContent | null }) {
           <p data-hero="rest" className="m-0 max-w-[680px] text-lg leading-7 text-pretty text-muted">
             {hero
               ? hero.subheadline
-              : "Weekly checks for Shopify and WordPress sites, plain-language fix guides, and a record of your progress. Built for the ADA in the US and the European Accessibility Act, in force since June 2025."}
+              : "EveryVisitor finds the accessibility problems that stop people using your site, and shows you exactly how to fix them. Built for online stores, works on any website."}
           </p>
           <form data-hero="rest" onSubmit={submit} noValidate className="flex max-w-[640px] flex-col gap-2">
             <label htmlFor="url" className="text-sm font-semibold">
@@ -177,6 +197,7 @@ export function FreeCheck({ hero = null }: { hero?: HeroContent | null }) {
               {hero?.trustLine ?? "We check one page. We don't store personal data. No overlay, no script on your site."}
             </span>
           </form>
+          <PlatformLine />
         </>
       )}
 

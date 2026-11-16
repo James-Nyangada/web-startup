@@ -11,6 +11,8 @@ import { readFirstUtm } from "@/lib/utm";
 import { appApi } from "@/lib/app-api";
 import { useScanProgress, type ScanCounts } from "@/lib/use-scan-progress";
 import { band } from "@/lib/severity";
+import { describeDetection } from "@/components/sites/add-site-dialog";
+import { isCustomPlatform, PLATFORM_OPTIONS, TECH_STACK_OPTIONS, techStackOption } from "@/lib/platforms";
 
 interface OnboardingState {
   step: 1 | 2 | 3 | 4;
@@ -19,6 +21,8 @@ interface OnboardingState {
   siteName: string;
   siteUrl: string;
   platform: string;
+  /** Tech stack of a custom-coded site (sites.framework); "" = not chosen. */
+  framework: string;
   clientName: string;
   scanProgress: number; // pages scanned so far
   scanPlanned: number;
@@ -98,6 +102,7 @@ export default function OnboardingPage() {
     siteName: "",
     siteUrl: "",
     platform: "unknown",
+    framework: "",
     clientName: "",
     scanProgress: 0,
     scanPlanned: 10,
@@ -109,6 +114,7 @@ export default function OnboardingPage() {
   const [scanUrl, setScanUrl] = useState<string | undefined>();
 
   const [detectingPlatform, setDetectingPlatform] = useState(false);
+  const [detectionNote, setDetectionNote] = useState<string | null>(null);
   const [activeSlide, setActiveSlide] = useState(0);
   const [verifyDialogOpen, setVerifyDialogOpen] = useState(false);
 
@@ -247,11 +253,12 @@ export default function OnboardingPage() {
       }
 
       setDetectingPlatform(true);
-      const detected = await apiClient<{ platform: string }>("/v1/sites/detect-platform", {
+      const detected = await apiClient<{ platform: string; framework?: string | null }>("/v1/sites/detect-platform", {
         method: "POST",
         body: JSON.stringify({ url: clean }),
       });
-      updateState({ platform: detected.platform });
+      updateState({ platform: detected.platform, framework: techStackOption(detected.framework) });
+      setDetectionNote(describeDetection(detected.platform, detected.framework));
     } catch {
       // Detection is a convenience; the user can pick the platform below.
     } finally {
@@ -306,6 +313,7 @@ export default function OnboardingPage() {
             name: state.siteName.trim() || "My site",
             rootUrl: state.siteUrl.trim(),
             platform: state.platform !== "unknown" ? state.platform : undefined,
+            framework: isCustomPlatform(state.platform) && state.framework ? state.framework : undefined,
             clientName: state.orgType === "agency" && state.clientName.trim() ? state.clientName.trim() : undefined,
             freeCheckId: freeCheckId(),
           }),
@@ -607,7 +615,7 @@ export default function OnboardingPage() {
                               : "var(--text, #0C1754)",
                         }}
                       >
-                        Merchant / Store
+                        Store or business
                       </div>
                       <p
                         style={{
@@ -617,7 +625,7 @@ export default function OnboardingPage() {
                           lineHeight: "16px",
                         }}
                       >
-                        We manage our own brand. Streamlined view focused on our own site&apos;s compliance.
+                        We manage our own website: an online store, company site or any other site. A simple view focused on our own site.
                       </p>
                     </button>
                   </div>
@@ -682,7 +690,7 @@ export default function OnboardingPage() {
                   lineHeight: "22px",
                 }}
               >
-                Enter your site URL. We will detect your ecommerce platform and prepare a fast 10-page initial scan.
+                Enter your site URL. We&apos;ll work out how it&apos;s built (Shopify, WordPress, custom code or anything else) and prepare a fast 10-page first scan.
               </p>
 
               <form
@@ -757,7 +765,7 @@ export default function OnboardingPage() {
                       id="site-name"
                       type="text"
                       required
-                      placeholder="e.g. Oakhaus Store"
+                      placeholder="e.g. Oakhaus"
                       value={state.siteName}
                       onChange={(e) => updateState({ siteName: e.target.value })}
                       style={{
@@ -782,12 +790,13 @@ export default function OnboardingPage() {
                         marginBottom: "6px",
                       }}
                     >
-                      Platform {detectingPlatform && <span style={{ fontSize: "11px", color: "var(--primary)" }}>Detecting...</span>}
+                      How is your site built? {detectingPlatform && <span style={{ fontSize: "11px", color: "var(--primary)" }}>Checking…</span>}
                     </label>
                     <select
                       id="site-platform"
                       value={state.platform}
                       onChange={(e) => updateState({ platform: e.target.value })}
+                      aria-describedby={detectionNote ? "site-platform-note" : undefined}
                       style={{
                         width: "100%",
                         padding: "10px 14px",
@@ -798,16 +807,53 @@ export default function OnboardingPage() {
                         fontSize: "14px",
                       }}
                     >
-                      <option value="shopify">Shopify</option>
-                      <option value="wordpress">WordPress</option>
-                      <option value="woocommerce">WooCommerce</option>
-                      <option value="webflow">Webflow</option>
-                      <option value="squarespace">Squarespace</option>
-                      <option value="wix">Wix</option>
-                      <option value="custom">Custom / Other</option>
-                      <option value="unknown">Unknown</option>
+                      {PLATFORM_OPTIONS.map((o) => (
+                        <option key={o.value} value={o.value}>
+                          {o.label}
+                        </option>
+                      ))}
                     </select>
+                    {detectionNote && (
+                      <span id="site-platform-note" style={{ display: "block", marginTop: "6px", fontSize: "12px", color: "var(--muted, #476788)" }}>
+                        {detectionNote}
+                      </span>
+                    )}
                   </div>
+                  {state.platform === "custom" && (
+                    <div>
+                      <label
+                        htmlFor="site-stack"
+                        style={{ display: "block", fontSize: "13px", fontWeight: 600, marginBottom: "6px" }}
+                      >
+                        Which technology? <span style={{ fontWeight: 400, color: "var(--muted, #476788)" }}>(optional)</span>
+                      </label>
+                      <select
+                        id="site-stack"
+                        value={state.framework}
+                        onChange={(e) => updateState({ framework: e.target.value })}
+                        aria-describedby="site-stack-help"
+                      style={{
+                          width: "100%",
+                          padding: "10px 14px",
+                          borderRadius: "8px",
+                          border: "1px solid var(--border, #EDE5DB)",
+                          background: "var(--bg, #FFFFFF)",
+                          color: "var(--text, #0C1754)",
+                          fontSize: "14px",
+                        }}
+                      >
+                        <option value="">Skip</option>
+                        {TECH_STACK_OPTIONS.map((o) => (
+                          <option key={o.value} value={o.value}>
+                            {o.label}
+                          </option>
+                        ))}
+                      </select>
+                      <span id="site-stack-help" style={{ display: "block", marginTop: "6px", fontSize: "12px", color: "var(--muted, #476788)" }}>
+                        This lets us show code examples in your framework. Not sure? Skip it.
+                      </span>
+                    </div>
+                  )}
                 </div>
 
                 {/* Client Name Field for Agency Mode */}

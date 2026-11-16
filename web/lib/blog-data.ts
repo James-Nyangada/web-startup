@@ -175,6 +175,122 @@ export const BLOG_POSTS: BlogPost[] = [
       },
     ],
   },
+  {
+    slug: "check-custom-coded-website-accessibility",
+    title: "How to check a custom-coded website for accessibility",
+    summary:
+      "Built with React, Next.js, Vue, plain HTML or a back-end framework? Here is a practical routine for finding accessibility problems in your own code, and fixing them where they start.",
+    date: "November 16, 2026",
+    readingTime: "6 min read",
+    author: {
+      name: "James Nyangada",
+      role: "Founder",
+      avatar: "JN",
+    },
+    tags: ["Custom code", "React", "Vue", "WCAG 2.2"],
+    content: [
+      {
+        sectionTitle: "Custom code means you own every fix",
+        paragraphs: [
+          "On Shopify or WordPress, many accessibility problems come from the theme, and the fix is often a setting. On a site you built yourself, every button, form and image comes from your own components. That is good news: there is no theme vendor to wait for, and one fix in a shared component reaches every page that uses it.",
+          "It also means nobody else is checking. The routine below takes about an hour for a typical site, and most of it can then run on its own every week.",
+        ],
+      },
+      {
+        sectionTitle: "Step 1: Run an automated check on real pages",
+        paragraphs: [
+          "Automated tools find roughly a third of accessibility problems, but they find them fast and they never get bored. Check the pages people actually use: home, a listing page, a detail page, a form, and anything with a checkout or booking flow.",
+          "Check the rendered page in a browser, not your source files. A React component can look fine in code and still render a button with no name once the icon library replaces the text. EveryVisitor's free check tests one page in a real browser in about 30 seconds; weekly monitoring covers hundreds of pages and groups them by page type, so a problem in one template shows up once, not 400 times.",
+        ],
+      },
+      {
+        sectionTitle: "Step 2: Put your mouse away",
+        paragraphs: [
+          "Press Tab from the top of the page to the bottom. You should be able to see where focus is at every moment, reach every link, button and field, open and close every menu and dialog, and never get stuck. Custom dropdowns, modals and carousels are where custom-coded sites most often fail this test.",
+          "If an element only works with a click handler on a div, replace it with a real button. You get keyboard support, focus and the right screen reader announcement for free.",
+        ],
+        codeBlock: {
+          language: "jsx",
+          caption: "A div with onClick isn't reachable by keyboard. A button is.",
+          code: `// Before: no keyboard access, announced as plain text
+<div className="add-to-cart" onClick={addToCart}>Add to cart</div>
+
+// After
+<button type="button" className="add-to-cart" onClick={addToCart}>
+  Add to cart
+</button>`,
+        },
+      },
+      {
+        sectionTitle: "Step 3: Listen to one page with a screen reader",
+        paragraphs: [
+          "Turn on VoiceOver (Cmd+F5 on a Mac) or NVDA (free, on Windows) and move through one important page. Listen for buttons announced only as \"button\", images read as file names, form fields with no label, and headings that skip levels. Ten minutes is enough to find the patterns, and patterns are what you fix in components.",
+        ],
+      },
+      {
+        sectionTitle: "Step 4: Fix it in the component, not the page",
+        paragraphs: [
+          "Most problems on a custom-coded site repeat because a component repeats. Make the accessible version the only version: require an alt prop on your image component, require a label on your icon button, generate unique ids for form fields with useId in React or Vue.",
+          "EveryVisitor's Custom code fix guides show each fix as plain HTML, with CSS where it matters and examples for React/Next.js and Vue. If you tell us your framework, its example is shown first.",
+        ],
+        codeBlock: {
+          language: "jsx",
+          caption: "An icon button that can't be used without a label",
+          code: `export function IconButton({ label, icon: Icon, ...props }) {
+  return (
+    <button type="button" aria-label={label} {...props}>
+      <Icon aria-hidden="true" focusable="false" />
+    </button>
+  );
+}`,
+        },
+      },
+      {
+        sectionTitle: "Step 5: Keep it fixed",
+        paragraphs: [
+          "Code changes every week, and accessibility regressions arrive with them: a new icon library, a redesigned header, a refactored form. Add an automated check to your CI pipeline for the components you control, and run a weekly check of the live site to catch what CI can't see, such as content and third-party scripts.",
+          "Automated checks are a floor, not a finish line. Pair them with the keyboard and screen reader checks above every few months, and keep a dated record of what you found and fixed.",
+        ],
+      },
+    ],
+  },
+  {
+    slug: "accessibility-company-websites",
+    title: "Accessibility for company websites, not just stores",
+    summary:
+      "Online stores get most of the attention, but company sites, portfolios, booking pages and non-profit sites have the same problems and the same visitors. Here is where to start.",
+    date: "November 16, 2026",
+    readingTime: "4 min read",
+    author: {
+      name: "James Nyangada",
+      role: "Founder",
+      avatar: "JN",
+    },
+    tags: ["Company websites", "Accessibility basics", "WCAG 2.2"],
+    content: [
+      {
+        sectionTitle: "Why stores get the attention",
+        paragraphs: [
+          "Most US accessibility lawsuits are filed against online stores, and the European Accessibility Act names e-commerce directly. So most accessibility advice is written for stores. That's why EveryVisitor is built especially for them.",
+          "But the people who can't use an inaccessible store can't use an inaccessible company website either. A recruitment page that a screen reader user can't apply through, a booking form that doesn't work with a keyboard, a contact page with grey-on-white text: each one turns away a customer, a client or a candidate.",
+        ],
+      },
+      {
+        sectionTitle: "The same five problems, everywhere",
+        paragraphs: [
+          "Whatever the site, automated checks keep finding the same things: images with no description, buttons and links with no name, text with too little contrast, form fields with no label, and pages that stop people from zooming on a phone.",
+          "None of these is hard to fix. Each has a step-by-step guide for Shopify, WordPress and custom code in our fix guide library.",
+        ],
+      },
+      {
+        sectionTitle: "Where to start on a company site",
+        paragraphs: [
+          "Start with the pages that lead to action: contact, booking, careers and any sign-up form. Then the home page and main navigation, because every visitor passes through them. Check each with the keyboard (Tab through the page) and run an automated check.",
+          "Then keep checking. Company sites change less often than stores, but a new campaign page or a redesigned header can undo months of work in one release. A weekly check catches that the week it happens, and a dated record shows the work you've done.",
+        ],
+      },
+    ],
+  },
 ];
 
 export interface ChangelogEntry {

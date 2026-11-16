@@ -1,3 +1,5 @@
+import { PLATFORM_FAQ } from "./home-data";
+
 export interface PlanFeatureRow {
   name: string;
   tooltip?: string;
@@ -99,7 +101,7 @@ export const COMPARISON_CATEGORIES: PlanFeatureCategory[] = [
         agencyPro: true,
       },
       {
-        name: "Platform Fix Guides (Shopify & WP)",
+        name: "Fix guides for Shopify, WordPress & custom code",
         store: true,
         growth: true,
         agency: true,
@@ -149,7 +151,7 @@ export const COMPARISON_CATEGORIES: PlanFeatureCategory[] = [
       },
       {
         name: "Cross-Site Issue Discovery",
-        tooltip: "Aggregate common theme flaws across multiple client storefronts",
+        tooltip: "Group common theme and template problems across client sites, whatever they are built with",
         store: false,
         growth: false,
         agency: true,
@@ -181,6 +183,7 @@ export const COMPARISON_CATEGORIES: PlanFeatureCategory[] = [
 ];
 
 export const PRICING_FAQS = [
+  ...PLATFORM_FAQ,
   {
     q: "How does the 14-day free trial work?",
     a: "Every new account starts on a 14-day trial with full access to test up to 3 sites and 50 pages per scan. No credit card is required to sign up. When your trial ends, you can choose whichever plan best fits your site count.",

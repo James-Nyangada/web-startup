@@ -3,14 +3,75 @@
 import { useState } from "react";
 import { Icon, I } from "@/components/icons";
 import type { FixGuideItem } from "@/lib/fix-guides-data";
+import { GUIDE_PLATFORM_LABEL } from "@/lib/platforms";
 
 interface GuideRendererProps {
   guide: FixGuideItem;
   className?: string;
   isCompact?: boolean;
+  /** The site's tech stack (sites.framework): its framework example is shown first. */
+  stack?: string | null;
 }
 
-export function GuideRenderer({ guide, className = "", isCompact = false }: GuideRendererProps) {
+interface CodeBlock {
+  kind: "incorrect" | "correct" | "extra";
+  title: string;
+  language: string;
+  code: string;
+}
+
+/**
+ * Splits the Code example section into its `### Label` + fenced blocks: Incorrect, Correct,
+ * then any framework or CSS examples (Custom code guides: "CSS", "React / Next.js (JSX)", "Vue").
+ */
+function parseCodeBlocks(snippet: string, platform: FixGuideItem["platform"]): CodeBlock[] {
+  const blocks: CodeBlock[] = [];
+  for (const m of snippet.matchAll(/^###\s*(.+?)\s*\n```(\w*)\n([\s\S]*?)```/gm)) {
+    const label = m[1]!.trim();
+    const kind = /^incorrect$/i.test(label) ? "incorrect" : /^correct$/i.test(label) ? "correct" : "extra";
+    blocks.push({
+      kind,
+      title:
+        kind === "incorrect"
+          ? "Problematic code"
+          : kind === "correct"
+            ? platform === "custom"
+              ? "The fix in HTML"
+              : "Recommended accessible code"
+            : label,
+      language: m[2]?.toUpperCase() || "HTML",
+      code: (m[3] || "").trim(),
+    });
+  }
+  if (blocks.length === 0) {
+    const general = snippet.match(/```(\w+)?\n([\s\S]*?)```/);
+    if (general) {
+      blocks.push({ kind: "correct", title: "Code change", language: general[1]?.toUpperCase() || "HTML", code: (general[2] || "").trim() });
+    }
+  }
+  return blocks;
+}
+
+const STACK_EXAMPLE: Record<string, RegExp> = {
+  react: /react|jsx/i,
+  nextjs: /react|next|jsx/i,
+  gatsby: /react|jsx/i,
+  remix: /react|jsx/i,
+  vue: /vue/i,
+  nuxt: /vue|nuxt/i,
+};
+
+/** Puts the example for the site's own framework first, ahead of the plain HTML (spec 4.5). */
+function orderForStack(blocks: CodeBlock[], stack?: string | null): CodeBlock[] {
+  const match = stack ? STACK_EXAMPLE[stack] : undefined;
+  if (!match) return blocks;
+  const i = blocks.findIndex((b) => b.kind === "extra" && match.test(b.title));
+  if (i === -1) return blocks;
+  const preferred = { ...blocks[i]!, title: `${blocks[i]!.title}: your framework` };
+  return [preferred, ...blocks.filter((_, j) => j !== i)];
+}
+
+export function GuideRenderer({ guide, className = "", isCompact = false, stack = null }: GuideRendererProps) {
   const [copiedCodeIndex, setCopiedCodeIndex] = useState<number | null>(null);
 
   const handleCopyCode = async (codeText: string, index: number) => {
@@ -23,34 +84,8 @@ export function GuideRenderer({ guide, className = "", isCompact = false }: Guid
     }
   };
 
-  // Extract code blocks from guide.codeSnippet
-  const codeBlocks: { title: string; language: string; code: string }[] = [];
-  const parts = guide.codeSnippet.split(/### (Incorrect|Correct)/g);
-
-  for (let i = 1; i < parts.length; i += 2) {
-    const blockType = parts[i];
-    const rawContent = parts[i + 1] || "";
-    const codeMatch = rawContent.match(/```(\w+)?\n([\s\S]*?)```/);
-    if (codeMatch) {
-      codeBlocks.push({
-        title: blockType === "Correct" ? "Recommended Accessible Code" : "Problematic Code",
-        language: codeMatch[1]?.toUpperCase() || "HTML",
-        code: (codeMatch[2] || "").trim(),
-      });
-    }
-  }
-
-  // Fallback if no split blocks found
-  if (codeBlocks.length === 0) {
-    const generalMatch = guide.codeSnippet.match(/```(\w+)?\n([\s\S]*?)```/);
-    if (generalMatch) {
-      codeBlocks.push({
-        title: "Code change",
-        language: generalMatch[1]?.toUpperCase() || "HTML",
-        code: (generalMatch[2] || "").trim(),
-      });
-    }
-  }
+  const codeBlocks = orderForStack(parseCodeBlocks(guide.codeSnippet, guide.platform), stack);
+  const platformName = guide.platform === "custom" ? "a custom-coded site" : GUIDE_PLATFORM_LABEL[guide.platform];
 
   return (
     <article className={`flex flex-col gap-6 text-ink ${className}`}>
@@ -75,7 +110,7 @@ export function GuideRenderer({ guide, className = "", isCompact = false }: Guid
       {/* How to fix on platform */}
       <section aria-labelledby="section-fix" className="flex flex-col gap-2">
         <h2 id="section-fix" className="m-0 text-xl font-semibold tracking-tight">
-          How to fix on {guide.platform === "shopify" ? "Shopify" : "WordPress"}
+          How to fix on {platformName}
         </h2>
         <p className="m-0 text-base leading-7 text-pretty text-ink">{guide.howToFix}</p>
       </section>
@@ -88,7 +123,7 @@ export function GuideRenderer({ guide, className = "", isCompact = false }: Guid
 
         <div className="flex flex-col gap-4">
           {codeBlocks.map((block, idx) => {
-            const isCorrect = block.title.includes("Recommended") || block.title.includes("Correct");
+            const isCorrect = block.kind !== "incorrect";
             const isCopied = copiedCodeIndex === idx;
 
             return (

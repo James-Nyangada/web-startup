@@ -8,10 +8,7 @@ import { Icon, I } from "@/components/icons";
 
 export default function FixGuidesListPage() {
   const [guides, setGuides] = useState<ContentPost[]>([]);
-  const [coverage, setCoverage] = useState<{
-    rules: { ruleId: string; title: string; occurrences: number; guides: Record<string, string | null> }[];
-    totalPublished: number;
-  } | null>(null);
+  const [coverage, setCoverage] = useState<Awaited<ReturnType<typeof staffApi.coverage>> | null>(null);
   const [loading, setLoading] = useState(true);
   const [viewTab, setViewTab] = useState<"list" | "coverage">("list");
   const [q, setQ] = useState("");
@@ -36,7 +33,8 @@ export default function FixGuidesListPage() {
     void loadData();
   }, [q]);
 
-  const PLATFORMS = ["shopify", "wordpress", "generic"];
+  const PLATFORMS = ["shopify", "wordpress", "custom"] as const;
+  const PLATFORM_NAME: Record<string, string> = { shopify: "Shopify", wordpress: "WordPress", custom: "Custom code", generic: "Custom code" };
 
   return (
     <StaffShell
@@ -115,10 +113,10 @@ export default function FixGuidesListPage() {
                             {g.title}
                           </Link>
                           <span className="block text-xs font-mono text-muted">
-                            Rule: {g.ruleId || "generic"} · /guides/{g.slug}
+                            Rule: {g.ruleId || "none"} · /fix/{g.platform === "custom" || g.platform === "generic" ? "custom-code" : g.platform}/{g.slug}
                           </span>
                         </td>
-                        <td className={`${td} capitalize`}>{g.platform || "generic"}</td>
+                        <td className={td}>{PLATFORM_NAME[g.platform ?? ""] ?? g.platform ?? "Custom code"}</td>
                         <td className={td}>
                           <span
                             className={`inline-block rounded-full px-2 py-0.5 text-xs font-semibold capitalize ${
@@ -168,7 +166,8 @@ export default function FixGuidesListPage() {
         {viewTab === "coverage" && (
           <div className="flex flex-col gap-4">
             <div className="rounded-xl border border-line bg-subtle p-4 text-xs text-ink">
-              <strong>Coverage Matrix:</strong> Top 50 accessibility scan issue rules across our customer websites.
+              <strong>Coverage Matrix:</strong> The most common scan rules across customer websites, with a guide column per
+              platform: Shopify, WordPress and Custom code.
               Missing guides are highlighted in amber so writers know exactly what to produce next.
             </div>
 
@@ -179,14 +178,14 @@ export default function FixGuidesListPage() {
                     <th scope="col" className={th}>Rule ID & Description</th>
                     <th scope="col" className={`${th} text-right`}>Occurrences</th>
                     {PLATFORMS.map((p) => (
-                      <th key={p} scope="col" className={`${th} text-center capitalize`}>
-                        {p}
+                      <th key={p} scope="col" className={`${th} text-center`}>
+                        {PLATFORM_NAME[p]}
                       </th>
                     ))}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-line">
-                  {(coverage?.rules || []).map((r) => (
+                  {(coverage || []).map((r) => (
                     <tr key={r.ruleId} className="hover:bg-subtle/30">
                       <td className={td}>
                         <div className="font-semibold text-ink">{r.ruleId}</div>
@@ -196,12 +195,18 @@ export default function FixGuidesListPage() {
                         {r.occurrences.toLocaleString()}
                       </td>
                       {PLATFORMS.map((p) => {
-                        const guideSlug = r.guides?.[p];
+                        const guide = r.platforms?.[p];
                         return (
                           <td key={p} className={`${td} text-center`}>
-                            {guideSlug ? (
-                              <span className="inline-block rounded-md bg-ok-soft text-ok font-semibold px-2 py-0.5 text-[11px] border border-ok/20">
-                                ✓ Published
+                            {guide ? (
+                              <span
+                                className={`inline-block rounded-md font-semibold px-2 py-0.5 text-[11px] border ${
+                                  guide.status === "published"
+                                    ? "bg-ok-soft text-ok border-ok/20"
+                                    : "bg-subtle text-muted border-line"
+                                }`}
+                              >
+                                {guide.status === "published" ? "✓ Published" : guide.status}
                               </span>
                             ) : (
                               <Link

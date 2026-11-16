@@ -5,6 +5,8 @@ import {
   detectPlatform,
   detectPlatformFromSitemaps,
 } from '../../../src/scanner/platform/detect.js';
+import { detectFramework, type Framework } from '../../../src/scanner/platform/framework.js';
+import { refineFramework } from '../../../src/scanner/platform/probe-framework.js';
 import type { Platform } from '../../../src/scanner/types.js';
 
 describe('detectPlatform', () => {
@@ -93,7 +95,7 @@ describe('detectPlatformFromSitemaps', () => {
 // P1-05 acceptance: 20 real reference sites. Network-dependent, so opt-in.
 const reference = JSON.parse(
   readFileSync(new URL('../../fixtures/platforms.json', import.meta.url), 'utf8'),
-) as { sites: { url: string; platform: Platform }[] };
+) as { sites: { url: string; platform: Platform; framework?: Framework }[] };
 
 describe.skipIf(!process.env.SCANNER_NETWORK_TESTS)(
   'detectPlatform on real reference sites',
@@ -103,17 +105,26 @@ describe.skipIf(!process.env.SCANNER_NETWORK_TESTS)(
       timeoutMs: 20_000,
     });
 
-    it('lists 20 sites', () => {
+    it('lists 20 sites: 5 builders and 15 custom stacks', () => {
       expect(reference.sites).toHaveLength(20);
+      expect(reference.sites.filter((s) => s.platform !== 'custom')).toHaveLength(5);
+      expect(reference.sites.filter((s) => s.platform === 'custom' && s.framework)).toHaveLength(15);
     });
 
     it.each(reference.sites)(
-      '$url → $platform',
-      async ({ url, platform }) => {
+      '$url → $platform $framework',
+      async ({ url, platform, framework }) => {
         const response = await fetch(url);
-        expect(detectPlatform({ html: response.text(), headers: response.headers }).platform).toBe(
-          platform,
-        );
+        const html = response.text();
+        expect(detectPlatform({ html, headers: response.headers }).platform).toBe(platform);
+        if (framework) {
+          const detected = await refineFramework(
+            detectFramework({ html, headers: response.headers }),
+            html,
+            response.url,
+          );
+          expect(detected.framework).toBe(framework);
+        }
       },
       30_000,
     );

@@ -8,7 +8,7 @@ import { FreeCheck } from "./free-check";
 import { Collapse } from "@/components/disclosure";
 import { useReveal } from "@/components/reveal";
 import { useTheme } from "@/components/theme";
-import { PLANS } from "@/lib/home-data";
+import { AUDIENCES, BUILT_WITH, BUILT_WITH_NOTE, PLANS } from "@/lib/home-data";
 import type { HomeContent } from "@/lib/home-content";
 import { Markdown } from "@/components/marketing/markdown";
 
@@ -88,6 +88,55 @@ export function HomePage({ content }: { content: HomeContent }) {
               );
             })}
           </ol>
+        </section>
+
+        <section id="built-with" aria-labelledby="bw-h" className="border-t border-line bg-subtle">
+          <div className="mx-auto flex max-w-[1280px] flex-col gap-8 px-4 py-20 sm:px-8">
+            <h2 id="bw-h" data-reveal className={H2}>
+              Works with how your site is <em>built</em>
+            </h2>
+            <ul data-reveal="stagger" className="m-0 grid list-none gap-6 p-0 [grid-template-columns:repeat(auto-fit,minmax(260px,1fr))]">
+              {BUILT_WITH.map((c) => (
+                <li
+                  key={c.title}
+                  className={`flex flex-col gap-3 rounded-2xl bg-surface p-6 shadow-card ${
+                    c.badge ? "border-2 border-primary" : "border border-line"
+                  }`}
+                >
+                  <span className="min-h-5 text-[13px] font-semibold text-ptext">{c.badge}</span>
+                  <h3 className="m-0 flex items-center gap-2 text-xl leading-7 font-semibold">
+                    {c.title === "Custom-coded sites" && (
+                      <span aria-hidden="true" className="font-mono text-base text-muted">&lt;/&gt;</span>
+                    )}
+                    {c.title}
+                  </h3>
+                  <p className="m-0 text-pretty text-muted">{c.text}</p>
+                </li>
+              ))}
+            </ul>
+            <p data-reveal className="m-0 max-w-[760px] text-lg leading-7 text-pretty">
+              {BUILT_WITH_NOTE}
+            </p>
+            <p className="m-0 text-xs text-muted">
+              Trademarks belong to their owners. EveryVisitor is not affiliated with these companies.
+            </p>
+          </div>
+        </section>
+
+        <section id="who" aria-labelledby="who-h" className="border-t border-line">
+          <div className="mx-auto flex max-w-[1280px] flex-col gap-8 px-4 py-20 sm:px-8">
+            <h2 id="who-h" data-reveal className={H2}>
+              Who it&apos;s <em>for</em>
+            </h2>
+            <dl data-reveal="stagger" className="m-0 grid gap-6 [grid-template-columns:repeat(auto-fit,minmax(240px,1fr))]">
+              {AUDIENCES.map((a) => (
+                <div key={a.who} className="flex flex-col gap-2 border-t-2 border-primary pt-4">
+                  <dt className="text-lg leading-7 font-semibold">{a.who}</dt>
+                  <dd className="m-0 text-pretty text-muted">{a.line}</dd>
+                </div>
+              ))}
+            </dl>
+          </div>
         </section>
 
         <section id="agencies" aria-labelledby="ag-h" className="border-t border-line">

@@ -1,3 +1,5 @@
+import { FRAMEWORKS } from '../scanner/platform/framework.js';
+import { PLATFORMS, type Platform } from '../scanner/types.js';
 import { Router, type NextFunction, type Request, type Response } from 'express';
 import multer from 'multer';
 import { z } from 'zod';
@@ -76,6 +78,8 @@ const orgListSchema = pageSchema.extend({
   plan: z.enum(PLANS).optional(),
   status: z.enum(BILLING_STATUSES).optional(),
   healthBand: z.enum(['good', 'at_risk', 'poor']).optional(),
+  platform: z.enum(PLATFORMS as unknown as [Platform, ...Platform[]]).optional(),
+  framework: z.enum(FRAMEWORKS as unknown as [string, ...string[]]).optional(),
   includeDeleted: z
     .enum(['true', 'false'])
     .optional()
@@ -519,12 +523,13 @@ export function staffRouter(
 
   router.get('/analytics/product', requireStaffPermission('view_dashboards'), async (req: Request, res: Response) => {
     const { from, to } = rangeOf(req);
-    const [adoption, issueTrend, aiTrend] = await Promise.all([
+    const [adoption, issueTrend, aiTrend, platforms] = await Promise.all([
       repos.staff.featureAdoption(),
       repos.staff.issueTrend(from, to),
       repos.staff.aiSuggestionTrend(from, to),
+      repos.staff.platformBreakdown(),
     ]);
-    res.json({ data: { adoption, issueTrend, aiTrend } });
+    res.json({ data: { adoption, issueTrend, aiTrend, platforms } });
   });
 
   router.get('/analytics/activation', requireStaffPermission('view_dashboards'), async (req: Request, res: Response) => {
@@ -585,7 +590,12 @@ export function staffRouter(
     status: z.enum(CONTENT_POST_STATUSES).default('draft'),
     publishAt: z.coerce.date().nullable().optional(),
     ruleId: z.string().nullable().optional(),
-    platform: z.string().nullable().optional(),
+    // `generic` was the old name for Custom code guides; store them as `custom` (docs/adr/0001).
+    platform: z
+      .string()
+      .nullable()
+      .optional()
+      .transform((p) => (p === 'generic' ? 'custom' : p)),
     sections: z
       .object({
         whatsWrong: z.string().default(''),
@@ -597,6 +607,16 @@ export function staffRouter(
             correct: z.string().optional(),
             language: z.string().max(30).optional(),
           })
+          .optional(),
+        extraExamples: z
+          .array(
+            z.object({
+              label: z.string().trim().min(1).max(60),
+              language: z.string().max(30).optional(),
+              code: z.string(),
+            }),
+          )
+          .max(10)
           .optional(),
         howToCheck: z.string().default(''),
       })
@@ -1387,6 +1407,8 @@ export function staffRouter(
       plan: f.plan,
       billingStatus: f.status,
       healthBand: f.healthBand,
+      platform: f.platform,
+      framework: f.framework,
       includeDeleted: f.includeDeleted,
       limit: f.limit,
       offset: f.cursor,

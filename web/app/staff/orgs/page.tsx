@@ -1,5 +1,6 @@
 "use client";
 
+import { FRAMEWORK_LABEL, PLATFORM_OPTIONS, platformWithStack } from "@/lib/platforms";
 import React, { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { StaffShell, card, formatDate, input, th, td, btn } from "@/components/staff/staff-shell";
@@ -28,6 +29,8 @@ export default function StaffOrgsPage() {
   const [plan, setPlan] = useState("");
   const [status, setStatus] = useState("");
   const [healthBand, setHealthBand] = useState("");
+  const [platform, setPlatform] = useState("");
+  const [framework, setFramework] = useState("");
   const [includeDeleted, setIncludeDeleted] = useState(false);
   const [rows, setRows] = useState<StaffOrgRow[]>([]);
   const [cursor, setCursor] = useState<string | null>(null);
@@ -60,6 +63,8 @@ export default function StaffOrgsPage() {
           plan: plan || undefined,
           status: status || undefined,
           healthBand: healthBand || undefined,
+          platform: platform || undefined,
+          framework: framework || undefined,
           includeDeleted,
           cursor: append,
         });
@@ -70,7 +75,7 @@ export default function StaffOrgsPage() {
         setState("error");
       }
     },
-    [q, plan, status, healthBand, includeDeleted],
+    [q, plan, status, healthBand, platform, framework, includeDeleted],
   );
 
   useEffect(() => {
@@ -86,6 +91,8 @@ export default function StaffOrgsPage() {
       if (seg.filterConfig.plan !== undefined) setPlan(seg.filterConfig.plan);
       if (seg.filterConfig.status !== undefined) setStatus(seg.filterConfig.status);
       if (seg.filterConfig.healthBand !== undefined) setHealthBand(seg.filterConfig.healthBand);
+      setPlatform(seg.filterConfig.platform ?? "");
+      setFramework(seg.filterConfig.framework ?? "");
     }
   };
 
@@ -98,6 +105,8 @@ export default function StaffOrgsPage() {
         plan: plan || undefined,
         status: status || undefined,
         healthBand: healthBand || undefined,
+        platform: platform || undefined,
+        framework: framework || undefined,
       });
       setSegments([...segments, created]);
       setSelectedSegmentId(created.id);
@@ -198,6 +207,32 @@ export default function StaffOrgsPage() {
               ))}
             </select>
           </div>
+          <div>
+            <label htmlFor="org-platform" className="mb-1 block text-xs font-semibold text-muted">
+              Platform
+            </label>
+            <select id="org-platform" value={platform} onChange={(e) => setPlatform(e.target.value)} className={input}>
+              <option value="">Any platform</option>
+              {PLATFORM_OPTIONS.map((p) => (
+                <option key={p.value} value={p.value}>
+                  {p.label}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label htmlFor="org-stack" className="mb-1 block text-xs font-semibold text-muted">
+              Tech stack
+            </label>
+            <select id="org-stack" value={framework} onChange={(e) => setFramework(e.target.value)} className={input}>
+              <option value="">Any tech stack</option>
+              {Object.entries(FRAMEWORK_LABEL).map(([value, name]) => (
+                <option key={value} value={value}>
+                  {name}
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
 
         <div className="flex flex-wrap items-center justify-between gap-3 border-t border-line/60 pt-3">
@@ -259,6 +294,16 @@ export default function StaffOrgsPage() {
                       {o.slug} · {o.type}
                       {o.deletedAt && <span className="ml-1 font-semibold text-crit">deleted</span>}
                     </div>
+                    {o.platforms && o.platforms.length > 0 && (
+                      <div className="text-xs text-muted">
+                        {o.platforms
+                          .map((p) => {
+                            const [pf, stack] = p.split(":");
+                            return platformWithStack(pf, stack);
+                          })
+                          .join(", ")}
+                      </div>
+                    )}
                   </td>
                   <td className={td}>
                     {o.health ? (
@@ -327,7 +372,7 @@ export default function StaffOrgsPage() {
               Save Segment
             </h2>
             <p className="text-xs text-muted mb-4">
-              Save current filter criteria (Plan: {plan || "All"}, Status: {status || "Any"}, Health: {healthBand || "Any"})
+              Save current filter criteria (Plan: {plan || "All"}, Status: {status || "Any"}, Health: {healthBand || "Any"}, Platform: {platform || "Any"}, Stack: {framework || "Any"})
               as a named segment for repeated monitoring and CSV export.
             </p>
 

@@ -28,6 +28,8 @@ export const FRAMEWORKS = [
   'hugo',
   'jekyll',
   'html',
+  /** Chosen by the user when their stack isn't listed; never returned by detection. */
+  'other',
 ] as const;
 
 export type Framework = (typeof FRAMEWORKS)[number];
@@ -144,6 +146,11 @@ const RULES: Rule[] = [
     confidence: 'high',
     tests: {
       'laravel_session cookie': (s) => /laravel_session/.test(s.cookies),
+      // Apps rename the session cookie (`<app>_session`), but Laravel's encrypted cookie
+      // value is always base64 JSON starting {"iv":
+      'Laravel encrypted session cookie': (s) => /\b[\w-]+_session=eyJpdiI6/.test(s.cookies),
+      'vary: X-Inertia': (s) => /\bx-inertia\b/i.test(s.header('vary')),
+      'x-powered-by: Statamic': (s) => s.powered.includes('statamic'),
       'Livewire wire: attributes': (s) => /\swire:(id|model|click|init)\b/.test(s.html),
       'Inertia data-page root': (s) => /id=["']app["'][^>]*\bdata-page=/.test(s.html),
       'XSRF-TOKEN cookie with PHP': (s) =>

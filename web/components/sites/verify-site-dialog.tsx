@@ -21,6 +21,153 @@ export interface VerifySiteDialogProps {
 
 type VerifyTab = "meta" | "dns" | "file";
 
+type HelpPlatform = "custom" | "shopify" | "wordpress" | "builder";
+
+const HELP_LABEL: Record<HelpPlatform, string> = {
+  custom: "Custom code",
+  shopify: "Shopify",
+  wordpress: "WordPress",
+  builder: "Wix, Webflow, Squarespace",
+};
+
+function helpPlatformFor(platform?: string): HelpPlatform {
+  if (platform === "shopify") return "shopify";
+  if (platform === "wordpress" || platform === "woocommerce") return "wordpress";
+  if (platform === "wix" || platform === "webflow" || platform === "squarespace") return "builder";
+  return "custom";
+}
+
+const codeStyle = { background: "var(--bgs, #F4F1EC)", padding: "1px 5px", borderRadius: "4px" } as const;
+
+/** Where to put the tag or file on each kind of site (spec 4.4). The site's own platform comes first. */
+function PlatformHelp({ method, platform, token }: { method: "meta" | "file"; platform?: string; token: string }) {
+  const own = helpPlatformFor(platform);
+  const order: HelpPlatform[] = [own, ...(["custom", "shopify", "wordpress", "builder"] as const).filter((p) => p !== own)];
+  const [active, setActive] = useState<HelpPlatform>(own);
+  const tabRefs = React.useRef<Record<string, HTMLButtonElement | null>>({});
+  const idBase = `verify-help-${method}`;
+
+  const onKeyDown = (e: React.KeyboardEvent, i: number) => {
+    if (e.key !== "ArrowRight" && e.key !== "ArrowLeft") return;
+    e.preventDefault();
+    const next = order[(i + (e.key === "ArrowRight" ? 1 : order.length - 1)) % order.length]!;
+    setActive(next);
+    tabRefs.current[next]?.focus();
+  };
+
+  const body: Record<HelpPlatform, React.ReactNode> =
+    method === "meta"
+      ? {
+          custom: (
+            <>
+              <p style={{ margin: 0 }}>
+                Add this tag inside the <code style={codeStyle}>&lt;head&gt;</code> of your home page. In React/Next.js,
+                add it to your root layout or <code style={codeStyle}>&lt;Head&gt;</code>; in plain HTML, add it to{" "}
+                <code style={codeStyle}>index.html</code>.
+              </p>
+              <p style={{ margin: "6px 0 0" }}>
+                Next.js App Router, in <code style={codeStyle}>app/layout.tsx</code>:{" "}
+                <code style={codeStyle}>{`export const metadata = { other: { "everyvisitor-verify": "${token}" } };`}</code>
+              </p>
+            </>
+          ),
+          shopify: (
+            <p style={{ margin: 0 }}>
+              In Shopify admin: Online Store → Themes → Edit code → <code style={codeStyle}>layout/theme.liquid</code>, just
+              before <code style={codeStyle}>&lt;/head&gt;</code>.
+            </p>
+          ),
+          wordpress: (
+            <p style={{ margin: 0 }}>
+              Use a header code plugin such as WPCode, or add it to your theme&apos;s{" "}
+              <code style={codeStyle}>header.php</code> just before <code style={codeStyle}>&lt;/head&gt;</code>.
+            </p>
+          ),
+          builder: (
+            <p style={{ margin: 0 }}>
+              Wix: Settings → Custom code → Head. Webflow: Site settings → Custom code → Head code. Squarespace: Settings
+              → Advanced → Code injection → Header.
+            </p>
+          ),
+        }
+      : {
+          custom: (
+            <p style={{ margin: 0 }}>
+              Upload <code style={codeStyle}>everyvisitor-verify.txt</code> to <code style={codeStyle}>/.well-known/</code> on
+              your web server or in your project&apos;s <code style={codeStyle}>public/</code> folder (so the file is at{" "}
+              <code style={codeStyle}>public/.well-known/everyvisitor-verify.txt</code>).
+            </p>
+          ),
+          shopify: (
+            <p style={{ margin: 0 }}>
+              Shopify can&apos;t serve files from <code style={codeStyle}>/.well-known/</code>. Use the meta tag or DNS method instead.
+            </p>
+          ),
+          wordpress: (
+            <p style={{ margin: 0 }}>
+              Upload the file with your host&apos;s file manager or SFTP into a <code style={codeStyle}>.well-known</code> folder in
+              the WordPress root (next to <code style={codeStyle}>wp-config.php</code>).
+            </p>
+          ),
+          builder: (
+            <p style={{ margin: 0 }}>
+              Most website builders can&apos;t serve files from this path. Use the meta tag or DNS method instead.
+            </p>
+          ),
+        };
+
+  return (
+    <div
+      style={{
+        fontSize: "12px",
+        color: "var(--muted, #476788)",
+        background: "var(--bgs, #F4F1EC)",
+        padding: "10px 12px",
+        borderRadius: "6px",
+        lineHeight: "18px",
+        display: "flex",
+        flexDirection: "column",
+        gap: "8px",
+      }}
+    >
+      <div role="tablist" aria-label="Instructions for your platform" style={{ display: "flex", flexWrap: "wrap", gap: "4px" }}>
+        {order.map((p, i) => (
+          <button
+            key={p}
+            ref={(el) => {
+              tabRefs.current[p] = el;
+            }}
+            id={`${idBase}-tab-${p}`}
+            type="button"
+            role="tab"
+            aria-selected={active === p}
+            aria-controls={`${idBase}-panel`}
+            tabIndex={active === p ? 0 : -1}
+            onClick={() => setActive(p)}
+            onKeyDown={(e) => onKeyDown(e, i)}
+            style={{
+              padding: "4px 10px",
+              fontSize: "12px",
+              fontWeight: 600,
+              borderRadius: "999px",
+              border: "1px solid var(--border, #EDE5DB)",
+              background: active === p ? "var(--primary, #2545FF)" : "var(--bg, #FFFFFF)",
+              color: active === p ? "var(--onp, #FFFFFF)" : "var(--text, #0C1754)",
+              cursor: "pointer",
+            }}
+          >
+            {HELP_LABEL[p]}
+          </button>
+        ))}
+      </div>
+      <div id={`${idBase}-panel`} role="tabpanel" aria-labelledby={`${idBase}-tab-${active}`}>
+        {body[active]}
+      </div>
+    </div>
+  );
+}
+
+
 export function VerifySiteDialog({
   open,
   orgSlug,
@@ -368,27 +515,7 @@ export function VerifySiteDialog({
                   </button>
                 </div>
 
-                <div
-                  style={{
-                    fontSize: "12px",
-                    color: "var(--muted, #476788)",
-                    background: "var(--bgs, #F4F1EC)",
-                    padding: "10px 12px",
-                    borderRadius: "6px",
-                    lineHeight: "16px",
-                  }}
-                >
-                  <strong>Platform Guide:</strong>
-                  {site.platform === "shopify" && (
-                    <span> In Shopify Admin: Online Store → Themes → Edit code → `layout/theme.liquid` before `&lt;/head&gt;`.</span>
-                  )}
-                  {site.platform === "wordpress" && (
-                    <span> In WordPress: Use WPCode or insert into `header.php` before `&lt;/head&gt;`.</span>
-                  )}
-                  {site.platform !== "shopify" && site.platform !== "wordpress" && (
-                    <span> Paste into your theme template, custom code head tag, or site header builder.</span>
-                  )}
-                </div>
+                <PlatformHelp method="meta" platform={site.platform} token={verifyToken} />
               </div>
             )}
 
@@ -550,6 +677,8 @@ export function VerifySiteDialog({
                     </button>
                   </div>
                 </div>
+
+                <PlatformHelp method="file" platform={site.platform} token={verifyToken} />
               </div>
             )}
 

@@ -5,8 +5,8 @@ import type { Auth } from '../lib/auth.js';
 import { requireAuth } from '../middleware/auth.js';
 import { requireOrgRole } from '../middleware/org.js';
 import { detectPlatform } from '../scanner/platform/detect.js';
-import { detectFramework, type Framework } from '../scanner/platform/framework.js';
-import { refineFramework } from '../scanner/platform/probe-framework.js';
+import { detectFramework, FRAMEWORKS, type Framework } from '../scanner/platform/framework.js';
+import { isCustomPlatform, refineFramework } from '../scanner/platform/probe-framework.js';
 import { createGuardedFetch } from '../scanner/net/guarded-fetch.js';
 import { rootUrlOf } from '../scanner/url/normalize.js';
 import { PLATFORMS, STANDARDS, type Platform } from '../scanner/types.js';
@@ -66,10 +66,17 @@ const guardedFetch = createGuardedFetch({
   maxBytes: 1024 * 1024,
 });
 
+const frameworkField = z
+  .enum(FRAMEWORKS as unknown as [Framework, ...Framework[]])
+  .nullable()
+  .optional();
+
 const createSiteSchema = z.object({
   name: z.string().trim().min(1, 'Name is required').max(255),
   rootUrl: z.string().trim().min(1, 'URL is required'),
   platform: z.enum(PLATFORMS as unknown as [Platform, ...Platform[]]).optional(),
+  /** The tech stack of a custom-coded site, when the user chose one (spec 4.3). */
+  framework: frameworkField,
   clientName: z.string().trim().max(255).optional().nullable(),
   freeCheckId: z.string().uuid().optional(),
   scanFrequency: z
@@ -80,6 +87,9 @@ const createSiteSchema = z.object({
 
 const updateSiteSchema = z.object({
   name: z.string().trim().min(1).max(255).optional(),
+  // Detection is only a suggestion; the user can always correct it (spec 4.2).
+  platform: z.enum(PLATFORMS as unknown as [Platform, ...Platform[]]).optional(),
+  framework: frameworkField,
   clientName: z.string().trim().max(255).optional().nullable(),
   scanFrequency: z.enum(SCAN_FREQUENCIES as unknown as [string, ...string[]]).optional(),
   scanDay: z.number().int().min(0).max(6).optional(),
@@ -300,7 +310,7 @@ export function orgSitesRouter(repos: Repositories): Router {
       return;
     }
 
-    const { name, rootUrl, platform, clientName } = parse.data;
+    const { name, rootUrl, platform, clientName, framework: chosenFramework } = parse.data;
 
     // Normalization requirement: `https://www.example.com/shop?x=1` stores `https://www.example.com`
     const normalizedRoot = rootUrlOf(rootUrl);
@@ -343,14 +353,14 @@ export function orgSitesRouter(repos: Repositories): Router {
 
     // Auto-detect platform if omitted or unknown
     let finalPlatform: Platform = platform ?? 'unknown';
-    let framework: Framework | null = null;
+    let framework: Framework | null = chosenFramework ?? null;
     try {
       const probe = await guardedFetch(normalizedRoot);
       const html = probe.text();
       if (finalPlatform === 'unknown') {
         finalPlatform = detectPlatform({ html, headers: probe.headers }).platform;
       }
-      if (finalPlatform === 'custom' || finalPlatform === 'unknown') {
+      if (!framework && (finalPlatform === 'custom' || finalPlatform === 'unknown')) {
         framework = (
           await refineFramework(
             detectFramework({ html, headers: probe.headers }),
@@ -911,8 +921,11 @@ export function orgSitesRouter(repos: Repositories): Router {
       }
 
       const org = await repos.organizations.findById(req.orgId!);
+      const changes = { ...(parse.data as UpdateSiteInput) };
+      // A tech stack only describes custom-coded sites; drop it when moving to a builder.
+      if (changes.platform && !isCustomPlatform(changes.platform)) changes.framework = null;
       const updated = await repos.sites.update(req.orgId!, siteId, {
-        ...(parse.data as UpdateSiteInput),
+        ...changes,
         timeZone: org?.timeZone ?? 'UTC',
       });
 

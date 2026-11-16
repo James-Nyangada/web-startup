@@ -3,13 +3,20 @@ export interface GuideSections {
   whoItAffects: string;
   howToFix: string;
   codeExample?: { incorrect?: string; correct?: string; language?: string };
+  /**
+   * Further labelled examples after Incorrect/Correct, e.g. "CSS", "React / Next.js (JSX)", "Vue".
+   * Custom code guides use these for framework versions of the fix.
+   */
+  extraExamples?: { label: string; language?: string; code: string }[];
   howToCheck: string;
 }
 
 const PLATFORM_NAMES: Record<string, string> = {
   shopify: 'Shopify',
   wordpress: 'WordPress',
-  generic: 'your site',
+  custom: 'a custom-coded site',
+  // Legacy value from before custom code guides had their own platform (docs/adr/0001).
+  generic: 'a custom-coded site',
 };
 
 export function platformName(platform: string): string {
@@ -33,11 +40,23 @@ function fence(md: string, label: 'Incorrect' | 'Correct') {
   return m ? { language: m[1] || undefined, code: m[2]! } : null;
 }
 
+/** Every `### Label` + fenced block in the code section other than Incorrect/Correct. */
+function extraFences(md: string): NonNullable<GuideSections['extraExamples']> {
+  const out: NonNullable<GuideSections['extraExamples']> = [];
+  for (const m of md.matchAll(/^###\s*(.+?)\s*\n```(\w*)\n([\s\S]*?)\n```/gm)) {
+    const label = m[1]!.trim();
+    if (/^(incorrect|correct)$/i.test(label)) continue;
+    out.push({ label, language: m[2] || undefined, code: m[3]! });
+  }
+  return out;
+}
+
 /** Splits a guide written in the five-section template into its fields. */
 export function parseGuideSections(bodyMd: string): GuideSections {
   const code = sectionBody(bodyMd, /^## Code example/i);
   const incorrect = fence(code, 'Incorrect');
   const correct = fence(code, 'Correct');
+  const extra = extraFences(code);
   return {
     whatsWrong: sectionBody(bodyMd, /^## What's wrong/i),
     whoItAffects: sectionBody(bodyMd, /^## Who it affects/i),
@@ -51,6 +70,7 @@ export function parseGuideSections(bodyMd: string): GuideSections {
           },
         }
       : {}),
+    ...(extra.length > 0 ? { extraExamples: extra } : {}),
     howToCheck: sectionBody(bodyMd, /^## How to check/i),
   };
 }
@@ -61,6 +81,9 @@ export function composeGuideBody(title: string, platform: string, s: GuideSectio
   const code: string[] = [];
   if (s.codeExample?.incorrect) code.push(`### Incorrect\n\`\`\`${lang}\n${s.codeExample.incorrect}\n\`\`\``);
   if (s.codeExample?.correct) code.push(`### Correct\n\`\`\`${lang}\n${s.codeExample.correct}\n\`\`\``);
+  for (const x of s.extraExamples ?? []) {
+    code.push(`### ${x.label}\n\`\`\`${x.language ?? ''}\n${x.code}\n\`\`\``);
+  }
   return [
     `# ${title}`,
     `## What's wrong\n\n${s.whatsWrong}`,

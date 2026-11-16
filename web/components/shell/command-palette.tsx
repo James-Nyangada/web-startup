@@ -192,7 +192,7 @@ export function CommandPalette({
         id: "action-add-site",
         category: "Actions",
         label: "Add new site",
-        subtext: "Begin monitoring a new Shopify or WordPress store",
+        subtext: "Start monitoring a new website: a store, company site or any public site",
         action: () => {
           router.push(org ? `/${org}/sites` : "/sites");
         },

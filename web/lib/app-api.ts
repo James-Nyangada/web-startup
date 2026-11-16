@@ -1,4 +1,5 @@
 import { apiBaseUrl, apiClient } from "./api";
+import { PLATFORM_LABEL } from "./platforms";
 import type { HistoryKind, Issue, IssueStatus, SiteRow } from "./site-data";
 import type { Severity } from "./severity";
 import type { TrendPoint } from "./trend";
@@ -12,6 +13,8 @@ export interface ApiSite {
   name: string;
   rootUrl: string;
   platform: string;
+  /** Tech stack of a custom-coded site (react, nextjs, vue, html, laravel…), when known. */
+  framework?: string | null;
   clientName: string | null;
   status: "pending_verification" | "active" | "paused" | "error";
   verifiedAt: string | null;
@@ -284,19 +287,8 @@ export const IGNORE_REASON_VALUE: Record<string, string> = Object.fromEntries(
   Object.entries(IGNORE_REASON_LABEL).map(([value, label]) => [label, value]),
 );
 
-const PLATFORM_LABEL: Record<string, string> = {
-  shopify: "Shopify",
-  wordpress: "WordPress",
-  woocommerce: "WooCommerce",
-  webflow: "Webflow",
-  wix: "Wix",
-  squarespace: "Squarespace",
-  custom: "Custom",
-  unknown: "Other",
-};
-
 export function platformLabel(platform: string | null | undefined): string {
-  return PLATFORM_LABEL[platform ?? "unknown"] ?? platform ?? "Other";
+  return PLATFORM_LABEL[platform ?? "unknown"] ?? platform ?? "Not sure";
 }
 
 /* ---------- Mappers to the shapes the UI renders ---------- */

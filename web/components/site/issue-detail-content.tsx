@@ -9,6 +9,7 @@ import { getWcagUnderstandingUrl } from "@/lib/wcag";
 import { GuideRenderer } from "@/components/marketing/guide-renderer";
 import { getFixGuideByRuleAndPlatform } from "@/lib/fix-guides-data";
 import { getPlatformDeepLinks } from "@/lib/platform-deep-links";
+import { frameworkLabel, guidePlatformFor, type GuidePlatform } from "@/lib/platforms";
 import { apiClient, ApiException } from "@/lib/api";
 import { appApi, formatDayTime, type ApiMember } from "@/lib/app-api";
 import { DRAWER_TABS, type HistoryKind, type Issue } from "@/lib/site-data";
@@ -29,8 +30,9 @@ const HISTORY_ICON: Record<HistoryKind, string> = {
   eye: I.ignored,
 };
 
-const PLATFORMS = ["Shopify", "WordPress", "Generic"] as const;
+const PLATFORMS = ["Shopify", "WordPress", "Custom code"] as const;
 type Platform = (typeof PLATFORMS)[number];
+const TAB_FOR: Record<GuidePlatform, Platform> = { shopify: "Shopify", wordpress: "WordPress", custom: "Custom code" };
 type AiState = "none" | "gen" | "ready" | "reported" | "cap_reached" | "error";
 
 const AI_LANG_LABELS: Record<string, string> = {
@@ -124,6 +126,8 @@ export interface IssueNoteItem {
 export interface IssueDetailContentProps {
   issue: Issue;
   sitePlatform?: string;
+  /** The site's tech stack (sites.framework): its framework example is shown first. */
+  siteFramework?: string | null;
   siteRootUrl?: string;
   orgSlug?: string;
   rechecking: boolean;
@@ -142,6 +146,7 @@ export interface IssueDetailContentProps {
 export function IssueDetailContent({
   issue,
   sitePlatform,
+  siteFramework = null,
   siteRootUrl,
   orgSlug,
   rechecking,
@@ -157,16 +162,14 @@ export function IssueDetailContent({
   onSetDue,
 }: IssueDetailContentProps) {
   const [dTab, setDTab] = useState(0);
-  const sitePf = sitePlatform?.toLowerCase() ?? "";
-  const initialPlatform: Platform = sitePf.includes("wordpress") || sitePf.includes("woocommerce")
-    ? "WordPress"
-    : sitePf.includes("shopify")
-      ? "Shopify"
-      : "Generic";
+  // The site's own platform tab comes first and is selected (spec 4.5).
+  const initialPlatform: Platform = TAB_FOR[guidePlatformFor(sitePlatform)];
+  const platformTabs: Platform[] = [initialPlatform, ...PLATFORMS.filter((p) => p !== initialPlatform)];
   const [pf, setPf] = useState<Platform>(initialPlatform);
+  const stackName = pf === "Custom code" ? frameworkLabel(siteFramework) : null;
 
   const deepLink = getPlatformDeepLinks({
-    platform: pf !== "Generic" ? pf : sitePlatform,
+    platform: pf !== "Custom code" ? pf : sitePlatform,
     rootUrl: siteRootUrl,
     template: issue.template,
   });
@@ -201,7 +204,7 @@ export function IssueDetailContent({
     steps = issue.steps;
     code = issue.code;
     lang = "Liquid";
-  } else if (pf === "Generic") {
+  } else if (pf === "Custom code") {
     steps = [
       "Find the element using the selector in “Where it occurs”.",
       "Apply the change shown below.",
@@ -660,7 +663,7 @@ export function IssueDetailContent({
                 aria-label="Platform selection"
                 className="inline-flex self-start overflow-hidden rounded-full border border-line-strong"
               >
-                {PLATFORMS.map((p) => (
+                {platformTabs.map((p) => (
                   <button
                     key={p}
                     type="button"
@@ -724,11 +727,20 @@ export function IssueDetailContent({
             )}
 
             {(() => {
-              const matchedGuide = pf !== "Generic" ? getFixGuideByRuleAndPlatform(issue.rule, pf) : undefined;
+              const matchedGuide = getFixGuideByRuleAndPlatform(issue.rule, pf);
               if (matchedGuide) {
                 return (
                   <div className="flex flex-col gap-6 pt-2">
-                    <GuideRenderer guide={matchedGuide} isCompact={true} />
+                    {stackName && siteFramework !== "html" && (
+                      <p className="m-0 text-sm text-muted">
+                        Showing the fix for your custom-coded site ({stackName}). The plain HTML version follows.
+                      </p>
+                    )}
+                    <GuideRenderer
+                      guide={matchedGuide}
+                      isCompact={true}
+                      stack={pf === "Custom code" ? siteFramework : null}
+                    />
                   </div>
                 );
               }
@@ -744,8 +756,8 @@ export function IssueDetailContent({
                     </ol>
                   ) : (
                     <p className="m-0 text-pretty text-sm text-muted">
-                      We don&apos;t have a specific written guide for this rule on {pf} yet. The generic fix
-                      applies to any theme, or generate an AI suggestion below.
+                      We don&apos;t have a written {pf} guide for this rule yet. The code change below
+                      applies to any site, or generate an AI suggestion below.
                     </p>
                   )}
 

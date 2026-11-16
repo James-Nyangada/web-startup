@@ -865,6 +865,7 @@ export function fakeRepos() {
       deleteMedia: vi.fn().mockResolvedValue(true),
       listMedia: vi.fn().mockResolvedValue({ items: [], total: 0 }),
       featureAdoption: vi.fn().mockResolvedValue({ totalPaying: 0, items: [] }),
+      platformBreakdown: vi.fn().mockResolvedValue([]),
       issueTrend: vi.fn().mockResolvedValue([]),
       aiSuggestionTrend: vi.fn().mockResolvedValue([]),
       activationDistribution: vi.fn().mockResolvedValue([]),

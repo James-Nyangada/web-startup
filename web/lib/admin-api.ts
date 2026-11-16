@@ -29,6 +29,8 @@ export interface StaffOrgRow {
   createdAt: string;
   siteCount: number;
   lastActivityAt: string | null;
+  /** How the org's sites are built: "shopify", "custom:nextjs", … */
+  platforms?: string[];
   mrrCents: number;
   health?: { score: number; band: "good" | "at_risk" | "poor"; reasons?: any } | null;
 }
@@ -478,7 +480,16 @@ export const staffApi = {
   confirm: (code: string) => apiClient<{ verified: boolean }>("/v1/staff/totp/confirm", json({ code })),
   verify: (code: string) => apiClient<{ verified: boolean }>("/v1/staff/totp/verify", json({ code })),
 
-  listOrgs: (params: { q?: string; plan?: string; status?: string; healthBand?: string; includeDeleted?: boolean; cursor?: string | null }) =>
+  listOrgs: (params: {
+    q?: string;
+    plan?: string;
+    status?: string;
+    healthBand?: string;
+    platform?: string;
+    framework?: string;
+    includeDeleted?: boolean;
+    cursor?: string | null;
+  }) =>
     apiFetch<Page<StaffOrgRow>>(`/v1/staff/orgs${qs({ ...params, limit: 50 })}`),
   inactiveCustomers: () => apiClient<InactiveCustomer[]>("/v1/staff/inactive-customers"),
   sendCheckIn: (orgId: string) =>
@@ -547,6 +558,8 @@ export const staffApi = {
       adoption: { totalPaying: number; items: { label: string; value: number }[] };
       issueTrend: { week: string; found: number; fixed: number }[];
       aiTrend: { week: string; generated: number; flagged: number }[];
+      /** Live sites per platform and tech stack (spec 4.7). */
+      platforms?: { platform: string; framework: string | null; sites: number; orgs: number }[];
     }>(`/v1/staff/analytics/product${qs(params)}`),
   activationDistribution: (params: { from?: string; to?: string }) =>
     apiClient<{ label: string; value: number }[]>(`/v1/staff/analytics/activation${qs(params)}`),
@@ -574,10 +587,16 @@ export const staffApi = {
     ),
   checkContent: (data: { title?: string; bodyMd?: string; excerpt?: string }) =>
     apiClient<{ warnings: { type: string; message: string; detail?: string }[] }>("/v1/staff/content/check", json(data)),
+  /** Top rules by occurrences, with the guide (if any) per platform: shopify, wordpress, custom. */
   coverage: () =>
-    apiClient<{ rules: { ruleId: string; title: string; occurrences: number; guides: Record<string, string | null> }[]; totalPublished: number }>(
-      "/v1/staff/content/coverage",
-    ),
+    apiClient<
+      {
+        ruleId: string;
+        title: string;
+        occurrences: number;
+        platforms: Record<string, { slug: string; status: string; reviewed: boolean } | null>;
+      }[]
+    >("/v1/staff/content/coverage"),
 
   /* ---------- Phase 8: Content Pages ---------- */
   listPages: () => apiClient<ContentPage[]>("/v1/staff/content/pages"),

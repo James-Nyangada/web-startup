@@ -83,7 +83,7 @@ export class AiService {
 
     // 2. Normalize and compute cache key
     const scrubbedSnippet = scrubHtmlSnippet(params.htmlSnippet || '');
-    const platform = (params.platform || 'generic').toLowerCase() as Platform;
+    const platform = (params.platform || 'custom').toLowerCase() as Platform;
     const cacheScope = aiCacheScope(platform, params.framework);
     const cacheKey = computeCacheKey(params.ruleId, cacheScope, scrubbedSnippet);
 

@@ -1,5 +1,6 @@
 "use client";
 
+import { platformWithStack } from "@/lib/platforms";
 import React, { useEffect, useState } from "react";
 import { StaffShell } from "@/components/staff/staff-shell";
 import { staffApi } from "@/lib/admin-api";
@@ -24,6 +25,7 @@ export default function ProductUsagePage() {
   const [featureAdoption, setFeatureAdoption] = useState<{ label: string; value: number }[]>([]);
   const [totalPaying, setTotalPaying] = useState(0);
   const [aiSuggestions, setAiSuggestions] = useState<Series>([]);
+  const [platformMix, setPlatformMix] = useState<{ label: string; value: number; orgs: number }[]>([]);
   const [error, setError] = useState<string | null>(null);
 
   const loadProductMetrics = async () => {
@@ -50,6 +52,13 @@ export default function ProductUsagePage() {
       setFeatureAdoption(insights.adoption.items);
       setTotalPaying(insights.adoption.totalPaying);
       setAiSuggestions(insights.aiTrend.map((w) => ({ label: w.week, value: w.generated, secondaryValue: w.flagged })));
+      setPlatformMix(
+        (insights.platforms ?? []).map((p) => ({
+          label: platformWithStack(p.platform, p.framework),
+          value: p.sites,
+          orgs: p.orgs,
+        })),
+      );
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not load product usage.");
     } finally {
@@ -164,6 +173,25 @@ export default function ProductUsagePage() {
             />
           </AccessibleChart>
         </div>
+
+        {/* Platform and tech stack mix (spec 4.7) */}
+        <AccessibleChart
+          findingTitle={
+            platformMix.length
+              ? `Sites by platform: ${platformMix[0]!.label} leads with ${platformMix[0]!.value.toLocaleString()} site${platformMix[0]!.value === 1 ? "" : "s"}`
+              : "No sites yet"
+          }
+          summaryText="Live customer sites grouped by platform, with the tech stack for custom-coded sites. Not limited to the date range."
+          tableHeaders={["Platform", "Sites", "Organisations"]}
+          tableRows={platformMix.map((p) => [p.label, p.value, p.orgs])}
+        >
+          <BarChart
+            data={platformMix.map(({ label, value }) => ({ label, value }))}
+            horizontal
+            valueFormatter={(v) => `${v.toLocaleString()} sites`}
+            ariaLabel="Sites by platform and tech stack"
+          />
+        </AccessibleChart>
       </div>
     </StaffShell>
   );

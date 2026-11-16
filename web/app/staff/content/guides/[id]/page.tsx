@@ -20,7 +20,7 @@ export default function GuideEditorPage() {
     title: "",
     slug: "",
     excerpt: "",
-    platform: (searchParams.get("platform") as any) || "generic",
+    platform: (searchParams.get("platform") as any) || "custom",
     ruleId: searchParams.get("ruleId") || "",
     status: "draft",
     sections: {
@@ -219,13 +219,13 @@ export default function GuideEditorPage() {
                 </label>
                 <select
                   id="guide-platform"
-                  value={post.platform || "generic"}
+                  value={post.platform === "generic" ? "custom" : post.platform || "custom"}
                   onChange={(e) => setPost((p) => ({ ...p, platform: e.target.value }))}
                   className={input}
                 >
                   <option value="shopify">Shopify (Liquid / Theme Editor)</option>
                   <option value="wordpress">WordPress (Gutenberg / Classic)</option>
-                  <option value="generic">Generic (HTML / CSS / React)</option>
+                  <option value="custom">Custom code (HTML / CSS / React / Vue)</option>
                 </select>
               </div>
             </div>

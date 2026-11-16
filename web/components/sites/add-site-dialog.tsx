@@ -6,6 +6,26 @@ import { useToast } from "@/components/shell/toast-context";
 import { useFocusTrap } from "@/components/use-focus-trap";
 import { apiClient, ApiException } from "@/lib/api";
 import { appApi, type ApiSite } from "@/lib/app-api";
+import {
+  frameworkLabel,
+  isCustomPlatform,
+  PLATFORM_LABEL,
+  PLATFORM_OPTIONS,
+  TECH_STACK_OPTIONS,
+  techStackOption,
+} from "@/lib/platforms";
+
+/** "Looks like a custom-coded site built with Next.js" — detection is a suggestion (spec 4.3). */
+export function describeDetection(platform: string, framework?: string | null): string {
+  if (platform === "unknown") return "We couldn't tell how this site is built. Choose below, or leave it as Not sure.";
+  if (platform === "custom") {
+    const stack = framework && framework !== "html" ? frameworkLabel(framework) : null;
+    return stack
+      ? `Looks like a custom-coded site built with ${stack}. You can change this.`
+      : "Looks like a custom-coded site. You can change this.";
+  }
+  return `Looks like ${PLATFORM_LABEL[platform] ?? platform}. You can change this.`;
+}
 
 export function AddSiteDialog({
   open,
@@ -24,6 +44,7 @@ export function AddSiteDialog({
   const [url, setUrl] = useState("");
   const [name, setName] = useState("");
   const [platform, setPlatform] = useState<string>("unknown");
+  const [framework, setFramework] = useState<string>("");
   const [clientName, setClientName] = useState("");
   const [detecting, setDetecting] = useState(false);
   const [detectedEvidence, setDetectedEvidence] = useState<string | null>(null);
@@ -38,6 +59,7 @@ export function AddSiteDialog({
       setUrl("");
       setName("");
       setPlatform("unknown");
+      setFramework("");
       setClientName("");
       setDetectedEvidence(null);
       setError(null);
@@ -65,7 +87,7 @@ export function AddSiteDialog({
         const host = parsed.hostname.replace(/^www\./i, "");
         const parts = host.split(".")[0];
         const formatted = parts.charAt(0).toUpperCase() + parts.slice(1);
-        setName(`${formatted} Store`);
+        setName(formatted);
       }
 
       // Trigger platform detection
@@ -73,19 +95,16 @@ export function AddSiteDialog({
       setDetectedEvidence(null);
 
       try {
-        const detected = await apiClient<{ platform: string }>("/v1/sites/detect-platform", {
-          method: "POST",
-          body: JSON.stringify({ url: rootOrigin }),
-        });
-        setPlatform(detected.platform);
-        setDetectedEvidence(
-          detected.platform !== "unknown"
-            ? `Detected: ${detected.platform}`
-            : "Platform could not be detected automatically. Please select below.",
+        const detected = await apiClient<{ platform: string; framework?: string | null }>(
+          "/v1/sites/detect-platform",
+          { method: "POST", body: JSON.stringify({ url: rootOrigin }) },
         );
+        setPlatform(detected.platform);
+        setFramework(techStackOption(detected.framework));
+        setDetectedEvidence(describeDetection(detected.platform, detected.framework));
       } catch {
         setPlatform("unknown");
-        setDetectedEvidence("Platform could not be detected automatically. Please select below.");
+        setDetectedEvidence("We couldn't tell how this site is built. Choose below, or leave it as Not sure.");
       }
     } catch {
       setError("Please enter a valid website address.");
@@ -115,6 +134,7 @@ export function AddSiteDialog({
           name: name.trim(),
           rootUrl: /^https?:\/\//i.test(url.trim()) ? url.trim() : `https://${url.trim()}`,
           platform: platform !== "unknown" ? platform : undefined,
+          framework: isCustomPlatform(platform) && framework ? framework : undefined,
           clientName: isAgency && clientName.trim() ? clientName.trim() : undefined,
         }),
       });
@@ -156,7 +176,7 @@ export function AddSiteDialog({
               Add new website
             </h2>
             <p className="text-xs text-muted m-0 mt-0.5">
-              We&apos;ll check the homepage, detect the platform, and run an onboarding scan.
+              We&apos;ll check the home page, work out how the site is built, and run a first scan.
             </p>
           </div>
           <button
@@ -216,31 +236,56 @@ export function AddSiteDialog({
           <div className="flex flex-col gap-1.5">
             <div className="flex items-center justify-between">
               <label htmlFor="sitePlatform" className="text-sm font-medium text-ink">
-                Platform
+                How is your site built?
               </label>
               {detecting && (
-                <span className="text-xs text-primary animate-pulse">Detecting platform...</span>
+                <span className="text-xs text-primary animate-pulse">Checking your site…</span>
               )}
             </div>
             <select
               id="sitePlatform"
               value={platform}
               onChange={(e) => setPlatform(e.target.value)}
+              aria-describedby={detectedEvidence ? "sitePlatformDetected" : undefined}
               className="h-10 rounded-xl border border-line bg-surface px-3 text-sm text-ink outline-none focus:border-primary focus:ring-1 focus:ring-primary"
             >
-              <option value="shopify">Shopify</option>
-              <option value="wordpress">WordPress</option>
-              <option value="woocommerce">WooCommerce</option>
-              <option value="webflow">Webflow</option>
-              <option value="wix">Wix</option>
-              <option value="squarespace">Squarespace</option>
-              <option value="custom">Custom / Other</option>
-              <option value="unknown">Unknown</option>
+              {PLATFORM_OPTIONS.map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label}
+                </option>
+              ))}
             </select>
             {detectedEvidence && (
-              <span className="text-[11px] text-ok font-medium">{detectedEvidence}</span>
+              <span id="sitePlatformDetected" className="text-[11px] text-muted font-medium">
+                {detectedEvidence}
+              </span>
             )}
           </div>
+
+          {platform === "custom" && (
+            <div className="flex flex-col gap-1.5">
+              <label htmlFor="siteStack" className="text-sm font-medium text-ink">
+                Which technology? <span className="text-xs text-muted font-normal">(optional)</span>
+              </label>
+              <select
+                id="siteStack"
+                value={framework}
+                onChange={(e) => setFramework(e.target.value)}
+                aria-describedby="siteStackHelp"
+                className="h-10 rounded-xl border border-line bg-surface px-3 text-sm text-ink outline-none focus:border-primary focus:ring-1 focus:ring-primary"
+              >
+                <option value="">Skip</option>
+                {TECH_STACK_OPTIONS.map((o) => (
+                  <option key={o.value} value={o.value}>
+                    {o.label}
+                  </option>
+                ))}
+              </select>
+              <span id="siteStackHelp" className="text-[11px] text-muted">
+                This lets us show code examples in your framework. Not sure? Skip it.
+              </span>
+            </div>
+          )}
 
           {isAgency && (
             <div className="flex flex-col gap-1.5">

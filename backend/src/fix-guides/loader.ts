@@ -117,7 +117,8 @@ export function parseFixGuide(content: string, filePath: string): FixGuide {
   }
 
   const { data, body } = parseFrontMatter(content);
-  const slug = filename.replace(/\.md$/, '');
+  // `slug:` front matter overrides the file name (Custom code guides: /fix/custom-code/image-alt).
+  const slug = data.slug || filename.replace(/\.md$/, '');
 
   return {
     ruleId: data.rule_id || '',

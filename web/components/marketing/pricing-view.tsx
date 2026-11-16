@@ -34,7 +34,7 @@ const DEFAULT_PLANS: PlanItem[] = [
     priceMonthly: 29,
     priceAnnual: 290,
     currency: "USD",
-    who: "One store owner, 1 site",
+    who: "For one website: an online store, company site or any other public site.",
     maxSites: 1,
     maxPagesPerScan: 250,
     scheduledFrequency: "Weekly",
@@ -57,7 +57,7 @@ const DEFAULT_PLANS: PlanItem[] = [
     priceAnnual: 1990,
     currency: "USD",
     tag: "Most popular for agencies",
-    who: "Up to 25 client sites",
+    who: "Up to 25 client sites. Any platform, including custom-coded client sites.",
     maxSites: 25,
     maxPagesPerScan: 250,
     scheduledFrequency: "Weekly (5 daily)",
@@ -68,7 +68,7 @@ const DEFAULT_PLANS: PlanItem[] = [
     priceMonthly: 399,
     priceAnnual: 3990,
     currency: "USD",
-    who: "Up to 75 sites, custom domain & API",
+    who: "Up to 75 sites, custom domain & API. Any platform, including custom-coded client sites.",
     maxSites: 75,
     maxPagesPerScan: 500,
     scheduledFrequency: "Daily",
@@ -151,10 +151,10 @@ export function PricingView({ copy, faqs }: { copy: PricingCopy | null; faqs: { 
               Simple, Transparent Pricing
             </span>
             <h1 id="pricing-hero-h" className="m-0 font-serif text-[44px] leading-[48px] font-normal sm:text-[60px] sm:leading-[64px]">
-              Predictable plans for <em>stores and agencies</em>
+              Predictable plans for <em>stores, sites and agencies</em>
             </h1>
             <p className="m-0 text-lg text-muted max-w-[600px]">
-              Every plan includes weekly WCAG 2.2 Level AA scanning, template grouping, and plain-English fix guides. Start with a 14-day free trial.
+              For any website, built especially for online stores. Every plan includes weekly WCAG 2.2 Level AA checks, page-type grouping, and plain-English fix guides for Shopify, WordPress or your own code. Start with a 14-day free trial.
             </p>
 
             {/* Billing cycle radio toggle */}
@@ -485,7 +485,7 @@ export function PricingView({ copy, faqs }: { copy: PricingCopy | null; faqs: { 
               Start with a <em>14-day free trial</em>
             </h2>
             <p className="m-0 text-lg text-muted">
-              Audit your first storefront in under 3 minutes. Zero commitments, no credit card required.
+              Check your first site in under 3 minutes. Zero commitments, no credit card required.
             </p>
             <Link
               href="/sign-up"

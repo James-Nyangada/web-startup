@@ -26,7 +26,8 @@ for f in files:
             k, v = line.split(':', 1)
             meta[k.strip()] = v.strip().strip('"\'')
 
-    slug = f.replace('.md', '')
+    # `slug:` front matter overrides the file name (Custom code guides: /fix/custom-code/image-alt).
+    slug = meta.get('slug') or f.replace('.md', '')
 
     def extract_sec(title_pat):
         m = re.search(r'## ' + title_pat + r'\n\n(.*?)(?=\n## |\Z)', body, re.DOTALL)
@@ -53,10 +54,13 @@ for f in files:
         'bodyMd': body
     })
 
-ts_header = """// Auto-generated from packages/fix-guides/guides
+ts_header = """// Auto-generated from packages/fix-guides/guides by web/scripts/export-guides.py. Do not edit.
+import { guidePlatformFor, type GuidePlatform } from './platforms';
+
 export interface FixGuideItem {
   ruleId: string;
-  platform: 'shopify' | 'wordpress';
+  /** `custom` = Custom code guides, served at /fix/custom-code/... (docs/adr/0001). */
+  platform: GuidePlatform;
   slug: string;
   title: string;
   summary: string;
@@ -81,18 +85,17 @@ export function getFixGuideBySlug(slug: string): FixGuideItem | undefined {
   return FIX_GUIDES_DATA.find((g) => g.slug === slug);
 }
 
-export function getFixGuidesByPlatform(platform: 'shopify' | 'wordpress'): FixGuideItem[] {
+export function getFixGuidesByPlatform(platform: GuidePlatform): FixGuideItem[] {
   return FIX_GUIDES_DATA.filter((g) => g.platform === platform);
 }
 
+/** Accepts a site platform or a tab label: WooCommerce maps to WordPress, others to Custom code. */
 export function getFixGuideByRuleAndPlatform(
   ruleId: string,
   platform: string,
 ): FixGuideItem | undefined {
-  const normPlatform = platform.toLowerCase();
-  return FIX_GUIDES_DATA.find(
-    (g) => g.ruleId === ruleId && (g.platform === normPlatform || normPlatform.includes(g.platform)),
-  );
+  const target = guidePlatformFor(platform);
+  return FIX_GUIDES_DATA.find((g) => g.ruleId === ruleId && g.platform === target);
 }
 """
 

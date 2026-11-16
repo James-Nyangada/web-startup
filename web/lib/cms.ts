@@ -31,6 +31,7 @@ export interface CmsPost {
     whoItAffects: string;
     howToFix: string;
     codeExample?: { incorrect?: string; correct?: string; language?: string };
+    extraExamples?: { label: string; language?: string; code: string }[];
     howToCheck: string;
   } | null;
   reviewedAt: string | null;

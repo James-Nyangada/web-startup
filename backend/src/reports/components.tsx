@@ -2,6 +2,7 @@ import { scoreBand } from '../scanner/results/score.js';
 import { RULE_CATALOG, ruleInfo, type Impact } from '../scanner/rules/catalog.js';
 import type { FoundIssue } from '../scanner/results/issues.js';
 import type { ScanResult } from '../scanner/scan.js';
+import { platformWithStack } from '../shared/platforms.js';
 
 export const IMPACTS: Impact[] = ['critical', 'serious', 'moderate', 'minor'];
 
@@ -315,6 +316,9 @@ export function Methodology({ scan }: { scan: ScanResult }) {
         same element of the same page type are counted once. The robots.txt rules of the site were
         respected.
       </p>
+      {scan.platform && scan.platform !== 'unknown' && (
+        <p className="small">Platform: {platformWithStack(scan.platform, scan.framework)}</p>
+      )}
     </section>
   );
 }

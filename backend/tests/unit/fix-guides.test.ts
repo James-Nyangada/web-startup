@@ -6,37 +6,62 @@ import {
   validateFixGuideContent,
   REQUIRED_SECTIONS,
 } from '../../src/fix-guides/loader.js';
+import { composeGuideBody, parseGuideSections } from '../../src/lib/guide-markdown.js';
 
-describe('Fix Guide Pipeline and First 50 Guides (Chunk P3-05)', () => {
+describe('Fix Guide Pipeline: 25 rules × Shopify, WordPress, Custom code (P3-05)', () => {
   const guides = loadAllFixGuides();
 
-  it('loads exactly 50 guides across 25 rules and 2 platforms', () => {
-    expect(guides).toHaveLength(50);
+  it('loads 75 guides: the same 25 rules for Shopify, WordPress and Custom code', () => {
+    expect(guides).toHaveLength(75);
 
-    const shopifyGuides = guides.filter((g) => g.platform === 'shopify');
-    const wpGuides = guides.filter((g) => g.platform === 'wordpress');
-
-    expect(shopifyGuides).toHaveLength(25);
-    expect(wpGuides).toHaveLength(25);
-
-    // Verify all unique rule IDs across both platforms
-    const shopifyRules = new Set(shopifyGuides.map((g) => g.ruleId));
-    const wpRules = new Set(wpGuides.map((g) => g.ruleId));
+    const rulesFor = (platform: string) =>
+      new Set(guides.filter((g) => g.platform === platform).map((g) => g.ruleId));
+    const shopifyRules = rulesFor('shopify');
 
     expect(shopifyRules.size).toBe(25);
-    expect(wpRules.size).toBe(25);
-    expect(shopifyRules).toEqual(wpRules);
+    expect(rulesFor('wordpress')).toEqual(shopifyRules);
+    expect(rulesFor('custom')).toEqual(shopifyRules);
+    expect(guides.filter((g) => g.platform === 'custom')).toHaveLength(25);
   });
 
   it('validates that every guide has complete front matter and valid reviewed_at timestamp', () => {
     for (const guide of guides) {
       expect(guide.ruleId, `ruleId in ${guide.slug}`).toBeTruthy();
-      expect(['shopify', 'wordpress']).toContain(guide.platform);
+      expect(['shopify', 'wordpress', 'custom']).toContain(guide.platform);
       expect(guide.title.length, `title in ${guide.slug}`).toBeGreaterThan(10);
       expect(guide.summary.length, `summary in ${guide.slug}`).toBeGreaterThan(15);
       expect(isNaN(Date.parse(guide.reviewedAt)), `reviewedAt in ${guide.slug}`).toBe(false);
-      expect(guide.slug).toBe(`${guide.platform}-${guide.ruleId}`);
+      // Custom code guides live at /fix/custom-code/<rule>, so their slug is the bare rule id.
+      expect(guide.slug).toBe(
+        guide.platform === 'custom' ? guide.ruleId : `${guide.platform}-${guide.ruleId}`,
+      );
     }
+    expect(new Set(guides.map((g) => g.slug)).size).toBe(guides.length);
+  });
+
+  it('gives every Custom code guide the fix in HTML plus React and Vue examples', () => {
+    for (const guide of guides.filter((g) => g.platform === 'custom')) {
+      const sections = parseGuideSections(guide.bodyMd);
+      expect(sections.codeExample?.language, guide.slug).toBe('html');
+      expect(sections.codeExample?.correct, guide.slug).toBeTruthy();
+      const labels = (sections.extraExamples ?? []).map((x) => x.label);
+      expect(labels, guide.slug).toContain('React / Next.js (JSX)');
+      expect(labels, guide.slug).toContain('Vue');
+      expect(sections.howToCheck, guide.slug).toMatch(/EveryVisitor/);
+    }
+  });
+
+  it('keeps framework examples when a guide is split into sections and rebuilt', () => {
+    const guide = getFixGuide('custom', 'color-contrast')!;
+    const sections = parseGuideSections(guide.bodyMd);
+    expect(sections.extraExamples?.map((x) => x.label)).toEqual([
+      'CSS',
+      'React / Next.js (JSX)',
+      'Vue',
+    ]);
+    const rebuilt = composeGuideBody(guide.title, 'custom', sections);
+    expect(rebuilt).toContain('## How to fix on a custom-coded site');
+    expect(parseGuideSections(rebuilt)).toEqual(sections);
   });
 
   it('validates that every guide has all 5 required markdown sections', () => {

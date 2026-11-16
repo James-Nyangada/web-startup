@@ -38,10 +38,17 @@ const aiRequestBodySchema = z
   .object({ platform: z.string().optional(), cacheKey: z.string().optional() })
   .catch({});
 
+/**
+ * The platform tab the user picked in the fix panel, as a stored platform value. The panel
+ * sends its labels ("Shopify", "WordPress", "Custom code"); `generic` is the legacy name.
+ * Empty means "use the site's own platform".
+ */
 function requestedPlatform(req: Request): string {
   const body = aiRequestBodySchema.parse(req.body);
   const query = typeof req.query.platform === 'string' ? req.query.platform : '';
-  return (body.platform || query).toLowerCase();
+  const raw = (body.platform || query).trim().toLowerCase();
+  if (!raw) return '';
+  return raw === 'custom code' || raw === 'generic' ? 'custom' : raw;
 }
 
 const issuesQuerySchema = z.object({
@@ -1331,7 +1338,8 @@ export function orgIssuesRouter(repos: Repositories, options?: IssuesRouterOptio
       const site = await repos.sites.findById(req.orgId!, issue.siteId);
       if (site) {
         if (!platform && site.platform) platform = site.platform;
-        if (isCustomPlatform(site.platform)) {
+        // The stack only matters when the fix is shown as code for a custom-coded site.
+        if (isCustomPlatform(site.platform) && isCustomPlatform(platform)) {
           framework = site.framework ?? null;
           // Sites added before framework detection (or whose first probe failed) are
           // detected on demand once, then remembered on the site.
@@ -1346,7 +1354,7 @@ export function orgIssuesRouter(repos: Repositories, options?: IssuesRouterOptio
       }
     }
     if (!platform) {
-      platform = 'generic';
+      platform = 'custom';
     }
 
     try {
@@ -1421,9 +1429,11 @@ export function orgIssuesRouter(repos: Repositories, options?: IssuesRouterOptio
       if (issue.siteId) {
         const site = await repos.sites.findById(req.orgId!, issue.siteId);
         if (!platform && site?.platform) platform = site.platform;
-        if (site && isCustomPlatform(site.platform)) framework = site.framework ?? null;
+        if (site && isCustomPlatform(site.platform) && isCustomPlatform(platform)) {
+          framework = site.framework ?? null;
+        }
       }
-      platform = platform || 'generic';
+      platform = platform || 'custom';
       const scrubbed = scrubHtmlSnippet(issue.htmlSnippet || '');
       cacheKey = computeCacheKey(issue.ruleId, aiCacheScope(platform, framework), scrubbed);
     }

@@ -413,6 +413,12 @@ export async function handleReportRender(
         throw new Error(`Scan results for ${scan.id} are no longer stored.`);
       }
       const scanResult = JSON.parse(rawBuffer.toString('utf-8')) as ScanResult;
+      // The platform the user confirmed on the site beats what the scan detected.
+      const reportSite = report.siteId ? await ctx.repos.sites.findRawById(report.siteId) : null;
+      if (reportSite) {
+        scanResult.platform = reportSite.platform;
+        scanResult.framework = reportSite.framework ?? null;
+      }
 
       const reportType = report.type === 'scan_summary' ? 'summary' : 'full';
 

@@ -68,6 +68,8 @@ export interface ScanResult {
   standard: Standard;
   rootUrl: string;
   platform: Platform;
+  /** The site's tech stack when custom-coded; added from the site record when a report is printed. */
+  framework?: string | null;
   status: 'completed' | 'partial' | 'failed';
   startedAt: string;
   finishedAt: string;

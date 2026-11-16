@@ -38,6 +38,24 @@ describe('detectFramework', () => {
       'laravel',
     );
     expect(detect('<form><input name="csrfmiddlewaretoken"></form>').framework).toBe('django');
+    expect(detect('<html></html>', { 'set-cookie': 'csrftoken=abc; Path=/' }).framework).toBe(
+      'django',
+    );
+    expect(detect('<html></html>', { 'x-powered-by': 'ASP.NET' }).framework).toBe('aspnet');
+    expect(detect('<meta name="csrf-param" content="authenticity_token">').framework).toBe('rails');
+  });
+
+  it('detects Laravel under a renamed session cookie, Inertia and Statamic', () => {
+    // A Laravel + Inertia + Vue site: the back-end wins over the Vue markers it renders.
+    const vueHtml = '<div data-server-rendered="true" id="app"></div>';
+    expect(
+      detect(vueHtml, { 'set-cookie': 'laracasts_session=eyJpdiI6Ink3NGh; path=/; httponly' })
+        .framework,
+    ).toBe('laravel');
+    expect(detect(vueHtml, { vary: 'X-Inertia, Accept-Encoding' }).framework).toBe('laravel');
+    expect(detect('<html></html>', { 'x-powered-by': 'Statamic' }).framework).toBe('laravel');
+    // Any other `_session` cookie is not enough on its own.
+    expect(detect('<html></html>', { 'set-cookie': 'app_session=abc123' }).framework).toBe('html');
     expect(detect('<html></html>', { 'x-aspnet-version': '4.0' }).framework).toBe('aspnet');
     expect(detect('<html></html>', { 'x-powered-by': 'PHP/8.2' }).framework).toBe('php');
   });

@@ -96,6 +96,10 @@ export interface StaffOrgFilters {
   billingStatus?: BillingStatus;
   includeDeleted?: boolean;
   healthBand?: HealthBand;
+  /** Orgs with at least one live site on this platform (shopify, custom, …). */
+  platform?: Platform;
+  /** Orgs with at least one live site on this tech stack (sites.framework: nextjs, vue, …). */
+  framework?: string;
   limit: number;
   offset: number;
 }
@@ -486,6 +490,22 @@ export function staffRepository(db: Database) {
 
     /* ---------- Organisations (P6-02 / P8-19) ---------- */
 
+    /** Live sites per platform and tech stack, for the product analytics breakdown (spec 4.7). */
+    async platformBreakdown() {
+      return db
+        .select({
+          platform: sites.platform,
+          framework: sites.framework,
+          sites: sql<number>`count(*)::int`,
+          orgs: sql<number>`count(distinct ${sites.orgId})::int`,
+        })
+        .from(sites)
+        .innerJoin(organizations, eq(organizations.id, sites.orgId))
+        .where(and(isNull(sites.deletedAt), isNull(organizations.deletedAt)))
+        .groupBy(sites.platform, sites.framework)
+        .orderBy(desc(sql`count(*)`));
+    },
+
     async listOrgs(filters: StaffOrgFilters) {
       const conditions: SQL[] = [];
       if (!filters.includeDeleted) conditions.push(isNull(organizations.deletedAt));
@@ -493,6 +513,12 @@ export function staffRepository(db: Database) {
       if (filters.billingStatus)
         conditions.push(eq(organizations.billingStatus, filters.billingStatus));
       if (filters.healthBand) conditions.push(eq(orgHealth.band, filters.healthBand));
+      if (filters.platform || filters.framework) {
+        conditions.push(sql`exists (select 1 from ${sites} s where s.org_id = ${organizations.id}
+          and s.deleted_at is null
+          ${filters.platform ? sql`and s.platform = ${filters.platform}` : sql``}
+          ${filters.framework ? sql`and s.framework = ${filters.framework}` : sql``})`);
+      }
       if (filters.q) {
         const pattern = `%${filters.q.replace(/[%_\\]/g, '\\$&')}%`;
         conditions.push(
@@ -520,6 +546,10 @@ export function staffRepository(db: Database) {
           createdAt: organizations.createdAt,
           siteCount,
           lastActivityAt: lastActivity,
+          // e.g. ["shopify", "custom:nextjs"]: how this customer's sites are built (spec 4.7).
+          platforms: sql<string[]>`coalesce((select array_agg(distinct case when s.framework is not null
+              and s.platform in ('custom', 'unknown') then s.platform || ':' || s.framework else s.platform end)
+            from ${sites} s where s.org_id = ${organizations.id} and s.deleted_at is null), '{}')`,
           subscription: {
             plan: subscriptions.plan,
             interval: subscriptions.interval,
@@ -1910,7 +1940,7 @@ export function staffRepository(db: Database) {
         platforms: {
           shopify: guideMap.get(`${r.ruleId}:shopify`) ?? null,
           wordpress: guideMap.get(`${r.ruleId}:wordpress`) ?? null,
-          generic: guideMap.get(`${r.ruleId}:generic`) ?? null,
+          custom: guideMap.get(`${r.ruleId}:custom`) ?? guideMap.get(`${r.ruleId}:generic`) ?? null,
         },
       }));
     },

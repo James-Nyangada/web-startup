@@ -1,5 +1,5 @@
 import { getPage } from "@/lib/cms";
-import { COMPARE, FACTS, FAQ, HOW } from "@/lib/home-data";
+import { COMPARE, FACTS, FAQ, HOW, PLATFORM_FAQ } from "@/lib/home-data";
 
 /** What the home page shows: CMS sections where published, the built-in text elsewhere. */
 export interface HomeContent {
@@ -22,10 +22,14 @@ interface FaqData { items: { question: string; answerMd: string; order: number; 
 export async function loadFaq(page: "home" | "pricing"): Promise<{ q: string; a: string }[] | null> {
   const faq = await getPage<FaqData>("home.faq");
   if (!faq) return null;
-  return [...faq.data.items]
+  const items = [...faq.data.items]
     .filter((i) => i.pages.includes(page))
     .sort((a, b) => a.order - b.order)
     .map((i) => ({ q: i.question, a: i.answerMd }));
+  // The "works on any website" questions (spec 3.4) appear on both pages even when the CMS
+  // list predates them. Once staff add them to the CMS list, the CMS wording is used instead.
+  const asked = new Set(items.map((i) => i.q.trim().toLowerCase()));
+  return [...items, ...PLATFORM_FAQ.filter((f) => !asked.has(f.q.toLowerCase()))];
 }
 
 export async function loadHomeContent(): Promise<HomeContent> {

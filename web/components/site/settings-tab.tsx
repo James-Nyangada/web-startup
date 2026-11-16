@@ -1,5 +1,6 @@
 "use client";
 
+import { isCustomPlatform, PLATFORM_OPTIONS, TECH_STACK_OPTIONS, techStackOption } from "@/lib/platforms";
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import { Icon, I } from "@/components/icons";
 import { apiClient } from "@/lib/api";
@@ -10,6 +11,8 @@ export interface SiteSettingsData {
   rootUrl: string;
   clientName?: string | null;
   platform?: string;
+  /** Tech stack of a custom-coded site (sites.framework). */
+  framework?: string | null;
   scanFrequency?: string;
   scanDay?: number;
   scanHour?: number;
@@ -31,14 +34,7 @@ export interface SettingsTabProps {
   onSiteDeleted?: () => void;
 }
 
-const PLATFORMS_LIST = [
-  { value: "shopify", label: "Shopify" },
-  { value: "woocommerce", label: "WooCommerce" },
-  { value: "magento", label: "Magento / Adobe Commerce" },
-  { value: "bigcommerce", label: "BigCommerce" },
-  { value: "custom", label: "Custom / In-house" },
-  { value: "unknown", label: "Unknown / Other" },
-];
+const PLATFORMS_LIST = PLATFORM_OPTIONS;
 
 const FREQUENCIES = [
   { value: "daily", label: "Daily (7 days a week)" },
@@ -75,6 +71,7 @@ export function SettingsTab({
       rootUrl: initialSite?.rootUrl || "",
       clientName: initialSite?.clientName || "",
       platform: initialSite?.platform || "unknown",
+      framework: techStackOption(initialSite?.framework),
       scanFrequency: initialSite?.scanFrequency || "weekly",
       scanDay: initialSite?.scanDay ?? 1,
       scanHour: initialSite?.scanHour ?? 2,
@@ -90,7 +87,8 @@ export function SettingsTab({
   // Section 1: General
   const [name, setName] = useState(baseline.name);
   const [clientName, setClientName] = useState(baseline.clientName || "");
-  const [platform, setPlatform] = useState(baseline.platform || "shopify");
+  const [platform, setPlatform] = useState(baseline.platform || "unknown");
+  const [framework, setFramework] = useState(baseline.framework || "");
   const [savingGeneral, setSavingGeneral] = useState(false);
 
   // Section 2: Monitoring
@@ -130,7 +128,8 @@ export function SettingsTab({
   const generalDirty =
     name !== baseline.name ||
     clientName !== (baseline.clientName || "") ||
-    platform !== baseline.platform;
+    platform !== baseline.platform ||
+    framework !== (baseline.framework || "");
 
   const monitoringDirty =
     scanFrequency !== baseline.scanFrequency ||
@@ -208,10 +207,11 @@ export function SettingsTab({
             name,
             clientName: clientName || null,
             platform,
+            framework: isCustomPlatform(platform) ? framework || null : null,
           }),
         });
       }
-      onSiteUpdated?.({ name, clientName, platform });
+      onSiteUpdated?.({ name, clientName, platform, framework });
       onToast?.("General settings updated successfully.");
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Failed to update general settings";
@@ -417,7 +417,7 @@ export function SettingsTab({
 
             <div className="flex flex-col gap-1.5 sm:col-span-2">
               <label htmlFor="platform-select" className="text-xs font-semibold text-ink uppercase tracking-wider">
-                CMS / eCommerce Platform
+                How is your site built?
               </label>
               <select
                 id="platform-select"
@@ -432,9 +432,34 @@ export function SettingsTab({
                 ))}
               </select>
               <span className="text-xs text-muted">
-                Platform detection helps tailor remediation snippets and theme-level guidelines.
+                We use this to show fix guides for your platform. Detection is only a suggestion; change it if it&apos;s wrong.
               </span>
             </div>
+
+            {platform === "custom" && (
+              <div className="flex flex-col gap-1.5 sm:col-span-2">
+                <label htmlFor="stack-select" className="text-xs font-semibold text-ink uppercase tracking-wider">
+                  Which technology? <span className="normal-case font-normal text-muted">(optional)</span>
+                </label>
+                <select
+                  id="stack-select"
+                  value={framework}
+                  onChange={(e) => setFramework(e.target.value)}
+                  aria-describedby="stack-help"
+                  className="h-10 rounded-lg border border-line-strong bg-surface px-3 text-sm text-ink focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                >
+                  <option value="">Not set</option>
+                  {TECH_STACK_OPTIONS.map((o) => (
+                    <option key={o.value} value={o.value}>
+                      {o.label}
+                    </option>
+                  ))}
+                </select>
+                <span id="stack-help" className="text-xs text-muted">
+                  This lets us show code examples in your framework. Not sure? Leave it empty.
+                </span>
+              </div>
+            )}
           </div>
 
           <div className="flex justify-end pt-2">

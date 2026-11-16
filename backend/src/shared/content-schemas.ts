@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { guideUrlSegment } from './platforms.js';
 
 export const homeHeroSchema = z.object({
   headline: z.string().trim().min(1).max(150),
@@ -115,7 +116,8 @@ export function validatePageContent(pageKey: string, data: unknown) {
 
 /**
  * The 301 to create when a post's slug changes after it has gone live (staff spec 3.2), so old
- * links keep working. Blog posts live at /blog/<slug>, guides at /fix/<platform>/<slug>.
+ * links keep working. Blog posts live at /blog/<slug>, guides at /fix/<platform>/<slug>
+ * (`/fix/custom-code/<slug>` for Custom code guides).
  */
 export function slugChangeRedirect(
   current: { type: string; platform?: string | null; slug: string; status: string },
@@ -123,6 +125,6 @@ export function slugChangeRedirect(
 ): { from: string; to: string } | null {
   if (!next.slug || next.slug === current.slug) return null;
   if (current.status !== 'published' && next.status !== 'published') return null;
-  const prefix = current.type === 'guide' ? `/fix/${current.platform ?? 'generic'}` : '/blog';
+  const prefix = current.type === 'guide' ? `/fix/${guideUrlSegment(current.platform)}` : '/blog';
   return { from: `${prefix}/${current.slug}`, to: `${prefix}/${next.slug}` };
 }
