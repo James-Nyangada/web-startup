@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { pageMetadata } from "@/lib/seo";
 import Link from "next/link";
 import { MarketingHeader } from "@/components/marketing/marketing-header";
 import { MarketingFooter } from "@/components/marketing/marketing-footer";
@@ -6,10 +7,11 @@ import { loadBlogPosts } from "@/lib/blog-source";
 
 export const revalidate = 300;
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: "Accessibility Engineering Blog",
   description: "In-depth technical guides, WCAG 2.2 analysis, and e-commerce compliance insights from the EveryVisitor engineering team.",
-};
+  path: "/blog",
+});
 
 const H2 = "m-0 font-serif text-[42px] leading-[46px] font-normal sm:text-[56px] sm:leading-[60px]";
 

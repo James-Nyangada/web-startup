@@ -100,6 +100,7 @@ export function proxy(request: NextRequest) {
     // Signed-in pages must not be kept in the browser cache or back/forward cache.
     const res = NextResponse.next();
     res.headers.set("Cache-Control", "no-store, max-age=0, must-revalidate");
+    res.headers.set("X-Robots-Tag", "noindex, nofollow");
     return res;
   }
 

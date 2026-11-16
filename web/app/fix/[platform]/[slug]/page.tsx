@@ -6,6 +6,9 @@ import { MarketingFooter } from "@/components/marketing/marketing-footer";
 import { GuideRenderer } from "@/components/marketing/guide-renderer";
 import type { FixGuideItem } from "@/lib/fix-guides-data";
 import { loadGuide, loadGuides } from "@/lib/guide-source";
+import { ArticleJsonLd, BreadcrumbJsonLd } from "@/components/seo/json-ld";
+import { pageMetadata } from "@/lib/seo";
+import { GUIDE_PLATFORM_LABEL, guideHref, guidePlatformFromSegment, guideUrlSegment } from "@/lib/platforms";
 
 export const revalidate = 300;
 export const dynamicParams = true;
@@ -20,7 +23,7 @@ interface FixGuidePageProps {
 export async function generateStaticParams() {
   const guides = await loadGuides();
   return guides.map((g) => ({
-    platform: g.platform,
+    platform: guideUrlSegment(g.platform),
     slug: g.slug,
   }));
 }
@@ -30,31 +33,30 @@ export async function generateMetadata({ params }: FixGuidePageProps): Promise<M
   const guide = await loadGuide(slug);
 
   if (!guide) {
-    return { title: "Fix Guide Not Found | EveryVisitor" };
+    return { title: "Fix guide not found" };
   }
 
-  const platformName = guide.platform === "shopify" ? "Shopify" : "WordPress";
-  return {
+  const platformName = GUIDE_PLATFORM_LABEL[guide.platform];
+  return pageMetadata({
     title: `${guide.title} | ${platformName} Accessibility Guide`,
     description: guide.summary,
-    openGraph: {
-      title: `${guide.title} | EveryVisitor Fix Guide`,
-      description: guide.summary,
-      type: "article",
-    },
-  };
+    path: guideHref(guide),
+    type: "article",
+    modifiedTime: guide.reviewedAt,
+  });
 }
 
 export default async function FixGuideArticlePage({ params }: FixGuidePageProps) {
   const { slug, platform } = await params;
   const guide = await loadGuide(slug);
 
-  if (!guide || guide.platform !== platform) {
+  if (!guide || guide.platform !== guidePlatformFromSegment(platform)) {
     notFound();
   }
 
-  const platformName = guide.platform === "shopify" ? "Shopify" : "WordPress";
-  const relatedGuides = (await loadGuides())
+  const platformName = GUIDE_PLATFORM_LABEL[guide.platform];
+  const allGuides = await loadGuides();
+  const relatedGuides = allGuides
     .filter((g) => g.platform === guide.platform)
     .filter((g) => g.slug !== guide.slug)
     .slice(0, 3);
@@ -62,7 +64,7 @@ export default async function FixGuideArticlePage({ params }: FixGuidePageProps)
   const tocItems = [
     { id: "section-wrong", label: "What's wrong" },
     { id: "section-affects", label: "Who it affects" },
-    { id: "section-fix", label: `How to fix on ${platformName}` },
+    { id: "section-fix", label: guide.platform === "custom" ? "How to fix on a custom-coded site" : `How to fix on ${platformName}` },
     { id: "section-code", label: "Code example" },
     { id: "section-check", label: "How to check your fix" },
   ];
@@ -95,7 +97,9 @@ export default async function FixGuideArticlePage({ params }: FixGuidePageProps)
                 className={`rounded px-2.5 py-0.5 text-xs font-bold uppercase tracking-wider ${
                   guide.platform === "shopify"
                     ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400"
-                    : "bg-blue-500/10 text-blue-700 dark:text-blue-400"
+                    : guide.platform === "wordpress"
+                      ? "bg-blue-500/10 text-blue-700 dark:text-blue-400"
+                      : "bg-violet-500/10 text-violet-700 dark:text-violet-300"
                 }`}
               >
                 {platformName}
@@ -128,7 +132,7 @@ export default async function FixGuideArticlePage({ params }: FixGuidePageProps)
                   Check if your site has this issue
                 </h2>
                 <p className="m-0 text-sm leading-6 text-surface/80">
-                  Scan any public store page free against WCAG 2.2 AA in 30 seconds.
+                  Check any public page free against WCAG 2.2 AA in 30 seconds.
                 </p>
                 <div className="flex gap-4 pt-2">
                   <Link
@@ -178,7 +182,7 @@ export default async function FixGuideArticlePage({ params }: FixGuidePageProps)
                     {relatedGuides.map((rel: FixGuideItem) => (
                       <li key={rel.slug}>
                         <Link
-                          href={`/fix/${rel.platform}/${rel.slug}`}
+                          href={guideHref(rel)}
                           className="text-sm font-medium leading-5 text-ink hover:text-primary no-underline block"
                         >
                           {rel.title}
@@ -190,13 +194,27 @@ export default async function FixGuideArticlePage({ params }: FixGuidePageProps)
                     href="/fix"
                     className="text-xs font-semibold text-primary hover:text-primary-hover no-underline pt-2 border-t border-line"
                   >
-                    View all 50 guides →
+                    View all {allGuides.length} guides →
                   </Link>
                 </div>
               )}
             </aside>
           </div>
         </div>
+        <ArticleJsonLd
+          type="TechArticle"
+          title={guide.title}
+          description={guide.summary}
+          path={guideHref(guide)}
+          dateModified={guide.reviewedAt}
+        />
+        <BreadcrumbJsonLd
+          items={[
+            { name: "Home", path: "/" },
+            { name: "Fix guides", path: "/fix" },
+            { name: guide.title, path: guideHref(guide) },
+          ]}
+        />
       </main>
 
       <MarketingFooter />

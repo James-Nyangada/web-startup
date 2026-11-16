@@ -1,12 +1,14 @@
 import type { Metadata } from "next";
+import { pageMetadata } from "@/lib/seo";
 import Link from "next/link";
 import { DPA_SECTIONS, DPA_UPDATED } from "@/lib/legal/dpa";
 import { CmsLegal, loadLegalPage } from "@/components/legal/cms-legal";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: "Data Processing Agreement (DPA)",
   description: "EveryVisitor Data Processing Agreement under Article 28 of the GDPR and UK GDPR.",
-};
+  path: "/legal/dpa",
+});
 
 function BuiltDpaPage() {
   return (

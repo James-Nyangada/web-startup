@@ -1,0 +1,16 @@
+# EveryVisitor
+
+> EveryVisitor is an accessibility monitoring service for Shopify and WordPress online stores and the web agencies that build them. It scans sites against WCAG 2.2 Level AA every week, explains each problem in plain English with a platform-specific fix, and keeps a dated record of the work done. It is not an overlay: it never injects a widget into your site, and it never claims that automated testing proves legal compliance.
+
+Who it is for: small and mid-sized online stores preparing for the European Accessibility Act (EAA) or worried about ADA website claims, and agencies who want to offer accessibility as a monthly care plan across many client sites.
+
+## Key pages
+
+- [Free accessibility checker](https://everyvisitor.app/check): test one public page against WCAG 2.2 AA in about 30 seconds, no sign-up
+- [Pricing](https://everyvisitor.app/pricing): plans for single stores and agencies, 14-day free trial
+- [For agencies](https://everyvisitor.app/agencies): white-label reports, client portals, cross-site theme fixes
+- [Fix guides](https://everyvisitor.app/fix): step-by-step fixes for common accessibility problems on Shopify and WordPress
+- [Blog](https://everyvisitor.app/blog): WCAG, EAA and e-commerce accessibility articles
+- [Help centre](https://everyvisitor.app/help)
+- [API reference](https://everyvisitor.app/developers/api)
+- [EveryVisitorBot](https://everyvisitor.app/bot): how our crawler behaves and how to control it

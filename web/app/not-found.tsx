@@ -15,6 +15,9 @@ export default function NotFound() {
           <Link href="/" className={edgePrimary}>
             Go to the home page
           </Link>
+          <Link href="/check" className={edgeSecondary}>
+            Run a free accessibility check
+          </Link>
           <Link href="/help" className={edgeSecondary}>
             Visit the help centre
           </Link>

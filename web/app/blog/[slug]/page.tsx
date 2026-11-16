@@ -5,6 +5,8 @@ import { MarketingHeader } from "@/components/marketing/marketing-header";
 import { MarketingFooter } from "@/components/marketing/marketing-footer";
 import { loadBlogPost, loadBlogPosts } from "@/lib/blog-source";
 import { Markdown } from "@/components/marketing/markdown";
+import { ArticleJsonLd, BreadcrumbJsonLd } from "@/components/seo/json-ld";
+import { pageMetadata } from "@/lib/seo";
 
 export const revalidate = 300;
 export const dynamicParams = true;
@@ -23,21 +25,16 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   if (!post) {
     return { title: "Article Not Found" };
   }
-  const title = post.seoTitle || post.title;
-  const description = post.seoDescription || post.summary;
-  return {
-    title,
-    description,
-    ...(post.canonicalUrl ? { alternates: { canonical: post.canonicalUrl } } : {}),
-    ...(post.noindex ? { robots: { index: false, follow: false } } : {}),
-    openGraph: {
-      title,
-      description,
-      type: "article",
-      ...(post.dateIso ? { publishedTime: post.dateIso } : {}),
-      ...(post.ogUrl || post.coverUrl ? { images: [{ url: (post.ogUrl || post.coverUrl)! }] } : {}),
-    },
-  };
+  return pageMetadata({
+    title: post.seoTitle || post.title,
+    description: post.seoDescription || post.summary,
+    path: `/blog/${post.slug}`,
+    canonical: post.canonicalUrl || undefined,
+    noindex: post.noindex,
+    type: "article",
+    publishedTime: post.dateIso ?? undefined,
+    image: post.ogUrl || post.coverUrl || undefined,
+  });
 }
 
 export default async function BlogPostPage({ params }: PageProps) {
@@ -152,7 +149,7 @@ export default async function BlogPostPage({ params }: PageProps) {
               Test your site for accessibility regressions
             </h3>
             <p className="m-0 max-w-md text-sm text-muted">
-              Get weekly automated scans, plain-language fix guides, and dated proof of progress for Shopify and WordPress.
+              Get weekly automated checks, plain-language fix guides, and a dated record of your progress, whether your site runs on Shopify, WordPress or your own code.
             </p>
             <div className="flex flex-wrap gap-3 mt-2">
               <Link
@@ -170,6 +167,21 @@ export default async function BlogPostPage({ params }: PageProps) {
             </div>
           </section>
         </article>
+        <ArticleJsonLd
+          title={post.title}
+          description={post.summary}
+          path={`/blog/${post.slug}`}
+          datePublished={post.dateIso}
+          image={post.ogUrl || post.coverUrl}
+          authorName={post.author.name}
+        />
+        <BreadcrumbJsonLd
+          items={[
+            { name: "Home", path: "/" },
+            { name: "Blog", path: "/blog" },
+            { name: post.title, path: `/blog/${post.slug}` },
+          ]}
+        />
       </main>
 
       <MarketingFooter />

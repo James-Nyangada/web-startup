@@ -1,10 +1,12 @@
 import type { Metadata } from "next";
+import { pageMetadata } from "@/lib/seo";
 import { CmsLegal, loadLegalPage } from "@/components/legal/cms-legal";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: "Terms of Service",
   description: "Terms of Service and Customer Agreement for EveryVisitor Accessibility Monitoring.",
-};
+  path: "/legal/terms",
+});
 
 function BuiltTermsPage() {
   return (

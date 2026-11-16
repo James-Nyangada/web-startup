@@ -1,12 +1,14 @@
 import type { Metadata } from "next";
+import { pageMetadata } from "@/lib/seo";
 import Link from "next/link";
 import { HelpLayout } from "@/components/help/help-layout";
 import { HELP_ARTICLES, HELP_CATEGORIES } from "@/lib/help-articles";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: "Help centre",
   description: "How to add sites, read issues, verify ownership, invite clients, manage billing and look after your data.",
-};
+  path: "/help",
+});
 
 const statusUrl = process.env.NEXT_PUBLIC_STATUS_URL;
 

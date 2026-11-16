@@ -1,10 +1,12 @@
 import type { Metadata } from "next";
+import { pageMetadata } from "@/lib/seo";
 import { CmsLegal, loadLegalPage } from "@/components/legal/cms-legal";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: "Privacy Policy",
   description: "EveryVisitor Privacy Policy: Zero third-party cookies, privacy-by-design, and GDPR compliance.",
-};
+  path: "/legal/privacy",
+});
 
 function BuiltPrivacyPage() {
   return (

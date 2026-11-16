@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { Icon, I } from "@/components/icons";
 import { SeverityBadge, BandBadge } from "@/components/badges";
 import { Collapse } from "@/components/disclosure";
@@ -27,20 +27,21 @@ export function FreeCheckFlow({
   onCheckCreated,
 }: FreeCheckFlowProps) {
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const queryUrl = searchParams?.get("url");
 
   const [phase, setPhase] = useState<"input" | "progress" | "result">(
     initialCheckId ? "progress" : "input",
   );
-  const [url, setUrl] = useState(queryUrl || initialUrl);
+  const [url, setUrl] = useState(initialUrl);
   const [urlError, setUrlError] = useState<string | null>(null);
 
+  // ?url= prefill, read after mount rather than with useSearchParams: that hook makes the
+  // static build skip the whole form, so crawlers would only see the loading fallback.
   useEffect(() => {
+    const queryUrl = new URLSearchParams(window.location.search).get("url");
     if (queryUrl && !initialCheckId) {
       setUrl(queryUrl);
     }
-  }, [queryUrl, initialCheckId]);
+  }, [initialCheckId]);
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
   const [checkId, setCheckId] = useState<string | null>(initialCheckId || null);
 

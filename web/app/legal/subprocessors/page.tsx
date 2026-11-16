@@ -1,10 +1,12 @@
 import type { Metadata } from "next";
+import { pageMetadata } from "@/lib/seo";
 import { CmsLegal, loadLegalPage } from "@/components/legal/cms-legal";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: "Subprocessors Registry",
   description: "Official list of third-party subprocessors authorized to process data on behalf of EveryVisitor.",
-};
+  path: "/legal/subprocessors",
+});
 
 const SUBPROCESSORS = [
   {

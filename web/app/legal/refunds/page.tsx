@@ -1,10 +1,12 @@
 import type { Metadata } from "next";
+import { pageMetadata } from "@/lib/seo";
 import { CmsLegal, loadLegalPage } from "@/components/legal/cms-legal";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: "Refund Policy",
   description: "EveryVisitor Refund Policy: 14-day free trial, how refunds work for monthly and annual plans, and when we always refund.",
-};
+  path: "/legal/refunds",
+});
 
 function BuiltRefundPolicyPage() {
   return (

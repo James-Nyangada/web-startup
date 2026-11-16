@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { pageMetadata } from "@/lib/seo";
 import Link from "next/link";
 import { MarketingHeader } from "@/components/marketing/marketing-header";
 import { MarketingFooter } from "@/components/marketing/marketing-footer";
@@ -10,10 +11,11 @@ export const revalidate = 300;
 
 const TYPE_LABEL = { new: "New", improved: "Improved", fixed: "Fixed" } as const;
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: "Product Changelog",
   description: "Recent product updates, improvements, and releases for EveryVisitor.",
-};
+  path: "/changelog",
+});
 
 const H2 = "m-0 font-serif text-[42px] leading-[46px] font-normal sm:text-[56px] sm:leading-[60px]";
 

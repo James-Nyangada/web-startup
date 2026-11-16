@@ -1,13 +1,15 @@
 import type { Metadata } from "next";
+import { pageMetadata } from "@/lib/seo";
 import Link from "next/link";
 import { MarketingHeader } from "@/components/marketing/marketing-header";
 import { MarketingFooter } from "@/components/marketing/marketing-footer";
 import { CmsLegal, loadLegalPage } from "@/components/legal/cms-legal";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: "EveryVisitorBot Crawler & Scanner",
   description: "Information about EveryVisitorBot, our polite web accessibility audit crawler.",
-};
+  path: "/bot",
+});
 
 const H2 = "m-0 font-serif text-[32px] leading-[36px] font-normal sm:text-[40px] sm:leading-[44px]";
 

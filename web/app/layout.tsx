@@ -4,6 +4,8 @@ import { ThemeProvider } from "@/components/theme";
 import { ToastProvider } from "@/components/shell/toast-context";
 import { EdgeListeners } from "@/components/shell/edge-listeners";
 import { UtmCapture } from "@/components/shell/utm-capture";
+import { OrganizationJsonLd } from "@/components/seo/json-ld";
+import { SITE } from "@/lib/seo";
 import "./globals.css";
 
 const serif = Instrument_Serif({
@@ -26,41 +28,53 @@ const mono = JetBrains_Mono({
   display: "swap",
 });
 
-const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://everyvisitor.app";
-
 export const metadata: Metadata = {
-  metadataBase: new URL(baseUrl),
-  title: { default: "EveryVisitor | Accessibility monitoring for online stores", template: "%s · EveryVisitor" },
-  description:
-    "Weekly accessibility checks for Shopify and WordPress sites, plain-language fix guides, and a verifiable record of your compliance progress.",
+  metadataBase: new URL(SITE.url),
+  title: { default: SITE.defaultTitle, template: "%s · EveryVisitor" },
+  description: SITE.defaultDescription,
+  applicationName: SITE.name,
+  // No canonical here: it would be inherited by every page that doesn't set its own.
+  alternates: {
+    types: { "application/rss+xml": [{ url: "/blog/rss.xml", title: "EveryVisitor blog" }] },
+  },
+  // Search Console / Bing Webmaster tokens, if verifying by meta tag rather than DNS.
+  ...((process.env.GOOGLE_SITE_VERIFICATION || process.env.BING_SITE_VERIFICATION) && {
+    verification: {
+      ...(process.env.GOOGLE_SITE_VERIFICATION && { google: process.env.GOOGLE_SITE_VERIFICATION }),
+      ...(process.env.BING_SITE_VERIFICATION && { other: { "msvalidate.01": process.env.BING_SITE_VERIFICATION } }),
+    },
+  }),
   keywords: [
     "accessibility",
     "WCAG 2.2",
+    "website accessibility checker",
+    "WCAG checker for custom websites",
+    "accessibility checker for React sites",
+    "accessibility audit for company websites",
     "Shopify accessibility",
     "WordPress accessibility",
     "European Accessibility Act",
-    "ADA compliance",
+    "ADA accessibility",
     "accessibility monitoring",
   ],
   authors: [{ name: "EveryVisitor" }],
   openGraph: {
     type: "website",
     locale: "en_US",
-    url: baseUrl,
-    siteName: "EveryVisitor",
-    title: "EveryVisitor | Accessibility monitoring for online stores",
-    description:
-      "Weekly accessibility checks for Shopify and WordPress sites, plain-language fix guides, and a verifiable record of your compliance progress.",
+    url: SITE.url,
+    siteName: SITE.name,
+    title: SITE.defaultTitle,
+    description: SITE.defaultDescription,
   },
   twitter: {
     card: "summary_large_image",
-    title: "EveryVisitor | Accessibility monitoring for online stores",
-    description:
-      "Weekly accessibility checks for Shopify and WordPress sites, plain-language fix guides, and a verifiable record of your compliance progress.",
+    title: SITE.defaultTitle,
+    description: SITE.defaultDescription,
   },
   robots: {
     index: true,
     follow: true,
+    googleBot: { index: true, follow: true, "max-image-preview": "large", "max-snippet": -1 },
   },
 };
 
@@ -101,6 +115,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <UtmCapture />
           </ToastProvider>
         </ThemeProvider>
+        <OrganizationJsonLd />
       </body>
     </html>
   );

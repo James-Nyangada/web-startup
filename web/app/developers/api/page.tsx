@@ -1,13 +1,15 @@
 import type { Metadata } from "next";
+import { pageMetadata } from "@/lib/seo";
 import Link from "next/link";
 import { MarketingHeader } from "@/components/marketing/marketing-header";
 import { MarketingFooter } from "@/components/marketing/marketing-footer";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: "API reference",
   description:
     "EveryVisitor public REST API: read sites, scans and accessibility issues, and start scans, with an Agency Pro API key.",
-};
+  path: "/developers/api",
+});
 
 // Re-read the OpenAPI document every 5 minutes so the docs follow the API (P6-06).
 export const revalidate = 300;

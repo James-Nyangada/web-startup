@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { HelpLayout } from "@/components/help/help-layout";
 import { HELP_ARTICLES, findHelpArticle, type HelpBlock } from "@/lib/help-articles";
+import { pageMetadata } from "@/lib/seo";
 
 export function generateStaticParams() {
   return HELP_ARTICLES.map((a) => ({ slug: a.slug }));
@@ -10,7 +11,9 @@ export function generateStaticParams() {
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
   const article = findHelpArticle((await params).slug);
-  return article ? { title: `${article.title} · Help`, description: article.summary } : { title: "Help" };
+  return article
+    ? pageMetadata({ title: `${article.title} · Help`, description: article.summary, path: `/help/${article.slug}`, type: "article" })
+    : { title: "Help" };
 }
 
 function Block({ block }: { block: HelpBlock }) {
