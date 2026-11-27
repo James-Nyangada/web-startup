@@ -295,7 +295,7 @@ export function AddSiteDialog({
               <input
                 id="clientName"
                 type="text"
-                placeholder="e.g. Mark Otieno"
+                placeholder="e.g. James Edwin"
                 value={clientName}
                 onChange={(e) => setClientName(e.target.value)}
                 className="h-10 rounded-xl border border-line bg-surface px-3 text-sm text-ink outline-none focus:border-primary focus:ring-1 focus:ring-primary"

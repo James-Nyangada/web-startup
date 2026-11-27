@@ -410,7 +410,7 @@ export function SettingsTab({
                 type="text"
                 value={clientName}
                 onChange={(e) => setClientName(e.target.value)}
-                placeholder="e.g. Mark Otieno"
+                placeholder="e.g. James Edwin"
                 className="h-10 rounded-lg border border-line-strong bg-surface px-3 text-sm text-ink placeholder:text-muted/60 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
               />
             </div>

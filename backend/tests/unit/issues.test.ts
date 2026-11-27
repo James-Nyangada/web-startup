@@ -78,7 +78,7 @@ describe('Issues API (Chunk P2-12, Screen S-25, Section 7.5)', () => {
     name: 'Oakhaus Furniture',
     rootUrl: 'https://oakhaus.com',
     platform: 'shopify' as const,
-    clientName: 'Mark Otieno',
+    clientName: 'James Edwin',
     status: 'active' as const,
     verifyMethod: null,
     verifyToken: 'ps_test_token',

@@ -30,7 +30,7 @@ describe('P4-09 Client Portal (S-60, S-61)', () => {
   const clientUser = {
     id: '22222222-2222-4222-8222-222222222222',
     email: 'mark@oakhaus.com',
-    name: 'Mark Otieno',
+    name: 'James Edwin',
     emailVerifiedAt: new Date(),
     avatarUrl: null,
     timeZone: 'Europe/London',
@@ -279,7 +279,7 @@ describe('P4-09 Client Portal (S-60, S-61)', () => {
     it('returns client user info, assigned websites, and agency branding', async () => {
       const res = await request(app).get('/v1/portal/home');
       expect(res.status).toBe(200);
-      expect(res.body.data.user.name).toBe('Mark Otieno');
+      expect(res.body.data.user.name).toBe('James Edwin');
       expect(res.body.data.sites).toHaveLength(1);
 
       const site = res.body.data.sites[0];

@@ -247,7 +247,7 @@ describe('Team Members and Invitations (Chunk P2-17)', () => {
       vi.mocked(repos.users.findByEmail).mockResolvedValueOnce({
         id: memberId,
         email: 'mark@brightline.studio',
-        name: 'Mark Otieno',
+        name: 'James Edwin',
         isStaff: false,
         totpSecretEncrypted: null,
         totpEnabledAt: null,

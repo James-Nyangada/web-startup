@@ -873,7 +873,7 @@ export default function OnboardingPage() {
                     <input
                       id="client-name"
                       type="text"
-                      placeholder="e.g. Mark Otieno"
+                      placeholder="e.g. James Edwin"
                       value={state.clientName}
                       onChange={(e) => updateState({ clientName: e.target.value })}
                       style={{

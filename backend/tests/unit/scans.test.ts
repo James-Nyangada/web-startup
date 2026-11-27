@@ -78,7 +78,7 @@ describe('Scans API & Onboarding Scans (Section 7.4 & Chunk P2-05)', () => {
     rootUrl: 'https://oakhaus.com',
     platform: 'shopify' as const,
     framework: null,
-    clientName: 'Mark Otieno',
+    clientName: 'James Edwin',
     status: 'active' as const,
     verifyMethod: 'meta' as const,
     verifyToken: 'ps_test_token',

@@ -222,7 +222,7 @@ export type SiteRow = {
 };
 
 export const SITES: SiteRow[] = [
-  { name: "Oakhaus Furniture", url: "oakhaus.com", client: "Mark Otieno", platform: "Shopify", score: 78, crit: 3, ser: 4, regressions: 1, delta: "Up 6", dir: 1, last: "14 Oct", nextScan: "Tomorrow 02:00", status: "Active", verified: true, reason: "Regressed: product images" },
+  { name: "Oakhaus Furniture", url: "oakhaus.com", client: "James Edwin", platform: "Shopify", score: 78, crit: 3, ser: 4, regressions: 1, delta: "Up 6", dir: 1, last: "14 Oct", nextScan: "Tomorrow 02:00", status: "Active", verified: true, reason: "Regressed: product images" },
   { name: "Sora Skincare", url: "soraskin.co", client: "Grace Wanjiru", platform: "Shopify", score: 58, crit: 7, ser: 11, regressions: 2, delta: "Down 9", dir: -1, last: "14 Oct", nextScan: "Wed 03:00", status: "Active", verified: true, reason: "Score dropped 9 after a new app" },
   { name: "Kito Coffee", url: "kitocoffee.com", client: "Kito Ltd", platform: "WordPress", score: 64, crit: 4, ser: 8, regressions: 1, delta: "Up 2", dir: 1, last: "13 Oct", nextScan: "Thu 02:00", status: "Active", verified: true, reason: "" },
   { name: "Mwanga Solar", url: "mwangasolar.co.ke", client: "Mwanga Energy", platform: "WordPress", score: null, crit: 0, ser: 0, regressions: 0, delta: "-", dir: 0, last: "Failed 13 Oct", nextScan: "Retrying today", status: "Error", verified: false, reason: "Scan failed: site returned 503" },

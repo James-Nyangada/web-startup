@@ -85,7 +85,7 @@ describe('Sites API (Chunk P2-06 & Section 7.3)', () => {
     rootUrl: 'https://oakhaus.com',
     platform: 'shopify' as const,
     framework: null,
-    clientName: 'Mark Otieno',
+    clientName: 'James Edwin',
     status: 'active' as const,
     verifyMethod: null,
     verifyToken: 'ps_test_token',

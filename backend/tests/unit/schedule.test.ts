@@ -88,7 +88,7 @@ describe('Scheduling and Manual Scans (Chunk P2-09)', () => {
     rootUrl: 'https://oakhaus.com',
     platform: 'shopify' as const,
     framework: null,
-    clientName: 'Mark Otieno',
+    clientName: 'James Edwin',
     status: 'active' as const,
     verifyMethod: 'meta' as const,
     verifyToken: 'ps_test_token',

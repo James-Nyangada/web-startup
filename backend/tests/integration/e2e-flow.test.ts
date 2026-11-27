@@ -48,7 +48,7 @@ describe('Phase 2 End-to-End Core App Flow (Section 13.2, Chunk P2-23)', () => {
     rootUrl: 'https://oakhaus.com',
     platform: 'shopify' as const,
     framework: null,
-    clientName: 'Mark Otieno',
+    clientName: 'James Edwin',
     status: 'active' as const,
     verifyMethod: 'file' as const,
     verifyToken: 'ps_verify_tok_123',
